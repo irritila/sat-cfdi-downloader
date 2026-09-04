@@ -14,7 +14,7 @@ Decisiones actuales:
 - Plataforma: aplicacion desktop.
 - Backend remoto: fuera de alcance por ahora.
 - Operacion: multiples contribuyentes/RFC o perfiles SAT administrados por el usuario.
-- Autenticacion SAT: e.firma/CSD, certificados, llaves privadas y contrasenas manejados de forma segura en el equipo local.
+- Autenticacion SAT: e.firma, certificado, llave privada y contrasena manejados de forma segura en el equipo local. No se asume CSD para descarga masiva salvo confirmacion oficial.
 - Flujo principal: crear solicitudes de descarga masiva, consultar estado y descargar paquetes disponibles.
 - Filtros de busqueda: solo los filtros aceptados por el servicio web del SAT.
 - Persistencia: solicitudes, paquetes, XML, metadatos y logs guardados localmente.
@@ -38,9 +38,12 @@ El sistema debe permitir a un usuario unico, actuando como contador, gestionar p
 
 - [#1](docs/milestones/m1-app-desktop.md) App escritorio distribuible.
 
+## Documentos del proyecto
+
+* [Requerimientos](docs/requirements.md)
+
 ## Otras referencias
 
 * [Documentacion oficial del servicio web proporcionada por el SAT](docs/web-service.md)
-* [docs.pdf](docs.pdf)
 * https://github.com/phpcfdi/sat-ws-descarga-masiva
     - Repositorio publico que implementa la descarga masiva con php.
