@@ -1,597 +1,515 @@
 # Requerimientos - SAT CFDI Downloader
 
-Estado: borrador inicial para revision iterativa. Incluye retroalimentacion operativa contable.
+Estado: borrador simple para revision iterativa.
 
-## 1. Contexto de producto
+## 1. Contexto
 
-SAT CFDI Downloader es una aplicacion de escritorio local-first para gestionar descargas masivas de CFDI usando los servicios web del SAT.
+SAT CFDI Downloader es una aplicacion de escritorio para uso personal. El usuario sera una sola persona actuando como contador desde su propio equipo.
 
-La aplicacion esta pensada para uso personal: un unico usuario actuando como contador desde su propio equipo. No se esta disenando como SaaS, portal multiusuario, producto comercial ni herramienta para clientes ficticios o potenciales.
-
-Esta restriccion debe guiar las decisiones de alcance: si una funcionalidad solo tiene sentido para vender el producto, administrar usuarios externos, colaborar en linea o soportar organizaciones, queda fuera del alcance actual.
+La aplicacion no se esta disenando como producto comercial, SaaS, portal multiusuario ni herramienta para clientes hipoteticos. Las decisiones deben mantenerse simples y enfocadas en el uso real actual.
 
 ## 2. Objetivo
 
-Permitir que el usuario registre perfiles SAT de contribuyentes/RFC, cree solicitudes de descarga masiva de CFDI conforme a los filtros soportados por el SAT, consulte el estado de dichas solicitudes, descargue los paquetes disponibles, extraiga los XML y consulte localmente los CFDI descargados.
+Permitir crear solicitudes de descarga masiva de CFDI ante el SAT, guardar localmente la informacion de cada solicitud, monitorear su estatus en segundo plano, descargar los paquetes disponibles y consultar el detalle de cada solicitud desde una interfaz de escritorio.
 
-El objetivo operativo no es construir un ERP ni un sistema fiscal completo. La aplicacion debe ser primero un descargador confiable, trazable y seguro. Cualquier funcion posterior, como conciliacion, validacion de vigencia, exportacion avanzada o integracion contable, debe evaluarse contra el uso personal real antes de entrar al alcance.
+La aplicacion debe poder mantenerse ejecutandose en segundo plano, iniciar automaticamente con la sesion de macOS y ofrecer acceso rapido desde el menu bar de macOS.
 
-## 3. Alcance inicial
+El MVP descarga y guarda paquetes ZIP. No extrae, parsea ni indexa XML.
 
-El alcance inicial incluye:
+## 3. Alcance del MVP
 
-- Aplicacion de escritorio.
-- Operacion local en una sola computadora.
-- Un unico usuario de la aplicacion.
-- Administracion de multiples perfiles SAT de contribuyentes/RFC.
-- Almacenamiento local de credenciales SAT de forma segura.
-- Creacion de solicitudes de descarga masiva para CFDI emitidos o recibidos.
-- Captura de filtros reales soportados por el SAT, como rango de fechas, RFC contraparte, tipo de comprobante, complemento y tipo de solicitud, cuando apliquen.
-- Manejo de solicitudes de tipo CFDI/XML y metadata cuando el servicio lo soporte y se confirme su uso en el flujo MVP.
-- Particion automatica de solicitudes cuando los parametros excedan topes o rangos aceptados por el SAT.
-- Consulta manual o automatica del estado de solicitudes.
-- Descarga de paquetes cuando el SAT los deje disponibles.
-- Extraccion de XML desde paquetes descargados.
-- Persistencia local de solicitudes, paquetes, XML, metadatos y logs.
-- Consulta local basica de CFDI descargados.
-- Cola visible de solicitudes y paquetes con estado operativo.
+El MVP incluye:
 
-## 4. Fuera de alcance actual
+- Aplicacion desktop para macOS.
+- Un solo usuario local.
+- Perfiles SAT de contribuyentes/RFC.
+- Registro seguro de e.firma por perfil SAT.
+- Crear nueva solicitud de descarga masiva.
+- Guardar localmente la metadata de cada solicitud.
+- Listar solicitudes creadas.
+- Mostrar el estatus actual de cada solicitud.
+- Monitorear solicitudes en segundo plano mediante un worker local.
+- Iniciar automaticamente con la sesion de macOS, si el usuario lo habilita.
+- Mostrar un icono en el menu bar de macOS para acceso rapido.
+- Descargar paquetes cuando el SAT los deje disponibles.
+- Guardar paquetes descargados localmente.
+- Navegar al detalle de una solicitud.
+- Mostrar en el detalle los parametros enviados, respuesta SAT, estatus, paquetes y logs basicos.
+- Emitir notificaciones nativas de macOS para eventos relevantes.
 
-Queda fuera del alcance actual:
+## 4. Decisiones del MVP
+
+- Tipo de solicitud inicial: CFDI/XML. Metadata queda fuera del MVP.
+- Plataforma inicial: macOS.
+- Descarga de paquetes: automatica cuando SAT reporte paquetes disponibles.
+- Inicio automatico: deshabilitado por defecto; el usuario puede habilitarlo.
+- Cerrar ventana principal: oculta la app al menu bar de macOS y mantiene el worker activo.
+- Salir de la app: requiere accion explicita desde el icono de menu bar o comando equivalente de macOS.
+- Pausa del worker: si el usuario pausa el monitoreo, la pausa persiste entre sesiones hasta que el usuario reanude.
+- Frecuencia inicial del worker: cada 10 minutos para solicitudes pendientes.
+- Backoff inicial: si una solicitud permanece sin cambios despues de tres verificaciones consecutivas, verificarla cada 30 minutos.
+- Carpeta local por defecto: `~/SAT-CFDI-Downloader/paquetes/{rfc}/{yyyy-mm}/{solicitud_id}/`.
+- En la ruta local, `{yyyy-mm}` corresponde al mes de la fecha inicial solicitada y `{solicitud_id}` corresponde al identificador SAT de la solicitud.
+- Retencion local: el MVP no borra paquetes ZIP automaticamente.
+
+## 5. Fuera de alcance actual
+
+Queda fuera del MVP:
 
 - Backend remoto.
-- Sincronizacion en la nube.
 - Multiusuario.
-- Roles, permisos por organizacion o administracion de equipos.
-- Portal para contribuyentes externos.
-- Facturacion, pagos, licenciamiento o onboarding comercial.
-- Colaboracion entre contadores.
-- Operacion desatendida en servidor.
-- Aplicacion movil.
-- Integraciones contables externas.
-- Conciliacion avanzada.
-- Validacion fiscal exhaustiva de CFDI.
-- Consulta masiva de vigencia/cancelacion de CFDI como requisito bloqueante del MVP.
-- Exportaciones avanzadas, salvo que se definan como necesarias para el uso personal.
+- Roles y permisos.
+- Portal para terceros.
+- Dashboards contables.
+- Conciliacion.
+- Validacion de vigencia/cancelacion de CFDI.
+- Extraccion, parseo o indexacion de XML.
+- Consulta local de CFDI por campos internos del XML.
+- Solicitudes de metadata como flujo alterno.
+- Exportaciones avanzadas.
+- Integraciones con sistemas contables.
+- Timbrado o cancelacion de CFDI.
+- Procesamiento fiscal avanzado.
+- Servicio remoto o daemon multiusuario independiente de la sesion local.
 
-Nota: que la vigencia/cancelacion no sea bloqueante del MVP no significa que se ignore. Debe documentarse como limite conocido: los XML descargados no prueban por si solos que un CFDI siga vigente en una fecha posterior.
+## 6. Flujo principal
 
-## 5. Actores
+1. El usuario registra o selecciona un perfil SAT.
+2. El usuario crea una solicitud de descarga masiva con los filtros permitidos por el SAT.
+3. La aplicacion envia la solicitud al SAT.
+4. La aplicacion guarda localmente la metadata de la solicitud.
+5. La solicitud aparece en la lista con su estatus actual.
+6. El worker local consulta periodicamente el estatus de solicitudes pendientes.
+7. Cuando el SAT devuelve paquetes disponibles, la aplicacion los descarga.
+8. La lista se actualiza con el avance de cada solicitud.
+9. El usuario abre el detalle de una solicitud para revisar estatus, metadata, paquetes y logs.
 
-### Usuario
+Cuando el inicio automatico este habilitado, la aplicacion debe iniciar con la sesion de macOS y continuar el monitoreo sin requerir que el usuario abra manualmente la ventana principal.
 
-Persona que usa la aplicacion localmente y actua como contador.
+Al cerrar la ventana principal, la aplicacion debe permanecer activa en el menu bar de macOS. Para detener el worker y cerrar el proceso, el usuario debe ejecutar una accion explicita de salida.
+
+## 7. Pantallas del MVP
+
+### 7.1 Perfiles SAT
+
+Pantalla para administrar los RFC que el usuario usara para operar ante el SAT.
+
+Debe permitir:
+
+- Crear perfil SAT.
+- Editar nombre descriptivo del perfil.
+- Registrar certificado, llave privada y contrasena de e.firma.
+- Ver si el perfil esta listo para crear solicitudes.
+
+### 7.2 Solicitudes
+
+Pantalla principal de la aplicacion.
+
+Debe mostrar una lista de solicitudes masivas creadas.
+
+Columnas sugeridas:
+
+- RFC.
+- Tipo de solicitud.
+- Fecha inicial.
+- Fecha final.
+- Estatus actual.
+- Codigo SAT.
+- Mensaje SAT.
+- Numero de paquetes.
+- Fecha de creacion.
+- Ultima actualizacion.
+
+Acciones sugeridas:
+
+- Crear nueva solicitud.
+- Actualizar estatus.
+- Abrir detalle.
+- Descargar paquetes disponibles.
+- Reintentar descarga fallida.
+- Eliminar solicitud local.
+
+La accion de descargar o reintentar descarga solo aplica cuando existen paquetes pendientes, fallidos o no descargados por pausa del worker.
+
+### 7.3 Nueva solicitud
+
+Formulario para crear una solicitud de descarga masiva.
+
+Debe pedir solo datos que el servicio del SAT soporte.
+
+Campos iniciales:
+
+- Perfil SAT.
+- Tipo: emitidos o recibidos.
+- Fecha inicial.
+- Fecha final.
+- Tipo de solicitud: CFDI/XML para el MVP.
+- RFC contraparte, si aplica segun SAT.
+- Tipo de comprobante, si aplica segun SAT.
+- Complemento, si aplica segun SAT.
+
+Nota: los campos exactos deben confirmarse contra la documentacion del servicio SAT antes de implementarse.
+
+### 7.4 Detalle de solicitud
+
+Pantalla para revisar una solicitud especifica.
+
+Debe mostrar:
+
+- Perfil SAT usado.
+- Filtros enviados.
+- Identificador de solicitud SAT.
+- Estatus actual.
+- Codigo y mensaje SAT.
+- Numero de CFDI reportados por SAT, si aplica.
+- Identificadores de paquetes, si existen.
+- Estado de descarga de cada paquete.
+- Timestamps relevantes.
+- Logs basicos de la solicitud.
+- Respuesta SAT relevante para diagnostico.
+
+Acciones sugeridas:
+
+- Verificar ahora.
+- Descargar paquetes disponibles.
+- Reintentar descarga fallida.
+- Eliminar solicitud local.
+
+Eliminar una solicitud local no modifica nada en SAT. En el MVP elimina los registros locales de la aplicacion, pero no borra automaticamente paquetes ZIP ya descargados.
+
+Si una solicitud queda vencida sin haber descargado todos sus paquetes, el detalle debe mostrar un aviso visible. La aplicacion no debe recrear solicitudes por si sola; el usuario podra crear otra solicitud manualmente usando los filtros visibles.
+
+### 7.5 Icono de menu bar
+
+La aplicacion debe mostrar un icono de acceso rapido en el menu bar de macOS.
+
+Debe permitir:
+
+- Ver si el worker esta activo.
+- Abrir la ventana principal.
+- Ver un resumen simple de solicitudes pendientes o con error.
+- Pausar o reanudar el monitoreo.
+- Ejecutar una revision manual.
+- Salir de la aplicacion.
+
+Si el usuario pausa el monitoreo desde el menu bar, la pausa debe persistir aunque cierre y vuelva a abrir la aplicacion.
+
+### 7.6 Notificaciones del sistema
+
+La aplicacion debe emitir notificaciones nativas de macOS cuando:
+
+- Una solicitud pase a terminada.
+- Una descarga de paquete concluya.
+- Una solicitud pase a error, rechazada o vencida.
+
+Cuando una solicitud pase a vencida, la notificacion debe indicar que los paquetes pueden ya no estar disponibles y que podria requerirse crear una nueva solicitud.
+
+## 8. Worker local
+
+La aplicacion debe tener un worker local que corra en segundo plano mientras la aplicacion este ejecutandose. La ventana principal puede estar cerrada u oculta, pero el proceso debe seguir activo desde el icono de menu bar.
 
 Responsabilidades:
 
-- Registrar perfiles SAT de contribuyentes/RFC.
-- Proporcionar credenciales SAT validas.
-- Crear solicitudes de descarga.
-- Revisar estados y resultados.
-- Consultar los CFDI descargados.
+- Buscar solicitudes pendientes.
+- Consultar su estatus ante SAT.
+- Actualizar la base local con la respuesta.
+- Detectar paquetes disponibles.
+- Descargar paquetes pendientes.
+- Registrar errores.
+- Evitar repetir descargas ya completadas.
 
-### SAT
+El worker no debe crear solicitudes nuevas por decision propia. Solo debe continuar el monitoreo y descarga de solicitudes creadas por el usuario.
 
-Sistema externo que expone los servicios de autenticacion, solicitud, verificacion y descarga masiva.
+El worker debe iniciar automaticamente al iniciar la sesion de macOS cuando el usuario haya habilitado esa preferencia. Este comportamiento pertenece a la sesion local del usuario, no a un servicio remoto ni a un proceso compartido entre usuarios.
 
-Responsabilidades externas:
+El intervalo inicial de verificacion es de 10 minutos por solicitud pendiente. Si una solicitud no cambia despues de tres verificaciones consecutivas, el intervalo para esa solicitud sube a 30 minutos.
 
-- Autenticar mediante e.firma vigente.
-- Recibir solicitudes de descarga.
-- Procesar solicitudes de forma asincrona.
-- Devolver estados de solicitud.
-- Entregar identificadores de paquetes cuando existan.
-- Permitir la descarga de paquetes autorizados.
+Si el monitoreo esta pausado, el worker no debe consultar ni descargar hasta que el usuario lo reanude. La pausa debe guardarse localmente y sobrevivir al reinicio de la aplicacion.
 
-## 6. Supuestos y restricciones
+## 9. Estados
 
-- La aplicacion corre en el equipo propio del usuario.
-- La informacion sensible no debe depender de un servidor remoto.
-- La fuente de verdad operativa es local.
-- El servicio SAT puede fallar, tardar, rechazar solicitudes, marcar duplicados o expirar paquetes.
-- Los filtros disponibles deben limitarse a los aceptados por el web service del SAT.
-- La operacion debe distinguir emitidos y recibidos porque corresponden a solicitudes y usos contables distintos.
-- La aplicacion debe considerar dos modalidades operativas: backfill historico y corte mensual/rutinario.
-- Los CFDI pueden tardar en aparecer en servicios SAT despues de emitirse; la aplicacion debe evitar presentar una descarga reciente como cierre fiscal definitivo.
-- La zona horaria de negocio debe fijarse explicitamente a hora del centro de Mexico para evitar errores en rangos por fecha.
-- La aplicacion debe limitar frecuencia de consultas/descargas para reducir riesgo de bloqueo temporal, throttling o errores por saturacion del SAT.
-- La e.firma vencida o revocada bloquea la operacion del perfil SAT correspondiente.
-- La documentacion local actual cubre con detalle la verificacion de solicitudes; los parametros exactos para creacion y descarga deben confirmarse contra documentacion oficial completa o referencia tecnica confiable.
-- La documentacion SAT revisada indica e.firma vigente como prerrequisito. Por ahora no debe modelarse CSD como credencial de descarga masiva salvo que se confirme oficialmente.
-- Las URL incluidas en ejemplos SAT no deben asumirse como endpoints productivos; deben tomarse de la publicacion vigente del SAT.
+La aplicacion debe mostrar estados simples y entendibles.
 
-## 7. Flujos principales
+Estados sugeridos:
 
-### 7.0 Modalidades operativas
-
-La aplicacion debe reconocer al menos dos formas de trabajo:
-
-- Backfill historico: descarga de periodos anteriores, potencialmente grandes, ejecutada una o pocas veces por perfil SAT.
-- Corte mensual/rutinario: descarga recurrente de periodos recientes, con tolerancia para CFDI que aparecen tarde o solicitudes que deben reintentarse.
-
-Ambas modalidades usan el mismo flujo tecnico, pero tienen expectativas distintas de tiempo, particion, volumen y revision posterior.
-
-### 7.1 Registrar perfil SAT
-
-1. El usuario crea un perfil para un contribuyente/RFC.
-2. El usuario registra certificado, llave privada y contrasena.
-3. La aplicacion valida que los archivos tengan formato legible.
-4. La aplicacion puede probar autenticacion contra el SAT antes de marcar las credenciales como operativas.
-5. La aplicacion almacena las credenciales o referencias de forma segura.
-6. El perfil queda disponible para generar solicitudes.
-
-Resultado esperado:
-
-- Perfil SAT local registrado.
-- Credenciales protegidas localmente.
-- Evento registrado en logs.
-
-### 7.2 Crear solicitud de descarga
-
-1. El usuario selecciona un perfil SAT.
-2. El usuario elige si busca CFDI emitidos o recibidos.
-3. El usuario elige tipo de solicitud, por ejemplo CFDI/XML o metadata si el SAT lo soporta para el caso.
-4. El usuario captura filtros soportados por el servicio: rango de fechas, RFC contraparte, tipo de comprobante, complemento u otros confirmados.
-5. La aplicacion valida los filtros antes de enviar.
-6. La aplicacion parte automaticamente el trabajo en varias solicitudes SAT cuando el rango o volumen estimado exceda limites conocidos.
-7. La aplicacion autentica contra SAT.
-8. La aplicacion envia cada solicitud requerida.
-9. La aplicacion persiste el identificador de cada solicitud y respuesta inicial.
-
-Resultado esperado:
-
-- Trabajo de descarga registrado localmente.
-- Una o mas solicitudes SAT registradas localmente.
-- Estado inicial registrado.
-- Mensaje/codigo SAT persistido.
-
-### 7.3 Consultar estado de solicitud
-
-1. La aplicacion selecciona una solicitud pendiente.
-2. La aplicacion autentica o reutiliza token valido.
-3. La aplicacion llama a `VerificaSolicitudDescarga`.
-4. La aplicacion guarda `EstadoSolicitud`, `CodigoEstadoSolicitud`, `CodEstatus`, `Mensaje`, `NumeroCFDIs` e `IdsPaquetes` si existen.
-5. La UI muestra el estado actualizado.
-
-Resultado esperado:
-
-- Estado local sincronizado con la respuesta SAT.
-- Si el estado es terminado, los paquetes quedan listos para descargarse.
-- Si hay error, rechazo o vencimiento, queda visible para el usuario.
-
-### 7.4 Descargar paquetes
-
-1. La aplicacion identifica solicitudes terminadas con paquetes disponibles.
-2. La aplicacion solicita al SAT la descarga de cada paquete.
-3. La aplicacion valida la integridad del paquete segun la informacion disponible. Si el SAT no entrega hash utilizable, al menos debe validar que el archivo se pueda abrir y extraer correctamente.
-4. La aplicacion guarda el paquete en carpeta local.
-5. La aplicacion registra resultado de descarga por paquete.
-
-Resultado esperado:
-
-- Paquetes guardados localmente.
-- Estado de paquete actualizado.
-- Errores registrados con codigo, mensaje y fecha.
-
-### 7.5 Extraer XML
-
-1. La aplicacion detecta paquetes descargados no extraidos.
-2. La aplicacion extrae los XML en una carpeta local controlada.
-3. La aplicacion indexa metadatos minimos para consulta.
-4. La aplicacion registra duplicados o archivos invalidos.
-
-Resultado esperado:
-
-- XML disponibles en almacenamiento local.
-- Metadatos consultables desde la UI.
-- Relacion entre solicitud, paquete y XML preservada.
-
-### 7.6 Consultar CFDI descargados
-
-1. El usuario abre la vista de CFDI.
-2. El usuario filtra por perfil SAT, fechas y metadatos disponibles.
-3. La aplicacion consulta la base local.
-4. La aplicacion muestra resultados y permite abrir el XML local.
-5. La aplicacion indica claramente cuando no ha verificado vigencia/cancelacion actual del CFDI.
-
-Resultado esperado:
-
-- El usuario puede encontrar CFDI previamente descargados sin consultar al SAT.
-- El usuario entiende que la consulta local muestra lo descargado, no necesariamente el estatus fiscal vigente al dia de consulta.
-
-## 8. Requerimientos funcionales
-
-### RF-001 Perfil SAT
-
-La aplicacion debe permitir crear, editar, desactivar y consultar perfiles SAT de contribuyentes/RFC.
-
-### RF-002 Credenciales SAT
-
-La aplicacion debe permitir registrar certificado, llave privada y contrasena de e.firma asociados a un perfil SAT.
-
-### RF-003 Almacenamiento seguro de credenciales
-
-La aplicacion debe proteger localmente las credenciales SAT usando cifrado o almacenamiento seguro del sistema operativo.
-
-### RF-004 Validacion basica de credenciales
-
-La aplicacion debe validar que los archivos de certificado y llave privada puedan leerse antes de guardarlos como credenciales activas. Cuando sea posible, debe probar autenticacion contra SAT antes de marcar el perfil como operativo.
-
-### RF-005 Autenticacion SAT
-
-La aplicacion debe autenticarse contra el servicio SAT usando e.firma vigente y WS-Security conforme a la documentacion tecnica disponible.
-
-### RF-006 Crear solicitud
-
-La aplicacion debe permitir crear solicitudes de descarga masiva usando un perfil SAT y filtros soportados por el SAT.
-
-El formulario de solicitud debe distinguir:
-
-- CFDI emitidos o recibidos.
-- Rango de fechas.
-- RFC contraparte cuando aplique.
-- Tipo de comprobante cuando aplique: ingreso, egreso, traslado, nomina o pago.
-- Complemento cuando aplique.
-- Tipo de solicitud: CFDI/XML o metadata, sujeto a confirmacion del servicio.
-
-### RF-007 Validar filtros
-
-La aplicacion debe impedir el envio de solicitudes con filtros no soportados o incompletos para el tipo de solicitud seleccionado.
-
-Los filtros deben validarse con base en reglas documentadas del SAT, no con expectativas de busqueda local o preferencias de UI.
-
-### RF-008 Persistir solicitud
-
-La aplicacion debe persistir cada solicitud enviada con su perfil SAT, parametros, fecha de envio, identificador SAT, codigos y mensaje de respuesta.
-
-### RF-009 Consultar estado
-
-La aplicacion debe permitir consultar el estado de una solicitud mediante el servicio de verificacion del SAT.
-
-### RF-010 Worker local
-
-La aplicacion debe contar con un worker local que pueda consultar periodicamente solicitudes pendientes y actualizar su estado.
-
-### RF-011 Estados SAT
-
-La aplicacion debe representar los estados SAT documentados: aceptada, en proceso, terminada, error, rechazada y vencida.
-
-### RF-012 Paquetes disponibles
-
-Cuando una solicitud termine exitosamente, la aplicacion debe registrar los identificadores de paquetes devueltos por SAT.
-
-### RF-013 Descargar paquetes
-
-La aplicacion debe descargar paquetes disponibles y guardarlos en almacenamiento local.
-
-### RF-014 Evitar descargas duplicadas
-
-La aplicacion debe detectar paquetes ya descargados para evitar descargas repetidas innecesarias.
-
-### RF-015 Extraer XML
-
-La aplicacion debe extraer los XML contenidos en los paquetes descargados.
-
-### RF-016 Indexar metadatos minimos
-
-La aplicacion debe guardar metadatos minimos de cada XML descargado para consulta local.
-
-Metadatos minimos propuestos:
-
-- UUID.
-- RFC emisor.
-- RFC receptor.
-- Fecha de emision.
-- Tipo de comprobante.
-- Uso CFDI, si esta disponible.
-- Metodo de pago, si esta disponible.
-- Forma de pago, si esta disponible.
-- Subtotal, si esta disponible.
-- IVA u otros impuestos trasladados principales, si estan disponibles.
-- Total.
-- Moneda, si esta disponible.
-- Complementos presentes.
-- Estado local del archivo.
-- Ruta local del XML.
-- Perfil SAT asociado.
-- Solicitud y paquete origen.
-
-### RF-017 Consulta local
-
-La aplicacion debe permitir consultar CFDI descargados desde la base local.
-
-### RF-018 Logs funcionales
-
-La aplicacion debe registrar eventos relevantes: autenticacion, solicitud, verificacion, descarga, extraccion, errores y reintentos.
-
-### RF-019 Reintentos controlados
-
-La aplicacion debe reintentar operaciones temporales fallidas sin duplicar solicitudes ni descargas ya registradas.
-
-### RF-020 Manejo de codigos SAT
-
-La aplicacion debe guardar y mostrar los codigos/mensajes SAT relevantes para que el usuario entienda el resultado de cada operacion.
-
-### RF-021 Particion automatica
-
-La aplicacion debe partir automaticamente trabajos de descarga en varias solicitudes SAT cuando el rango, filtros o volumen estimado puedan exceder topes del servicio.
-
-### RF-022 Cola visible
-
-La aplicacion debe mostrar una cola operativa donde el usuario pueda ver trabajos, solicitudes y paquetes con estados entendibles.
-
-Estados internos sugeridos:
-
-- Borrador.
-- Solicitada.
+- Creada.
+- Enviada.
 - Aceptada.
 - En proceso.
 - Terminada.
 - Descargando.
 - Descargada.
-- Extrayendo.
-- Extraida.
-- Sin informacion.
 - Error.
 - Rechazada.
 - Vencida.
 
-### RF-023 Traduccion operativa de errores
+Los estados internos de la aplicacion deben conservar los codigos originales del SAT para diagnostico.
 
-La aplicacion debe traducir codigos SAT a mensajes operativos accionables, sin ocultar el codigo original.
+Estados SAT documentados para `EstadoSolicitud`:
 
-### RF-024 Integridad de paquetes
+| Valor | Estado |
+| --- | --- |
+| 1 | Aceptada |
+| 2 | En proceso |
+| 3 | Terminada |
+| 4 | Error |
+| 5 | Rechazada |
+| 6 | Vencida |
 
-La aplicacion debe validar que los paquetes descargados sean utilizables. Si el servicio proporciona hash o informacion de integridad, debe usarse; si no, la aplicacion debe validar al menos que el ZIP sea legible y que la extraccion termine correctamente.
+## 10. Datos locales
 
-### RF-025 Organizacion predecible de archivos
+La aplicacion debe guardar datos en una base local.
 
-La aplicacion debe guardar XML y paquetes en una estructura navegable sin depender de la app.
+Entidades iniciales:
 
-Estructura sugerida:
+- `PerfilSat`: RFC y datos descriptivos del contribuyente.
+- `CredencialSat`: referencia segura a certificado, llave privada y contrasena.
+- `SolicitudMasiva`: solicitud creada por el usuario y enviada al SAT.
+- `PaqueteSolicitud`: paquete reportado o descargado para una solicitud.
+- `LogSolicitud`: eventos relevantes de una solicitud.
+
+Metadata minima de `SolicitudMasiva`:
+
+- Perfil SAT.
+- RFC solicitante.
+- Tipo: emitidos o recibidos.
+- Fechas solicitadas.
+- Filtros enviados.
+- Identificador SAT de solicitud.
+- Estatus actual.
+- Codigo SAT.
+- Mensaje SAT.
+- Numero de CFDI reportados, si aplica.
+- Fecha de creacion.
+- Fecha de envio.
+- Ultima verificacion.
+- Ultimo error, si existe.
+
+Metadata minima de `PaqueteSolicitud`:
+
+- Solicitud asociada.
+- Identificador de paquete SAT.
+- Estatus de descarga.
+- Ruta local del archivo descargado.
+- Fecha de descarga.
+- Error de descarga, si existe.
+- Fecha de vencimiento estimada, si se puede inferir de la respuesta SAT o del momento en que se reporto disponible.
+
+## 11. Almacenamiento local
+
+La aplicacion debe usar almacenamiento local.
+
+Debe existir:
+
+- Base de datos local para solicitudes, perfiles, paquetes y logs.
+- Carpeta local para paquetes descargados.
+- Logs locales para diagnostico.
+
+Los paquetes se guardan por defecto en:
 
 ```text
-{base}/{rfc}/{anio}/{mes}/{emitidos|recibidos}/{uuid}.xml
+~/SAT-CFDI-Downloader/paquetes/{rfc}/{yyyy-mm}/{solicitud_id}/
 ```
 
-La estructura final debe revisarse antes de implementarse, especialmente para metadata, paquetes ZIP y solicitudes partidas.
+Donde:
 
-### RF-026 Deduplicacion por UUID
+- `{rfc}` es el RFC solicitante.
+- `{yyyy-mm}` es el mes de la fecha inicial solicitada.
+- `{solicitud_id}` es el identificador SAT de la solicitud.
 
-La aplicacion debe detectar CFDI repetidos por UUID cuando existan rangos superpuestos o paquetes duplicados.
+La carpeta de una solicitud se crea cuando la aplicacion ya conoce el identificador SAT. La ruta configurable puede agregarse desde preferencias si se decide incluirla en el MVP.
 
-### RF-027 Avisos de e.firma
+El MVP no ejecuta limpieza automatica de paquetes ZIP. El usuario administra la carpeta local; la accion de eliminar solicitud local no borra ZIPs automaticamente.
 
-La aplicacion debe detectar y mostrar vigencia de e.firma cuando pueda leerla del certificado. Debe alertar con anticipacion razonable antes de que caduque.
+## 12. Seguridad
 
-### RF-028 Limite conocido de vigencia fiscal
+La aplicacion debe tratar e.firma, llaves privadas, contrasenas, tokens SAT y paquetes descargados como informacion sensible.
 
-La aplicacion debe indicar cuando un CFDI descargado no tiene verificacion reciente de vigencia/cancelacion. Esta verificacion no bloquea el MVP, pero la UI y la documentacion no deben presentar la descarga local como prueba definitiva de vigencia fiscal.
+Requerimientos:
 
-## 9. Requerimientos no funcionales
+- No guardar contrasenas en texto plano.
+- No registrar secretos en logs.
+- Proteger credenciales usando cifrado local o almacenamiento seguro del sistema operativo.
+- Permitir operar sin backend remoto.
 
-### RNF-001 Local-first
+## 13. Requerimientos funcionales
+
+### RF-001 Administrar perfiles SAT
+
+La aplicacion debe permitir crear y editar perfiles SAT locales.
+
+### RF-002 Registrar e.firma
+
+La aplicacion debe permitir registrar certificado, llave privada y contrasena de e.firma para un perfil SAT.
+
+### RF-003 Crear solicitud masiva
+
+La aplicacion debe permitir crear una solicitud de descarga masiva usando un perfil SAT y filtros soportados por el SAT.
+
+### RF-004 Guardar solicitud localmente
+
+La aplicacion debe guardar la metadata de cada solicitud creada, incluyendo parametros, identificador SAT, codigos, mensajes y fechas relevantes.
+
+### RF-005 Listar solicitudes
+
+La aplicacion debe mostrar una lista de solicitudes masivas creadas con su estatus actual.
+
+### RF-006 Consultar estatus
+
+La aplicacion debe consultar el estatus de una solicitud ante el SAT y actualizar la base local.
+
+### RF-007 Monitorear en segundo plano
+
+La aplicacion debe monitorear solicitudes pendientes mediante un worker local mientras el proceso este ejecutandose, aunque la ventana principal no este visible.
+
+### RF-008 Descargar paquetes
+
+La aplicacion debe descargar paquetes ZIP disponibles para solicitudes terminadas.
+
+### RF-009 Ver detalle
+
+La aplicacion debe permitir abrir el detalle de una solicitud desde la lista.
+
+### RF-010 Registrar logs
+
+La aplicacion debe registrar eventos basicos de cada solicitud: creacion, envio, verificacion, descarga, error y cambios de estado.
+
+### RF-011 Manejar errores SAT
+
+La aplicacion debe guardar codigo y mensaje SAT cuando ocurra un error o rechazo.
+
+### RF-012 Evitar duplicar descargas
+
+La aplicacion debe detectar paquetes ya descargados para no descargarlos otra vez sin accion explicita del usuario.
+
+### RF-013 Inicio automatico
+
+La aplicacion debe permitir habilitar o deshabilitar el inicio automatico con la sesion de macOS.
+
+### RF-014 Icono de menu bar
+
+La aplicacion debe mostrar un icono en el menu bar de macOS para acceso rapido al estado del worker y acciones principales.
+
+### RF-015 Ejecutar con ventana oculta
+
+La aplicacion debe poder seguir monitoreando y descargando solicitudes aunque la ventana principal este cerrada u oculta, siempre que el proceso local siga ejecutandose.
+
+### RF-016 Notificaciones del sistema operativo
+
+La aplicacion debe emitir notificaciones nativas de macOS cuando una solicitud termine, una descarga concluya o una solicitud pase a error, rechazada o vencida.
+
+### RF-017 Comportamiento al cerrar ventana
+
+La aplicacion debe ocultarse al menu bar de macOS cuando el usuario cierre la ventana principal. Salir de la aplicacion requiere una accion explicita.
+
+### RF-018 Acciones manuales sobre solicitud
+
+La aplicacion debe permitir ejecutar acciones manuales sobre una solicitud: verificar ahora, reintentar descarga y eliminar solicitud local.
+
+Reintentar descarga solo aplica a paquetes pendientes o fallidos. Eliminar solicitud local no modifica SAT ni borra paquetes ZIP automaticamente en el MVP.
+
+### RF-019 Retencion local
+
+La aplicacion no debe borrar paquetes ZIP automaticamente. La limpieza de archivos queda bajo control del usuario.
+
+## 14. Requerimientos no funcionales
+
+### RNF-001 Simplicidad
+
+La aplicacion debe mantenerse enfocada en crear, listar, monitorear y detallar solicitudes masivas.
+
+### RNF-002 Local-first
 
 La aplicacion debe funcionar sin backend remoto. Solo requiere internet para comunicarse con SAT.
 
-### RNF-002 Seguridad local
-
-La aplicacion debe tratar certificados, llaves privadas, contrasenas, tokens y XML como informacion sensible.
-
 ### RNF-003 Trazabilidad
 
-La aplicacion debe conservar historial suficiente para entender que se solicito, cuando, con que parametros, que respondio SAT y que paquetes/XML se obtuvieron.
+La aplicacion debe conservar suficiente informacion para saber que se solicito, cuando se solicito, que respondio SAT y que paquetes se descargaron.
 
-### RNF-004 Idempotencia operativa
+### RNF-004 Seguridad local
 
-Las operaciones repetibles deben evitar duplicados: solicitudes con mismos parametros, descargas del mismo paquete y XML con mismo UUID.
+La aplicacion debe proteger credenciales y evitar exponer secretos en archivos, base de datos o logs.
 
-### RNF-005 Resiliencia
+### RNF-005 Recuperacion basica
 
-La aplicacion debe tolerar errores temporales de red, expiracion de token, indisponibilidad del SAT y respuestas intermedias.
+Si la app se cierra y vuelve a abrir, debe poder continuar monitoreando solicitudes pendientes desde la informacion guardada localmente.
 
 ### RNF-006 Escala inicial
 
-La aplicacion debe soportar al menos 10,000 CFDI descargados e indexados localmente sin degradacion notable para uso personal.
+La aplicacion debe soportar alrededor de 10,000 CFDI como escala inicial de uso personal.
 
-### RNF-007 Observabilidad local
+### RNF-007 Integracion con el sistema operativo
 
-Los logs deben permitir diagnosticar errores sin exponer innecesariamente secretos o contrasenas.
+La aplicacion debe integrarse con el mecanismo normal de inicio automatico, menu bar y notificaciones nativas de macOS.
 
-### RNF-008 Portabilidad
+### RNF-008 Control explicito del usuario
 
-La arquitectura debe permitir distribuir la aplicacion como app de escritorio instalable. La plataforma exacta se definira despues.
+El usuario debe poder saber si la aplicacion esta corriendo en segundo plano y debe poder pausar, reanudar o salir desde el icono de menu bar.
 
-### RNF-009 Zona horaria de negocio
+## 15. Criterios de aceptacion
 
-La aplicacion debe manejar rangos de fecha usando una zona horaria de negocio explicita, inicialmente hora del centro de Mexico.
+### CA-001 Crear perfil SAT
 
-### RNF-010 Control de frecuencia
-
-El worker debe aplicar limites de frecuencia y backoff para consultas y descargas, evitando ciclos agresivos contra el SAT.
-
-### RNF-011 Recuperacion ante trabajos parciales
-
-La aplicacion debe poder retomar trabajos incompletos despues de cerrar la app, reiniciar el equipo o fallar una operacion.
-
-### RNF-012 Alertas por estado incompleto
-
-La aplicacion debe mostrar claramente cuando un trabajo quedo parcial, con paquetes pendientes, XML no extraidos, errores o respuestas inconclusas.
-
-### RNF-013 Respaldo local
-
-La arquitectura debe permitir respaldar la base de datos local, configuracion y archivos descargados. La politica concreta de respaldo se definira despues.
-
-## 10. Modelo conceptual inicial
-
-Entidades propuestas:
-
-- `PerfilSat`: contribuyente/RFC gestionado localmente.
-- `CredencialSat`: certificado, llave privada y material sensible protegido.
-- `TrabajoDescarga`: intencion operativa del usuario, por ejemplo descargar recibidos de enero 2026.
-- `SolicitudDescarga`: solicitud enviada al SAT.
-- `ConsultaSolicitud`: cada verificacion de estado realizada.
-- `PaqueteDescarga`: paquete SAT asociado a una solicitud.
-- `CfdiXml`: XML extraido e indexado.
-- `LogOperacion`: evento funcional o tecnico relevante.
-
-Relaciones principales:
-
-- Un `PerfilSat` tiene cero o mas `CredencialSat`.
-- Un `PerfilSat` tiene muchos `TrabajoDescarga`.
-- Un `TrabajoDescarga` puede generar una o muchas `SolicitudDescarga`.
-- Una `SolicitudDescarga` tiene muchas `ConsultaSolicitud`.
-- Una `SolicitudDescarga` puede tener muchos `PaqueteDescarga`.
-- Un `PaqueteDescarga` puede contener muchos `CfdiXml`.
-- Un `CfdiXml` debe poder rastrearse hasta su paquete, solicitud, trabajo y perfil SAT.
-
-## 11. Estados de solicitud
-
-Estados documentados por SAT para `EstadoSolicitud`:
-
-| Valor | Estado local sugerido | Significado |
-| --- | --- | --- |
-| 1 | Aceptada | SAT recibio la solicitud. |
-| 2 | En proceso | SAT esta procesando la solicitud. |
-| 3 | Terminada | SAT termino y puede devolver paquetes. |
-| 4 | Error | SAT reporto error en la solicitud. |
-| 5 | Rechazada | SAT rechazo la solicitud. |
-| 6 | Vencida | La solicitud o paquetes vencieron. |
-
-Notas:
-
-- La documentacion indica que la solicitud vence 72 horas despues de generado el paquete de descarga.
-- Solo el estado terminado debe habilitar descarga de paquetes.
-- Error, rechazada y vencida deben considerarse estados terminales para el worker, salvo accion manual del usuario.
-
-Estados internos adicionales de la aplicacion:
-
-| Estado interno | Uso |
-| --- | --- |
-| Borrador | Trabajo capturado pero no enviado. |
-| Solicitada | Solicitud enviada al SAT, esperando primera verificacion util. |
-| Descargando | Paquetes en proceso de descarga. |
-| Descargada | Paquetes guardados localmente. |
-| Extrayendo | XML en proceso de extraccion/indexacion. |
-| Extraida | XML extraidos e indexados. |
-| Sin informacion | SAT no encontro informacion para los filtros. |
-| Parcial | Hay paquetes, XML o solicitudes pendientes dentro del trabajo. |
-
-Los estados internos no deben reemplazar los codigos originales SAT; deben complementarlos para que el usuario entienda el avance real.
-
-## 12. Codigos SAT relevantes
-
-Codigos de verificacion documentados:
-
-| Codigo | Manejo esperado |
-| --- | --- |
-| 300 Usuario No Valido | Mostrar error de autenticacion/usuario. |
-| 301 XML Mal Formado | Marcar solicitud/consulta con error tecnico de request. |
-| 302 Sello Mal Formado | Marcar error de firma. |
-| 303 Sello no corresponde con RfcSolicitante | Marcar error de credencial/RFC. |
-| 304 Certificado Revocado o Caduco | Marcar credencial como no valida para operar. |
-| 305 Certificado Invalido | Marcar error de credencial. |
-| 5000 Solicitud recibida con exito | Continuar flujo normal. |
-| 5003 Tope maximo | Indicar que se deben acotar filtros/rango. |
-| 5004 No se encontro la informacion | Marcar resultado sin paquetes/informacion. |
-| 5011 Limite de descargas por folio por dia | Posponer descarga/verificacion segun aplique. |
-
-Codigos de solicitud documentados:
-
-| Codigo | Manejo esperado |
-| --- | --- |
-| 5000 Solicitud recibida con exito | Guardar solicitud y continuar con verificacion. |
-| 5002 Se agotaron solicitudes de por vida | Evitar reintento automatico con los mismos parametros. |
-| 5003 Tope maximo | Sugerir reducir rango o filtros. |
-| 5004 No se encontro informacion | Guardar resultado sin paquetes. |
-| 5005 Solicitud duplicada | Asociar o mostrar que ya existe una solicitud vigente con los mismos parametros. |
-| 404 Error no controlado | Registrar y permitir reintento manual/controlado. |
-
-## 13. Criterios de aceptacion iniciales
-
-### CA-001 Registrar perfil
-
-Dado que el usuario tiene un RFC y credenciales validas, cuando registra un perfil SAT, entonces la aplicacion guarda el perfil y protege sus credenciales localmente.
+Dado que el usuario captura los datos de un perfil SAT, cuando guarda el perfil, entonces la aplicacion lo muestra disponible para crear solicitudes.
 
 ### CA-002 Crear solicitud
 
-Dado un perfil SAT valido y filtros soportados por SAT, cuando el usuario crea una solicitud, entonces la aplicacion envia la solicitud, guarda el identificador SAT y registra la respuesta inicial.
+Dado un perfil SAT valido y filtros soportados, cuando el usuario crea una solicitud, entonces la aplicacion la envia al SAT y guarda su metadata localmente.
 
-### CA-003 Consultar solicitud
+### CA-003 Listar solicitudes
 
-Dado que existe una solicitud registrada, cuando la aplicacion consulta su estado, entonces guarda la respuesta SAT con estado, codigo, mensaje, numero de CFDI e identificadores de paquetes si existen.
+Dado que existen solicitudes guardadas, cuando el usuario abre la pantalla principal, entonces ve la lista de solicitudes con su estatus actual.
 
-### CA-004 Detectar solicitud terminada
+### CA-004 Monitorear solicitud
 
-Dado que SAT responde `EstadoSolicitud = 3`, cuando la aplicacion procesa la respuesta, entonces registra los paquetes disponibles y habilita su descarga.
+Dado que existe una solicitud pendiente, cuando el worker local corre, entonces consulta el SAT y actualiza su estatus en la base local.
 
-### CA-005 Descargar paquete
+### CA-005 Ver detalle
 
-Dado un paquete disponible, cuando la aplicacion lo descarga correctamente, entonces guarda el archivo localmente y actualiza el estado del paquete.
+Dado que existe una solicitud en la lista, cuando el usuario abre su detalle, entonces ve parametros, estatus, codigos SAT, mensajes, paquetes y logs basicos.
 
-### CA-006 Extraer XML
+### CA-006 Descargar paquetes
 
-Dado un paquete descargado, cuando la aplicacion lo extrae, entonces guarda los XML localmente e indexa sus metadatos minimos.
+Dado que una solicitud tiene paquetes disponibles, cuando el worker o el usuario inicia la descarga, entonces la aplicacion guarda los paquetes localmente y actualiza su estado.
 
-### CA-007 Consulta local
+### CA-007 Registrar error
 
-Dado que existen CFDI indexados, cuando el usuario filtra en la UI, entonces la aplicacion muestra resultados desde la base local sin consultar al SAT.
+Dado que SAT responde con error, rechazo o vencimiento, cuando la aplicacion procesa la respuesta, entonces guarda codigo, mensaje y fecha del evento.
 
-### CA-008 Manejo de errores SAT
+### CA-008 Continuar despues de cerrar
 
-Dado que SAT responde con error, rechazo, vencimiento o limite, cuando la aplicacion procesa la respuesta, entonces guarda el codigo/mensaje y muestra un estado entendible para el usuario.
+Dado que la aplicacion se cerro con solicitudes pendientes, cuando se vuelve a abrir, entonces muestra esas solicitudes y puede continuar monitoreandolas.
 
-### CA-009 Particion de trabajo
+### CA-009 Inicio automatico
 
-Dado un trabajo de descarga que excede limites conocidos del SAT, cuando el usuario lo confirma, entonces la aplicacion genera varias solicitudes SAT rastreables bajo el mismo trabajo.
+Dado que el usuario habilito el inicio automatico, cuando inicia sesion en macOS, entonces la aplicacion inicia en segundo plano y continua monitoreando solicitudes pendientes.
 
-### CA-010 Deduplicacion
+### CA-010 Icono de menu bar
 
-Dado que un XML ya fue descargado previamente, cuando otro paquete contiene el mismo UUID, entonces la aplicacion no debe crear un duplicado logico y debe preservar el rastro de origen.
+Dado que la aplicacion esta ejecutandose, cuando el usuario revisa el menu bar de macOS, entonces ve un icono que permite abrir la app, revisar estado general del worker, pausar/reanudar monitoreo y salir.
 
-### CA-011 Paquete invalido o incompleto
+### CA-011 Ventana cerrada con worker activo
 
-Dado que un paquete descargado no se puede abrir o extraer, cuando la aplicacion lo procesa, entonces debe marcarlo como error, conservar evidencia en logs y permitir reintento controlado.
+Dado que la ventana principal esta cerrada u oculta pero la aplicacion sigue activa en el menu bar de macOS, cuando existen solicitudes pendientes, entonces el worker continua consultando el SAT y descargando paquetes disponibles.
 
-### CA-012 Vigencia no verificada
+### CA-012 Notificacion del sistema
 
-Dado que la aplicacion no ha consultado vigencia/cancelacion de un CFDI, cuando lo muestra en la consulta local, entonces debe indicar que el estatus fiscal vigente no ha sido verificado por este flujo.
+Dado que una solicitud termina, una descarga concluye o una solicitud falla, cuando la aplicacion procesa el cambio, entonces emite una notificacion nativa de macOS.
 
-### CA-013 Trabajo parcial
+### CA-013 Acciones manuales
 
-Dado que un trabajo tiene solicitudes, paquetes o XML pendientes, cuando el usuario revisa la cola, entonces la aplicacion debe mostrarlo como parcial o pendiente, no como completado.
+Dado que el usuario abre una solicitud, cuando ejecuta una accion manual disponible, entonces la aplicacion verifica ahora, reintenta una descarga fallida o elimina la solicitud local segun corresponda.
 
-## 14. Riesgos
+### CA-014 Pausa persistente
 
-- La documentacion disponible en el repositorio cubre principalmente verificacion; falta confirmar todos los parametros y reglas del servicio de solicitud y descarga.
-- El manejo de WS-Security, firmas XML y RSA-SHA1 puede ser sensible a detalles de canonicalizacion y estructura SOAP.
-- SAT puede cambiar endpoints, certificados, reglas o disponibilidad del servicio.
-- El almacenamiento de llaves privadas y contrasenas requiere una decision cuidadosa de seguridad local.
-- La duplicidad de solicitudes debe manejarse bien para evitar topar limites SAT.
-- Los paquetes vencen; el worker debe priorizar descargas disponibles.
-- XML mal formados, duplicados o con variantes de version pueden complicar la indexacion.
-- El usuario puede confiar de mas en XML descargados localmente aunque no se haya verificado vigencia/cancelacion actual.
-- Cancelaciones en proceso pueden requerir un modelo mas rico que vigente/cancelado si se agrega verificacion fiscal en una fase posterior.
-- CFDI de nomina, pago, traslado, ingreso y egreso tienen usos contables distintos; la UI debe evitar mezclarlos de forma confusa.
-- CFDI 3.3 historicos pueden aparecer en backfills y el parser debe tolerarlos si se soporta descarga historica.
-- SAT puede degradarse en periodos de alta carga; el worker debe tolerar caidas prolongadas sin perder trazabilidad.
-- Una descarga parcial no detectada puede provocar errores de trabajo contable. La aplicacion debe preferir estados incompletos visibles sobre cierres silenciosos.
+Dado que el usuario pausa el worker desde el menu bar, cuando cierra y vuelve a abrir la aplicacion, entonces el monitoreo permanece pausado hasta que el usuario lo reanude.
 
-## 15. Preguntas abiertas
+### CA-015 Retencion de ZIP
 
-- Cual sera la primera plataforma soportada: macOS, Windows o ambas?
-- Se usara solo e.firma? La documentacion revisada exige e.firma vigente y no se debe asumir CSD para descarga masiva.
-- Cuales son exactamente los filtros soportados por el servicio de solicitud para CFDI y metadata?
-- El MVP descargara siempre CFDI XML, usara metadata primero o permitira ambos tipos de solicitud?
-- El primer flujo sera backfill historico, corte mensual o ambos?
-- La app sera descargador o fuente de verdad fiscal? Si sera fuente de verdad despues, cuando entra vigencia/cancelacion?
-- Cuantos RFC reales y que volumen esperado por RFC/mes se usaran en la primera version?
-- La consulta local necesita exportacion CSV/Excel desde el inicio?
-- Se requiere password maestro de la aplicacion o basta con almacenamiento seguro del sistema operativo?
-- El worker correra solo mientras la app esta abierta o tambien en segundo plano al iniciar sesion?
-- Como se organizaran fisicamente los archivos: por RFC, anio/mes, solicitud o paquete?
-- Que politica se usara para limpiar paquetes ZIP despues de extraer XML?
-- Que nivel de detalle debe tener el log visible al usuario frente al log tecnico?
-- Que estrategia minima de respaldo local se acepta para base de datos, XML y logs?
-- Se marcara un mes como cerrado o siempre quedara sujeto a re-descarga/revision por CFDI tardios?
+Dado que existen paquetes ZIP descargados, cuando la aplicacion monitorea, descarga o elimina una solicitud local, entonces no borra esos ZIPs automaticamente.
+
+## 16. Preguntas abiertas
+
+- Bloqueante: cuales son exactamente los filtros aceptados por el servicio SAT para crear solicitudes?
+- No bloqueante: la ruta local de paquetes sera configurable en el MVP o se dejara fija por ahora?
+- No bloqueante: que nivel de detalle debe tener el log visible en la pantalla de detalle?
