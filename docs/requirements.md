@@ -42,9 +42,11 @@ El MVP incluye:
 - Tipo de solicitud inicial: CFDI/XML. Metadata queda fuera del MVP.
 - Plataforma inicial: macOS.
 - Descarga de paquetes: automatica cuando SAT reporte paquetes disponibles.
-- Inicio automatico: deshabilitado por defecto; el usuario puede habilitarlo.
+- Inicio automatico: deshabilitado por defecto; el usuario puede habilitarlo. Cuando este habilitado, la app inicia solo con el icono de menu bar y el worker; no abre la ventana principal.
+- Apertura manual: cuando el usuario abre la app manualmente, la ventana principal debe mostrarse aunque el proceso ya este ejecutandose en el menu bar.
 - Cerrar ventana principal: oculta la app al menu bar de macOS y mantiene el worker activo.
 - Salir de la app: requiere accion explicita desde el icono de menu bar o comando equivalente de macOS.
+- Registro al salir: el cierre de la app guarda estado a nivel aplicacion. No se crea `LogSolicitud` por cada solicitud activa; solo se registra `LogSolicitud` si una operacion concreta de solicitud o paquete fue interrumpida por la salida.
 - Pausa del worker: si el usuario pausa el monitoreo, la pausa persiste entre sesiones hasta que el usuario reanude.
 - Frecuencia inicial del worker: cada 10 minutos para solicitudes pendientes.
 - Backoff inicial: si una solicitud permanece sin cambios despues de tres verificaciones consecutivas, verificarla cada 30 minutos.
@@ -84,7 +86,7 @@ Queda fuera del MVP:
 8. La lista se actualiza con el avance de cada solicitud.
 9. El usuario abre el detalle de una solicitud para revisar estatus, metadata, paquetes y logs.
 
-Cuando el inicio automatico este habilitado, la aplicacion debe iniciar con la sesion de macOS y continuar el monitoreo sin requerir que el usuario abra manualmente la ventana principal.
+Cuando el inicio automatico este habilitado, la aplicacion debe iniciar con la sesion de macOS, mostrar solo el icono de menu bar y continuar el monitoreo sin abrir automaticamente la ventana principal.
 
 Al cerrar la ventana principal, la aplicacion debe permanecer activa en el menu bar de macOS. Para detener el worker y cerrar el proceso, el usuario debe ejecutar una accion explicita de salida.
 
@@ -150,6 +152,8 @@ Campos iniciales:
 
 Nota: los campos exactos deben confirmarse contra la documentacion del servicio SAT antes de implementarse.
 
+Antes de enviar una solicitud al SAT, la aplicacion debe validar localmente que no exista otra solicitud activa/no eliminada para el mismo perfil SAT con los mismos filtros relevantes para el servicio. Si existe, debe bloquear el envio y mostrar la solicitud existente, sin llamar al SAT.
+
 ### 7.4 Detalle de solicitud
 
 Pantalla para revisar una solicitud especifica.
@@ -175,9 +179,11 @@ Acciones sugeridas:
 - Reintentar descarga fallida.
 - Eliminar solicitud local.
 
-Eliminar una solicitud local no modifica nada en SAT. En el MVP elimina los registros locales de la aplicacion, pero no borra automaticamente paquetes ZIP ya descargados.
+Eliminar una solicitud local no modifica nada en SAT. En el MVP marca virtualmente como eliminados los registros locales de la aplicacion, pero no borra automaticamente paquetes ZIP ya descargados.
 
 Si una solicitud queda vencida sin haber descargado todos sus paquetes, el detalle debe mostrar un aviso visible. La aplicacion no debe recrear solicitudes por si sola; el usuario podra crear otra solicitud manualmente usando los filtros visibles.
+
+Si un paquete esta marcado como descargado pero el ZIP ya no existe en la ruta local, el detalle debe mostrarlo como archivo no encontrado sin cambiar automaticamente el estado persistido del paquete.
 
 ### 7.5 Icono de menu bar
 
@@ -226,22 +232,38 @@ El intervalo inicial de verificacion es de 10 minutos por solicitud pendiente. S
 
 Si el monitoreo esta pausado, el worker no debe consultar ni descargar hasta que el usuario lo reanude. La pausa debe guardarse localmente y sobrevivir al reinicio de la aplicacion.
 
+Si el monitoreo esta pausado, las acciones manuales que impliquen verificar estatus o descargar paquetes deben quedar pendientes hasta que el usuario reanude el monitoreo.
+
+Para mantener simple el MVP, la accion manual pendiente se guarda como metadata de `SolicitudMasiva`; no existe una entidad separada para cola de acciones.
+
 ## 9. Estados
 
 La aplicacion debe mostrar estados simples y entendibles.
 
-Estados sugeridos:
+Estados sugeridos para `SolicitudMasiva`:
 
 - Creada.
 - Enviada.
 - Aceptada.
 - En proceso.
 - Terminada.
-- Descargando.
-- Descargada.
 - Error.
 - Rechazada.
 - Vencida.
+
+Estados sugeridos para `PaqueteSolicitud`:
+
+- Disponible.
+- Descargando.
+- Descargado.
+- Error.
+- Vencido.
+
+La lista de solicitudes puede mostrar un estado agregado de descarga cuando una solicitud terminada tenga paquetes en `Disponible`, `Descargando`, `Descargado`, `Error` o `Vencido`, pero el estado SAT de la solicitud y el estado local de paquetes deben mantenerse separados.
+
+El estado `Error` de una solicitud es terminal para el worker automatico. Cualquier reintento debe ejecutarse como accion manual del usuario.
+
+El estado `Error` de un paquete no se reintenta automaticamente por el worker. Cualquier reintento de descarga debe ejecutarse como accion manual del usuario.
 
 Los estados internos de la aplicacion deben conservar los codigos originales del SAT para diagnostico.
 
@@ -267,6 +289,9 @@ Entidades iniciales:
 - `SolicitudMasiva`: solicitud creada por el usuario y enviada al SAT.
 - `PaqueteSolicitud`: paquete reportado o descargado para una solicitud.
 - `LogSolicitud`: eventos relevantes de una solicitud.
+- `ConfiguracionApp`: preferencias locales de la aplicacion.
+
+Cada `PerfilSat` tiene una sola credencial activa, reemplazable cuando el usuario actualiza e.firma. `ConfiguracionApp` se maneja como un registro unico local.
 
 Metadata minima de `SolicitudMasiva`:
 
@@ -284,6 +309,10 @@ Metadata minima de `SolicitudMasiva`:
 - Fecha de envio.
 - Ultima verificacion.
 - Ultimo error, si existe.
+- Accion manual pendiente, si existe.
+- Fecha de accion manual pendiente, si existe.
+
+El numero de CFDI reportados por SAT puede venir vacio, nulo o en cero aun cuando existan paquetes. No debe usarse como unico indicador de exito o fracaso de una solicitud.
 
 Metadata minima de `PaqueteSolicitud`:
 
@@ -317,7 +346,9 @@ Donde:
 - `{yyyy-mm}` es el mes de la fecha inicial solicitada.
 - `{solicitud_id}` es el identificador SAT de la solicitud.
 
-La carpeta de una solicitud se crea cuando la aplicacion ya conoce el identificador SAT. La ruta configurable puede agregarse desde preferencias si se decide incluirla en el MVP.
+La carpeta de una solicitud se crea cuando la aplicacion ya conoce el identificador SAT.
+
+La ruta local de paquetes queda fija en el MVP. Una pantalla de configuracion para cambiarla puede agregarse despues.
 
 El MVP no ejecuta limpieza automatica de paquetes ZIP. El usuario administra la carpeta local; la accion de eliminar solicitud local no borra ZIPs automaticamente.
 
@@ -327,9 +358,13 @@ La aplicacion debe tratar e.firma, llaves privadas, contrasenas, tokens SAT y pa
 
 Requerimientos:
 
+- Importar/copiar `.cer` y `.key` al almacenamiento controlado por la aplicacion al registrar e.firma.
 - No guardar contrasenas en texto plano.
 - No registrar secretos en logs.
 - Proteger credenciales usando cifrado local o almacenamiento seguro del sistema operativo.
+- Permitir cache temporal de token SAT si su periodo de expiracion lo justifica, siempre protegido y con vencimiento registrado.
+- No guardar tokens SAT en logs ni en texto plano.
+- Guardar peticiones/respuestas SAT en `LogSolicitud` solo despues de sanitizar token, firma, llave privada, contrasena y cualquier otro secreto.
 - Permitir operar sin backend remoto.
 
 ## 13. Requerimientos funcionales
@@ -342,9 +377,13 @@ La aplicacion debe permitir crear y editar perfiles SAT locales.
 
 La aplicacion debe permitir registrar certificado, llave privada y contrasena de e.firma para un perfil SAT.
 
+Al registrar e.firma, la aplicacion debe importar/copiar `.cer` y `.key` al almacenamiento controlado por la aplicacion.
+
 ### RF-003 Crear solicitud masiva
 
 La aplicacion debe permitir crear una solicitud de descarga masiva usando un perfil SAT y filtros soportados por el SAT.
+
+Antes de llamar al SAT, la aplicacion debe rechazar solicitudes locales duplicadas con los mismos parametros relevantes. Esta defensa evita gastar cupos o topar errores SAT por solicitudes duplicadas.
 
 ### RF-004 Guardar solicitud localmente
 
@@ -374,6 +413,8 @@ La aplicacion debe permitir abrir el detalle de una solicitud desde la lista.
 
 La aplicacion debe registrar eventos basicos de cada solicitud: creacion, envio, verificacion, descarga, error y cambios de estado.
 
+El cierre normal de la aplicacion no debe registrar `LogSolicitud` por cada solicitud activa. Solo debe agregarse un `LogSolicitud` cuando una operacion concreta de solicitud o paquete sea interrumpida por la salida.
+
 ### RF-011 Manejar errores SAT
 
 La aplicacion debe guardar codigo y mensaje SAT cuando ocurra un error o rechazo.
@@ -382,9 +423,11 @@ La aplicacion debe guardar codigo y mensaje SAT cuando ocurra un error o rechazo
 
 La aplicacion debe detectar paquetes ya descargados para no descargarlos otra vez sin accion explicita del usuario.
 
-### RF-013 Inicio automatico
+### RF-013 Inicio automatico y apertura manual
 
-La aplicacion debe permitir habilitar o deshabilitar el inicio automatico con la sesion de macOS.
+La aplicacion debe permitir habilitar o deshabilitar el inicio automatico con la sesion de macOS. Cuando este habilitado, la aplicacion debe iniciar en segundo plano con el icono de menu bar, sin abrir la ventana principal.
+
+Cuando el usuario abra manualmente la aplicacion, la ventana principal debe mostrarse aunque el proceso ya exista en el menu bar.
 
 ### RF-014 Icono de menu bar
 
@@ -402,11 +445,15 @@ La aplicacion debe emitir notificaciones nativas de macOS cuando una solicitud t
 
 La aplicacion debe ocultarse al menu bar de macOS cuando el usuario cierre la ventana principal. Salir de la aplicacion requiere una accion explicita.
 
+Al salir de la aplicacion, se guarda estado de cierre a nivel aplicacion. No se generan logs de solicitud salvo que exista una verificacion o descarga en curso que deba marcarse como interrumpida.
+
 ### RF-018 Acciones manuales sobre solicitud
 
 La aplicacion debe permitir ejecutar acciones manuales sobre una solicitud: verificar ahora, reintentar descarga y eliminar solicitud local.
 
-Reintentar descarga solo aplica a paquetes pendientes o fallidos. Eliminar solicitud local no modifica SAT ni borra paquetes ZIP automaticamente en el MVP.
+Reintentar descarga solo aplica a paquetes pendientes o fallidos. Si el monitoreo esta pausado, la accion queda pendiente hasta reanudar.
+
+Eliminar solicitud local no modifica SAT ni borra paquetes ZIP automaticamente en el MVP. La eliminacion local es virtual: marca como eliminados `SolicitudMasiva`, `PaqueteSolicitud` y `LogSolicitud`.
 
 ### RF-019 Retencion local
 
@@ -454,7 +501,9 @@ Dado que el usuario captura los datos de un perfil SAT, cuando guarda el perfil,
 
 ### CA-002 Crear solicitud
 
-Dado un perfil SAT valido y filtros soportados, cuando el usuario crea una solicitud, entonces la aplicacion la envia al SAT y guarda su metadata localmente.
+Dado un perfil SAT valido, filtros soportados y sin una solicitud activa equivalente, cuando el usuario crea una solicitud, entonces la aplicacion la envia al SAT y guarda su metadata localmente.
+
+Dado que ya existe una solicitud activa equivalente, cuando el usuario intenta crearla otra vez, entonces la aplicacion muestra la solicitud existente y no llama al SAT.
 
 ### CA-003 Listar solicitudes
 
@@ -482,7 +531,7 @@ Dado que la aplicacion se cerro con solicitudes pendientes, cuando se vuelve a a
 
 ### CA-009 Inicio automatico
 
-Dado que el usuario habilito el inicio automatico, cuando inicia sesion en macOS, entonces la aplicacion inicia en segundo plano y continua monitoreando solicitudes pendientes.
+Dado que el usuario habilito el inicio automatico, cuando inicia sesion en macOS, entonces la aplicacion inicia en segundo plano, muestra el icono de menu bar sin abrir la ventana principal y continua monitoreando solicitudes pendientes.
 
 ### CA-010 Icono de menu bar
 
@@ -498,7 +547,9 @@ Dado que una solicitud termina, una descarga concluye o una solicitud falla, cua
 
 ### CA-013 Acciones manuales
 
-Dado que el usuario abre una solicitud, cuando ejecuta una accion manual disponible, entonces la aplicacion verifica ahora, reintenta una descarga fallida o elimina la solicitud local segun corresponda.
+Dado que el usuario abre una solicitud, cuando ejecuta una accion manual disponible, entonces la aplicacion verifica ahora, reintenta una descarga fallida o marca la solicitud local como eliminada segun corresponda.
+
+Si el monitoreo esta pausado, verificar ahora y reintentar descarga quedan pendientes hasta reanudar.
 
 ### CA-014 Pausa persistente
 
@@ -510,6 +561,6 @@ Dado que existen paquetes ZIP descargados, cuando la aplicacion monitorea, desca
 
 ## 16. Preguntas abiertas
 
+- Bloqueante: donde esta la documentacion oficial o referencia canonica para crear solicitudes (`SolicitaDescarga`) y descargar paquetes (`DescargaMasiva`)?
 - Bloqueante: cuales son exactamente los filtros aceptados por el servicio SAT para crear solicitudes?
-- No bloqueante: la ruta local de paquetes sera configurable en el MVP o se dejara fija por ahora?
 - No bloqueante: que nivel de detalle debe tener el log visible en la pantalla de detalle?

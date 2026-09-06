@@ -43,6 +43,7 @@ El sistema debe permitir a un usuario unico, actuando como contador, gestionar p
 ## Documentos del proyecto
 
 * [Requerimientos](docs/requirements.md)
+* [Arquitectura](docs/architecture.md)
 
 ## Otras referencias
 
