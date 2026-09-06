@@ -28,3 +28,4 @@ Un ADR aceptado no se edita para cambiar la decision central. Si una decision ca
 | [0009](0009-macos-activation-and-login-behavior.md) | Accepted | Usar activacion macOS por contexto |
 | [0010](0010-keychain-secret-store-and-memory-token.md) | Accepted | Usar Keychain para secretos y token SAT solo en memoria |
 | [0011](0011-qt-qml-application-stack.md) | Accepted | Usar Qt y QML como stack de aplicacion |
+| [0012](0012-qt-layered-project-structure.md) | Accepted | Organizar el proyecto Qt por capas y targets CMake |

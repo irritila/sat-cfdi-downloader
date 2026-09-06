@@ -771,6 +771,7 @@ Estado: validado.
 Objetivo: mostrar los modulos principales dentro de la aplicacion macOS y los contratos que separan UI, casos de uso, persistencia, archivos, credenciales y comunicacion con SAT.
 
 El stack inicial queda definido en `ADR 0011`: Qt 6, QML / Qt Quick Controls para UI y C++/Qt para servicios, dominio y adaptadores.
+La estructura fisica de carpetas y targets CMake queda definida en `ADR 0012` y `docs/design/qt-project-structure.md`.
 
 ```mermaid
 flowchart TB
@@ -876,6 +877,7 @@ flowchart TB
 - El contrato de integracion con sistema operativo es generico; macOS es el adaptador inicial del MVP.
 - La politica de monitoreo y backoff vive dentro del worker; no se modela como componente separado.
 - QML no contiene reglas SAT, reglas de estado ni acceso directo a base de datos; consume servicios expuestos desde C++.
+- La composition root vive en el target ejecutable y conecta servicios con adaptadores concretos.
 
 ### Decisiones reflejadas
 
@@ -888,6 +890,7 @@ flowchart TB
 - El contrato de integracion SO cubre menu bar, Login Item y notificaciones; macOS es la implementacion inicial.
 - Sin extraccion, parseo ni indexacion de XML en el MVP.
 - Stack de aplicacion: Qt 6, QML / Qt Quick Controls, C++ y CMake.
+- Estructura de implementacion: capas y targets CMake por `presentation`, `application`, `domain`, `ports`, `infrastructure` y `app`.
 
 ### Preguntas para revisar
 

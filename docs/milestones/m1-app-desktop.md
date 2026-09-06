@@ -72,3 +72,5 @@ Este milestone no agrega alcance comercial, multiusuario ni backend remoto. La p
 - `docs/requirements.md`
 - `docs/architecture.md`
 - `docs/adrs/0011-qt-qml-application-stack.md`
+- `docs/adrs/0012-qt-layered-project-structure.md`
+- `docs/design/qt-project-structure.md`
