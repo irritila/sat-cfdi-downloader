@@ -43,7 +43,7 @@ flowchart LR
 - No hay backend remoto propio.
 - El unico sistema externo de negocio es el SAT.
 - macOS participa como plataforma local para menu bar, inicio automatico y notificaciones.
-- El almacen seguro de credenciales se modela como contrato local, no como dependencia concreta. La implementacion puede decidir despues si usa Keychain u otro mecanismo.
+- El almacen seguro de credenciales se modela como contrato local. `ADR 0010` define Keychain como adaptador inicial para macOS.
 - La base de datos local guarda metadata operativa, no XML parseado.
 - La carpeta local guarda paquetes ZIP descargados.
 
@@ -672,6 +672,8 @@ Estado: validado.
 
 Este diagrama muestra como la aplicacion se integra con macOS para iniciar con la sesion, mantenerse en segundo plano, ocultar la ventana principal y salir solo por accion explicita.
 
+La decision de activacion macOS queda fijada en `ADR 0009`: foreground al abrir manualmente, background/menu bar al iniciar por Login Item.
+
 ```mermaid
 sequenceDiagram
     actor Usuario
@@ -738,6 +740,7 @@ Lectura:
 - El inicio automatico depende de una preferencia local deshabilitada por defecto.
 - Cuando el inicio automatico esta habilitado, la app inicia solo con icono de menu bar y worker; no muestra la ventana principal.
 - Cuando el usuario abre manualmente la app, la ventana principal se muestra aunque el proceso ya estuviera vivo en el menu bar.
+- La politica de activacion macOS se resuelve dentro de `OSIntegration`; el dominio solo depende de las intenciones "foreground" y "background".
 - El menu bar es el punto de acceso cuando la ventana principal esta oculta.
 - Cerrar la ventana no termina el proceso ni detiene el worker.
 - Pausar o reanudar monitoreo se guarda como preferencia persistente.
@@ -1200,6 +1203,7 @@ flowchart TB
 - La separacion entre base local, carpeta de ZIPs y almacen seguro queda explicita.
 - La base local es el unico almacenamiento de logs del MVP.
 - El modo de inicio automatico no cambia el alcance: solo mantiene monitoreo local para el mismo usuario.
+- La app no se modela como daemon, LaunchAgent independiente ni app `LSUIElement` permanente.
 
 ### Preguntas para revisar
 
@@ -1211,7 +1215,7 @@ flowchart TB
 
 Estado: validado.
 
-Objetivo: fijar las fronteras de seguridad para e.firma, llave privada, contrasena, tokens SAT y logs. Este diagrama no decide una tecnologia concreta de almacenamiento seguro; solo define el contrato que debe respetar la implementacion.
+Objetivo: fijar las fronteras de seguridad para e.firma, llave privada, contrasena, tokens SAT y logs. La frontera se mantiene como contrato `SecretStore`; `ADR 0010` define Keychain como adaptador inicial de macOS y token SAT solo en memoria.
 
 ```mermaid
 flowchart TB
@@ -1222,12 +1226,12 @@ flowchart TB
         profiles["Servicio de perfiles SAT"]
         requests["Servicio de solicitudes / acciones / worker"]
         sanitizer["Sanitizador de logs"]
-        token_cache["Cache temporal de token SAT<br/>con expiracion"]
+        token_memory["Token SAT en memoria<br/>no persistido"]
     end
 
     subgraph secure_boundary["Frontera de secretos"]
-        credentials_contract["Contrato de secretos seguros"]
-        secure_store["Almacen seguro local"]
+        credentials_contract["Contrato SecretStore"]
+        secure_store["MacOSSecretStore<br/>Keychain + archivos cifrados"]
     end
 
     subgraph local_persistence["Persistencia local operativa"]
@@ -1248,8 +1252,7 @@ flowchart TB
     credentials_contract -->|"Entrega material solo en memoria"| requests
     requests -->|"Autentica con e.firma"| sat
     sat -->|"Token o error"| requests
-    requests -->|"Mantiene token temporal hasta expiracion"| token_cache
-    token_cache -->|"Persiste temporalmente solo si TTL lo justifica"| credentials_contract
+    requests -->|"Mantiene token solo durante operacion o ciclo"| token_memory
 
     requests -->|"Solicitud, verificacion o descarga con token"| sat
     sat -->|"Respuesta SAT"| requests
@@ -1259,9 +1262,10 @@ flowchart TB
     requests -->|"Metadata de solicitud y paquete"| db
     requests -->|"ZIP descargado"| package_folder
 
-    token_cache -. "No se guarda en base local comun" .-> db
-    token_cache -. "No se guarda en LogSolicitud" .-> logs
-    token_cache -. "No se escribe en archivos" .-> package_folder
+    token_memory -. "No se guarda en base local comun" .-> db
+    token_memory -. "No se guarda en LogSolicitud" .-> logs
+    token_memory -. "No se escribe en archivos" .-> package_folder
+    token_memory -. "No se persiste en Keychain" .-> secure_store
     secure_store -. "No expone secretos a logs" .-> logs
 ```
 
@@ -1270,19 +1274,20 @@ flowchart TB
 - La UI recibe archivos y contrasena de e.firma, pero no los persiste directamente.
 - Al registrar e.firma, la aplicacion importa/copia `.cer` y `.key` al almacenamiento controlado por la aplicacion.
 - `CredencialSat` en la base local debe guardar referencias no secretas al contrato de secretos seguros.
-- El material sensible de e.firma vive dentro de la frontera de secretos.
+- El material sensible de e.firma vive dentro de la frontera de secretos implementada por `MacOSSecretStore`.
 - El servicio que autentica o firma recibe material sensible solo para la operacion actual.
-- El token SAT puede mantenerse en cache temporal si su periodo de expiracion lo justifica.
-- Si el token SAT se persiste temporalmente, debe hacerlo bajo el contrato de secretos seguros, con vencimiento registrado, nunca en base local ni en texto plano.
+- El token SAT vive solo en memoria del proceso mientras dura la operacion o ciclo actual.
+- El token SAT no se persiste en base local, logs, archivos ni Keychain.
 - `LogSolicitud` vive en la base local, pero debe pasar por sanitizacion antes de guardar payloads de diagnostico.
 - Los paquetes ZIP descargados son informacion sensible, pero pertenecen a la carpeta local de paquetes, no al almacen de credenciales.
 
 ### Decisiones reflejadas
 
-- Se modela almacenamiento seguro por contrato, no como dependencia concreta.
+- Se modela almacenamiento seguro por contrato; Keychain es el adaptador inicial para macOS.
 - No se guardan contrasenas, llaves privadas ni tokens en texto plano.
 - `.cer` y `.key` se importan o copian al almacenamiento controlado por la aplicacion.
-- El token SAT puede almacenarse temporalmente si el TTL lo justifica, protegido por el contrato de secretos seguros.
+- La llave privada importada queda cifrada en reposo; el secreto para descifrarla vive en Keychain.
+- El token SAT no se persiste en el MVP.
 - No se registran secretos en `LogSolicitud`.
 - La base local guarda metadata y referencias, no secretos.
 - El MVP sigue siendo local y personal; no introduce permisos, cuentas ni servidor remoto.
@@ -1290,7 +1295,7 @@ flowchart TB
 ### Preguntas para revisar
 
 - Validado: al registrar e.firma, la app importa/copia `.cer` y `.key` al almacenamiento controlado por la aplicacion.
-- Validado: el token SAT puede almacenarse temporalmente si su periodo de expiracion lo justifica, siempre protegido y con vencimiento.
+- Validado por `ADR 0010`: el token SAT solo vive en memoria para el MVP.
 - Validado: `LogSolicitud` guarda peticiones/respuestas SAT sanitizadas, no payloads literalmente crudos si contienen token, firma o secretos.
 
 ## 9. Contratos internos
@@ -1313,9 +1318,11 @@ classDiagram
         <<contract>>
         +importarEFirma(perfilSatId, certificado, llavePrivada, contrasena) CredencialRef
         +obtenerMaterialFirma(credencialRef) MaterialFirma
-        +guardarTokenTemporal(perfilSatId, token, expiraEn) TokenRef
-        +obtenerTokenVigente(perfilSatId) TokenSat?
         +eliminarSecretos(perfilSatId)
+    }
+
+    class MacOSSecretStore {
+        <<adapter>>
     }
 
     class SolicitudRepository {
@@ -1425,25 +1432,28 @@ classDiagram
     WorkerLocal --> LogSolicitudRepository
     WorkerLocal --> LogSanitizer
 
+    MacOSSecretStore ..|> SecretStore
     MacOSIntegration ..|> OSIntegration
 ```
 
 ### Lectura del diagrama
 
 - `SatGateway` encapsula el servicio web SAT: autenticar, crear solicitud, verificar estado y descargar paquete.
-- `crearSolicitud` y `descargarPaquete` quedan como contratos provisionales hasta confirmar documentacion oficial o referencia canonica para `SolicitaDescarga` y `DescargaMasiva`.
-- `SecretStore` encapsula e.firma y token temporal. La base local solo debe guardar referencias no secretas.
+- `crearSolicitud` y `descargarPaquete` se especifican en `docs/web-service.md`, usando la fuente canonica aceptada en `ADR 0005`.
+- `SecretStore` encapsula e.firma. La base local solo debe guardar referencias no secretas.
+- `MacOSSecretStore` es el adaptador inicial basado en Keychain y archivos cifrados controlados por la app.
 - Los repositorios separan responsabilidades: solicitudes, paquetes, logs y configuracion.
 - `PackageStorage` solo maneja rutas y ZIPs. No extrae, parsea ni indexa XML.
 - `OSIntegration` cubre Login Item, menu bar, ventana principal y notificaciones.
 - `MacOSIntegration` es el adaptador inicial que cumple `OSIntegration` para el MVP en macOS.
+- La activacion foreground/background de macOS queda dentro de `OSIntegration`.
 - `LogSanitizer` es obligatorio antes de persistir payloads de peticiones/respuestas SAT en `LogSolicitud`.
 - Los servicios de aplicacion dependen de contratos, no de adaptadores concretos.
 
 ### Decisiones reflejadas
 
 - Se conserva separacion entre `ServicioSolicitudes`, `ServicioAcciones`, `ServicioConsultaLocal` y `WorkerLocal`.
-- Los tokens temporales pertenecen al contrato de secretos, no a la base local comun.
+- Los tokens SAT no se persisten en el MVP; viven solo en memoria del proceso.
 - La descarga de paquetes queda modelada a nivel ZIP.
 - La verificacion de existencia del ZIP se expone como contrato de almacenamiento, pero no modifica automaticamente el estado persistido.
 - La configuracion local queda en un contrato propio porque controla pausa, autostart y cierre de app.
@@ -1676,29 +1686,30 @@ erDiagram
 - Validado: `PerfilSat.rfc` debe ser unico entre perfiles activos/no eliminados.
 - Validado: `ConfiguracionApp` debe ser un registro unico local.
 
-## 12. Riesgos y bloqueantes antes de ADRs
+## 12. Riesgos y decisiones pendientes
 
 Estado: en revision.
 
 Estos puntos no amplian el alcance del MVP. Sirven para no convertir supuestos tecnicos en decisiones finales antes de implementacion.
 
-### 12.1 Documentacion SAT incompleta
+### 12.1 Contratos SAT documentados
 
-- `docs/web-service.md` documenta autenticacion y `VerificaSolicitudDescarga`.
-- Antes de cerrar ADRs de integracion SAT, debe confirmarse documentacion oficial o una referencia canonica para `SolicitaDescarga` y `DescargaMasiva`.
-- Hasta resolverlo, los contratos `SatGateway.crearSolicitud()` y `SatGateway.descargarPaquete()` son provisionales.
+- `ADR 0005` acepta la documentacion oficial SAT como fuente canonica para `SolicitaDescarga` y `DescargaMasiva`.
+- `docs/web-service.md` ya contiene la especificacion local inicial de autenticacion, solicitud, verificacion y descarga.
+- `ADR 0008` define el mapeo entre la UI del MVP y los atributos SAT de `SolicitaDescarga`.
+- La implementacion todavia debe validarse con pruebas reales contra SAT, especialmente omision de atributos vacios, estructura exacta de `RfcReceptores` y manejo de errores operativos.
 
 ### 12.2 Riesgos macOS especificos
 
+- `ADR 0009` decide usar activacion por contexto: foreground al abrir manualmente y background/menu bar al iniciar por Login Item.
 - Login Items puede requerir aprobacion explicita del usuario en macOS. `OSIntegration.configurarLoginItem` debe representar estados como habilitado, pendiente, rechazado o no disponible.
-- Debe decidirse si el bundle sera app normal con Dock y menu bar, o app tipo agente (`LSUIElement`) visible solo en menu bar.
 - Las notificaciones nativas pueden ser rechazadas por el usuario. La UI debe poder mostrar que las notificaciones estan deshabilitadas sin romper el flujo principal.
-- Si el adaptador de secretos usa almacenamiento seguro del sistema operativo, puede haber prompts del sistema al registrar o usar e.firma.
+- `ADR 0010` decide usar Keychain mediante `MacOSSecretStore`; puede haber prompts o rechazos del sistema al registrar o usar e.firma.
 
 ### 12.3 Decisiones conscientes ya tomadas
 
 - La aplicacion sigue siendo de uso personal; no se agregan usuarios, clientes, roles ni backend remoto por escenarios comerciales hipoteticos.
 - Las acciones manuales con monitoreo pausado quedan pendientes en `SolicitudMasiva`, porque esa fue la decision de alcance vigente.
 - `ServicioAcciones` se conserva separado de `ServicioSolicitudes`; una implementacion futura puede compartir logica interna con el worker sin cambiar el modelo.
-- El token SAT puede mantenerse solo en memoria o persistirse temporalmente bajo `SecretStore` si la documentacion confirma un TTL que lo justifique.
+- `ADR 0010` decide que el token SAT vive solo en memoria para el MVP.
 - `LogSanitizer` se mantiene como contrato explicito antes de guardar payloads SAT en `LogSolicitud`.

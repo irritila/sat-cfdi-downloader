@@ -44,6 +44,7 @@ El MVP incluye:
 - Descarga de paquetes: automatica cuando SAT reporte paquetes disponibles.
 - Inicio automatico: deshabilitado por defecto; el usuario puede habilitarlo. Cuando este habilitado, la app inicia solo con el icono de menu bar y el worker; no abre la ventana principal.
 - Apertura manual: cuando el usuario abre la app manualmente, la ventana principal debe mostrarse aunque el proceso ya este ejecutandose en el menu bar.
+- Activacion macOS: la app usa modo foreground al abrir manualmente y modo background/menu bar al iniciar por Login Item.
 - Cerrar ventana principal: oculta la app al menu bar de macOS y mantiene el worker activo.
 - Salir de la app: requiere accion explicita desde el icono de menu bar o comando equivalente de macOS.
 - Registro al salir: el cierre de la app guarda estado a nivel aplicacion. No se crea `LogSolicitud` por cada solicitud activa; solo se registra `LogSolicitud` si una operacion concreta de solicitud o paquete fue interrumpida por la salida.
@@ -145,12 +146,14 @@ Campos iniciales:
 - Tipo: emitidos o recibidos.
 - Fecha inicial.
 - Fecha final.
-- Tipo de solicitud: CFDI/XML para el MVP.
+- Tipo de solicitud fijo: CFDI/XML para el MVP.
 - RFC contraparte, si aplica segun SAT.
 - Tipo de comprobante, si aplica segun SAT.
 - Complemento, si aplica segun SAT.
 
-Nota: los campos exactos deben confirmarse contra la documentacion del servicio SAT antes de implementarse.
+Nota: los campos del formulario deben mantenerse alineados con la especificacion local del servicio SAT.
+
+El mapeo de esos campos a `SolicitaDescarga` queda definido en `docs/adrs/0008-map-ui-filters-to-sat-solicita-descarga.md`.
 
 Antes de enviar una solicitud al SAT, la aplicacion debe validar localmente que no exista otra solicitud activa/no eliminada para el mismo perfil SAT con los mismos filtros relevantes para el servicio. Si existe, debe bloquear el envio y mostrar la solicitud existente, sin llamar al SAT.
 
@@ -361,8 +364,8 @@ Requerimientos:
 - Importar/copiar `.cer` y `.key` al almacenamiento controlado por la aplicacion al registrar e.firma.
 - No guardar contrasenas en texto plano.
 - No registrar secretos en logs.
-- Proteger credenciales usando cifrado local o almacenamiento seguro del sistema operativo.
-- Permitir cache temporal de token SAT si su periodo de expiracion lo justifica, siempre protegido y con vencimiento registrado.
+- Proteger credenciales mediante `SecretStore`; en macOS el adaptador inicial usa Keychain y archivos controlados/cifrados por la aplicacion.
+- No persistir tokens SAT. Solo pueden mantenerse en memoria del proceso hasta expirar, fallar autenticacion, terminar el ciclo en curso o cerrar la app.
 - No guardar tokens SAT en logs ni en texto plano.
 - Guardar peticiones/respuestas SAT en `LogSolicitud` solo despues de sanitizar token, firma, llave privada, contrasena y cualquier otro secreto.
 - Permitir operar sin backend remoto.
@@ -561,6 +564,4 @@ Dado que existen paquetes ZIP descargados, cuando la aplicacion monitorea, desca
 
 ## 16. Preguntas abiertas
 
-- Bloqueante: donde esta la documentacion oficial o referencia canonica para crear solicitudes (`SolicitaDescarga`) y descargar paquetes (`DescargaMasiva`)?
-- Bloqueante: cuales son exactamente los filtros aceptados por el servicio SAT para crear solicitudes?
 - No bloqueante: que nivel de detalle debe tener el log visible en la pantalla de detalle?
