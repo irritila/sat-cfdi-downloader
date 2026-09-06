@@ -1,8 +1,10 @@
-# Documentación para la implementación del Servicio Web de Verificación de Descarga Masiva de CFDI y CFDI de retenciones
+# Especificación local para la implementación del Servicio Web de Descarga Masiva de CFDI
 
-**SAT / SHCP — Diciembre 2023, Versión 1.2**
+**Compilación local basada en documentación oficial SAT / SHCP**
 
 ---
+
+> Nota de alcance local: este archivo resume la especificacion necesaria para el MVP personal. La fuente canonica queda definida en `docs/adrs/0005-sat-web-service-contract-source.md`. Los servicios de CFDI de retenciones quedan fuera del MVP.
 
 ## Índice
 
@@ -10,8 +12,18 @@
 2. [Prerrequisitos](#2-prerrequisitos)
 3. [Modo de uso para servicios](#3-modo-de-uso-para-servicios)
 4. [Autenticación para servicios](#4-autenticación-para-servicios)
-5. [Servicio de Verificación de Descarga Masiva](#5-servicio-de-verificación-de-descarga-masiva)
-6. [Control de cambios](#6-control-de-cambios)
+5. [Servicio de Solicitud de Descarga Masiva](#5-servicio-de-solicitud-de-descarga-masiva)
+6. [Servicio de Verificación de Descarga Masiva](#6-servicio-de-verificación-de-descarga-masiva)
+7. [Servicio de Descarga Masiva](#7-servicio-de-descarga-masiva)
+8. [Control de cambios](#8-control-de-cambios)
+
+## Fuentes oficiales usadas
+
+- [Portal SAT: Consulta y recuperación de comprobantes](https://wwwmat.sat.gob.mx/cs/Satellite?c=ConsultaInfo&childpagename=SatTyR%2FConsultaInfo%2FSAT_LandingConsultaInformacion&cid=1462231542968&packedargs=d%3DTouch&pagename=TySWrapper).
+- [SAT: URLs productivas del Web Service](https://wwwmat.sat.gob.mx/cs/Satellite?blobcol=urldata&blobkey=id&blobtable=MungoBlobs&blobwhere=1461174995058&ssbinary=true).
+- [SAT: Web service de solicitud de descargas para CFDI y retenciones](https://wwwmat.sat.gob.mx/cs/Satellite?blobcol=urldata&blobkey=id&blobtable=MungoBlobs&blobwhere=1461175195160&ssbinary=true).
+- [SAT: Web service de descarga de solicitudes exitosas](https://wwwmat.sat.gob.mx/cs/Satellite?blobcol=urldata&blobkey=id&blobtable=MungoBlobs&blobwhere=1461174995026&ssbinary=true).
+- [SAT: Web service de verificación de descarga masiva](https://wwwmat.sat.gob.mx/cs/Satellite?blobcol=urldata&blobkey=id&blobtable=MungoBlobs&blobwhere=1461175779527&ssbinary=true).
 
 ---
 
@@ -157,11 +169,129 @@ http://DescargaMasivaTerceros.gob.mx/IAutenticacion/Autentica
 
 ---
 
-## 5. Servicio de Verificación de Descarga Masiva
+## 5. Servicio de Solicitud de Descarga Masiva
+
+Permite crear una solicitud para descargar CFDI o metadata por rango de fechas, emisor/receptor y filtros soportados por SAT. En el MVP solo se usara para solicitar paquetes CFDI/XML.
+
+### 5.1 Endpoint productivo para CFDI
+
+```text
+https://cfdidescargamasivasolicitud.clouda.sat.gob.mx/SolicitaDescargaService.svc
+```
+
+WSDL:
+
+```text
+https://cfdidescargamasivasolicitud.clouda.sat.gob.mx/SolicitaDescargaService.svc?wsdl
+```
+
+SOAPAction:
+
+```text
+http://DescargaMasivaTerceros.sat.gob.mx/ISolicitaDescargaService/SolicitaDescarga
+```
+
+### 5.2 Operación `SolicitaDescarga`
+
+La operación recibe una solicitud firmada con e.firma y devuelve un identificador de solicitud SAT cuando la petición es aceptada.
+
+#### Parámetros
+
+| Parámetro | Tipo | Dirección | Uso en MVP | Observaciones |
+| --- | --- | --- | --- | --- |
+| Authorization | Header | Entrada | Obligatorio | Token obtenido por autenticación. |
+| FechaInicial | DateTime | Entrada | Obligatorio | No se declara cuando la consulta es por folio fiscal. |
+| FechaFinal | DateTime | Entrada | Obligatorio | No se declara cuando la consulta es por folio fiscal. |
+| RfcReceptor | Lista/atributo RFC | Entrada | Segun tipo | Para `emitidos`, se usa como receptor contraparte. Para `recibidos`, identifica al receptor igual a `PerfilSat.rfc`. |
+| RfcEmisor | String | Entrada | Segun tipo | Para `emitidos`, es igual a `PerfilSat.rfc`. Para `recibidos`, es el RFC contraparte si se captura. |
+| RfcSolicitante | String | Entrada | Obligatorio | RFC dueño de la e.firma que realiza la solicitud. |
+| TipoSolicitud | Enum | Entrada | Fijo en `CFDI` | SAT tambien soporta `Metadata`, fuera del MVP. |
+| TipoComprobante | Enum | Entrada | Opcional | `I`, `E`, `T`, `N`, `P` o vacio/sin filtro. |
+| EstadoComprobante | Enum | Entrada | Opcional | `0` cancelado, `1` vigente o vacio/sin filtro. En descarga XML, SAT indica que solo incluye CFDI vigentes. |
+| RfcACuentaTerceros | String | Entrada | Opcional | Filtro especifico del servicio SAT. |
+| Complemento | Enum/String | Entrada | Opcional | Identificador de complemento SAT o vacio/sin filtro. |
+| Folio/UUID | String | Entrada | Fuera del formulario MVP | Si se usa, no deben declararse `FechaInicial`, `FechaFinal`, `RfcEmisor` ni `RfcSolicitante`. |
+| Signature | SignatureType | Entrada | Obligatorio | Firma XML de la petición con e.firma. |
+| IdSolicitud | String | Salida | Persistir | Identificador SAT de la solicitud. |
+| CodEstatus | String | Salida | Persistir | Código de estatus de la petición. |
+| Mensaje | String | Salida | Persistir | Mensaje SAT asociado al estatus. |
+
+#### Orden de atributos para firma
+
+SAT documenta que la petición debe ordenarse para validar correctamente la firma. El orden de atributos documentado es:
+
+1. `Complemento`
+2. `EstadoComprobante`
+3. `FechaInicial`
+4. `FechaFinal`
+5. `Folio`
+6. `RfcACuentaTerceros`
+7. `RfcEmisor`
+8. `RfcSolicitante`
+9. `TipoComprobante`
+10. `TipoSolicitud`
+
+#### Respuesta esperada
+
+Cuando SAT acepta la solicitud, la respuesta contiene:
+
+- `IdSolicitud`.
+- `CodEstatus`.
+- `Mensaje`.
+
+La aplicacion debe persistir esos valores en `SolicitudMasiva`.
+
+#### Códigos de respuesta
+
+| Código | Mensaje | Observaciones |
+| --- | --- | --- |
+| 300 | Usuario No Válido | |
+| 301 | XML Mal Formado | Request con información inválida, por ejemplo RFC receptor no válido. |
+| 302 | Sello Mal Formado | |
+| 303 | Sello no corresponde con RfcSolicitante | |
+| 304 | Certificado Revocado o Caduco | Certificado inválido por tipo, vigencia u otra condición. |
+| 305 | Certificado Inválido | Certificado inválido por tipo, vigencia u otra condición. |
+| 5000 | Solicitud de descarga recibida con éxito | Solicitud aceptada por SAT. |
+| 5001 | Tercero no autorizado | El solicitante no tiene autorización de descarga. |
+| 5002 | Se han agotado las solicitudes de por vida | Se alcanzó el límite con el mismo criterio. |
+| 5005 | Ya se tiene una solicitud registrada | Ya existe una solicitud activa con los mismos criterios. |
+| 5006 | Error interno en el proceso | Error SAT. |
+
+#### Reglas para el MVP
+
+- Solo CFDI regulares, no retenciones.
+- `TipoSolicitud` fijo en `CFDI`.
+- No se implementa solicitud de metadata.
+- No se implementa solicitud por `Folio/UUID`.
+- No se expone `RfcACuentaTerceros`.
+- No se expone `EstadoComprobante`; al solicitar XML/CFDI, SAT documenta que solo se descargan XML vigentes.
+- La UI debe evitar crear solicitudes locales duplicadas antes de llamar a SAT.
+- La equivalencia local anti-duplicados debe considerar los filtros que SAT usa para detectar duplicados: perfil/RFC solicitante, fechas, emisor, receptor y tipo de solicitud; si se agregan mas filtros al formulario, deben incorporarse a la comparacion si SAT los considera criterio.
+- La traduccion UI "emitidos/recibidos" queda definida por `ADR 0008`.
+- Los filtros vacios se omiten del XML; no deben enviarse cadenas vacias salvo que una prueba contra SAT demuestre que el contrato lo exige.
+
+#### Mapeo UI a atributos SAT
+
+| UI | Atributo SAT | Regla |
+| --- | --- | --- |
+| Perfil SAT | `RfcSolicitante` | Siempre es el RFC del perfil/e.firma. |
+| Tipo `emitidos` | `RfcEmisor` | Igual a `PerfilSat.rfc`. |
+| Tipo `emitidos` + RFC contraparte | `RfcReceptores/RfcReceptor` | La contraparte se envia como receptor; si no hay contraparte, se omite. |
+| Tipo `recibidos` | `RfcReceptor` | Igual a `PerfilSat.rfc`. |
+| Tipo `recibidos` + RFC contraparte | `RfcEmisor` | La contraparte se envia como emisor; si no hay contraparte, se omite. |
+| Fecha inicial | `FechaInicial` | Inicio del dia en hora Centro de Mexico. |
+| Fecha final | `FechaFinal` | Fin del dia en hora Centro de Mexico. |
+| Tipo de solicitud | `TipoSolicitud` | Fijo en `CFDI` para el MVP. |
+| Tipo de comprobante | `TipoComprobante` | Opcional: `I`, `E`, `T`, `N`, `P`. Si no se captura, se omite. |
+| Complemento | `Complemento` | Opcional. Si no se captura, se omite. |
+
+---
+
+## 6. Servicio de Verificación de Descarga Masiva
 
 Permite verificar el estatus de las solicitudes de descarga realizadas previamente a través del Servicio de Solicitud de Descarga Masiva. Si la solicitud tiene estatus de terminado, devuelve los identificadores de los paquetes que conforman la solicitud.
 
-### 5.1 VerificaSolicitudDescarga
+### 6.1 VerificaSolicitudDescarga
 
 Verifica el estatus de una solicitud de descarga masiva realizada previamente.
 
@@ -289,7 +419,7 @@ X-Powered-By: ASP.NET
 </s:Envelope>
 ```
 
-### 5.2 Códigos de respuesta
+### 6.2 Códigos de respuesta
 
 > **Nota importante:** Las URL integradas en esta documentación son solo referencia para la correcta interpretación de los ejemplos. Las URL válidas para la implementación del Web Service están publicadas en la sección **Consulta y Recuperación de Comprobantes**, del apartado de Factura Electrónica en el Portal del SAT.
 
@@ -321,7 +451,83 @@ X-Powered-By: ASP.NET
 
 ---
 
-## 6. Control de cambios
+## 7. Servicio de Descarga Masiva
+
+Permite descargar un paquete especifico asociado a una solicitud terminada. El paquete se obtiene usando un identificador devuelto por `VerificaSolicitudDescarga`.
+
+### 7.1 Endpoint productivo para CFDI
+
+```text
+https://cfdidescargamasiva.clouda.sat.gob.mx/DescargaMasivaService.svc
+```
+
+WSDL:
+
+```text
+https://cfdidescargamasiva.clouda.sat.gob.mx/DescargaMasivaService.svc?wsdl
+```
+
+SOAPAction:
+
+```text
+http://DescargaMasivaTerceros.sat.gob.mx/IDescargaMasivaTercerosService/Descargar
+```
+
+### 7.2 Operación `Descargar`
+
+La operación recibe una petición firmada con `IdPaquete` y `RfcSolicitante`. Si la descarga es exitosa, devuelve el contenido del paquete compactado.
+
+#### Parámetros
+
+| Parámetro | Tipo | Dirección | Uso en MVP | Observaciones |
+| --- | --- | --- | --- | --- |
+| Authorization | Header | Entrada | Obligatorio | Token obtenido por autenticación. |
+| IdPaquete | String | Entrada | Obligatorio | Identificador de paquete devuelto por verificación. |
+| RfcSolicitante | String | Entrada | Obligatorio | RFC dueño de la e.firma que realiza la descarga. |
+| Signature | SignatureType | Entrada | Obligatorio | Firma XML de la petición con e.firma. |
+| CodEstatus | String | Salida | Persistir | Código de estatus de la descarga. |
+| Mensaje | String | Salida | Persistir | Mensaje SAT asociado al estatus. |
+| Paquete | Stream/Base64 | Salida | Guardar como ZIP | Contenido del paquete descargado. |
+
+#### Respuesta esperada
+
+Cuando SAT acepta la descarga, la respuesta contiene:
+
+- `CodEstatus`.
+- `Mensaje`.
+- `Paquete`.
+
+La aplicacion debe guardar el paquete como archivo ZIP en la carpeta local definida por la solicitud y actualizar `PaqueteSolicitud`.
+
+#### Códigos de respuesta
+
+| Código | Mensaje | Observaciones |
+| --- | --- | --- |
+| 300 | Usuario No Válido | |
+| 301 | XML Mal Formado | Request con información inválida. |
+| 302 | Sello Mal Formado | |
+| 303 | Sello no corresponde con RfcSolicitante | |
+| 304 | Certificado Revocado o Caduco | El certificado fue revocado o expiró. |
+| 305 | Certificado Inválido | Puede deberse al tipo, codificación u otra condición. |
+| 5000 | Solicitud de descarga recibida con éxito | Descarga aceptada por SAT. |
+| 5004 | No se encontró la información | No se encontró la información del paquete solicitado. |
+| 5007 | No existe el paquete solicitado | Los paquetes solo tienen periodo de vida limitado. |
+| 5008 | Máximo de descargas permitidas | El paquete ya alcanzó el máximo de descargas. |
+| 404 | Error no controlado | Error genérico. Si persiste, levantar un RMA. |
+
+#### Reglas para el MVP
+
+- Solo descargar paquetes ya registrados en `PaqueteSolicitud`.
+- Marcar el paquete como `Descargando` despues de obtener token valido.
+- Guardar el ZIP sin extraer, parsear ni indexar XML.
+- No validar que el ZIP pueda abrirse antes de marcarlo como `Descargado`.
+- Si SAT devuelve `5007`, marcar el paquete como `Vencido`.
+- Si SAT devuelve `5008`, marcar el paquete como `Error` y requerir intervencion manual.
+- No reintentar automaticamente paquetes en `Error`.
+
+---
+
+## 8. Control de cambios
 
 | # | Cambio realizado | Fecha |
 |---|-----------------|-------|
