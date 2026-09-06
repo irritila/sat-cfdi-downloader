@@ -41,6 +41,7 @@ El MVP incluye:
 
 - Tipo de solicitud inicial: CFDI/XML. Metadata queda fuera del MVP.
 - Plataforma inicial: macOS.
+- Stack inicial: Qt 6 con QML / Qt Quick Controls y C++.
 - Descarga de paquetes: automatica cuando SAT reporte paquetes disponibles.
 - Inicio automatico: deshabilitado por defecto; el usuario puede habilitarlo. Cuando este habilitado, la app inicia solo con el icono de menu bar y el worker; no abre la ventana principal.
 - Apertura manual: cuando el usuario abre la app manualmente, la ventana principal debe mostrarse aunque el proceso ya este ejecutandose en el menu bar.

@@ -24,6 +24,7 @@ Decisiones actuales:
 ## Arquitectura objetivo inicial
 
 - UI desktop para macOS.
+- Stack inicial: Qt 6, QML / Qt Quick Controls y C++.
 - Base de datos local.
 - Carpeta local para paquetes ZIP.
 - Worker local para solicitudes, consultas de estado y descargas.

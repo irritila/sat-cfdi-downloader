@@ -59,7 +59,7 @@ flowchart LR
 
 - Validado: el SAT se muestra como unico sistema externo.
 - Validado: base local y carpeta de paquetes ZIP se muestran separados porque tienen responsabilidades distintas.
-- Pendiente para etapas posteriores: definir la implementacion concreta del contrato de almacenamiento seguro de credenciales.
+- Validado por `ADR 0010`: el adaptador inicial de almacenamiento seguro en macOS usa Keychain.
 
 ## 2. Diagrama de casos de uso
 
@@ -770,16 +770,18 @@ Estado: validado.
 
 Objetivo: mostrar los modulos principales dentro de la aplicacion macOS y los contratos que separan UI, casos de uso, persistencia, archivos, credenciales y comunicacion con SAT.
 
+El stack inicial queda definido en `ADR 0011`: Qt 6, QML / Qt Quick Controls para UI y C++/Qt para servicios, dominio y adaptadores.
+
 ```mermaid
 flowchart TB
-    subgraph app["SAT CFDI Downloader - proceso local macOS"]
-        subgraph presentation["Presentacion"]
-            main_ui["Ventana principal"]
+    subgraph app["SAT CFDI Downloader - proceso local macOS - Qt 6"]
+        subgraph presentation["Presentacion QML / Qt Quick Controls"]
+            main_ui["Ventana principal QML"]
             menu_bar["Menu bar controller"]
             notifications_ui["Notificaciones de UI"]
         end
 
-        subgraph application["Aplicacion / Casos de uso"]
+        subgraph application["Aplicacion / Casos de uso C++"]
             profiles_service["Servicio de perfiles SAT"]
             request_service["Servicio de solicitudes"]
             query_service["Servicio de consulta local"]
@@ -787,7 +789,7 @@ flowchart TB
             worker["Worker local<br/>monitoreo y backoff"]
         end
 
-        subgraph domain["Dominio"]
+        subgraph domain["Dominio C++"]
             request_state["Reglas de estado<br/>SolicitudMasiva / PaqueteSolicitud"]
             sat_filters["Reglas de filtros SAT"]
             local_retention["Reglas de retencion local"]
@@ -804,7 +806,7 @@ flowchart TB
         subgraph infrastructure["Adaptadores locales"]
             sat_adapter["Adaptador servicios web SAT"]
             secure_credentials_adapter["Adaptador almacenamiento seguro"]
-            db_adapter["Adaptador base de datos local"]
+            db_adapter["Adaptador base de datos local<br/>SQLite"]
             file_adapter["Adaptador carpeta de paquetes ZIP"]
             macos_adapter["Adaptador macOS<br/>Login Item, menu bar, notificaciones"]
         end
@@ -873,6 +875,7 @@ flowchart TB
 - Los adaptadores son la parte que habla con SAT, macOS, base local, carpeta de ZIPs y almacenamiento seguro local.
 - El contrato de integracion con sistema operativo es generico; macOS es el adaptador inicial del MVP.
 - La politica de monitoreo y backoff vive dentro del worker; no se modela como componente separado.
+- QML no contiene reglas SAT, reglas de estado ni acceso directo a base de datos; consume servicios expuestos desde C++.
 
 ### Decisiones reflejadas
 
@@ -884,6 +887,7 @@ flowchart TB
 - Dependencias externas/locales encapsuladas detras de contratos.
 - El contrato de integracion SO cubre menu bar, Login Item y notificaciones; macOS es la implementacion inicial.
 - Sin extraccion, parseo ni indexacion de XML en el MVP.
+- Stack de aplicacion: Qt 6, QML / Qt Quick Controls, C++ y CMake.
 
 ### Preguntas para revisar
 
