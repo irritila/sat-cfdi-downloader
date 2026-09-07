@@ -326,7 +326,7 @@ Verifica el estatus de una solicitud de descarga masiva realizada previamente.
 | Signature | SignatureType | Firma de la petición con el certificado de e.firma | Entrada |
 | IdsPaquetes | Lista\<String\> | Identificadores de los paquetes. Solo se devuelve cuando el estado es **Terminado** | Salida |
 | EstadoSolicitud | Int | Estado de la solicitud de descarga | Salida |
-| CodigoEstadoSolicitud | String | Código de estado: `5000`, `5001`, `5002` o `5005` | Salida |
+| CodigoEstadoSolicitud | String | Código operativo devuelto por la verificación; consultar la tabla consolidada de códigos de esta sección | Salida |
 | NumeroCFDIs | Int | Número de CFDI que conforman la solicitud | Salida |
 | CodEstatus | String | Código de estatus de la petición de verificación | Salida |
 | Mensaje | String | Descripción del código de la petición de verificación | Salida |
@@ -344,7 +344,9 @@ Verifica el estatus de una solicitud de descarga masiva realizada previamente.
 
 > *La solicitud vence 72 horas después de que se generó el paquete de descarga.
 
-#### Ejemplo de petición
+#### Ejemplo histórico de petición
+
+El siguiente ejemplo se conserva como referencia documental del PDF SAT. El endpoint, host y `SOAPAction` no deben copiarse a la configuración productiva. La implementación debe obtenerlos del WSDL productivo vigente.
 
 ```http
 POST https://srvsolicituddescargamaster.cloudapp.net/VerificaSolicitudDescargaService.svc HTTP/1.1
@@ -444,7 +446,7 @@ X-Powered-By: ASP.NET
 
 > **Nota importante:** Las URL integradas en esta documentación son solo referencia para la correcta interpretación de los ejemplos. Las URL válidas para la implementación del Web Service están publicadas en la sección **Consulta y Recuperación de Comprobantes**, del apartado de Factura Electrónica en el Portal del SAT.
 
-#### Mensajes de la operación VerificaSolicitudDescarga
+#### `CodEstatus` de la operación VerificaSolicitudDescarga
 
 | Código | Mensaje | Observaciones |
 |--------|---------|---------------|
@@ -459,7 +461,7 @@ X-Powered-By: ASP.NET
 | 5004 | No se encontró la información | No se encontró la solicitud de descarga que se pretende verificar |
 | 5011 | Límite de descargas por folio por día | Se ha alcanzado o sobrepasado el límite de descargas diarias por folio |
 
-#### Códigos de Solicitud de Descarga Masiva (CodigoEstadoSolicitud)
+#### `CodigoEstadoSolicitud` de la verificación
 
 | Código | Mensaje | Observaciones |
 |--------|---------|---------------|
@@ -469,6 +471,8 @@ X-Powered-By: ASP.NET
 | 5004 | No se encontró la información | La solicitud de descarga no generó paquetes por falta de información |
 | 5005 | Solicitud duplicada | Si existe una solicitud vigente con los mismos parámetros (Fecha inicial, Fecha final, RfcEmisor, RfcReceptor, TipoSolicitud), no se permitirá generar una nueva |
 | 404 | Error no controlado | Error genérico. Si persiste, levantar un RMA |
+
+`CodEstatus` y `CodigoEstadoSolicitud` son campos diferentes aunque puedan contener el mismo valor en una respuesta. La implementación debe conservarlos por separado y no usar esta tabla como catálogo único para creación, verificación y descarga.
 
 ---
 

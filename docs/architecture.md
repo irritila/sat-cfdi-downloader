@@ -431,7 +431,7 @@ sequenceDiagram
                 else Paquete vencido en SAT
                     SAT-->>Executor: Codigo 5007
                     Executor->>DB: Marcar paquete como Vencido
-                    Executor->>DB: Marcar solicitud como Vencida si no quedan paquetes descargables
+                    Executor->>DB: Registrar vencimiento local del paquete y motivo/origen
                     Executor->>DB: Guardar LogSolicitud
                     Executor->>Notificaciones: Notificar paquete vencido
                 else Descarga fallida
@@ -455,7 +455,7 @@ Lectura:
 - El MVP no valida que el ZIP pueda abrirse antes de marcarlo como descargado.
 - El MVP no extrae, parsea ni indexa XML despues de guardar el ZIP.
 - Si la descarga falla, queda registrado el error y el usuario puede reintentar manualmente.
-- Si SAT devuelve paquete vencido y ya no quedan paquetes descargables, la solicitud pasa a `Vencida`.
+- Si SAT devuelve paquete vencido, el paquete pasa a `Vencido` con motivo/origen de vencimiento. La solicitud solo pasa a `Vencida` cuando la verificacion SAT devuelve `EstadoSolicitud=6`.
 - Si el monitoreo esta pausado, el worker no descarga paquetes.
 - El worker no reintenta automaticamente paquetes en `Error`; esos paquetes requieren accion manual.
 
@@ -657,7 +657,7 @@ sequenceDiagram
                 else Paquete vencido en SAT
                     SAT-->>Executor: Codigo 5007
                     Executor->>DB: Marcar paquete como Vencido
-                    Executor->>DB: Marcar solicitud como Vencida si no quedan paquetes descargables
+                    Executor->>DB: Registrar vencimiento local del paquete y motivo/origen
                     Executor->>DB: Guardar LogSolicitud
                     Executor->>Notificaciones: Notificar paquete vencido
                     Executor-->>Acciones: Paquete vencido
@@ -997,7 +997,7 @@ classDiagram
         +date fechaFinal
         +json filtrosSat
         +string dedupKey
-        +string estado
+        +string estadoLocal
         +string codEstatusSolicitud
         +string mensajeSolicitudSat
         +string estadoSolicitudSat
@@ -1130,9 +1130,7 @@ stateDiagram-v2
         EnProceso --> Vencida: EstadoSolicitud = 6
 
         Terminada --> Terminada: Registrar paquetes disponibles
-        Terminada --> Vencida: Paquetes pendientes expiran
 
-        EnvioFallido --> Enviando: Usuario reintenta envio corregible
     }
 
     Visible --> EliminadaLocalmente: Eliminar solicitud local
@@ -1144,8 +1142,8 @@ stateDiagram-v2
 - `Creada` es estado local: existe antes de que SAT devuelva `IdSolicitud`.
 - `Enviando` permite recuperar un cierre inesperado durante la creacion de solicitud.
 - `Enviada` significa que ya existe `IdSolicitud` SAT y puede ser monitoreada.
-- `Aceptada`, `EnProceso`, `Terminada`, `ErrorSat`, `Rechazada` y `Vencida` reflejan `EstadoSolicitud` devuelto por SAT.
-- `EnvioFallido` y `EnvioIncierto` no tienen `IdSolicitud`; no deben tratarse como estados SAT.
+- `Aceptada`, `EnProceso`, `Terminada`, `ErrorSat`, `Rechazada` y `Vencida` reflejan `EstadoSolicitud` devuelto por SAT; deben persistirse separadas del ciclo local de envio.
+- `EnvioFallido` y `EnvioIncierto` no tienen `IdSolicitud`; no deben tratarse como estados SAT ni reenviarse en el MVP.
 - `Terminada` no significa que los ZIP ya esten descargados. Solo significa que SAT reporto la solicitud como terminada y pueden registrarse paquetes disponibles.
 - `Descargando` y `Descargado` no son estados de `SolicitudMasiva`; pertenecen a `PaqueteSolicitud`.
 - `EliminadaLocalmente` representa eliminacion virtual mediante `eliminadaEn`. No toca SAT ni borra paquetes ZIP.
@@ -1186,8 +1184,8 @@ stateDiagram-v2
         Error --> Descargando: Usuario ejecuta reintento manual
         Descargando --> Disponible: Recuperacion tras cierre inesperado
 
-        Disponible --> Vencido: SolicitudMasiva pasa a Vencida
-        Error --> Vencido: SolicitudMasiva pasa a Vencida
+        Disponible --> Vencido: Expiracion SAT o estimacion local
+        Error --> Vencido: Expiracion SAT o estimacion local
     }
 
     Visible --> EliminadoLocalmente: Eliminar solicitud local
@@ -1703,7 +1701,7 @@ erDiagram
         date fecha_final
         string filtros_sat_json
         string dedup_key
-        string estado
+        string estado_local
         string cod_estatus_solicitud
         string mensaje_solicitud_sat
         string estado_solicitud_sat
@@ -1732,6 +1730,9 @@ erDiagram
         datetime disponible_en
         datetime descargado_en
         datetime vencimiento_estimado_en
+        string motivo_vencimiento
+        string origen_vencimiento
+        datetime reconciliado_en
         string codigo_descarga_sat
         string mensaje_descarga_sat
         string ultimo_error
@@ -1778,7 +1779,7 @@ erDiagram
 - Debe existir una restriccion logica o indice unico parcial para impedir solicitudes activas equivalentes por `dedup_key`, considerando solo los estados que bloquean duplicados.
 - `PAQUETE_SOLICITUD` debe tener unicidad por `solicitud_masiva_id` + `id_paquete_sat`.
 - `CONFIGURACION_APP` debe manejarse como registro unico de configuracion local.
-- Indice para monitoreo: `SOLICITUD_MASIVA.estado`, `siguiente_verificacion_en`, `eliminada_en`.
+- Indice para monitoreo: `SOLICITUD_MASIVA.estado_local`, `estado_solicitud_sat`, `siguiente_verificacion_en`, `eliminada_en`.
 - Indice para descarga: `PAQUETE_SOLICITUD.estado_descarga`, `eliminado_en`.
 - Indice para detalle: `LOG_SOLICITUD.solicitud_masiva_id`, `creado_en`.
 

@@ -14,6 +14,7 @@ Este documento no agrega funcionalidades al MVP. Solo precisa como se ejecutan y
 - Todas las operaciones criticas pasan por un ejecutor serial.
 - La UI nunca aplica directamente respuestas SAT ni escribe estados persistidos.
 - Los codigos SAT se guardan sin mezclar respuesta de creacion, estado de verificacion y descarga.
+- El estado SAT y el ciclo de vida local se persisten por separado.
 - Las transacciones locales deben mantener coherentes `SolicitudMasiva`, `PaqueteSolicitud` y `LogSolicitud`.
 - Los ZIP se escriben con archivo temporal y rename atomico antes de marcar `Descargado`.
 
@@ -56,6 +57,15 @@ No se implementan `SolicitaDescargaFolio`, `Metadata`, `RfcACuentaTerceros` ni X
 
 ## Estados de SolicitudMasiva
 
+`SolicitudMasiva` conserva dos dimensiones distintas:
+
+- `estado_local`: ciclo previo o posterior a la llamada SAT (`Creada`, `Enviando`, `Enviada`, `EnvioFallido`, `EnvioIncierto` o `EliminadaLocalmente`).
+- `estado_solicitud_sat`: estado devuelto por SAT (`Aceptada`, `EnProceso`, `Terminada`, `Error`, `Rechazada` o `Vencida`). Es nulo mientras SAT no haya devuelto un estado.
+
+La UI puede mostrar un estado resumido, pero no debe persistir una sola columna que mezcle ambas dimensiones.
+
+En las tablas siguientes, los estados mostrados como `Aceptada`, `EnProceso`, `Terminada`, `ErrorSat`, `Rechazada` y `Vencida` son valores de presentacion derivados de `estado_solicitud_sat`; `Creada`, `Enviando`, `Enviada`, `EnvioFallido` y `EnvioIncierto` provienen de `estado_local`.
+
 | Estado | Significado | Tiene `IdSolicitud` SAT | Worker automatico | Acciones manuales validas |
 | --- | --- | --- | --- | --- |
 | `Creada` | Registro local creado antes de enviar a SAT. | No | Puede enviar si no hay intento iniciado. | Eliminar local. |
@@ -66,8 +76,8 @@ No se implementan `SolicitaDescargaFolio`, `Metadata`, `RfcACuentaTerceros` ni X
 | `Terminada` | SAT reporto `EstadoSolicitud=3`; paquetes deben estar registrados. | Si | Descargar paquetes pendientes; verificar solo si hace falta reconciliar. | Descargar, reintentar descarga, eliminar local. |
 | `ErrorSat` | SAT reporto `EstadoSolicitud=4`. | Si | Terminal para worker automatico. | Eliminar local. |
 | `Rechazada` | SAT reporto `EstadoSolicitud=5` o rechazo inicial conocido sin `IdSolicitud`. | Puede no tener | Terminal para worker automatico. | Eliminar local. |
-| `Vencida` | SAT reporto `EstadoSolicitud=6` o paquetes pendientes expiraron. | Si | Terminal para verificacion/descarga automatica. | Eliminar local; crear nueva solicitud manualmente. |
-| `EnvioFallido` | Fallo conocido antes de crear solicitud: autenticacion, XML local mal formado, rechazo con codigo claro. | No | Terminal para worker automatico. | Reintentar envio si el error es corregible; eliminar local. |
+| `Vencida` | SAT reporto `EstadoSolicitud=6`. | Si | Terminal para verificacion/descarga automatica. | Eliminar local; crear nueva solicitud manualmente. |
+| `EnvioFallido` | Fallo conocido antes de crear solicitud: autenticacion, XML local mal formado, rechazo con codigo claro. | No | Terminal para worker automatico. | Eliminar local; crear nueva solicitud manualmente. |
 | `EnvioIncierto` | Timeout/interrupcion despues de iniciar envio; no se sabe si SAT creo solicitud. | No | No reintentar automaticamente. | Eliminar local; crear nueva solicitud manualmente con advertencia. |
 | `EliminadaLocalmente` | Eliminacion virtual. | Puede tener | Ignorar. | Ninguna. |
 
@@ -75,7 +85,7 @@ Notas:
 
 - `ErrorSat` no debe mezclarse con `EnvioFallido`.
 - `EnvioIncierto` existe para evitar reintentos automaticos que puedan gastar cupo SAT o topar duplicados.
-- Una solicitud `Terminada` puede pasar a `Vencida` si aun tiene paquetes no descargados y SAT/descarga indica expiracion.
+- `Vencida` solo representa `EstadoSolicitud=6` de SAT. La expiracion local de un paquete se registra en `PaqueteSolicitud` con su motivo y origen, y no cambia por si sola el estado SAT de la solicitud.
 
 ## Estados de PaqueteSolicitud
 
@@ -85,7 +95,7 @@ Notas:
 | `Descargando` | Token valido obtenido y descarga iniciada. | No iniciar otra descarga concurrente. | Eliminar local, con advertencia. |
 | `Descargado` | Archivo final existe porque el temporal fue renombrado correctamente. | Ignorar. | Eliminar local via solicitud. |
 | `Error` | Error SAT, red, autenticacion, archivo o interrupcion. | No reintentar automaticamente. | Reintentar descarga, eliminar local via solicitud. |
-| `Vencido` | SAT indico paquete inexistente/expirado o vencio la solicitud. | Ignorar. | Eliminar local via solicitud. |
+| `Vencido` | El paquete ya no es descargable. La causa se conserva en `motivo_vencimiento` y `origen_vencimiento`. | Ignorar. | Eliminar local via solicitud. |
 | `EliminadoLocalmente` | Eliminacion virtual. | Ignorar. | Ninguna. |
 
 Transiciones adicionales:
@@ -99,8 +109,8 @@ Transiciones adicionales:
 La app detecta vencimiento de solicitudes o paquetes por tres caminos:
 
 - Verificacion SAT devuelve `EstadoSolicitud = 6`: la solicitud pasa a `Vencida` y sus paquetes no descargados pasan a `Vencido` en la misma transaccion.
-- Descarga SAT devuelve `5007` para un paquete: el paquete pasa a `Vencido`. Si ya no quedan paquetes descargables para esa solicitud, la solicitud pasa a `Vencida`.
-- El scheduler detecta `vencimiento_estimado_en` vencido para paquetes `Disponible`, `Error` o `Descargando`: esos paquetes pasan a `Vencido` y se registra `LogSolicitud`. Si no quedan paquetes descargables, la solicitud pasa a `Vencida`.
+- Descarga SAT devuelve `5007` para un paquete: el paquete pasa a `Vencido` con origen `SAT` y motivo `paquete_expirado`. Esto no cambia el estado SAT de la solicitud.
+- El scheduler detecta `vencimiento_estimado_en` vencido para paquetes `Disponible`, `Error` o `Descargando`: esos paquetes pasan a `Vencido` con origen `estimacion_local` y se registra `LogSolicitud`. Esto tampoco cambia el estado SAT de la solicitud.
 
 La deteccion por fecha estimada no borra archivos ni recrea solicitudes. Solo evita seguir presentando paquetes como descargables cuando la ventana de SAT probablemente expiro.
 
@@ -193,7 +203,7 @@ Reglas Qt/SQLite:
 3. Llamar SAT.
 4. Transaccion local:
    - Si `CodEstatus=5000` e `IdSolicitud` existe: marcar `Enviada`, guardar `id_solicitud_sat`, `cod_estatus_solicitud` y mensaje.
-   - Si SAT rechaza con codigo conocido sin `IdSolicitud`: marcar `Rechazada` o `EnvioFallido` segun causa.
+- Si SAT rechaza con codigo conocido sin `IdSolicitud`: marcar `EnvioFallido` si el fallo es operativo o `Rechazada` si la respuesta representa un rechazo SAT.
    - Si hay timeout/interrupcion despues de iniciar HTTP: marcar `EnvioIncierto`.
 
 ### Verificar solicitud
@@ -202,7 +212,7 @@ Una sola transaccion debe:
 
 - Actualizar `SolicitudMasiva` con `estado_solicitud_sat`, `codigo_estado_solicitud`, mensaje, fechas y estado local.
 - Si SAT reporta `Terminada`, registrar o actualizar todos los `PaqueteSolicitud` devueltos.
-- Si SAT reporta `Vencida`, marcar paquetes no descargados como `Vencido`.
+- Si SAT reporta `Vencida`, marcar paquetes no descargados como `Vencido` con origen `SAT` y motivo `solicitud_expirada`.
 - Registrar `LogSolicitud`.
 
 La app no debe dejar `SolicitudMasiva=Terminada` sin registrar los paquetes recibidos en la misma transaccion.
@@ -216,7 +226,7 @@ La app no debe dejar `SolicitudMasiva=Terminada` sin registrar los paquetes reci
 5. Renombrar archivo temporal a ruta final.
 6. Transaccion local: marcar `Descargado`, guardar ruta y codigo SAT.
 
-Si falla antes de renombrar, el paquete queda en `Error`, `Disponible` o `Vencido` segun causa. Si la causa es vencimiento y no quedan paquetes descargables, la solicitud queda `Vencida` en la misma transaccion.
+Si falla antes de renombrar, el paquete queda en `Error`, `Disponible` o `Vencido` segun causa. La solicitud solo pasa a `Vencida` si una respuesta de verificacion SAT reporta `EstadoSolicitud=6`.
 
 ### Eliminar solicitud local
 
@@ -233,9 +243,11 @@ No borra ZIPs fisicos.
 Al iniciar la app:
 
 - `Creada` sin intento de envio: se mantiene visible y puede enviarse.
-- `Enviando` con intento iniciado: pasa a `EnvioIncierto` y registra log.
+- `Enviando` con intento iniciado: pasa a `EnvioIncierto` y registra log. No se reenvia desde el MVP.
 - `Descargando` sin archivo final: pasa a `Disponible` y registra log de descarga interrumpida.
-- Archivos temporales `.part` o `.tmp` se eliminan o ignoran.
+- Si existe el archivo final para un paquete en `Descargando`, se reconcilia como `Descargado` y se registra el evento.
+- Archivos temporales `.part` o `.tmp` sin archivo final se eliminan o ignoran.
+- Un archivo final sin paquete persistido se conserva como archivo huerfano y se registra en `LogSolicitud`; no se elimina automaticamente.
 - Solicitudes `Terminada` con paquetes `Disponible` o `Error` quedan disponibles para descarga o reintento manual.
 - Solicitudes eliminadas localmente se ignoran por worker y UI principal.
 

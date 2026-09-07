@@ -17,7 +17,7 @@ Este milestone no agrega alcance comercial, multiusuario ni backend remoto. La p
 - Base local SQLite con migracion inicial.
 - Repositorios para perfiles, solicitudes, paquetes, logs y configuracion.
 - Carpeta local fija para paquetes ZIP.
-- Worker local con pausa persistente, intervalo 10/30 min y estados definidos.
+- Worker local con pausa persistente, intervalo fijo de 10 minutos que puede elevarse a 30 minutos por backoff, y estados definidos. Estos valores no son configurables en el MVP.
 - Contratos internos iniciales: `SatGateway`, `SecretStore`, `OSIntegration`, `PackageStorage`, repositorios y `LogSanitizer`.
 - Adaptadores iniciales con implementaciones reales o stubs controlados segun riesgo.
 - Spike tecnico temprano de firma/autenticacion/operaciones SAT para validar el contrato antes de conectar el flujo productivo.

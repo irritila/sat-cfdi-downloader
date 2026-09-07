@@ -244,7 +244,7 @@ Para mantener simple el MVP, las acciones manuales pendientes se guardan como do
 
 ## 9. Estados
 
-La aplicacion debe mostrar estados simples y entendibles.
+La aplicacion debe mostrar estados simples y entendibles. El modelo persiste por separado el ciclo local de envio y el estado devuelto por SAT; la UI puede presentar un resumen derivado.
 
 Estados sugeridos para `SolicitudMasiva`:
 
@@ -272,7 +272,7 @@ La lista de solicitudes puede mostrar un estado agregado de descarga cuando una 
 
 El estado `Error SAT` de una solicitud es terminal para el worker automatico. Cualquier reintento debe ejecutarse como accion manual del usuario.
 
-Una solicitud en `Envio fallido` no tiene `IdSolicitud` SAT y solo puede reintentarse si el error es corregible. Una solicitud en `Envio incierto` tampoco tiene `IdSolicitud`; la aplicacion no debe reintentar automaticamente porque no sabe si SAT alcanzo a registrar la solicitud.
+Una solicitud en `Envio fallido` no tiene `IdSolicitud` SAT y es terminal en el MVP. Una solicitud en `Envio incierto` tampoco tiene `IdSolicitud`; la aplicacion no debe reenviarla porque no sabe si SAT alcanzo a registrar la solicitud. El usuario puede crear una nueva solicitud manualmente.
 
 El estado `Error` de un paquete no se reintenta automaticamente por el worker. Cualquier reintento de descarga debe ejecutarse como accion manual del usuario.
 

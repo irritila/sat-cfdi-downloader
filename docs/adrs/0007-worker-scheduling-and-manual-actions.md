@@ -24,7 +24,7 @@ Reglas:
 - Si el monitoreo esta pausado, esas acciones quedan pendientes en `SolicitudMasiva` hasta reanudar.
 - Las acciones pendientes se representan como dos intenciones idempotentes: `verificacion_pendiente` y `descarga_pendiente`.
 - El estado `ErrorSat` de `SolicitudMasiva` es terminal para el worker automatico.
-- `EnvioFallido` y `EnvioIncierto` no tienen `IdSolicitud` y no deben verificarse automaticamente.
+- `EnvioFallido` y `EnvioIncierto` no tienen `IdSolicitud`, son terminales en el MVP y no deben verificarse ni reenviarse.
 - El estado `Error` de `PaqueteSolicitud` no se reintenta automaticamente; requiere accion manual.
 
 ## Consecuencias
