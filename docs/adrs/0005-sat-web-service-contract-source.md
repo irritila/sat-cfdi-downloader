@@ -1,4 +1,4 @@
-# ADR 0005: Usar documentacion oficial SAT como fuente canonica de contratos SAT
+# ADR 0005: Usar fuentes oficiales SAT y WSDL productivos como autoridad de contrato
 
 ## Estado
 
@@ -8,7 +8,7 @@ Accepted
 
 Al revisar la documentacion inicial, `docs/web-service.md` solo documentaba autenticacion y `VerificaSolicitudDescarga`. Para implementar el MVP tambien se requerian contratos trazables para:
 
-- `SolicitaDescarga`.
+- `SolicitaDescargaEmitidos` y `SolicitaDescargaRecibidos`.
 - `DescargaMasiva`.
 
 La arquitectura ya modelaba `SatGateway.crearSolicitud()` y `SatGateway.descargarPaquete()`, por lo que era necesario decidir una fuente canonica antes de fijar firma, payload, codigos, filtros y comportamiento real.
@@ -17,13 +17,15 @@ En el portal del SAT de consulta y recuperacion de comprobantes existen document
 
 ## Decision
 
-Usar la documentacion oficial del SAT como fuente canonica para definir los contratos del web service.
+Usar fuentes oficiales SAT como base canonica, separando forma tecnica y reglas funcionales.
 
 Orden de autoridad:
 
-1. Documentos oficiales SAT enlazados desde el portal de consulta y recuperacion de comprobantes.
-2. WSDL publicados por SAT para los servicios productivos.
+1. WSDL productivos publicados por SAT para nombres de operaciones, SOAPActions, tipos XSD, endpoints efectivos y estructura SOAP concreta.
+2. Documentos oficiales SAT enlazados desde el portal de consulta y recuperacion de comprobantes para reglas funcionales, limites, codigos y comportamiento operativo.
 3. `phpcfdi/sat-ws-descarga-masiva` como referencia secundaria de implementacion, ejemplos y compatibilidad, no como fuente normativa.
+
+Si el WSDL productivo y un PDF oficial difieren, la discrepancia debe documentarse en `docs/web-service.md` y validarse con spike tecnico antes de conectar un flujo productivo. No se debe fijar contrato C++ definitivo sobre firmas asumidas.
 
 Para el MVP inicial se consumira el servicio productivo de CFDI regulares:
 
@@ -36,10 +38,10 @@ Los servicios de retenciones quedan fuera del MVP, aunque se documentan como sep
 
 ## Consecuencias
 
-- Se cierra el bloqueante de fuente canonica.
+- Se cierra la regla de autoridad de fuentes, pero la interoperabilidad real queda sujeta al spike tecnico SAT.
 - `docs/web-service.md` contiene la especificacion local vigente con endpoints, operaciones, parametros, codigos y reglas MVP.
 - La especificacion local debe mantenerse trazable a los documentos oficiales SAT.
-- Los WSDL pueden usarse para validar nombres de servicios, endpoints y contratos generables, pero la implementacion debe respetar tambien las reglas funcionales del PDF oficial.
+- Los WSDL controlan nombres de servicios, endpoints y contratos generables; la implementacion debe respetar tambien las reglas funcionales del PDF oficial.
 - `phpcfdi/sat-ws-descarga-masiva` puede usarse para contrastar comportamiento real y casos conocidos, especialmente cuando la documentacion oficial sea ambigua.
 
 ## Referencias
@@ -51,6 +53,6 @@ Los servicios de retenciones quedan fuera del MVP, aunque se documentan como sep
 - Servicio de solicitud SAT: https://wwwmat.sat.gob.mx/cs/Satellite?blobcol=urldata&blobkey=id&blobtable=MungoBlobs&blobwhere=1461175195160&ssbinary=true
 - Servicio de descarga SAT: https://wwwmat.sat.gob.mx/cs/Satellite?blobcol=urldata&blobkey=id&blobtable=MungoBlobs&blobwhere=1461174995026&ssbinary=true
 - Servicio de verificacion SAT: https://wwwmat.sat.gob.mx/cs/Satellite?blobcol=urldata&blobkey=id&blobtable=MungoBlobs&blobwhere=1461175779527&ssbinary=true
-- WSDL solicitud CFDI: https://cfdidescargamasivasolicitud.clouda.sat.gob.mx/SolicitaDescargaService.svc?wsdl
-- WSDL descarga CFDI: https://cfdidescargamasiva.clouda.sat.gob.mx/DescargaMasivaService.svc?wsdl
+- WSDL solicitud CFDI: https://cfdidescargamasivasolicitud.clouda.sat.gob.mx/SolicitaDescargaService.svc?singleWsdl
+- WSDL descarga CFDI: https://cfdidescargamasiva.clouda.sat.gob.mx/DescargaMasivaService.svc?singleWsdl
 - Referencia secundaria: https://github.com/phpcfdi/sat-ws-descarga-masiva

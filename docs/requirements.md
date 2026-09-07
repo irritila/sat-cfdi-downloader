@@ -154,9 +154,11 @@ Campos iniciales:
 
 Nota: los campos del formulario deben mantenerse alineados con la especificacion local del servicio SAT.
 
-El mapeo de esos campos a `SolicitaDescarga` queda definido en `docs/adrs/0008-map-ui-filters-to-sat-solicita-descarga.md`.
+El mapeo de esos campos a las operaciones SAT `SolicitaDescargaEmitidos` y `SolicitaDescargaRecibidos` queda definido en `docs/adrs/0013-sat-request-operations-v15.md`.
 
 Antes de enviar una solicitud al SAT, la aplicacion debe validar localmente que no exista otra solicitud activa/no eliminada para el mismo perfil SAT con los mismos filtros relevantes para el servicio. Si existe, debe bloquear el envio y mostrar la solicitud existente, sin llamar al SAT.
+
+Para el MVP, `EstadoComprobante` no se expone en UI. La aplicacion lo fija internamente en `Vigente` para solicitudes CFDI/XML.
 
 ### 7.4 Detalle de solicitud
 
@@ -238,7 +240,7 @@ Si el monitoreo esta pausado, el worker no debe consultar ni descargar hasta que
 
 Si el monitoreo esta pausado, las acciones manuales que impliquen verificar estatus o descargar paquetes deben quedar pendientes hasta que el usuario reanude el monitoreo.
 
-Para mantener simple el MVP, la accion manual pendiente se guarda como metadata de `SolicitudMasiva`; no existe una entidad separada para cola de acciones.
+Para mantener simple el MVP, las acciones manuales pendientes se guardan como dos intenciones idempotentes en `SolicitudMasiva`: verificacion pendiente y descarga pendiente. No existe una entidad separada para cola de acciones.
 
 ## 9. Estados
 
@@ -247,11 +249,14 @@ La aplicacion debe mostrar estados simples y entendibles.
 Estados sugeridos para `SolicitudMasiva`:
 
 - Creada.
+- Enviando.
 - Enviada.
 - Aceptada.
 - En proceso.
 - Terminada.
-- Error.
+- Error SAT.
+- Envio fallido.
+- Envio incierto.
 - Rechazada.
 - Vencida.
 
@@ -265,11 +270,19 @@ Estados sugeridos para `PaqueteSolicitud`:
 
 La lista de solicitudes puede mostrar un estado agregado de descarga cuando una solicitud terminada tenga paquetes en `Disponible`, `Descargando`, `Descargado`, `Error` o `Vencido`, pero el estado SAT de la solicitud y el estado local de paquetes deben mantenerse separados.
 
-El estado `Error` de una solicitud es terminal para el worker automatico. Cualquier reintento debe ejecutarse como accion manual del usuario.
+El estado `Error SAT` de una solicitud es terminal para el worker automatico. Cualquier reintento debe ejecutarse como accion manual del usuario.
+
+Una solicitud en `Envio fallido` no tiene `IdSolicitud` SAT y solo puede reintentarse si el error es corregible. Una solicitud en `Envio incierto` tampoco tiene `IdSolicitud`; la aplicacion no debe reintentar automaticamente porque no sabe si SAT alcanzo a registrar la solicitud.
 
 El estado `Error` de un paquete no se reintenta automaticamente por el worker. Cualquier reintento de descarga debe ejecutarse como accion manual del usuario.
 
 Los estados internos de la aplicacion deben conservar los codigos originales del SAT para diagnostico.
+
+La aplicacion debe guardar por separado:
+
+- Codigo y mensaje de creacion de solicitud (`CodEstatus` y `Mensaje`).
+- Estado y codigo de verificacion (`EstadoSolicitud`, `CodigoEstadoSolicitud` y mensaje).
+- Codigo y mensaje de descarga por paquete.
 
 Estados SAT documentados para `EstadoSolicitud`:
 
@@ -300,20 +313,24 @@ Cada `PerfilSat` tiene una sola credencial activa, reemplazable cuando el usuari
 Metadata minima de `SolicitudMasiva`:
 
 - Perfil SAT.
+- Operacion SAT usada.
 - RFC solicitante.
 - Tipo: emitidos o recibidos.
 - Fechas solicitadas.
 - Filtros enviados.
+- Clave local anti-duplicados.
 - Identificador SAT de solicitud.
 - Estatus actual.
-- Codigo SAT.
-- Mensaje SAT.
+- Codigo y mensaje de creacion de solicitud.
+- Estado, codigo y mensaje de verificacion.
 - Numero de CFDI reportados, si aplica.
 - Fecha de creacion.
+- Fecha de inicio de envio.
 - Fecha de envio.
 - Ultima verificacion.
 - Ultimo error, si existe.
-- Accion manual pendiente, si existe.
+- Verificacion pendiente, si existe.
+- Descarga pendiente, si existe.
 - Fecha de accion manual pendiente, si existe.
 
 El numero de CFDI reportados por SAT puede venir vacio, nulo o en cero aun cuando existan paquetes. No debe usarse como unico indicador de exito o fracaso de una solicitud.
@@ -325,6 +342,7 @@ Metadata minima de `PaqueteSolicitud`:
 - Estatus de descarga.
 - Ruta local del archivo descargado.
 - Fecha de descarga.
+- Codigo y mensaje SAT de descarga, si existen.
 - Error de descarga, si existe.
 - Fecha de vencimiento estimada, si se puede inferir de la respuesta SAT o del momento en que se reporto disponible.
 
@@ -369,6 +387,7 @@ Requerimientos:
 - No persistir tokens SAT. Solo pueden mantenerse en memoria del proceso hasta expirar, fallar autenticacion, terminar el ciclo en curso o cerrar la app.
 - No guardar tokens SAT en logs ni en texto plano.
 - Guardar peticiones/respuestas SAT en `LogSolicitud` solo despues de sanitizar token, firma, llave privada, contrasena y cualquier otro secreto.
+- No guardar en `LogSolicitud` el contenido `Paquete` de descarga ni base64/bytes del ZIP.
 - Permitir operar sin backend remoto.
 
 ## 13. Requerimientos funcionales
@@ -383,11 +402,15 @@ La aplicacion debe permitir registrar certificado, llave privada y contrasena de
 
 Al registrar e.firma, la aplicacion debe importar/copiar `.cer` y `.key` al almacenamiento controlado por la aplicacion.
 
+Antes de marcar el perfil como listo para crear solicitudes, la aplicacion debe validar que la contrasena abre la llave privada, que certificado y llave corresponden, que el RFC del certificado corresponde al perfil y que la e.firma esta vigente.
+
 ### RF-003 Crear solicitud masiva
 
 La aplicacion debe permitir crear una solicitud de descarga masiva usando un perfil SAT y filtros soportados por el SAT.
 
 Antes de llamar al SAT, la aplicacion debe rechazar solicitudes locales duplicadas con los mismos parametros relevantes. Esta defensa evita gastar cupos o topar errores SAT por solicitudes duplicadas.
+
+La comparacion anti-duplicados debe usar la clave normalizada definida en `docs/design/operational-rules.md`. Las solicitudes en curso bloquean duplicados; las solicitudes terminales o eliminadas no bloquean automaticamente, pero deben mostrarse como advertencia antes de reenviar.
 
 ### RF-004 Guardar solicitud localmente
 
@@ -409,6 +432,8 @@ La aplicacion debe monitorear solicitudes pendientes mediante un worker local mi
 
 La aplicacion debe descargar paquetes ZIP disponibles para solicitudes terminadas.
 
+La aplicacion debe escribir cada ZIP primero a un archivo temporal y marcarlo como descargado solo despues de renombrarlo a la ruta final.
+
 ### RF-009 Ver detalle
 
 La aplicacion debe permitir abrir el detalle de una solicitud desde la lista.
@@ -421,7 +446,7 @@ El cierre normal de la aplicacion no debe registrar `LogSolicitud` por cada soli
 
 ### RF-011 Manejar errores SAT
 
-La aplicacion debe guardar codigo y mensaje SAT cuando ocurra un error o rechazo.
+La aplicacion debe guardar codigo y mensaje SAT cuando ocurra un error o rechazo, separando origen de creacion de solicitud, verificacion de solicitud y descarga de paquete.
 
 ### RF-012 Evitar duplicar descargas
 
@@ -523,11 +548,11 @@ Dado que existe una solicitud en la lista, cuando el usuario abre su detalle, en
 
 ### CA-006 Descargar paquetes
 
-Dado que una solicitud tiene paquetes disponibles, cuando el worker o el usuario inicia la descarga, entonces la aplicacion guarda los paquetes localmente y actualiza su estado.
+Dado que una solicitud tiene paquetes disponibles, cuando el worker o el usuario inicia la descarga, entonces la aplicacion guarda los paquetes localmente con archivo temporal, renombra a la ruta final y solo entonces actualiza su estado a descargado.
 
 ### CA-007 Registrar error
 
-Dado que SAT responde con error, rechazo o vencimiento, cuando la aplicacion procesa la respuesta, entonces guarda codigo, mensaje y fecha del evento.
+Dado que SAT responde con error, rechazo o vencimiento, cuando la aplicacion procesa la respuesta, entonces guarda codigo, mensaje, origen y fecha del evento.
 
 ### CA-008 Continuar despues de cerrar
 

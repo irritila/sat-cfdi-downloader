@@ -20,6 +20,7 @@ Reglas:
 
 - `MacOSSecretStore` usa Keychain para secretos pequenos, llaves de cifrado y contrasenas.
 - Al registrar e.firma, la app importa/copia `.cer` y `.key` al almacenamiento controlado por la app.
+- Antes de marcar el perfil como listo para crear solicitudes, la app debe validar que la contrasena abre la llave privada, que certificado y llave corresponden, que el RFC del certificado corresponde al perfil y que la e.firma esta vigente.
 - La llave privada importada debe quedar cifrada en reposo. La llave o secreto que permite descifrarla vive en Keychain, no en la base local.
 - La contrasena de e.firma se guarda en Keychain, nunca en la base local ni en logs.
 - `CredencialSat` guarda solo referencias no secretas a los items administrados por `SecretStore`.

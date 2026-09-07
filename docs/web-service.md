@@ -24,6 +24,8 @@
 - [SAT: Web service de solicitud de descargas para CFDI y retenciones](https://wwwmat.sat.gob.mx/cs/Satellite?blobcol=urldata&blobkey=id&blobtable=MungoBlobs&blobwhere=1461175195160&ssbinary=true).
 - [SAT: Web service de descarga de solicitudes exitosas](https://wwwmat.sat.gob.mx/cs/Satellite?blobcol=urldata&blobkey=id&blobtable=MungoBlobs&blobwhere=1461174995026&ssbinary=true).
 - [SAT: Web service de verificación de descarga masiva](https://wwwmat.sat.gob.mx/cs/Satellite?blobcol=urldata&blobkey=id&blobtable=MungoBlobs&blobwhere=1461175779527&ssbinary=true).
+- [WSDL productivo: SolicitaDescargaService](https://cfdidescargamasivasolicitud.clouda.sat.gob.mx/SolicitaDescargaService.svc?singleWsdl).
+- [WSDL productivo: DescargaMasivaService](https://cfdidescargamasiva.clouda.sat.gob.mx/DescargaMasivaService.svc?singleWsdl).
 
 ---
 
@@ -173,6 +175,8 @@ http://DescargaMasivaTerceros.gob.mx/IAutenticacion/Autentica
 
 Permite crear una solicitud para descargar CFDI o metadata por rango de fechas, emisor/receptor y filtros soportados por SAT. En el MVP solo se usara para solicitar paquetes CFDI/XML.
 
+Nota de version: el PDF oficial SAT enlazado desde el portal puede describir la operacion historica `SolicitaDescarga`. El WSDL productivo vigente publica operaciones separadas para emitidos, recibidos y folio. Para la forma SOAP concreta se usa el WSDL productivo; para reglas funcionales, limites y codigos se conserva la documentacion oficial SAT como fuente canonica.
+
 ### 5.1 Endpoint productivo para CFDI
 
 ```text
@@ -182,43 +186,71 @@ https://cfdidescargamasivasolicitud.clouda.sat.gob.mx/SolicitaDescargaService.sv
 WSDL:
 
 ```text
-https://cfdidescargamasivasolicitud.clouda.sat.gob.mx/SolicitaDescargaService.svc?wsdl
+https://cfdidescargamasivasolicitud.clouda.sat.gob.mx/SolicitaDescargaService.svc?singleWsdl
 ```
 
-SOAPAction:
+### 5.2 Operaciones publicadas por el WSDL productivo
 
-```text
-http://DescargaMasivaTerceros.sat.gob.mx/ISolicitaDescargaService/SolicitaDescarga
-```
+| Operacion | Uso en MVP | SOAPAction |
+| --- | --- | --- |
+| `SolicitaDescargaEmitidos` | Crear solicitud CFDI/XML emitidos. | `http://DescargaMasivaTerceros.sat.gob.mx/ISolicitaDescargaService/SolicitaDescargaEmitidos` |
+| `SolicitaDescargaRecibidos` | Crear solicitud CFDI/XML recibidos. | `http://DescargaMasivaTerceros.sat.gob.mx/ISolicitaDescargaService/SolicitaDescargaRecibidos` |
+| `SolicitaDescargaFolio` | Fuera del MVP. | `http://DescargaMasivaTerceros.sat.gob.mx/ISolicitaDescargaService/SolicitaDescargaFolio` |
 
-### 5.2 Operación `SolicitaDescarga`
-
-La operación recibe una solicitud firmada con e.firma y devuelve un identificador de solicitud SAT cuando la petición es aceptada.
-
-#### Parámetros
+### 5.3 Parámetros comunes
 
 | Parámetro | Tipo | Dirección | Uso en MVP | Observaciones |
 | --- | --- | --- | --- | --- |
 | Authorization | Header | Entrada | Obligatorio | Token obtenido por autenticación. |
 | FechaInicial | DateTime | Entrada | Obligatorio | No se declara cuando la consulta es por folio fiscal. |
 | FechaFinal | DateTime | Entrada | Obligatorio | No se declara cuando la consulta es por folio fiscal. |
-| RfcReceptor | Lista/atributo RFC | Entrada | Segun tipo | Para `emitidos`, se usa como receptor contraparte. Para `recibidos`, identifica al receptor igual a `PerfilSat.rfc`. |
-| RfcEmisor | String | Entrada | Segun tipo | Para `emitidos`, es igual a `PerfilSat.rfc`. Para `recibidos`, es el RFC contraparte si se captura. |
-| RfcSolicitante | String | Entrada | Obligatorio | RFC dueño de la e.firma que realiza la solicitud. |
-| TipoSolicitud | Enum | Entrada | Fijo en `CFDI` | SAT tambien soporta `Metadata`, fuera del MVP. |
-| TipoComprobante | Enum | Entrada | Opcional | `I`, `E`, `T`, `N`, `P` o vacio/sin filtro. |
-| EstadoComprobante | Enum | Entrada | Opcional | `0` cancelado, `1` vigente o vacio/sin filtro. En descarga XML, SAT indica que solo incluye CFDI vigentes. |
-| RfcACuentaTerceros | String | Entrada | Opcional | Filtro especifico del servicio SAT. |
-| Complemento | Enum/String | Entrada | Opcional | Identificador de complemento SAT o vacio/sin filtro. |
-| Folio/UUID | String | Entrada | Fuera del formulario MVP | Si se usa, no deben declararse `FechaInicial`, `FechaFinal`, `RfcEmisor` ni `RfcSolicitante`. |
+| RfcSolicitante | String | Entrada | Obligatorio en MVP | RFC dueño de la e.firma que realiza la solicitud. En el MVP se envia siempre igual a `PerfilSat.rfc`. |
+| TipoSolicitud | Enum | Entrada | Fijo en `CFDI` | SAT tambien soporta otros valores en WSDL; quedan fuera del MVP. |
+| EstadoComprobante | String | Entrada | Fijo en `Vigente` | Se fija internamente para solicitar XML vigentes y no exponer cancelados en el MVP. |
+| TipoComprobante | String | Entrada | Opcional | `I`, `E`, `T`, `N`, `P` o sin filtro. |
+| Complemento | String | Entrada | Opcional | Identificador de complemento SAT o sin filtro. |
+| RfcACuentaTerceros | String | Entrada | Fuera del MVP | Filtro especifico del servicio SAT. |
 | Signature | SignatureType | Entrada | Obligatorio | Firma XML de la petición con e.firma. |
 | IdSolicitud | String | Salida | Persistir | Identificador SAT de la solicitud. |
-| CodEstatus | String | Salida | Persistir | Código de estatus de la petición. |
-| Mensaje | String | Salida | Persistir | Mensaje SAT asociado al estatus. |
+| RfcSolicitante (respuesta) | String | Salida | Persistir | RFC solicitante devuelto por SAT si viene en respuesta. |
+| CodEstatus | String | Salida | Persistir separado | Código de estatus de la creación de solicitud. No mezclar con `CodigoEstadoSolicitud` de verificación. |
+| Mensaje | String | Salida | Persistir separado | Mensaje SAT asociado al estatus de creación. |
+
+### 5.4 Operación `SolicitaDescargaEmitidos`
+
+Uso:
+
+- Crear solicitudes para CFDI emitidos por el RFC del perfil SAT.
+
+Mapeo:
+
+| UI | Atributo SAT | Regla MVP |
+| --- | --- | --- |
+| Perfil SAT | `RfcEmisor` | Igual a `PerfilSat.rfc`. |
+| Perfil SAT | `RfcSolicitante` | Igual a `PerfilSat.rfc`. |
+| RFC contraparte | `RfcReceptores/RfcReceptor` | Opcional; el MVP permite un receptor contraparte. El WSDL permite arreglo. |
+
+### 5.5 Operación `SolicitaDescargaRecibidos`
+
+Uso:
+
+- Crear solicitudes para CFDI recibidos por el RFC del perfil SAT.
+
+Mapeo:
+
+| UI | Atributo SAT | Regla MVP |
+| --- | --- | --- |
+| Perfil SAT | `RfcReceptor` | Igual a `PerfilSat.rfc`. |
+| Perfil SAT | `RfcSolicitante` | Igual a `PerfilSat.rfc`. |
+| RFC contraparte | `RfcEmisor` | Opcional; se usa cuando el usuario filtra por emisor. |
+
+### 5.6 Operación `SolicitaDescargaFolio`
+
+El WSDL productivo publica `SolicitaDescargaFolio`, pero queda fuera del MVP. La UI no permite crear solicitudes por UUID/Folio.
 
 #### Orden de atributos para firma
 
-SAT documenta que la petición debe ordenarse para validar correctamente la firma. El orden de atributos documentado es:
+SAT documenta que la petición debe ordenarse para validar correctamente la firma. El orden historico documentado para los atributos de solicitud es:
 
 1. `Complemento`
 2. `EstadoComprobante`
@@ -231,15 +263,18 @@ SAT documenta que la petición debe ordenarse para validar correctamente la firm
 9. `TipoComprobante`
 10. `TipoSolicitud`
 
+La implementacion debe validar el orden exacto por operacion durante el spike SAT, usando WSDL productivo y prueba real, antes de conectar `SatGateway` productivo.
+
 #### Respuesta esperada
 
-Cuando SAT acepta la solicitud, la respuesta contiene:
+Cuando SAT acepta la solicitud, la respuesta de la operacion elegida contiene:
 
 - `IdSolicitud`.
+- `RfcSolicitante`, si viene en respuesta.
 - `CodEstatus`.
 - `Mensaje`.
 
-La aplicacion debe persistir esos valores en `SolicitudMasiva`.
+La aplicacion debe persistir esos valores en `SolicitudMasiva`, separando los campos de creacion de solicitud de los campos de verificacion.
 
 #### Códigos de respuesta
 
@@ -261,29 +296,15 @@ La aplicacion debe persistir esos valores en `SolicitudMasiva`.
 
 - Solo CFDI regulares, no retenciones.
 - `TipoSolicitud` fijo en `CFDI`.
+- `EstadoComprobante` fijo internamente en `Vigente`.
 - No se implementa solicitud de metadata.
-- No se implementa solicitud por `Folio/UUID`.
+- No se implementa solicitud por `Folio/UUID`, aunque el WSDL publique `SolicitaDescargaFolio`.
 - No se expone `RfcACuentaTerceros`.
-- No se expone `EstadoComprobante`; al solicitar XML/CFDI, SAT documenta que solo se descargan XML vigentes.
+- No se expone `EstadoComprobante` en la UI; al solicitar XML/CFDI, el MVP conserva `Vigente` como constante interna.
 - La UI debe evitar crear solicitudes locales duplicadas antes de llamar a SAT.
-- La equivalencia local anti-duplicados debe considerar los filtros que SAT usa para detectar duplicados: perfil/RFC solicitante, fechas, emisor, receptor y tipo de solicitud; si se agregan mas filtros al formulario, deben incorporarse a la comparacion si SAT los considera criterio.
-- La traduccion UI "emitidos/recibidos" queda definida por `ADR 0008`.
+- La equivalencia local anti-duplicados debe considerar `operacion_sat`, perfil/RFC solicitante, fechas, emisor, receptor/receptores, tipo de solicitud, estado de comprobante, tipo de comprobante y complemento.
+- La traduccion UI "emitidos/recibidos" queda definida por `ADR 0013`.
 - Los filtros vacios se omiten del XML; no deben enviarse cadenas vacias salvo que una prueba contra SAT demuestre que el contrato lo exige.
-
-#### Mapeo UI a atributos SAT
-
-| UI | Atributo SAT | Regla |
-| --- | --- | --- |
-| Perfil SAT | `RfcSolicitante` | Siempre es el RFC del perfil/e.firma. |
-| Tipo `emitidos` | `RfcEmisor` | Igual a `PerfilSat.rfc`. |
-| Tipo `emitidos` + RFC contraparte | `RfcReceptores/RfcReceptor` | La contraparte se envia como receptor; si no hay contraparte, se omite. |
-| Tipo `recibidos` | `RfcReceptor` | Igual a `PerfilSat.rfc`. |
-| Tipo `recibidos` + RFC contraparte | `RfcEmisor` | La contraparte se envia como emisor; si no hay contraparte, se omite. |
-| Fecha inicial | `FechaInicial` | Inicio del dia en hora Centro de Mexico. |
-| Fecha final | `FechaFinal` | Fin del dia en hora Centro de Mexico. |
-| Tipo de solicitud | `TipoSolicitud` | Fijo en `CFDI` para el MVP. |
-| Tipo de comprobante | `TipoComprobante` | Opcional: `I`, `E`, `T`, `N`, `P`. Si no se captura, se omite. |
-| Complemento | `Complemento` | Opcional. Si no se captura, se omite. |
 
 ---
 
@@ -464,7 +485,7 @@ https://cfdidescargamasiva.clouda.sat.gob.mx/DescargaMasivaService.svc
 WSDL:
 
 ```text
-https://cfdidescargamasiva.clouda.sat.gob.mx/DescargaMasivaService.svc?wsdl
+https://cfdidescargamasiva.clouda.sat.gob.mx/DescargaMasivaService.svc?singleWsdl
 ```
 
 SOAPAction:

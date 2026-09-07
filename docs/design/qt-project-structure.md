@@ -24,7 +24,7 @@ Este diseno asume `ADR 0011`: Qt 6, QML / Qt Quick Controls, C++ y CMake.
 | --- | --- | --- | --- |
 | `satcfdi_domain` | static lib | Entidades, estados, filtros normalizados, reglas de transicion y retencion local. | `Qt6::Core` |
 | `satcfdi_ports` | interface lib | Contratos C++: SAT, secretos, repositorios, paquetes, SO y sanitizacion. | `satcfdi_domain` |
-| `satcfdi_application` | static lib | Casos de uso, worker, acciones manuales, coordinacion de repositorios y logs. | `satcfdi_domain`, `satcfdi_ports`, `Qt6::Core` |
+| `satcfdi_application` | static lib | Casos de uso, ejecutor serial, worker, acciones manuales, coordinacion de repositorios y logs. | `satcfdi_domain`, `satcfdi_ports`, `Qt6::Core` |
 | `satcfdi_infrastructure` | static lib | Adaptadores SQLite, SAT, archivos, macOS, Keychain y notificaciones. | `satcfdi_domain`, `satcfdi_ports`, `Qt6::Core`, `Qt6::Sql`, `Qt6::Network`, `Qt6::Widgets` |
 | `satcfdi_presentation` | static lib / qml module | View models C++ y QML expuesto por la app. | `satcfdi_application`, `satcfdi_domain`, `Qt6::Core`, `Qt6::Qml`, `Qt6::Quick` |
 | `satcfdi_app` | executable `MACOSX_BUNDLE` | `main.cpp`, composition root, recursos, bundle macOS. | Todos los targets anteriores, `Qt6::Widgets`, `Qt6::Quick` |
@@ -104,6 +104,7 @@ Reglas:
 │   │   ├── profiles/
 │   │   ├── requests/
 │   │   ├── actions/
+│   │   ├── execution/
 │   │   ├── worker/
 │   │   └── logging/
 │   ├── infrastructure/
@@ -162,6 +163,20 @@ QML no debe importar ni usar:
 - Keychain/SecretStore.
 - `QFile` para paquetes ZIP.
 
+## Asincronia y reglas de hilos
+
+La UI QML corre en el hilo grafico. Ninguna llamada SAT, escritura SQLite, acceso a Keychain o escritura de ZIP debe bloquear ese hilo.
+
+Reglas:
+
+- `OperacionExecutor` vive en un hilo de trabajo o usa una cola serial fuera del hilo grafico.
+- Worker y acciones manuales encolan operaciones en `OperacionExecutor`; no ejecutan directamente SAT, transacciones ni escrituras de ZIP.
+- Cada hilo que use SQLite debe tener su propia conexion `QSqlDatabase`.
+- Los repositorios no deben compartir una conexion abierta entre hilo grafico y ejecutor.
+- Los modelos visuales basados en `QAbstractListModel` se actualizan en el hilo grafico.
+- Los resultados del ejecutor regresan a view models mediante signals/slots con conexion encolada o un mecanismo equivalente seguro para Qt.
+- La eliminacion local debe verificarse antes de aplicar cualquier resultado asincrono a una solicitud o paquete.
+
 ## Modulo QML
 
 El ejecutable debe declarar un modulo QML propio con `qt_add_qml_module`.
@@ -198,6 +213,8 @@ Para avanzar M1 sin depender del SAT real desde el primer commit de codigo:
 
 Los fakes no deben esconderse como implementacion productiva.
 
+El uso de fakes permite construir el esqueleto de UI y estados, pero no completa el MVP SAT. Antes de depender de flujos funcionales productivos debe existir un spike de firma/autenticacion/operaciones SAT reales.
+
 ## CMake esperado
 
 El `CMakeLists.txt` raiz debe:
@@ -219,12 +236,12 @@ ctest --test-dir build
 
 ## Primer corte implementable
 
-El primer corte de codigo no debe tocar SAT real. Debe entregar:
+El primer corte de codigo previo al spike SAT no debe tocar SAT real. Debe entregar lo minimo para validar estructura y ejecucion local:
 
 - App Qt que abre una ventana QML.
-- Menu bar/system tray con abrir, pausar/reanudar y salir.
-- Navegacion QML entre solicitudes, nueva solicitud, detalle y perfiles.
-- Servicios conectados a repositorios fake o SQLite inicial.
-- Worker fake que avance estados para validar UI y logs.
+- Targets CMake por capa compilando.
+- Composition root inicial.
+- Menu bar/system tray basico con abrir y salir.
+- Un view model fake conectado a QML para validar el puente C++/QML.
 
-Despues de ese corte se implementa SQLite real y luego el spike SAT.
+Despues de ese corte se debe ejecutar el spike SAT de firma/autenticacion/operaciones antes de ampliar UI, repositorios o worker que dependan de contratos SOAP no comprobados. Luego se implementa SQLite real y se conecta el flujo con fakes o adaptadores productivos segun el resultado del spike.

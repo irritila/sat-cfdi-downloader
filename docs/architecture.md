@@ -197,6 +197,8 @@ Estado: validado.
 
 Objetivo: describir las interacciones principales del MVP. Se agregara un flujo a la vez para mantener la revision simple.
 
+Regla de ejecucion: toda operacion que toque SAT, estados persistidos o archivos ZIP se ejecuta mediante el ejecutor serial definido en `ADR 0014` y `docs/design/operational-rules.md`. El worker automatico y el servicio de acciones manuales disparan operaciones, pero no aplican resultados concurrentemente sobre los mismos registros.
+
 ### 3.1 Crear solicitud masiva
 
 Estado: validado.
@@ -208,6 +210,7 @@ sequenceDiagram
     actor Usuario
     participant UI as UI macOS
     participant Solicitudes as Servicio de solicitudes
+    participant Executor as Ejecutor serial
     participant Credenciales as Almacen seguro de credenciales
     participant SAT as Servicios web SAT
     participant DB as Base de datos local
@@ -229,24 +232,34 @@ sequenceDiagram
         else Sin duplicado local
             Solicitudes->>DB: Guardar SolicitudMasiva en estado Creada
             Solicitudes->>DB: Guardar LogSolicitud
-            Solicitudes->>Credenciales: Solicitar material de e.firma
-            Credenciales-->>Solicitudes: Entrega credenciales para firmar
-            Solicitudes->>SAT: Autenticar con e.firma
+            Solicitudes->>Executor: Enviar solicitud creada
+            Executor->>DB: Marcar Enviando e intento de envio
+            Executor->>Credenciales: Solicitar material de e.firma
+            Credenciales-->>Executor: Entrega credenciales para firmar
+            Executor->>SAT: Autenticar con e.firma
 
             alt Autenticacion rechazada
-                SAT-->>Solicitudes: Codigo y mensaje de error
-                Solicitudes->>DB: Actualizar solicitud con error
-                Solicitudes->>DB: Guardar LogSolicitud
+                SAT-->>Executor: Codigo y mensaje de error
+                Executor->>DB: Actualizar solicitud como EnvioFallido
+                Executor->>DB: Guardar LogSolicitud
+                Executor-->>Solicitudes: Error SAT
                 Solicitudes-->>UI: Error SAT
                 UI-->>Usuario: Muestra error de autenticacion
             else Autenticacion aceptada
-                SAT-->>Solicitudes: Token de autenticacion
-                Solicitudes->>SAT: Enviar solicitud masiva CFDI/XML
-                SAT-->>Solicitudes: IdSolicitud, codigo y mensaje
-                Solicitudes->>DB: Actualizar SolicitudMasiva
-                Solicitudes->>DB: Guardar LogSolicitud
+                SAT-->>Executor: Token de autenticacion
+                Executor->>SAT: Enviar SolicitaDescargaEmitidos o Recibidos
+                SAT-->>Executor: IdSolicitud, codigo y mensaje
+                Executor->>DB: Actualizar SolicitudMasiva como Enviada
+                Executor->>DB: Guardar LogSolicitud
+                Executor-->>Solicitudes: Solicitud creada
                 Solicitudes-->>UI: Solicitud creada
                 UI-->>Usuario: Muestra solicitud en lista
+            else Timeout o interrupcion despues de iniciar envio
+                Executor->>DB: Marcar solicitud como EnvioIncierto
+                Executor->>DB: Guardar LogSolicitud
+                Executor-->>Solicitudes: Resultado de envio incierto
+                Solicitudes-->>UI: Resultado de envio incierto
+                UI-->>Usuario: Muestra advertencia sin reintentar automaticamente
             end
         end
     end
@@ -257,9 +270,11 @@ Lectura:
 - La UI no habla directamente con SAT.
 - El servicio de solicitudes valida filtros antes de autenticar o enviar.
 - El servicio de solicitudes valida duplicados locales antes de tocar SAT para proteger al usuario de repetir accidentalmente una solicitud.
+- El ejecutor serial realiza el envio, la autenticacion y las actualizaciones criticas de estado.
 - Las credenciales se obtienen mediante el contrato de almacenamiento seguro.
-- La respuesta SAT se guarda como metadata de la solicitud y log operativo.
+- La respuesta SAT se guarda como metadata de la solicitud y log operativo, separando `CodEstatus` de creacion de los codigos de verificacion posteriores.
 - El worker no crea solicitudes ni necesita notificacion directa; detecta pendientes leyendo la base local.
+- Si el envio queda incierto, la aplicacion no reintenta automaticamente porque podria crear duplicados o consumir limites SAT.
 
 Decisiones reflejadas:
 
@@ -267,6 +282,7 @@ Decisiones reflejadas:
 - Metadata local: se guarda a nivel solicitud, no a nivel XML.
 - El flujo termina con una solicitud visible en la lista y lista para monitoreo.
 - La solicitud se guarda localmente en estado `Creada` antes de llamar al SAT para conservar trazabilidad.
+- Antes de llamar a SAT se marca `Enviando` para poder recuperar el estado si la app se cierra durante el envio.
 - La rama de filtros invalidos se mantiene porque representa validacion local antes de tocar SAT.
 - La validacion anti-duplicados local evita llamadas que podrian topar codigos SAT como `5002` o `5005`.
 
@@ -285,6 +301,7 @@ Este diagrama muestra como el worker local detecta solicitudes pendientes, consu
 ```mermaid
 sequenceDiagram
     participant Worker as Worker local
+    participant Executor as Ejecutor serial
     participant DB as Base de datos local
     participant Credenciales as Almacen seguro de credenciales
     participant SAT as Servicios web SAT
@@ -298,32 +315,35 @@ sequenceDiagram
         Worker->>DB: Buscar solicitudes pendientes por verificar
 
         loop Por cada solicitud elegible
-            Worker->>DB: Leer perfil, filtros e IdSolicitud
-            Worker->>Credenciales: Solicitar material de e.firma
-            Credenciales-->>Worker: Entrega credenciales para firmar
-            Worker->>SAT: Autenticar si no hay token valido
-            SAT-->>Worker: Token o error
+            Worker->>Executor: Verificar solicitud elegible
+            Executor->>DB: Leer perfil, filtros e IdSolicitud
+            Executor->>Credenciales: Solicitar material de e.firma
+            Credenciales-->>Executor: Entrega credenciales para firmar
+            Executor->>SAT: Autenticar para el ciclo actual
+            SAT-->>Executor: Token o error
 
             alt Error de autenticacion
-                Worker->>DB: Guardar error y LogSolicitud
-                Worker->>Notificaciones: Notificar error
+                Executor->>DB: Guardar error y LogSolicitud
+                Executor->>Notificaciones: Notificar error
             else Token valido
-                Worker->>SAT: VerificaSolicitudDescarga
-                SAT-->>Worker: EstadoSolicitud, codigos, mensaje, paquetes
-                Worker->>DB: Actualizar SolicitudMasiva
-                Worker->>DB: Guardar LogSolicitud
+                Executor->>SAT: VerificaSolicitudDescarga
+                SAT-->>Executor: EstadoSolicitud, codigos, mensaje, paquetes
+                Executor->>DB: Iniciar transaccion local
+                Executor->>DB: Actualizar SolicitudMasiva
 
                 alt Solicitud terminada
-                    Worker->>DB: Registrar paquetes disponibles
-                    Worker->>Notificaciones: Notificar solicitud terminada
+                    Executor->>DB: Registrar paquetes disponibles
+                    Executor->>Notificaciones: Notificar solicitud terminada
                 else Solicitud vencida
-                    Worker->>DB: Marcar paquetes no descargados como Vencido
-                    Worker->>Notificaciones: Notificar solicitud vencida
+                    Executor->>DB: Marcar paquetes no descargados como Vencido
+                    Executor->>Notificaciones: Notificar solicitud vencida
                 else Error o rechazada
-                    Worker->>Notificaciones: Notificar estado terminal
+                    Executor->>Notificaciones: Notificar estado terminal
                 else Aceptada o en proceso
-                    Worker->>DB: Programar siguiente verificacion
+                    Executor->>DB: Programar siguiente verificacion
                 end
+                Executor->>DB: Guardar LogSolicitud
+                Executor->>DB: Confirmar transaccion local
             end
         end
     end
@@ -333,13 +353,15 @@ Lectura:
 
 - El worker parte de la base local; no depende de una notificacion directa de la UI.
 - Si el monitoreo esta pausado, el worker no consulta SAT.
-- La autenticacion puede reutilizar token valido o solicitar uno nuevo, segun lo permita la implementacion.
+- El worker agenda verificaciones; el ejecutor serial ejecuta la llamada SAT y la transaccion local.
+- El token SAT vive solo en memoria del ciclo/operacion actual.
 - La respuesta de `VerificaSolicitudDescarga` actualiza la solicitud y queda registrada en logs.
 - Si SAT devuelve paquetes, solo se registran como disponibles; la descarga se modelara en el siguiente diagrama.
 - `Actualizar SolicitudMasiva` guarda que la solicitud cambio a terminada, con codigo y mensaje SAT.
 - `Registrar paquetes disponibles` crea o actualiza registros `PaqueteSolicitud` con los IDs que devolvio SAT.
 - `Descargar paquetes ZIP` queda para otro flujo.
 - Si SAT marca la solicitud como vencida, el worker marca los paquetes no descargados como `Vencido` en la misma actualizacion local.
+- La actualizacion de solicitud, paquetes y log ocurre en una misma transaccion local para no dejar una solicitud `Terminada` sin paquetes registrados.
 
 Decisiones reflejadas:
 
@@ -364,11 +386,12 @@ Base documental:
 
 - `docs/web-service.md` documenta que una solicitud terminada puede devolver `IdsPaquetes`.
 - `docs/web-service.md` documenta que el SAT permite descargar archivos XML o metadata en archivos compactados cuando la solicitud fue procesada exitosamente.
-- El contrato exacto del servicio de descarga de paquete queda pendiente de confirmar antes de implementar.
+- `docs/web-service.md` documenta la operacion `Descargar` y sus codigos principales.
 
 ```mermaid
 sequenceDiagram
     participant Worker as Worker local
+    participant Executor as Ejecutor serial
     participant DB as Base de datos local
     participant Credenciales as Almacen seguro de credenciales
     participant SAT as Servicios web SAT
@@ -383,31 +406,39 @@ sequenceDiagram
         Worker->>DB: Buscar PaqueteSolicitud disponible
 
         loop Por cada paquete elegible
-            Worker->>DB: Leer solicitud, perfil e IdPaquete
-            Worker->>Credenciales: Solicitar material de e.firma
-            Credenciales-->>Worker: Entrega credenciales para firmar
-            Worker->>SAT: Autenticar si no hay token valido
-            SAT-->>Worker: Token o error
+            Worker->>Executor: Descargar paquete elegible
+            Executor->>DB: Leer solicitud, perfil e IdPaquete
+            Executor->>Credenciales: Solicitar material de e.firma
+            Credenciales-->>Executor: Entrega credenciales para firmar
+            Executor->>SAT: Autenticar para el ciclo actual
+            SAT-->>Executor: Token o error
 
             alt Error de autenticacion
-                Worker->>DB: Marcar paquete con error
-                Worker->>DB: Guardar LogSolicitud
-                Worker->>Notificaciones: Notificar error
+                Executor->>DB: Marcar paquete con error
+                Executor->>DB: Guardar LogSolicitud
+                Executor->>Notificaciones: Notificar error
             else Token valido
-                Worker->>DB: Marcar paquete como Descargando
-                Worker->>SAT: Descargar paquete ZIP por IdPaquete
+                Executor->>DB: Marcar paquete como Descargando
+                Executor->>SAT: Descargar paquete ZIP por IdPaquete
 
                 alt Descarga exitosa
-                    SAT-->>Worker: Archivo ZIP
-                    Worker->>Archivos: Guardar ZIP en ruta local
-                    Worker->>DB: Actualizar PaqueteSolicitud como Descargado
-                    Worker->>DB: Guardar ruta local y LogSolicitud
-                    Worker->>Notificaciones: Notificar descarga concluida
+                    SAT-->>Executor: Archivo ZIP
+                    Executor->>Archivos: Guardar ZIP temporal
+                    Executor->>Archivos: Renombrar temporal a ZIP final
+                    Executor->>DB: Actualizar PaqueteSolicitud como Descargado
+                    Executor->>DB: Guardar ruta local y LogSolicitud
+                    Executor->>Notificaciones: Notificar descarga concluida
+                else Paquete vencido en SAT
+                    SAT-->>Executor: Codigo 5007
+                    Executor->>DB: Marcar paquete como Vencido
+                    Executor->>DB: Marcar solicitud como Vencida si no quedan paquetes descargables
+                    Executor->>DB: Guardar LogSolicitud
+                    Executor->>Notificaciones: Notificar paquete vencido
                 else Descarga fallida
-                    SAT-->>Worker: Codigo y mensaje de error
-                    Worker->>DB: Marcar paquete con error
-                    Worker->>DB: Guardar LogSolicitud
-                    Worker->>Notificaciones: Notificar error
+                    SAT-->>Executor: Codigo y mensaje de error
+                    Executor->>DB: Marcar paquete con error
+                    Executor->>DB: Guardar LogSolicitud
+                    Executor->>Notificaciones: Notificar error
                 end
             end
         end
@@ -417,11 +448,14 @@ sequenceDiagram
 Lectura:
 
 - El worker solo descarga paquetes que ya existen como `PaqueteSolicitud`.
+- El worker selecciona paquetes elegibles; el ejecutor serial descarga y aplica cambios persistidos.
 - La descarga usa `IdPaquete`, asociado previamente a una `SolicitudMasiva`.
 - El ZIP se guarda en la carpeta local definida para la solicitud.
+- El ZIP se escribe primero como archivo temporal; solo despues de renombrarlo a la ruta final se marca como `Descargado`.
 - El MVP no valida que el ZIP pueda abrirse antes de marcarlo como descargado.
 - El MVP no extrae, parsea ni indexa XML despues de guardar el ZIP.
 - Si la descarga falla, queda registrado el error y el usuario puede reintentar manualmente.
+- Si SAT devuelve paquete vencido y ya no quedan paquetes descargables, la solicitud pasa a `Vencida`.
 - Si el monitoreo esta pausado, el worker no descarga paquetes.
 - El worker no reintenta automaticamente paquetes en `Error`; esos paquetes requieren accion manual.
 
@@ -432,6 +466,7 @@ Decisiones reflejadas:
 - `Eliminar solicitud local` no borra ZIPs ya descargados.
 - Una descarga manual solo aplica a paquetes pendientes, fallidos o no descargados por pausa del worker.
 - Los paquetes en `Error` se reintentan solo por accion manual.
+- Si SAT responde que el paquete ya no existe o expiro, el paquete pasa a `Vencido`.
 
 Preguntas para revisar:
 
@@ -515,6 +550,7 @@ sequenceDiagram
     actor Usuario
     participant UI as UI macOS
     participant Acciones as Servicio de acciones
+    participant Executor as Ejecutor serial
     participant DB as Base de datos local
     participant Credenciales as Almacen seguro de credenciales
     participant SAT as Servicios web SAT
@@ -525,34 +561,39 @@ sequenceDiagram
     Acciones->>DB: Leer solicitud y estado de monitoreo
 
     alt Monitoreo pausado
-        Acciones->>DB: Guardar accion pendiente
+        Acciones->>DB: Guardar verificacion_pendiente
         Acciones-->>UI: Verificacion pendiente hasta reanudar
         UI-->>Usuario: Muestra accion pendiente
     else Monitoreo activo
-        Acciones->>Credenciales: Solicitar material de e.firma
-        Credenciales-->>Acciones: Entrega credenciales para firmar
-        Acciones->>SAT: Autenticar si no hay token valido
-        SAT-->>Acciones: Token o error
+        Acciones->>Executor: Ejecutar verificacion ahora
+        Executor->>Credenciales: Solicitar material de e.firma
+        Credenciales-->>Executor: Entrega credenciales para firmar
+        Executor->>SAT: Autenticar para la operacion actual
+        SAT-->>Executor: Token o error
 
         alt Error de autenticacion
-            Acciones->>DB: Guardar error y LogSolicitud
-            Acciones->>Notificaciones: Notificar error
+            Executor->>DB: Guardar error y LogSolicitud
+            Executor->>Notificaciones: Notificar error
+            Executor-->>Acciones: Error SAT
             Acciones-->>UI: Error SAT
             UI-->>Usuario: Muestra error
         else Token valido
-            Acciones->>SAT: VerificaSolicitudDescarga
-            SAT-->>Acciones: EstadoSolicitud, codigos, mensaje, paquetes
-            Acciones->>DB: Actualizar SolicitudMasiva
-            Acciones->>DB: Guardar LogSolicitud
+            Executor->>SAT: VerificaSolicitudDescarga
+            SAT-->>Executor: EstadoSolicitud, codigos, mensaje, paquetes
+            Executor->>DB: Iniciar transaccion local
+            Executor->>DB: Actualizar SolicitudMasiva
 
             alt Solicitud terminada
-                Acciones->>DB: Registrar paquetes disponibles si existen
+                Executor->>DB: Registrar paquetes disponibles si existen
             else Solicitud vencida
-                Acciones->>DB: Marcar paquetes no descargados como Vencido
+                Executor->>DB: Marcar paquetes no descargados como Vencido
             else Aceptada, en proceso, error o rechazada
-                Acciones->>DB: Sincronizar solo estado de solicitud
+                Executor->>DB: Sincronizar solo estado de solicitud
             end
+            Executor->>DB: Guardar LogSolicitud
+            Executor->>DB: Confirmar transaccion local
 
+            Executor-->>Acciones: Verificacion ejecutada
             Acciones-->>UI: Verificacion ejecutada
             UI-->>Usuario: Muestra estatus actualizado
         end
@@ -566,6 +607,7 @@ sequenceDiagram
     actor Usuario
     participant UI as UI macOS
     participant Acciones as Servicio de acciones
+    participant Executor as Ejecutor serial
     participant DB as Base de datos local
     participant Credenciales as Almacen seguro de credenciales
     participant SAT as Servicios web SAT
@@ -581,38 +623,52 @@ sequenceDiagram
         Acciones-->>UI: No hay paquetes para reintentar
         UI-->>Usuario: Muestra accion no disponible
     else Monitoreo pausado
-        Acciones->>DB: Guardar accion pendiente
+        Acciones->>DB: Guardar descarga_pendiente
         Acciones-->>UI: Reintento pendiente hasta reanudar
         UI-->>Usuario: Muestra accion pendiente
     else Monitoreo activo con paquetes elegibles
-        Acciones->>Credenciales: Solicitar material de e.firma
-        Credenciales-->>Acciones: Entrega credenciales para firmar
-        Acciones->>SAT: Autenticar si no hay token valido
-        SAT-->>Acciones: Token o error
+        Acciones->>Executor: Ejecutar reintento de descarga
+        Executor->>Credenciales: Solicitar material de e.firma
+        Credenciales-->>Executor: Entrega credenciales para firmar
+        Executor->>SAT: Autenticar para la operacion actual
+        SAT-->>Executor: Token o error
 
         alt Error de autenticacion
-            Acciones->>DB: Guardar error y LogSolicitud
-            Acciones->>Notificaciones: Notificar error
+            Executor->>DB: Guardar error y LogSolicitud
+            Executor->>Notificaciones: Notificar error
+            Executor-->>Acciones: Error SAT
             Acciones-->>UI: Error SAT
             UI-->>Usuario: Muestra error
         else Token valido
             loop Por cada paquete elegible
-                Acciones->>DB: Marcar paquete como Descargando
-                Acciones->>SAT: Descargar paquete ZIP por IdPaquete
+                Executor->>DB: Marcar paquete como Descargando
+                Executor->>SAT: Descargar paquete ZIP por IdPaquete
 
                 alt Descarga exitosa
-                    SAT-->>Acciones: Archivo ZIP
-                    Acciones->>Archivos: Guardar ZIP en ruta local
-                    Acciones->>DB: Actualizar PaqueteSolicitud como Descargado
-                    Acciones->>DB: Guardar ruta local y LogSolicitud
-                    Acciones->>Notificaciones: Notificar descarga concluida
+                    SAT-->>Executor: Archivo ZIP
+                    Executor->>Archivos: Guardar ZIP temporal
+                    Executor->>Archivos: Renombrar temporal a ZIP final
+                    Executor->>DB: Actualizar PaqueteSolicitud como Descargado
+                    Executor->>DB: Guardar ruta local y LogSolicitud
+                    Executor->>Notificaciones: Notificar descarga concluida
+                    Executor-->>Acciones: Descarga ejecutada
                     Acciones-->>UI: Descarga ejecutada
                     UI-->>Usuario: Muestra paquete descargado
+                else Paquete vencido en SAT
+                    SAT-->>Executor: Codigo 5007
+                    Executor->>DB: Marcar paquete como Vencido
+                    Executor->>DB: Marcar solicitud como Vencida si no quedan paquetes descargables
+                    Executor->>DB: Guardar LogSolicitud
+                    Executor->>Notificaciones: Notificar paquete vencido
+                    Executor-->>Acciones: Paquete vencido
+                    Acciones-->>UI: Paquete vencido
+                    UI-->>Usuario: Muestra vencimiento
                 else Descarga fallida
-                    SAT-->>Acciones: Codigo y mensaje de error
-                    Acciones->>DB: Marcar paquete con error
-                    Acciones->>DB: Guardar LogSolicitud
-                    Acciones->>Notificaciones: Notificar error
+                    SAT-->>Executor: Codigo y mensaje de error
+                    Executor->>DB: Marcar paquete con error
+                    Executor->>DB: Guardar LogSolicitud
+                    Executor->>Notificaciones: Notificar error
+                    Executor-->>Acciones: Error SAT
                     Acciones-->>UI: Error SAT
                     UI-->>Usuario: Muestra error
                 end
@@ -646,7 +702,7 @@ sequenceDiagram
 Lectura:
 
 - La UI no ejecuta directamente verificaciones ni descargas contra SAT.
-- Verificar ahora y reintentar descarga son ejecutadas por el `Servicio de acciones`.
+- Verificar ahora y reintentar descarga son iniciadas por el `Servicio de acciones`; la ejecucion critica ocurre en el ejecutor serial compartido.
 - Si el monitoreo esta pausado, las acciones de verificacion y descarga quedan pendientes hasta reanudar.
 - Reintentar descarga solo aplica a paquetes pendientes o fallidos.
 - Eliminar solicitud local requiere confirmacion del usuario.
@@ -788,6 +844,7 @@ flowchart TB
             query_service["Servicio de consulta local"]
             actions_service["Servicio de acciones manuales"]
             worker["Worker local<br/>monitoreo y backoff"]
+            operation_executor["Ejecutor serial de operaciones"]
         end
 
         subgraph domain["Dominio C++"]
@@ -829,26 +886,25 @@ flowchart TB
 
     request_service --> sat_filters
     request_service --> request_state
-    request_service --> sat_gateway
-    request_service --> credentials_store
     request_service --> repositories
+    request_service --> operation_executor
 
     query_service --> repositories
     query_service --> package_storage
 
     actions_service --> request_state
-    actions_service --> sat_gateway
-    actions_service --> credentials_store
-    actions_service --> repositories
-    actions_service --> package_storage
-    actions_service --> os_integration
+    actions_service --> operation_executor
 
-    worker --> request_state
-    worker --> sat_gateway
-    worker --> credentials_store
     worker --> repositories
-    worker --> package_storage
-    worker --> os_integration
+    worker --> operation_executor
+
+    operation_executor --> request_state
+    operation_executor --> sat_filters
+    operation_executor --> sat_gateway
+    operation_executor --> credentials_store
+    operation_executor --> repositories
+    operation_executor --> package_storage
+    operation_executor --> os_integration
 
     profiles_service --> credentials_store
     profiles_service --> repositories
@@ -871,6 +927,7 @@ flowchart TB
 - La aplicacion es un solo proceso local de macOS. El worker vive dentro de la app; no es backend remoto ni daemon multiusuario.
 - La UI no accede directamente a SAT, base de datos, archivos ni credenciales. Siempre pasa por servicios de aplicacion.
 - Los servicios de aplicacion representan los casos de uso ya validados: perfiles, crear solicitud, consultar lista/detalle, acciones manuales y monitoreo automatico.
+- El ejecutor serial concentra llamadas SAT, transiciones criticas, transacciones y escrituras de ZIP para evitar carreras entre UI, acciones manuales y worker.
 - El dominio concentra reglas que no deben quedar escondidas en la UI: estados de solicitud/paquete, filtros SAT y retencion local.
 - Los contratos internos permiten cambiar detalles de implementacion sin cambiar los casos de uso. Por ejemplo, el almacenamiento seguro se mantiene como contrato, no como dependencia concreta.
 - Los adaptadores son la parte que habla con SAT, macOS, base local, carpeta de ZIPs y almacenamiento seguro local.
@@ -878,6 +935,7 @@ flowchart TB
 - La politica de monitoreo y backoff vive dentro del worker; no se modela como componente separado.
 - QML no contiene reglas SAT, reglas de estado ni acceso directo a base de datos; consume servicios expuestos desde C++.
 - La composition root vive en el target ejecutable y conecta servicios con adaptadores concretos.
+- Las llamadas SAT, cambios de estado criticos y escrituras de ZIP pasan por el ejecutor serial para evitar carreras entre worker y acciones manuales.
 
 ### Decisiones reflejadas
 
@@ -885,6 +943,7 @@ flowchart TB
 - Un solo proceso macOS con UI, menu bar y worker local.
 - Separacion entre acciones manuales y worker automatico.
 - `Servicio de acciones manuales` se conserva separado de `Servicio de solicitudes`.
+- Worker y acciones manuales comparten el ejecutor serial para aplicar operaciones criticas.
 - Separacion entre metadata persistida en base local y paquetes ZIP guardados en carpeta local.
 - Dependencias externas/locales encapsuladas detras de contratos.
 - El contrato de integracion SO cubre menu bar, Login Item y notificaciones; macOS es la implementacion inicial.
@@ -931,21 +990,29 @@ classDiagram
         +uuid perfilSatId
         +string idSolicitudSat
         +string tipoCfdi
-        +string tipoSolicitud
+        +string operacionSat
+        +string tipoSolicitudSat
+        +string estadoComprobanteSat
         +date fechaInicial
         +date fechaFinal
         +json filtrosSat
+        +string dedupKey
         +string estado
-        +string codigoSat
-        +string mensajeSat
+        +string codEstatusSolicitud
+        +string mensajeSolicitudSat
+        +string estadoSolicitudSat
+        +string codigoEstadoSolicitud
+        +string mensajeVerificacionSat
         +int numeroCfdi
         +datetime creadaEn
+        +datetime envioIniciadoEn
         +datetime enviadaEn
         +datetime ultimaVerificacionEn
         +datetime siguienteVerificacionEn
         +int verificacionesSinCambio
         +string ultimoError
-        +string accionPendiente
+        +bool verificacionPendiente
+        +bool descargaPendiente
         +datetime accionPendienteEn
         +datetime eliminadaEn
     }
@@ -959,6 +1026,8 @@ classDiagram
         +datetime disponibleEn
         +datetime descargadoEn
         +datetime vencimientoEstimadoEn
+        +string codigoDescargaSat
+        +string mensajeDescargaSat
         +string ultimoError
         +datetime eliminadoEn
     }
@@ -968,6 +1037,7 @@ classDiagram
         +uuid solicitudMasivaId
         +string tipoEvento
         +string origen
+        +string origenCodigoSat
         +string codigoSat
         +string mensajeSat
         +json payloadResumen
@@ -994,11 +1064,11 @@ classDiagram
 - No existe entidad `Usuario`: el producto es personal y corre en la sesion local de macOS.
 - No existe entidad `Cliente`: los contribuyentes/RFC se modelan como `PerfilSat`.
 - `CredencialSat` no contiene secretos en claro. Solo guarda referencias al contrato de almacenamiento seguro.
-- `SolicitudMasiva` conserva filtros, estado, codigo/mensaje SAT y datos necesarios para el monitoreo.
+- `SolicitudMasiva` conserva filtros normalizados, `dedupKey`, estado local/SAT, codigos separados y datos necesarios para el monitoreo.
 - `PaqueteSolicitud` representa paquetes ZIP, no XML individuales.
 - `LogSolicitud` pertenece al historial operativo de una solicitud. No se usa para registrar cierres normales de la aplicacion.
 - `ConfiguracionApp` centraliza preferencias locales: inicio automatico, pausa de monitoreo y ultimo cierre.
-- Las acciones manuales pendientes se guardan dentro de `SolicitudMasiva` para evitar una cola separada en el MVP.
+- Las acciones manuales pendientes se guardan como `verificacionPendiente` y `descargaPendiente` dentro de `SolicitudMasiva` para evitar una cola separada en el MVP.
 - La eliminacion local es virtual mediante campos `eliminadoEn`; no borra ZIPs automaticamente.
 
 ### Decisiones reflejadas
@@ -1008,7 +1078,7 @@ classDiagram
 - Persistencia separada entre metadata de solicitudes y archivos ZIP.
 - Las credenciales se referencian desde la base local, pero se protegen fuera de ella mediante el contrato seguro.
 - `ConfiguracionApp` se conserva como entidad persistida.
-- Las acciones manuales pendientes se resuelven con campos dentro de `SolicitudMasiva`.
+- Las acciones manuales pendientes se resuelven con dos intenciones idempotentes dentro de `SolicitudMasiva`.
 - Se usa eliminacion virtual con `eliminadoEn` en `SolicitudMasiva`, `PaqueteSolicitud`, `LogSolicitud` y `PerfilSat`.
 - El MVP no modela CFDI XML, UUIDs de comprobante ni campos fiscales internos.
 
@@ -1035,29 +1105,34 @@ stateDiagram-v2
     state "Solicitud visible localmente" as Visible {
         [*] --> Creada: Usuario confirma solicitud
 
-        Creada --> Enviada: SAT devuelve IdSolicitud
-        Creada --> Error: Error al autenticar o enviar
+        Creada --> Enviando: Inicia envio a SAT
+        Enviando --> Enviada: SAT devuelve IdSolicitud
+        Enviando --> EnvioFallido: Error conocido sin IdSolicitud
+        Enviando --> EnvioIncierto: Timeout o interrupcion despues de iniciar envio
 
         Enviada --> Aceptada: EstadoSolicitud = 1
         Enviada --> EnProceso: EstadoSolicitud = 2
         Enviada --> Terminada: EstadoSolicitud = 3
-        Enviada --> Error: EstadoSolicitud = 4
+        Enviada --> ErrorSat: EstadoSolicitud = 4
         Enviada --> Rechazada: EstadoSolicitud = 5
         Enviada --> Vencida: EstadoSolicitud = 6
 
         Aceptada --> EnProceso: SAT inicia procesamiento
         Aceptada --> Terminada: EstadoSolicitud = 3
-        Aceptada --> Error: EstadoSolicitud = 4
+        Aceptada --> ErrorSat: EstadoSolicitud = 4
         Aceptada --> Rechazada: EstadoSolicitud = 5
         Aceptada --> Vencida: EstadoSolicitud = 6
 
         EnProceso --> EnProceso: SAT no reporta cambio
         EnProceso --> Terminada: EstadoSolicitud = 3
-        EnProceso --> Error: EstadoSolicitud = 4
+        EnProceso --> ErrorSat: EstadoSolicitud = 4
         EnProceso --> Rechazada: EstadoSolicitud = 5
         EnProceso --> Vencida: EstadoSolicitud = 6
 
         Terminada --> Terminada: Registrar paquetes disponibles
+        Terminada --> Vencida: Paquetes pendientes expiran
+
+        EnvioFallido --> Enviando: Usuario reintenta envio corregible
     }
 
     Visible --> EliminadaLocalmente: Eliminar solicitud local
@@ -1067,23 +1142,26 @@ stateDiagram-v2
 ### Lectura del diagrama
 
 - `Creada` es estado local: existe antes de que SAT devuelva `IdSolicitud`.
+- `Enviando` permite recuperar un cierre inesperado durante la creacion de solicitud.
 - `Enviada` significa que ya existe `IdSolicitud` SAT y puede ser monitoreada.
-- `Aceptada`, `EnProceso`, `Terminada`, `Error`, `Rechazada` y `Vencida` reflejan `EstadoSolicitud` devuelto por SAT.
+- `Aceptada`, `EnProceso`, `Terminada`, `ErrorSat`, `Rechazada` y `Vencida` reflejan `EstadoSolicitud` devuelto por SAT.
+- `EnvioFallido` y `EnvioIncierto` no tienen `IdSolicitud`; no deben tratarse como estados SAT.
 - `Terminada` no significa que los ZIP ya esten descargados. Solo significa que SAT reporto la solicitud como terminada y pueden registrarse paquetes disponibles.
 - `Descargando` y `Descargado` no son estados de `SolicitudMasiva`; pertenecen a `PaqueteSolicitud`.
 - `EliminadaLocalmente` representa eliminacion virtual mediante `eliminadaEn`. No toca SAT ni borra paquetes ZIP.
 
 ### Decisiones reflejadas
 
-- El worker solo monitorea solicitudes con estado `Enviada`, `Aceptada` o `EnProceso`.
+- El worker verifica estatus SAT de solicitudes con estado `Enviada`, `Aceptada` o `EnProceso`.
+- Una solicitud `Terminada` ya no requiere verificacion regular, pero el worker puede descargar sus paquetes disponibles y detectar vencimiento de paquetes pendientes.
 - Cuando la solicitud llega a `Terminada`, el siguiente paso es registrar paquetes disponibles, no extraer XML.
-- `Error`, `Rechazada` y `Vencida` son estados terminales para monitoreo automatico de esa solicitud.
+- `ErrorSat`, `Rechazada`, `EnvioFallido`, `EnvioIncierto` y `Vencida` son estados terminales para monitoreo automatico de esa solicitud.
 - La eliminacion local puede ocurrir desde cualquier estado visible.
 
 ### Preguntas para revisar
 
 - Validado: debe existir el estado local `Enviada`.
-- Validado: `Error` es terminal para el worker automatico; cualquier reintento debe ser accion manual.
+- Validado: `ErrorSat` es terminal para el worker automatico; cualquier reintento debe ser accion manual.
 - Validado: `Descargando` y `Descargado` quedan fuera de `SolicitudMasiva` y pertenecen a `PaqueteSolicitud`.
 
 ### 6.2 Estado de PaqueteSolicitud
@@ -1099,11 +1177,14 @@ stateDiagram-v2
 
         Disponible --> Descargando: Worker inicia descarga automatica
         Disponible --> Descargando: Usuario ejecuta descarga manual
+        Disponible --> Error: Error de autenticacion o preparacion
 
         Descargando --> Descargado: ZIP guardado en carpeta local
         Descargando --> Error: Error SAT, red, archivo o interrupcion
+        Descargando --> Vencido: SAT indica paquete vencido
 
         Error --> Descargando: Usuario ejecuta reintento manual
+        Descargando --> Disponible: Recuperacion tras cierre inesperado
 
         Disponible --> Vencido: SolicitudMasiva pasa a Vencida
         Error --> Vencido: SolicitudMasiva pasa a Vencida
@@ -1120,7 +1201,8 @@ stateDiagram-v2
 - `Descargado` significa que el ZIP fue guardado en la carpeta local configurada. El MVP no abre ni valida internamente el ZIP antes de marcarlo como descargado.
 - `Error` registra fallas de SAT, red, escritura local o interrupcion de una descarga en curso.
 - La transicion de `Error` a `Descargando` ocurre por accion manual del usuario.
-- `Vencido` representa un paquete que ya no debe intentarse descargar porque su solicitud vencio antes de completar la descarga.
+- `Vencido` representa un paquete que ya no debe intentarse descargar porque su solicitud vencio o SAT devolvio paquete inexistente/expirado.
+- Si la app arranca y encuentra un paquete en `Descargando` sin archivo final, lo regresa a `Disponible` y registra log de interrupcion local.
 - `EliminadoLocalmente` es eliminacion virtual. No borra el ZIP si ya existia en disco.
 
 ### Decisiones reflejadas
@@ -1316,9 +1398,9 @@ classDiagram
     class SatGateway {
         <<contract>>
         +autenticar(materialFirma) TokenSat
-        +crearSolicitud(filtrosSat, token) RespuestaSolicitud
-        +verificarSolicitud(idSolicitudSat, rfcSolicitante, token) RespuestaVerificacion
-        +descargarPaquete(idPaqueteSat, token) PaqueteZip
+        +crearSolicitud(solicitudSat, token, materialFirma) RespuestaSolicitud
+        +verificarSolicitud(idSolicitudSat, rfcSolicitante, token, materialFirma) RespuestaVerificacion
+        +descargarPaquete(idPaqueteSat, rfcSolicitante, token, materialFirma) PaqueteZip
     }
 
     class SecretStore {
@@ -1337,7 +1419,8 @@ classDiagram
         +guardarSolicitud(solicitud) SolicitudMasiva
         +actualizarSolicitud(solicitud)
         +buscarSolicitudesParaVerificar(fechaActual) SolicitudMasiva[]
-        +buscarActivaPorFiltros(perfilSatId, filtrosSat) SolicitudMasiva?
+        +buscarActivaPorDedupKey(dedupKey) SolicitudMasiva?
+        +buscarParaRecuperacionAlArrancar() SolicitudMasiva[]
         +buscarPorId(id) SolicitudMasiva?
         +marcarEliminada(id, fecha)
     }
@@ -1369,8 +1452,11 @@ classDiagram
     class PackageStorage {
         <<contract>>
         +construirRuta(solicitud, paquete) RutaLocal
-        +guardarZip(ruta, paqueteZip)
+        +construirRutaTemporal(rutaFinal) RutaLocal
+        +guardarZipTemporal(rutaTemporal, paqueteZip)
+        +promoverZipTemporal(rutaTemporal, rutaFinal)
         +existeZip(ruta) bool
+        +limpiarTemporalesAbandonados()
     }
 
     class OSIntegration {
@@ -1397,6 +1483,14 @@ classDiagram
         <<application>>
     }
 
+    class OperacionExecutor {
+        <<application>>
+        +enviarSolicitud(solicitudIdLocal)
+        +verificarSolicitud(solicitudIdLocal)
+        +descargarPaquetes(solicitudIdLocal)
+        +recuperarAlArrancar()
+    }
+
     class ServicioAcciones {
         <<application>>
     }
@@ -1409,35 +1503,33 @@ classDiagram
         <<application>>
     }
 
-    ServicioSolicitudes --> SatGateway
-    ServicioSolicitudes --> SecretStore
+    ServicioSolicitudes --> OperacionExecutor
     ServicioSolicitudes --> SolicitudRepository
     ServicioSolicitudes --> LogSolicitudRepository
     ServicioSolicitudes --> LogSanitizer
 
-    ServicioAcciones --> SatGateway
-    ServicioAcciones --> SecretStore
+    ServicioAcciones --> OperacionExecutor
     ServicioAcciones --> SolicitudRepository
-    ServicioAcciones --> PaqueteRepository
-    ServicioAcciones --> PackageStorage
-    ServicioAcciones --> OSIntegration
     ServicioAcciones --> LogSolicitudRepository
-    ServicioAcciones --> LogSanitizer
 
     ServicioConsultaLocal --> SolicitudRepository
     ServicioConsultaLocal --> PaqueteRepository
     ServicioConsultaLocal --> LogSolicitudRepository
     ServicioConsultaLocal --> PackageStorage
 
-    WorkerLocal --> SatGateway
-    WorkerLocal --> SecretStore
+    WorkerLocal --> OperacionExecutor
     WorkerLocal --> SolicitudRepository
     WorkerLocal --> PaqueteRepository
-    WorkerLocal --> PackageStorage
-    WorkerLocal --> OSIntegration
     WorkerLocal --> ConfiguracionRepository
-    WorkerLocal --> LogSolicitudRepository
-    WorkerLocal --> LogSanitizer
+
+    OperacionExecutor --> SatGateway
+    OperacionExecutor --> SecretStore
+    OperacionExecutor --> SolicitudRepository
+    OperacionExecutor --> PaqueteRepository
+    OperacionExecutor --> PackageStorage
+    OperacionExecutor --> OSIntegration
+    OperacionExecutor --> LogSolicitudRepository
+    OperacionExecutor --> LogSanitizer
 
     MacOSSecretStore ..|> SecretStore
     MacOSIntegration ..|> OSIntegration
@@ -1445,12 +1537,14 @@ classDiagram
 
 ### Lectura del diagrama
 
-- `SatGateway` encapsula el servicio web SAT: autenticar, crear solicitud, verificar estado y descargar paquete.
-- `crearSolicitud` y `descargarPaquete` se especifican en `docs/web-service.md`, usando la fuente canonica aceptada en `ADR 0005`.
+- `SatGateway` encapsula el servicio web SAT: autenticar, crear solicitud, verificar estado y descargar paquete. Las operaciones posteriores a autenticacion reciben token y material de firma porque tambien van firmadas.
+- `crearSolicitud` usa `SolicitaDescargaEmitidos` o `SolicitaDescargaRecibidos` segun `ADR 0013`; `descargarPaquete` se especifica en `docs/web-service.md`.
+- `OperacionExecutor` es la unica frontera que ejecuta llamadas SAT, transacciones criticas y escrituras de ZIP. `ServicioSolicitudes`, `ServicioAcciones` y `WorkerLocal` lo invocan segun el disparador.
 - `SecretStore` encapsula e.firma. La base local solo debe guardar referencias no secretas.
 - `MacOSSecretStore` es el adaptador inicial basado en Keychain y archivos cifrados controlados por la app.
 - Los repositorios separan responsabilidades: solicitudes, paquetes, logs y configuracion.
-- `PackageStorage` solo maneja rutas y ZIPs. No extrae, parsea ni indexa XML.
+- `SolicitudRepository.buscarActivaPorDedupKey` aplica la regla anti-duplicados definida en `docs/design/operational-rules.md`.
+- `PackageStorage` solo maneja rutas, temporales y ZIPs. No extrae, parsea ni indexa XML.
 - `OSIntegration` cubre Login Item, menu bar, ventana principal y notificaciones.
 - `MacOSIntegration` es el adaptador inicial que cumple `OSIntegration` para el MVP en macOS.
 - La activacion foreground/background de macOS queda dentro de `OSIntegration`.
@@ -1460,6 +1554,7 @@ classDiagram
 ### Decisiones reflejadas
 
 - Se conserva separacion entre `ServicioSolicitudes`, `ServicioAcciones`, `ServicioConsultaLocal` y `WorkerLocal`.
+- La diferencia entre accion manual y worker automatico es el disparador; la ejecucion critica se comparte en `OperacionExecutor`.
 - Los tokens SAT no se persisten en el MVP; viven solo en memoria del proceso.
 - La descarga de paquetes queda modelada a nivel ZIP.
 - La verificacion de existencia del ZIP se expone como contrato de almacenamiento, pero no modifica automaticamente el estado persistido.
@@ -1601,21 +1696,29 @@ erDiagram
         string perfil_sat_id FK
         string id_solicitud_sat UK
         string tipo_cfdi
-        string tipo_solicitud
+        string operacion_sat
+        string tipo_solicitud_sat
+        string estado_comprobante_sat
         date fecha_inicial
         date fecha_final
         string filtros_sat_json
+        string dedup_key
         string estado
-        string codigo_sat
-        string mensaje_sat
+        string cod_estatus_solicitud
+        string mensaje_solicitud_sat
+        string estado_solicitud_sat
+        string codigo_estado_solicitud
+        string mensaje_verificacion_sat
         int numero_cfdi
         datetime creada_en
+        datetime envio_iniciado_en
         datetime enviada_en
         datetime ultima_verificacion_en
         datetime siguiente_verificacion_en
         int verificaciones_sin_cambio
         string ultimo_error
-        string accion_pendiente
+        boolean verificacion_pendiente
+        boolean descarga_pendiente
         datetime accion_pendiente_en
         datetime eliminada_en
     }
@@ -1629,6 +1732,8 @@ erDiagram
         datetime disponible_en
         datetime descargado_en
         datetime vencimiento_estimado_en
+        string codigo_descarga_sat
+        string mensaje_descarga_sat
         string ultimo_error
         datetime eliminado_en
     }
@@ -1638,6 +1743,7 @@ erDiagram
         string solicitud_masiva_id FK
         string tipo_evento
         string origen
+        string origen_codigo_sat
         string codigo_sat
         string mensaje_sat
         string payload_resumen_json
@@ -1658,7 +1764,7 @@ erDiagram
 
 - `PERFIL_SAT` representa un RFC/contribuyente operado por el usuario local.
 - `CREDENCIAL_SAT` tiene relacion uno a uno con `PERFIL_SAT` y guarda solo referencias no secretas.
-- `SOLICITUD_MASIVA` es la entidad central de la app: contiene filtros, estado SAT/local y programacion de monitoreo.
+- `SOLICITUD_MASIVA` es la entidad central de la app: contiene filtros normalizados, operacion SAT efectiva, estado SAT/local y programacion de monitoreo.
 - `PAQUETE_SOLICITUD` representa ZIPs reportados o descargados; no representa XML individuales.
 - `LOG_SOLICITUD` guarda eventos sanitizados de una solicitud.
 - `CONFIGURACION_APP` no se relaciona con una entidad de usuario porque la app es personal y corre en una sesion local.
@@ -1669,7 +1775,7 @@ erDiagram
 - `PERFIL_SAT.rfc` debe ser unico entre perfiles activos/no eliminados.
 - `CREDENCIAL_SAT.perfil_sat_id` debe ser unico para mantener una credencial activa por perfil.
 - `SOLICITUD_MASIVA.id_solicitud_sat` debe ser unico cuando exista; antes de enviar a SAT puede estar vacio.
-- Debe existir una restriccion logica o indice unico parcial para impedir solicitudes activas equivalentes por `perfil_sat_id` + filtros SAT relevantes.
+- Debe existir una restriccion logica o indice unico parcial para impedir solicitudes activas equivalentes por `dedup_key`, considerando solo los estados que bloquean duplicados.
 - `PAQUETE_SOLICITUD` debe tener unicidad por `solicitud_masiva_id` + `id_paquete_sat`.
 - `CONFIGURACION_APP` debe manejarse como registro unico de configuracion local.
 - Indice para monitoreo: `SOLICITUD_MASIVA.estado`, `siguiente_verificacion_en`, `eliminada_en`.
@@ -1682,7 +1788,7 @@ erDiagram
 - No hay tabla de CFDI/XML ni UUID de comprobante en el MVP.
 - La base local guarda metadata, logs sanitizados y referencias a secretos, no secretos.
 - La carpeta de ZIPs sigue fuera de la base de datos; la base solo guarda `ruta_local`.
-- La accion manual pendiente vive dentro de `SOLICITUD_MASIVA`, no en una tabla separada.
+- Las acciones manuales pendientes viven dentro de `SOLICITUD_MASIVA` como intenciones idempotentes separadas, no en una tabla de cola.
 - Una sola credencial activa por `PERFIL_SAT`.
 - `PERFIL_SAT.rfc` unico entre perfiles activos/no eliminados.
 - `CONFIGURACION_APP` como registro unico local.
@@ -1701,10 +1807,11 @@ Estos puntos no amplian el alcance del MVP. Sirven para no convertir supuestos t
 
 ### 12.1 Contratos SAT documentados
 
-- `ADR 0005` acepta la documentacion oficial SAT como fuente canonica para `SolicitaDescarga` y `DescargaMasiva`.
+- `ADR 0005` acepta documentacion oficial SAT y WSDL productivos como fuentes de contrato, con una regla explicita para resolver discrepancias.
 - `docs/web-service.md` ya contiene la especificacion local inicial de autenticacion, solicitud, verificacion y descarga.
-- `ADR 0008` define el mapeo entre la UI del MVP y los atributos SAT de `SolicitaDescarga`.
-- La implementacion todavia debe validarse con pruebas reales contra SAT, especialmente omision de atributos vacios, estructura exacta de `RfcReceptores` y manejo de errores operativos.
+- `ADR 0013` reemplaza `ADR 0008` y define el mapeo entre la UI del MVP y `SolicitaDescargaEmitidos` / `SolicitaDescargaRecibidos`.
+- La implementacion todavia debe validarse con pruebas reales contra SAT, especialmente firma XML, WS-Security, omision de atributos vacios, estructura exacta de `RfcReceptores`, SOAP Faults, descarga con paquete en cuerpo SOAP y codigos en encabezado/respuesta.
+- El spike SAT debe ocurrir antes de fijar el `SatGateway` productivo y antes de invertir en flujos funcionales que dependan de firmas asumidas.
 
 ### 12.2 Riesgos macOS especificos
 
@@ -1717,6 +1824,7 @@ Estos puntos no amplian el alcance del MVP. Sirven para no convertir supuestos t
 
 - La aplicacion sigue siendo de uso personal; no se agregan usuarios, clientes, roles ni backend remoto por escenarios comerciales hipoteticos.
 - Las acciones manuales con monitoreo pausado quedan pendientes en `SolicitudMasiva`, porque esa fue la decision de alcance vigente.
+- `ADR 0014` fija un ejecutor serial para worker y acciones manuales, con recuperacion transaccional al arrancar.
 - `ServicioAcciones` se conserva separado de `ServicioSolicitudes`; una implementacion futura puede compartir logica interna con el worker sin cambiar el modelo.
 - `ADR 0010` decide que el token SAT vive solo en memoria para el MVP.
 - `LogSanitizer` se mantiene como contrato explicito antes de guardar payloads SAT en `LogSolicitud`.

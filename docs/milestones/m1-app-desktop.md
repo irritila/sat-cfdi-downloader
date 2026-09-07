@@ -20,6 +20,7 @@ Este milestone no agrega alcance comercial, multiusuario ni backend remoto. La p
 - Worker local con pausa persistente, intervalo 10/30 min y estados definidos.
 - Contratos internos iniciales: `SatGateway`, `SecretStore`, `OSIntegration`, `PackageStorage`, repositorios y `LogSanitizer`.
 - Adaptadores iniciales con implementaciones reales o stubs controlados segun riesgo.
+- Spike tecnico temprano de firma/autenticacion/operaciones SAT para validar el contrato antes de conectar el flujo productivo.
 
 ## Fuera de alcance de M1
 
@@ -35,14 +36,14 @@ Este milestone no agrega alcance comercial, multiusuario ni backend remoto. La p
 
 1. Inicializar proyecto Qt 6 con CMake.
 2. Crear estructura de modulos: `presentation`, `application`, `domain`, `ports`, `infrastructure`.
-3. Implementar shell QML: lista de solicitudes, nueva solicitud, detalle y perfiles SAT con datos mock.
-4. Implementar ciclo de vida de ventana y menu bar/system tray.
-5. Crear migracion SQLite inicial y repositorios.
-6. Implementar `ConfiguracionApp`, pausa persistente y autostart apagado por defecto.
-7. Implementar worker local contra un `SatGateway` fake para validar estados sin tocar SAT.
-8. Implementar carpeta local de paquetes ZIP y deteccion de existencia de archivo.
-9. Implementar `LogSanitizer` y logs operativos basicos.
-10. Hacer spike tecnico de autenticacion/firma SAT antes de conectar `SatGateway` real.
+3. Hacer spike tecnico de importacion de e.firma, firma XML, WS-Security, autenticacion SAT y operaciones reales de solicitud/verificacion/descarga con alcance minimo controlado.
+4. Implementar shell QML: lista de solicitudes, nueva solicitud, detalle y perfiles SAT con datos mock.
+5. Implementar ciclo de vida de ventana y menu bar/system tray.
+6. Crear migracion SQLite inicial y repositorios.
+7. Implementar `ConfiguracionApp`, pausa persistente y autostart apagado por defecto.
+8. Implementar worker local contra un `SatGateway` fake para validar estados sin tocar SAT.
+9. Implementar carpeta local de paquetes ZIP y deteccion de existencia de archivo.
+10. Implementar `LogSanitizer` y logs operativos basicos.
 11. Implementar `MacOSSecretStore` con Keychain para e.firma.
 12. Empaquetar `.app` local para prueba manual.
 
@@ -56,8 +57,12 @@ Este milestone no agrega alcance comercial, multiusuario ni backend remoto. La p
 - La app permite crear/listar solicitudes locales usando datos fake.
 - El worker fake cambia estados y registra logs sin depender de SAT real.
 - Los paquetes fake quedan registrados como `PaqueteSolicitud` y apuntan a una ruta local esperada.
+- El spike SAT deja evidencia tecnica de si firma, autenticacion y operaciones reales son viables con las librerias elegidas.
+- Las integraciones reales prometidas por M1 se prueban fuera del entorno de desarrollo cuando apliquen: apertura del bundle, menu bar, cerrar-a-menu-bar, salida explicita, Keychain, Login Item y notificaciones con permiso concedido/denegado.
 - QML no accede directamente a SQLite, archivos, secretos ni SAT.
 - Las decisiones relevantes quedan trazables a ADRs.
+
+Nota: M1 puede usar fakes para UI, worker y repositorios mientras se estabiliza la base. Ese resultado no completa el MVP SAT hasta conectar y probar `SatGateway` real.
 
 ## Riesgos tecnicos tempranos
 

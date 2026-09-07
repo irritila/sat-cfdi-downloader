@@ -2,7 +2,9 @@
 
 ## Estado
 
-Accepted
+Superseded por `ADR 0013`
+
+Este ADR se conserva como historico. Para implementacion nueva debe usarse `ADR 0013`, porque el WSDL productivo publica operaciones separadas para emitidos y recibidos.
 
 ## Contexto
 

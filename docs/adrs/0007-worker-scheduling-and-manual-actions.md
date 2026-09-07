@@ -22,18 +22,19 @@ Reglas:
 - Si el monitoreo esta pausado, el worker no consulta ni descarga.
 - Las acciones manuales `Verificar ahora` y `Reintentar descarga` se ejecutan desde `ServicioAcciones`.
 - Si el monitoreo esta pausado, esas acciones quedan pendientes en `SolicitudMasiva` hasta reanudar.
-- El estado `Error` de `SolicitudMasiva` es terminal para el worker automatico.
+- Las acciones pendientes se representan como dos intenciones idempotentes: `verificacion_pendiente` y `descarga_pendiente`.
+- El estado `ErrorSat` de `SolicitudMasiva` es terminal para el worker automatico.
+- `EnvioFallido` y `EnvioIncierto` no tienen `IdSolicitud` y no deben verificarse automaticamente.
 - El estado `Error` de `PaqueteSolicitud` no se reintenta automaticamente; requiere accion manual.
 
 ## Consecuencias
 
 - El usuario mantiene control explicito sobre pausa/reanudacion.
 - No se introduce una cola separada de acciones pendientes en el MVP.
-- La implementacion debe definir como representar una accion pendiente por solicitud sin sobrecomplicar la UI.
+- La implementacion debe mostrar acciones pendientes sin convertirlas en estados principales de solicitud.
 - Si esta regla resulta demasiado compleja en uso real, puede simplificarse con un ADR posterior.
 
 ## Referencias
 
 - `docs/requirements.md`
 - `docs/architecture.md`
-
