@@ -25,6 +25,7 @@ La app debe conservar metadata local aunque el SAT no este disponible y debe mos
 - Aplicacion de migraciones.
 - Proveedor de conexiones SQLite por hilo.
 - Repositorios de perfiles, solicitudes, paquetes, logs y configuracion.
+- Implementacion minima de `LogSanitizer` detras del contrato en `satcfdi_ports`.
 - Crear, listar y consultar detalle de solicitudes.
 - Persistir solicitudes simuladas con estado local/SAT.
 - Eliminacion logica de solicitudes y registros relacionados.
@@ -56,8 +57,9 @@ La app debe conservar metadata local aunque el SAT no este disponible y debe mos
 5. Implementar consultas normales que oculten registros con `eliminado_en`.
 6. Implementar insercion y consulta de solicitudes simuladas.
 7. Implementar eliminacion logica de solicitud, paquetes y logs relacionados.
-8. Conectar view models de lista y detalle a los repositorios.
-9. Agregar tests de restricciones, consultas y transacciones locales.
+8. Implementar `LogSanitizer` para token, contrasena, firma, certificados, base64 y contenido `Paquete`.
+9. Conectar view models de lista y detalle a los repositorios.
+10. Agregar tests de restricciones, consultas, sanitizacion y transacciones locales.
 
 ## Decisiones que debe respetar
 
@@ -67,6 +69,7 @@ La app debe conservar metadata local aunque el SAT no este disponible y debe mos
 - La carpeta de ZIPs no se crea ni se modifica en esta tarea.
 - La configuracion de la app se conserva como registro unico.
 - Los logs persistidos deben ser sanitizados, aunque en esta tarea solo se usen datos simulados.
+- `LogSanitizer` es el componente reutilizable para sanitizar antes de persistir; las tareas posteriores no deben duplicar reglas ad-hoc.
 
 ## Criterios de aceptacion
 
@@ -81,6 +84,8 @@ La app debe conservar metadata local aunque el SAT no este disponible y debe mos
 - [ ] La eliminacion logica tambien oculta sus paquetes y logs relacionados sin borrar fisicamente los registros.
 - [ ] Las restricciones de RFC, credencial unica, paquete unico y configuracion unica son verificadas por tests.
 - [ ] Las operaciones de repositorio no bloquean el hilo grafico.
+- [ ] `LogSanitizer` elimina o reemplaza tokens, contrasenas, firmas, certificados sensibles, base64 y contenido `Paquete`.
+- [ ] Los tests de sanitizacion cubren entradas presentes y ausentes sin alterar datos no sensibles.
 - [ ] Los tests usan una base temporal y no modifican datos de usuario.
 - [ ] No se introducen llamadas SAT, Keychain, worker ni escritura de ZIP.
 
@@ -111,6 +116,7 @@ Pendiente.
 
 - Esta tarea no demuestra que el contrato SAT sea correcto; eso corresponde a `T006`.
 - El almacenamiento de credenciales sigue siendo solo referencia hasta `T005`.
+- `T005`, `T006`, `T007` y `T009` reutilizan `LogSanitizer` en lugar de implementar saneado propio.
 - La concurrencia entre worker y acciones manuales se resolvera en `T007`, no dentro de los repositorios.
 
 ## Referencias
@@ -120,4 +126,3 @@ Pendiente.
 - `docs/architecture.md`
 - `docs/design/operational-rules.md`
 - `docs/design/qt-project-structure.md`
-

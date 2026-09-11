@@ -49,6 +49,7 @@ El resultado sigue limitado a uso personal: crear solicitudes masivas, monitorea
 - `T003-persistencia-local.md`.
 - `T004-ciclo-vida-macos.md`.
 - `T005-secret-store-keychain.md`.
+- `T005.1-ui-perfiles-sat.md`.
 - `T006-spike-sat.md`.
 - `T007-worker-ejecutor-serial.md`.
 - `T008-almacenamiento-zip.md`.
@@ -155,4 +156,3 @@ Pendiente.
 - `docs/design/operational-rules.md`
 - ADR 0013
 - ADR 0014
-

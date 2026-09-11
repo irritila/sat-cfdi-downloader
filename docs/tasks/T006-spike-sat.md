@@ -44,6 +44,7 @@ El SAT requiere firma XML, WS-Security, autenticacion y operaciones SOAP con con
 
 ## Dependencias
 
+- `T002-shell-qt-qml.md` para los contratos iniciales de `satcfdi_ports`.
 - `docs/web-service.md`.
 - ADR 0005 y ADR 0013.
 - Un material de e.firma controlado para pruebas, o una decision explicita de que la prueba real queda bloqueada por falta de credenciales.
@@ -63,7 +64,7 @@ Esta tarea no depende de `T005`. Puede usar un fixture criptografico independien
 
 1. Obtener o inspeccionar los WSDL de solicitud y descarga usados por el MVP.
 2. Confirmar nombres de operaciones, SOAP actions, namespaces, tipos XSD y forma de respuestas.
-3. Implementar un programa o test aislado que construya la autenticacion y firma.
+3. Implementar un programa o test aislado que construya la autenticacion y firma, usando el contrato `LogSanitizer` para la evidencia.
 4. Probar autenticacion con material controlado y registrar el resultado sanitizado.
 5. Probar una solicitud de emitidos o recibidos con filtros minimos.
 6. Probar verificacion y documentar la transicion de estado observada.
@@ -94,6 +95,7 @@ Esta tarea no depende de `T005`. Puede usar un fixture criptografico independien
 - [ ] Ningun secreto, token, firma completa, ZIP o payload sensible aparece en logs o evidencia.
 - [ ] El resultado contiene una recomendacion concreta para implementar `SatGateway`.
 - [ ] El resultado clasifica cada operacion como `Viable`, `Requiere ajuste` o `Bloqueada`.
+- [ ] Si una operacion critica queda `Bloqueada`, `T009` no puede iniciar esa parte del flujo hasta resolver el bloqueo y actualizar la evidencia.
 
 ## Verificacion
 
@@ -127,4 +129,3 @@ Pendiente.
 - `docs/architecture.md`
 - ADR 0005
 - ADR 0013
-

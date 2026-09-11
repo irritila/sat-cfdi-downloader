@@ -100,7 +100,7 @@ El MVP descarga paquetes ZIP y los conserva en una carpeta local. La base guarda
 - [ ] La falta de permisos, espacio o rename produce un error visible y un log sanitizado.
 - [ ] La vista de detalle puede indicar si la ruta persistida existe.
 - [ ] La vista de detalle no cambia automaticamente el estado `Descargado` si falta el archivo.
-- [ ] La eliminacion local de una solicitud no borra ZIPs fisicos.
+- [ ] `PackageStorage` no expone una operacion de borrado destructivo como parte de la eliminacion logica.
 - [ ] La app no abre, valida, extrae ni indexa el ZIP.
 - [ ] Los tests usan carpetas temporales y no modifican paquetes del usuario.
 
@@ -132,6 +132,7 @@ Pendiente.
 - Un rename atomico reduce el riesgo de archivos incompletos, pero no sustituye el registro transaccional en SQLite.
 - El MVP no garantiza que el ZIP sea valido internamente; esa validacion queda fuera de alcance.
 - La retencion de ZIPs es responsabilidad del usuario en esta version personal.
+- La verificacion completa de que eliminar una solicitud no borra ZIPs se realiza en `T009` y `T010`.
 
 ## Referencias
 

@@ -45,6 +45,7 @@ Esta tarea es el cierre de la primera version utilizable. La app sera usada por 
 
 - `T004-ciclo-vida-macos.md`.
 - `T005-secret-store-keychain.md`.
+- `T005.1-ui-perfiles-sat.md`.
 - `T006-spike-sat.md`.
 - `T007-worker-ejecutor-serial.md`.
 - `T008-almacenamiento-zip.md`.

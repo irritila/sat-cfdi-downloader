@@ -24,6 +24,7 @@ Se necesita un resultado visible temprano, pero todavia no deben introducirse SQ
 - Proyecto Qt 6.8 LTS con CMake y C++20.
 - Target ejecutable `satcfdi_app` como bundle macOS.
 - Targets internos minimos para dominio, puertos, aplicacion y presentacion.
+- Esqueletos iniciales de los contratos en `satcfdi_ports`: `SatGateway`, `SecretStore`, `OSIntegration`, `PackageStorage`, `LogSanitizer` y repositorios.
 - Composition root inicial.
 - Modulo QML propio `SatCfdiDownloader`.
 - Ventana principal QML.
@@ -42,7 +43,7 @@ Se necesita un resultado visible temprano, pero todavia no deben introducirse SQ
 
 ## Dependencias
 
-- `T001` para usar nombres y conceptos de dominio estabilizados.
+- `docs/design/operational-rules.md` para nombres y estados del dominio.
 - `docs/design/qt-project-structure.md`.
 - ADR 0011 y ADR 0012.
 
@@ -51,9 +52,10 @@ Se necesita un resultado visible temprano, pero todavia no deben introducirse SQ
 1. Crear `CMakeLists.txt` raiz y targets definidos por la estructura Qt.
 2. Crear `main.cpp`, composition root y carga de recursos QML.
 3. Registrar el modulo `SatCfdiDownloader` con `qt_add_qml_module`.
-4. Crear un modelo fake de solicitudes y view models para lista, nueva solicitud y detalle.
-5. Implementar navegacion minima entre las vistas.
-6. Agregar una prueba automatizada minima para confirmar que el proyecto compila y registra sus tests.
+4. Crear los esqueletos de contratos en `satcfdi_ports`, sin fijar detalles SOAP que dependan del spike SAT.
+5. Crear un modelo fake de solicitudes y view models para lista, nueva solicitud y detalle.
+6. Implementar navegacion minima entre las vistas.
+7. Agregar una prueba automatizada minima para confirmar que el proyecto compila y registra sus tests.
 
 ## Restricciones tecnicas
 
@@ -62,6 +64,7 @@ Se necesita un resultado visible temprano, pero todavia no deben introducirse SQ
 - Ningun archivo QML importa repositorios, SQL, SAT, filesystem o Keychain.
 - El composition root es el unico punto que conecta implementaciones concretas.
 - El shell debe poder reemplazar los datos fake por repositorios sin redisenar las vistas.
+- Los contratos iniciales son fronteras compilables; los DTOs SAT pueden ajustarse despues de `T006` sin quebrar los targets.
 
 ## Criterios de aceptacion
 
@@ -74,6 +77,8 @@ Se necesita un resultado visible temprano, pero todavia no deben introducirse SQ
 - [ ] El detalle muestra metadata simulada de la solicitud seleccionada.
 - [ ] QML no accede directamente a SQLite, archivos, secretos ni SAT.
 - [ ] La estructura de targets y carpetas coincide con `qt-project-structure.md`.
+- [ ] Existen contratos compilables en `satcfdi_ports` para SAT, secretos, sistema operativo, paquetes, logs y repositorios.
+- [ ] Los contratos no contienen detalles SOAP inventados ni implementaciones concretas.
 - [ ] No se introducen tablas, migraciones ni dependencias de integracion SAT en esta tarea.
 
 ## Verificacion
@@ -101,6 +106,7 @@ Pendiente.
 - El shell no demuestra que la integracion SAT sea viable; eso corresponde a `T006`.
 - El shell no completa el MVP y no debe confundirse con persistencia funcional.
 - El menu bar se implementa despues en `T004` para mantener el incremento enfocado.
+- Los contratos de puertos son provisionales donde el resultado de `T006` aun pueda cambiar la forma SAT.
 
 ## Referencias
 
@@ -108,4 +114,3 @@ Pendiente.
 - ADR 0011
 - ADR 0012
 - `T001-modelo-fisico-sqlite.md`
-

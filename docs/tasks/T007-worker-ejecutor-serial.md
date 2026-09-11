@@ -44,10 +44,13 @@ El worker debe revisar solicitudes y paquetes pendientes mientras la app esta ab
 
 - `T003-persistencia-local.md`.
 - `T004-ciclo-vida-macos.md`.
+- `T002-shell-qt-qml.md` para consumir los contratos iniciales de `satcfdi_ports`.
 - ADR 0007 y ADR 0014.
 - `docs/design/operational-rules.md`.
 
 Esta tarea puede ejecutarse con fakes y no depende de `T006`. La integracion con `SatGateway` real se realiza en `T009`.
+
+Los fakes deben implementar los contratos definidos en `T002`; los DTOs concretos de `SatGateway` pueden ajustarse despues de `T006`.
 
 ## Trabajo esperado
 
@@ -137,4 +140,3 @@ Pendiente.
 - `docs/design/qt-project-structure.md`
 - ADR 0007
 - ADR 0014
-
