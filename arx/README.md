@@ -22,6 +22,22 @@ Las definiciones completas estan en `arx/agents/`. Las integraciones concretas
 de cada herramienta deben ser adaptadores pequenos que apunten a estos archivos,
 sin copiar su contenido.
 
+## Roles Qt por responsabilidad
+
+| Rol | Cuando invocarlo | Responsabilidad principal |
+| --- | --- | --- |
+| [qt-architecture-lead](agents/qt-architecture-lead.md) | Nuevos modulos, responsabilidades, contratos compartidos o dudas de arquitectura y estilo. | Definir arquitectura y convenciones; coordinar cambios entre modulos. |
+| [qt-interface-engineer](agents/qt-interface-engineer.md) | Pantallas, componentes, navegacion e interaccion. | Componer la UI y verificar estados visuales, interaccion y accesibilidad. |
+| [qt-core-engineer](agents/qt-core-engineer.md) | Logica de negocio, modelos, persistencia e integracion con servicios. | Implementar dominio y casos de uso, con contratos, ownership y concurrencia definidos. |
+| [qt-platform-engineer](agents/qt-platform-engineer.md) | Build, dependencias, CI, tooling, integracion nativa y distribucion. | Mantener automatizaciones e instrucciones reproducibles. |
+| [qt-quality-engineer](agents/qt-quality-engineer.md) | Estrategia de pruebas, validacion, regresiones y defectos dificiles de reproducir. | Producir pruebas y evidencia sobre criterios de aceptacion y riesgos pendientes. |
+
+Cada definicion detalla su autonomia, limites, entregables y criterios de
+finalizacion. Selecciona el rol segun la responsabilidad principal de la tarea.
+Coordinar un cambio compartido implica identificar consumidores, acordar el
+contrato y registrar su impacto; no activa otros roles automaticamente. Combina
+roles solo cuando la tarea lo solicite explicitamente, como indica `AGENTS.md`.
+
 ## Integraciones
 
 - **Codex:** invoca explicitamente el archivo del rol en el prompt de la tarea.
