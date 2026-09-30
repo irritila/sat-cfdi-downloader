@@ -13,7 +13,7 @@ ningun rol debe analizar el proyecto ignorando ese stack.
 Selecciona un solo rol para una tarea y lee su archivo antes de comenzar:
 
 ```text
-Usa el rol definido en arx/agents/especialista-qt-qml-cpp.md.
+Usa el rol definido en arx/agents/qt-engineer.md.
 Lee primero AGENTS.md, README.md y la documentacion relevante de docs/.
 Reporta "Contexto leido" con los archivos consultados antes de trabajar.
 ```
