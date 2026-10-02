@@ -44,6 +44,8 @@ La app necesita usar certificado, llave privada y contrasena para autenticarse a
 - `T003-persistencia-local.md`.
 - ADR 0006 y ADR 0010.
 - `docs/architecture.md`.
+- `docs/design/qt-project-structure.md` para la frontera entre aplicacion e
+  infraestructura.
 
 Esta tarea no depende de `T006`. El spike SAT puede recomendar una libreria criptografica adicional, pero debe usar material de prueba independiente y no bloquear la custodia basica en Keychain.
 
@@ -59,14 +61,100 @@ Esta tarea no depende de `T006`. El spike SAT puede recomendar una libreria crip
 8. Traducir errores tecnicos a errores visibles sin incluir secretos.
 9. Implementar un fake `SecretStore` para tests de aplicacion.
 
-## Decisiones que debe cerrar esta tarea
+## Decisiones cerradas del refinamiento
 
-- Identificadores y nombres de los items Keychain.
-- Que material se guarda directamente en Keychain y que material se guarda en archivo cifrado controlado por la app.
-- Politica cuando el usuario cancela o deniega acceso a Keychain.
-- Politica de reemplazo si la nueva e.firma es invalida.
-- Politica de limpieza si la importacion falla a mitad del proceso.
-- Forma de comprobar vigencia y correspondencia sin registrar material sensible.
+- La vigencia de T005 es exclusivamente local: `notBefore <= ahora <
+  notAfter`, usando un `Clock` inyectable. La revocacion y aceptacion final del
+  SAT quedan para T006/T009.
+- Los items Keychain usan `kSecUseDataProtectionKeychain=true`,
+  `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` y
+  `kSecAttrSynchronizable=false`. El worker puede operar con la pantalla
+  bloqueada despues del primer desbloqueo. `errSecInteractionNotAllowed` se
+  trata como error transitorio y no genera prompts en segundo plano.
+- El `service` es versionado y no contiene RFC ni rutas. Las cuentas se basan
+  en un `credentialUUID` opaco por generacion:
+
+  ```text
+  <bundle-id>.efirma.v1.password
+  <bundle-id>.efirma.v1.wrapping-key
+  account = <credentialUUID>
+  ```
+
+- La aplicacion guarda certificado y llave privada en un contenedor versionado
+  cifrado autenticado dentro de `AppDataLocation/credentials/`, con nombres
+  aleatorios y permisos restrictivos. La clave de envoltura vive en Keychain.
+  No se crean descifrados temporales persistentes.
+- `SecretStore` es un puerto de infraestructura. `CredencialesSatService`
+  orquesta importacion, reemplazo, eliminacion y la transaccion SQLite.
+- `MaterialFirma` y los buffers de contraseña son tipos move-only, no cruzan
+  QML ni señales encoladas y se limpian al destruirse como garantia best effort.
+- La importacion valida formato, contraseña, correspondencia criptografica,
+  RFC, que el certificado sea admisible como e.firma y vigencia local antes de
+  activar una referencia.
+- El reemplazo crea una generacion candidata, actualiza SQLite y confirma la
+  candidata solo despues del `commit`. La credencial anterior permanece activa
+  si falla cualquier paso previo.
+- La reconciliacion al arrancar elimina generaciones sin referencia vigente en
+  SQLite. Si la limpieza posterior al commit falla, la nueva credencial sigue
+  activa y el residuo se limpia en la siguiente reconciliacion.
+- El token SAT no pertenece a `SecretStore` y solo puede vivir en memoria.
+
+### Contrato minimo
+
+Casos de uso de `CredencialesSatService`:
+
+```text
+importar(perfilId, EntradaEFirma)
+reemplazar(perfilId, EntradaEFirma)
+obtenerEstado(perfilId)
+obtenerMaterialFirma(perfilId)
+eliminar(perfilId)
+```
+
+El puerto `SecretStore` debe cubrir internamente:
+
+```text
+prepararEFirma(EntradaEFirma, rfcEsperado) -> CredencialPreparada
+obtenerEstado(CredencialRef) -> EstadoCredencial
+obtenerMaterialFirma(CredencialRef) -> MaterialFirma
+eliminar(CredencialRef) -> Resultado
+reconciliar(referenciasVigentes) -> ResumenReconciliacion
+```
+
+`CredencialPreparada` es move-only y descarta su generacion si se destruye sin
+confirmacion. `MaterialFirma` es move-only, no tiene conversion a `QString`,
+`QByteArray` ni `QDebug`, y solo vive durante la operacion que lo consume.
+
+Estados de credencial:
+
+```text
+SinCredencial | Validando | Lista | Vencida | NoVigenteAun |
+MaterialFaltante | MaterialDanado
+```
+
+Categorias de error visibles:
+
+```text
+ArchivoIlegible | FormatoInvalido | ContrasenaIncorrecta |
+ParejaIncompatible | RfcNoCoincide | NoEsEFirma | Vencida |
+NoVigenteAun | CredencialNoEncontrada | CredencialDanada |
+AlmacenBloqueado | AccesoDenegado | CanceladoPorUsuario |
+AlmacenMalConfigurado | AlmacenNoDisponible | FalloEscritura | Interno
+```
+
+La UI traduce categorias; los detalles de `OSStatus`, rutas y diagnosticos
+tecnicos solo pueden aparecer en logs sanitizados.
+
+## Pendientes no bloqueantes
+
+- Confirmar mediante un spike la biblioteca/API concreta para leer los formatos
+  PKCS#8 usados por `.key` y extraer el RFC del certificado sin heuristicas.
+- Definir la regla verificable para distinguir una e.firma de un CSD cuando el
+  formato del certificado lo permita; no se usaran nombres ni extensiones.
+- Determinar si los metadatos no secretos `numero_serie`, `vigente_desde` y
+  `vigente_hasta` requieren columnas adicionales en `credencial_sat`.
+- Unificar el nombre del fake entre `FakeSecretStore` y cualquier referencia
+  previa a `InMemorySecretStore`.
 
 ## Restricciones tecnicas
 
@@ -79,19 +167,37 @@ Esta tarea no depende de `T006`. El spike SAT puede recomendar una libreria crip
 
 ## Criterios de aceptacion
 
-- [ ] Una e.firma valida puede importarse y asociarse a un `PerfilSat`.
-- [ ] Una contrasena incorrecta es rechazada sin activar la credencial.
-- [ ] Una llave y certificado que no corresponden son rechazados.
-- [ ] Un certificado con RFC distinto al perfil es rechazado.
-- [ ] Una e.firma vencida o invalida es rechazada.
-- [ ] El reemplazo conserva la credencial anterior si la nueva importacion falla.
-- [ ] El reemplazo deja una sola credencial activa cuando la nueva importacion es valida.
-- [ ] Una referencia de credencial puede recuperarse desde SQLite sin revelar secretos.
-- [ ] `obtenerMaterialFirma` entrega material solo durante la operacion solicitada.
-- [ ] Los errores de Keychain, cancelacion y acceso denegado son distinguibles para la UI.
-- [ ] Ningun secreto aparece en SQLite, logs, mensajes visibles o archivos temporales de pruebas.
-- [ ] El fake `SecretStore` permite probar servicios sin usar Keychain real.
-- [ ] La tarea no introduce soporte para CSD, multiusuario o migracion de credenciales.
+- [ ] Dado un perfil activo y fixtures validos, cuando se importa una e.firma,
+  entonces se crea una referencia opaca y el perfil queda listo.
+- [ ] Dada una contraseña incorrecta, cuando se importa, entonces devuelve
+  `ContrasenaIncorrecta` y no activa ninguna credencial.
+- [ ] Dado un certificado y una llave incompatibles, cuando se importan,
+  entonces devuelve `ParejaIncompatible` sin residuos.
+- [ ] Dado un RFC de certificado distinto al perfil, cuando se importa,
+  entonces devuelve `RfcNoCoincide` sin exponer el RFC en el mensaje visible.
+- [ ] Dado un certificado vencido o aún no vigente, cuando se importa,
+  entonces devuelve la categoria correspondiente usando el `Clock` inyectado.
+- [ ] Dado un certificado no admisible como e.firma, cuando se importa,
+  entonces devuelve `NoEsEFirma` sin inferirlo por nombre o extensión.
+- [ ] Dada una credencial activa, cuando un reemplazo falla en validacion,
+  Keychain, escritura o commit, entonces la credencial anterior sigue usable.
+- [ ] Dado un reemplazo valido, cuando termina el commit, entonces existe una
+  sola generacion activa y la anterior queda pendiente de limpieza.
+- [ ] Dado un cierre inesperado o fallo de limpieza posterior al commit, cuando
+  inicia la app, entonces la reconciliacion elimina generaciones huerfanas sin
+  tocar la credencial vigente.
+- [ ] Dada una referencia recuperada desde SQLite, entonces no contiene
+  contraseña, llave, DER, token ni ruta absoluta.
+- [ ] Dado `obtenerMaterialFirma`, entonces devuelve `MaterialFirma` move-only
+  y no persiste ni expone el material fuera de la operacion.
+- [ ] Dado Keychain cancelado, denegado, bloqueado o no disponible, entonces la
+  UI recibe categorias distintas y el worker no genera prompts en bucle.
+- [ ] Dado cualquier flujo de importacion/reemplazo, entonces ningun secreto
+  aparece en SQLite, WAL/SHM, logs, QML, mensajes visibles ni temporales.
+- [ ] Dado `FakeSecretStore`, entonces los servicios pueden probar exito,
+  fallos y reemplazo sin Keychain real.
+- [ ] La tarea no agrega token persistente, exportacion, CSD productivo,
+  multiusuario ni migracion de credenciales.
 
 ## Verificacion
 
@@ -103,6 +209,14 @@ Esta tarea no depende de `T006`. El spike SAT puede recomendar una libreria crip
 6. Probar reemplazo valido y reemplazo fallido.
 7. Inspeccionar SQLite y `LogSolicitud` para confirmar ausencia de secretos.
 8. Ejecutar `ctest --test-dir build`.
+9. Ejecutar la suite determinista con `FakeSecretStore`, `KeychainApi` falso y
+   `Clock` controlable.
+10. Ejecutar pruebas de Keychain real solo con un namespace de servicio aislado
+    y un bundle firmado; omitirlas con `QSKIP` explicito si el entorno no aplica.
+11. Escanear SQLite, WAL/SHM, logs, mensajes y temporales con centinelas de los
+    fixtures; el conteo esperado es cero.
+12. Ejecutar pruebas manuales de cancelacion, denegacion y bloqueo sin permitir
+    prompts desde el worker.
 
 ## Definicion de terminado
 
