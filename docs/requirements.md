@@ -308,7 +308,11 @@ Entidades iniciales:
 - `LogSolicitud`: eventos relevantes de una solicitud.
 - `ConfiguracionApp`: preferencias locales de la aplicacion.
 
-Cada `PerfilSat` tiene una sola credencial activa, reemplazable cuando el usuario actualiza e.firma. `ConfiguracionApp` se maneja como un registro unico local.
+Cada `PerfilSat` puede existir sin credencial y tiene como maximo una credencial vigente, reemplazable cuando el usuario actualiza e.firma. `ConfiguracionApp` se maneja como un registro unico local.
+
+Un perfil inactivo no puede usarse para crear solicitudes nuevas, pero no detiene el worker sobre solicitudes existentes, no invalida su credencial y no libera el RFC. Solo la eliminacion logica del perfil libera el RFC para recrearlo.
+
+El MVP permite eliminar perfiles solo cuando no tengan solicitudes no eliminadas en curso. La eliminacion conserva historial local y elimina la credencial vigente y sus secretos desde la capa de aplicacion.
 
 Metadata minima de `SolicitudMasiva`:
 
@@ -318,6 +322,8 @@ Metadata minima de `SolicitudMasiva`:
 - Tipo: emitidos o recibidos.
 - Fechas solicitadas.
 - Filtros enviados.
+
+La deduplicacion de solicitudes equivalentes usa RFC solicitante y filtros visibles para SAT, no la identidad local del perfil. Si un perfil se elimina y se recrea con el mismo RFC, las solicitudes historicas o en curso del perfil anterior siguen contando para las reglas de duplicados.
 - Clave local anti-duplicados.
 - Identificador SAT de solicitud.
 - Estatus actual.

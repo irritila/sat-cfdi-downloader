@@ -2,7 +2,12 @@
 
 ## Estado
 
-Accepted
+Superseded
+
+Reemplazado parcialmente por ADR 0015 para reglas de vencimiento de paquetes y
+solicitud, rechazo inicial sin `IdSolicitud` y eliminacion local como estado
+operativo. Las decisiones de ejecutor serial, frontera de concurrencia,
+transacciones locales y recuperacion al arrancar siguen vigentes.
 
 ## Contexto
 

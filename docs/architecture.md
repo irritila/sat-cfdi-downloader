@@ -224,15 +224,14 @@ sequenceDiagram
         Solicitudes-->>UI: Error de validacion
         UI-->>Usuario: Muestra campos a corregir
     else Filtros validos
-        Solicitudes->>DB: Buscar solicitud activa con mismos filtros SAT
+        Solicitudes->>Executor: Crear y enviar solicitud
+        Executor->>DB: Validar dedup_key e insertar Creada en una transaccion
 
-        alt Solicitud duplicada local
+        alt Solicitud equivalente bloqueante
+            Executor-->>Solicitudes: Solicitud vigente ya existe
             Solicitudes-->>UI: Solicitud vigente ya existe
             UI-->>Usuario: Muestra solicitud existente sin tocar SAT
-        else Sin duplicado local
-            Solicitudes->>DB: Guardar SolicitudMasiva en estado Creada
-            Solicitudes->>DB: Guardar LogSolicitud
-            Solicitudes->>Executor: Enviar solicitud creada
+        else Excepcion manual confirmada o sin duplicado
             Executor->>DB: Marcar Enviando e intento de envio
             Executor->>Credenciales: Solicitar material de e.firma
             Credenciales-->>Executor: Entrega credenciales para firmar
@@ -248,12 +247,27 @@ sequenceDiagram
             else Autenticacion aceptada
                 SAT-->>Executor: Token de autenticacion
                 Executor->>SAT: Enviar SolicitaDescargaEmitidos o Recibidos
-                SAT-->>Executor: IdSolicitud, codigo y mensaje
+                SAT-->>Executor: Codigo, mensaje e IdSolicitud si aplica
+
+                alt CodEstatus 5000 con IdSolicitud utilizable
                 Executor->>DB: Actualizar SolicitudMasiva como Enviada
                 Executor->>DB: Guardar LogSolicitud
                 Executor-->>Solicitudes: Solicitud creada
                 Solicitudes-->>UI: Solicitud creada
                 UI-->>Usuario: Muestra solicitud en lista
+                else Rechazo documentado sin IdSolicitud
+                    Executor->>DB: Actualizar solicitud como EnvioFallido
+                    Executor->>DB: Guardar codigo, mensaje y LogSolicitud
+                    Executor-->>Solicitudes: Envio fallido conocido
+                    Solicitudes-->>UI: Envio fallido conocido
+                    UI-->>Usuario: Muestra diagnostico
+                else 5000 sin IdSolicitud, 5006 o codigo no documentado
+                    Executor->>DB: Marcar solicitud como EnvioIncierto
+                    Executor->>DB: Guardar codigo, mensaje y LogSolicitud
+                    Executor-->>Solicitudes: Resultado de envio incierto
+                    Solicitudes-->>UI: Resultado de envio incierto
+                    UI-->>Usuario: Muestra advertencia sin reintentar automaticamente
+                end
             else Timeout o interrupcion despues de iniciar envio
                 Executor->>DB: Marcar solicitud como EnvioIncierto
                 Executor->>DB: Guardar LogSolicitud
@@ -269,10 +283,11 @@ Lectura:
 
 - La UI no habla directamente con SAT.
 - El servicio de solicitudes valida filtros antes de autenticar o enviar.
-- El servicio de solicitudes valida duplicados locales antes de tocar SAT para proteger al usuario de repetir accidentalmente una solicitud.
-- El ejecutor serial realiza el envio, la autenticacion y las actualizaciones criticas de estado.
+- El ejecutor serial valida duplicados locales e inserta `Creada` en una misma transaccion antes de tocar SAT.
+- El ejecutor serial realiza el envio, la autenticacion y todas las actualizaciones criticas de estado.
 - Las credenciales se obtienen mediante el contrato de almacenamiento seguro.
 - La respuesta SAT se guarda como metadata de la solicitud y log operativo, separando `CodEstatus` de creacion de los codigos de verificacion posteriores.
+- La creacion no escribe `estado_solicitud_sat`: `Rechazada` queda reservada para verificacion SAT.
 - El worker no crea solicitudes ni necesita notificacion directa; detecta pendientes leyendo la base local.
 - Si el envio queda incierto, la aplicacion no reintenta automaticamente porque podria crear duplicados o consumir limites SAT.
 
@@ -284,7 +299,7 @@ Decisiones reflejadas:
 - La solicitud se guarda localmente en estado `Creada` antes de llamar al SAT para conservar trazabilidad.
 - Antes de llamar a SAT se marca `Enviando` para poder recuperar el estado si la app se cierra durante el envio.
 - La rama de filtros invalidos se mantiene porque representa validacion local antes de tocar SAT.
-- La validacion anti-duplicados local evita llamadas que podrian topar codigos SAT como `5002` o `5005`.
+- La validacion anti-duplicados local ocurre dentro del ejecutor para que el chequeo y el insert sean atomicos.
 
 Preguntas para revisar:
 
@@ -691,9 +706,9 @@ sequenceDiagram
     UI-->>Usuario: Pide confirmacion
     Usuario-->>UI: Confirma eliminacion local
     UI->>Acciones: Confirmar eliminacion
-    Acciones->>DB: Marcar SolicitudMasiva como eliminada
-    Acciones->>DB: Marcar PaqueteSolicitud asociados como eliminados
-    Acciones->>DB: Marcar LogSolicitud asociados como eliminados
+    Acciones->>DB: Establecer SolicitudMasiva.eliminado_en
+    Acciones->>DB: Establecer PaqueteSolicitud.eliminado_en
+    Acciones->>DB: Establecer LogSolicitud.eliminado_en
     Acciones-->>Archivos: No borrar paquetes ZIP
     Acciones-->>UI: Solicitud eliminada localmente
     UI-->>Usuario: Actualiza lista
@@ -991,6 +1006,7 @@ classDiagram
         +string idSolicitudSat
         +string tipoCfdi
         +string operacionSat
+        +string rfcSolicitante
         +string tipoSolicitudSat
         +string estadoComprobanteSat
         +date fechaInicial
@@ -1014,7 +1030,7 @@ classDiagram
         +bool verificacionPendiente
         +bool descargaPendiente
         +datetime accionPendienteEn
-        +datetime eliminadaEn
+        +datetime eliminadoEn
     }
 
     class PaqueteSolicitud {
@@ -1026,6 +1042,10 @@ classDiagram
         +datetime disponibleEn
         +datetime descargadoEn
         +datetime vencimientoEstimadoEn
+        +datetime vencidoEn
+        +string motivoVencimiento
+        +string origenVencimiento
+        +datetime reconciliadoEn
         +string codigoDescargaSat
         +string mensajeDescargaSat
         +string ultimoError
@@ -1053,7 +1073,7 @@ classDiagram
         +datetime actualizadaEn
     }
 
-    PerfilSat "1" --> "1" CredencialSat : protege credenciales
+    PerfilSat "1" --> "0..1" CredencialSat : protege credenciales
     PerfilSat "1" --> "0..*" SolicitudMasiva : agrupa solicitudes
     SolicitudMasiva "1" --> "0..*" PaqueteSolicitud : contiene paquetes
     SolicitudMasiva "1" --> "0..*" LogSolicitud : registra eventos
@@ -1063,8 +1083,8 @@ classDiagram
 
 - No existe entidad `Usuario`: el producto es personal y corre en la sesion local de macOS.
 - No existe entidad `Cliente`: los contribuyentes/RFC se modelan como `PerfilSat`.
-- `CredencialSat` no contiene secretos en claro. Solo guarda referencias al contrato de almacenamiento seguro.
-- `SolicitudMasiva` conserva filtros normalizados, `dedupKey`, estado local/SAT, codigos separados y datos necesarios para el monitoreo.
+- `CredencialSat` no contiene secretos en claro. Solo guarda referencias vigentes al contrato de almacenamiento seguro; un perfil puede existir sin credencial.
+- `SolicitudMasiva` conserva RFC solicitante, filtros normalizados, `dedupKey`, estado local/SAT, codigos separados y datos necesarios para el monitoreo.
 - `PaqueteSolicitud` representa paquetes ZIP, no XML individuales.
 - `LogSolicitud` pertenece al historial operativo de una solicitud. No se usa para registrar cierres normales de la aplicacion.
 - `ConfiguracionApp` centraliza preferencias locales: inicio automatico, pausa de monitoreo y ultimo cierre.
@@ -1133,8 +1153,7 @@ stateDiagram-v2
 
     }
 
-    Visible --> EliminadaLocalmente: Eliminar solicitud local
-    EliminadaLocalmente --> [*]
+    Visible --> [*]: Eliminar localmente mediante eliminadoEn
 ```
 
 ### Lectura del diagrama
@@ -1146,7 +1165,7 @@ stateDiagram-v2
 - `EnvioFallido` y `EnvioIncierto` no tienen `IdSolicitud`; no deben tratarse como estados SAT ni reenviarse en el MVP.
 - `Terminada` no significa que los ZIP ya esten descargados. Solo significa que SAT reporto la solicitud como terminada y pueden registrarse paquetes disponibles.
 - `Descargando` y `Descargado` no son estados de `SolicitudMasiva`; pertenecen a `PaqueteSolicitud`.
-- `EliminadaLocalmente` representa eliminacion virtual mediante `eliminadaEn`. No toca SAT ni borra paquetes ZIP.
+- La eliminacion local se representa mediante `eliminadoEn`; no es un estado operativo. No toca SAT ni borra paquetes ZIP.
 
 ### Decisiones reflejadas
 
@@ -1188,8 +1207,7 @@ stateDiagram-v2
         Error --> Vencido: Expiracion SAT o estimacion local
     }
 
-    Visible --> EliminadoLocalmente: Eliminar solicitud local
-    EliminadoLocalmente --> [*]
+    Visible --> [*]: Eliminar localmente mediante eliminadoEn
 ```
 
 ### Lectura del diagrama
@@ -1201,7 +1219,7 @@ stateDiagram-v2
 - La transicion de `Error` a `Descargando` ocurre por accion manual del usuario.
 - `Vencido` representa un paquete que ya no debe intentarse descargar porque su solicitud vencio o SAT devolvio paquete inexistente/expirado.
 - Si la app arranca y encuentra un paquete en `Descargando` sin archivo final, lo regresa a `Disponible` y registra log de interrupcion local.
-- `EliminadoLocalmente` es eliminacion virtual. No borra el ZIP si ya existia en disco.
+- La eliminacion local se representa mediante `eliminadoEn`; no es un estado de descarga y no borra el ZIP si ya existia en disco.
 
 ### Decisiones reflejadas
 
@@ -1664,7 +1682,7 @@ Objetivo: definir la estructura logica de persistencia local para el MVP. Este d
 
 ```mermaid
 erDiagram
-    PERFIL_SAT ||--|| CREDENCIAL_SAT : tiene
+    PERFIL_SAT ||--o| CREDENCIAL_SAT : tiene
     PERFIL_SAT ||--o{ SOLICITUD_MASIVA : agrupa
     SOLICITUD_MASIVA ||--o{ PAQUETE_SOLICITUD : contiene
     SOLICITUD_MASIVA ||--o{ LOG_SOLICITUD : registra
@@ -1695,6 +1713,7 @@ erDiagram
         string id_solicitud_sat UK
         string tipo_cfdi
         string operacion_sat
+        string rfc_solicitante
         string tipo_solicitud_sat
         string estado_comprobante_sat
         date fecha_inicial
@@ -1718,7 +1737,7 @@ erDiagram
         boolean verificacion_pendiente
         boolean descarga_pendiente
         datetime accion_pendiente_en
-        datetime eliminada_en
+        datetime eliminado_en
     }
 
     PAQUETE_SOLICITUD {
@@ -1730,6 +1749,7 @@ erDiagram
         datetime disponible_en
         datetime descargado_en
         datetime vencimiento_estimado_en
+        datetime vencido_en
         string motivo_vencimiento
         string origen_vencimiento
         datetime reconciliado_en
@@ -1764,7 +1784,7 @@ erDiagram
 ### Lectura del diagrama
 
 - `PERFIL_SAT` representa un RFC/contribuyente operado por el usuario local.
-- `CREDENCIAL_SAT` tiene relacion uno a uno con `PERFIL_SAT` y guarda solo referencias no secretas.
+- `CREDENCIAL_SAT` tiene relacion uno a cero-o-uno con `PERFIL_SAT` y guarda solo referencias no secretas vigentes.
 - `SOLICITUD_MASIVA` es la entidad central de la app: contiene filtros normalizados, operacion SAT efectiva, estado SAT/local y programacion de monitoreo.
 - `PAQUETE_SOLICITUD` representa ZIPs reportados o descargados; no representa XML individuales.
 - `LOG_SOLICITUD` guarda eventos sanitizados de una solicitud.
@@ -1773,13 +1793,13 @@ erDiagram
 
 ### Restricciones e indices esperados
 
-- `PERFIL_SAT.rfc` debe ser unico entre perfiles activos/no eliminados.
-- `CREDENCIAL_SAT.perfil_sat_id` debe ser unico para mantener una credencial activa por perfil.
+- `PERFIL_SAT.rfc` debe ser unico entre perfiles no eliminados; `activo=false` no libera el RFC.
+- `CREDENCIAL_SAT.perfil_sat_id` debe ser unico para mantener como maximo una credencial vigente por perfil.
 - `SOLICITUD_MASIVA.id_solicitud_sat` debe ser unico cuando exista; antes de enviar a SAT puede estar vacio.
 - Debe existir una restriccion logica o indice unico parcial para impedir solicitudes activas equivalentes por `dedup_key`, considerando solo los estados que bloquean duplicados.
 - `PAQUETE_SOLICITUD` debe tener unicidad por `solicitud_masiva_id` + `id_paquete_sat`.
 - `CONFIGURACION_APP` debe manejarse como registro unico de configuracion local.
-- Indice para monitoreo: `SOLICITUD_MASIVA.estado_local`, `estado_solicitud_sat`, `siguiente_verificacion_en`, `eliminada_en`.
+- Indice para monitoreo: `SOLICITUD_MASIVA.estado_local`, `estado_solicitud_sat`, `siguiente_verificacion_en`, `eliminado_en`.
 - Indice para descarga: `PAQUETE_SOLICITUD.estado_descarga`, `eliminado_en`.
 - Indice para detalle: `LOG_SOLICITUD.solicitud_masiva_id`, `creado_en`.
 
@@ -1790,14 +1810,14 @@ erDiagram
 - La base local guarda metadata, logs sanitizados y referencias a secretos, no secretos.
 - La carpeta de ZIPs sigue fuera de la base de datos; la base solo guarda `ruta_local`.
 - Las acciones manuales pendientes viven dentro de `SOLICITUD_MASIVA` como intenciones idempotentes separadas, no en una tabla de cola.
-- Una sola credencial activa por `PERFIL_SAT`.
-- `PERFIL_SAT.rfc` unico entre perfiles activos/no eliminados.
+- Como maximo una credencial vigente por `PERFIL_SAT`; el perfil puede existir sin credencial.
+- `PERFIL_SAT.rfc` unico entre perfiles no eliminados.
 - `CONFIGURACION_APP` como registro unico local.
 
 ### Preguntas para revisar
 
-- Validado: una sola credencial activa por `PerfilSat`, reemplazable al actualizar e.firma.
-- Validado: `PerfilSat.rfc` debe ser unico entre perfiles activos/no eliminados.
+- Validado: como maximo una credencial vigente por `PerfilSat`, reemplazable al actualizar e.firma.
+- Validado: `PerfilSat.rfc` debe ser unico entre perfiles no eliminados.
 - Validado: `ConfiguracionApp` debe ser un registro unico local.
 
 ## 12. Riesgos y decisiones pendientes

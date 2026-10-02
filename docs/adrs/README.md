@@ -30,4 +30,5 @@ Un ADR aceptado no se edita para cambiar la decision central. Si una decision ca
 | [0011](0011-qt-qml-application-stack.md) | Accepted | Usar Qt y QML como stack de aplicacion |
 | [0012](0012-qt-layered-project-structure.md) | Accepted | Organizar el proyecto Qt por capas y targets CMake |
 | [0013](0013-sat-request-operations-v15.md) | Accepted | Usar operaciones SAT v1.5 separadas para crear solicitudes |
-| [0014](0014-serial-operation-executor-and-recovery.md) | Accepted | Serializar operaciones y definir recuperacion transaccional |
+| [0014](0014-serial-operation-executor-and-recovery.md) | Superseded | Serializar operaciones y definir recuperacion transaccional; reemplazado parcialmente por ADR 0015 |
+| [0015](0015-solicitudes-paquetes-y-eliminacion-local.md) | Accepted | Separar estados SAT, paquetes y eliminacion local |
