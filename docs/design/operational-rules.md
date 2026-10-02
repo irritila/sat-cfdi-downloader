@@ -161,9 +161,66 @@ paquetes no eliminados esten `Descargado` o `Vencido`. Si hay paquetes
 `Disponible`, `Descargando` o `Error`, la solicitud equivalente sigue
 bloqueada.
 
+Para implementacion local, `evaluarDuplicado` clasifica una coincidencia como:
+
+| Coincidencia existente | Resultado |
+| --- | --- |
+| `Creada`, `Enviando`, `Enviada`, `Aceptada` o `EnProceso` | `Bloqueado` |
+| `Terminada` con algun paquete no eliminado `Disponible`, `Descargando` o `Error` | `Bloqueado` |
+| `Terminada` con todos sus paquetes no eliminados en `Descargado` | `Bloqueado` |
+| `Terminada` con al menos un `Vencido` y el resto `Descargado` o `Vencido` | `RequiereConfirmacion` |
+| `Terminada` sin paquetes no eliminados | `RequiereConfirmacion` |
+| `EnvioIncierto` | `RequiereConfirmacion` |
+| `EnvioFallido`, `ErrorSat`, `Rechazada` o `Vencida` | `RequiereConfirmacion` |
+| Solicitud eliminada localmente con la misma clave | `RequiereConfirmacion` |
+
+Si hay varias coincidencias para la misma `dedup_key`, la precedencia es
+`Bloqueado` > `RequiereConfirmacion` > `Libre`.
+
 La clave no incluye `perfil_sat_id`: debe basarse en RFC solicitante, filtros y
 valores visibles para SAT. Asi, eliminar y recrear un perfil con el mismo RFC no
 evade la deduplicacion local.
+
+### Formato canonico de `dedup_key v1`
+
+El formato persistido es:
+
+```text
+v1:<sha256-hex-lowercase>
+```
+
+El hash SHA-256 se calcula sobre una serializacion canonica UTF-8 sin BOM, con
+pares `clave=valor` separados por LF y sin LF final. El orden fijo de claves es:
+
+1. `operacion_sat`.
+2. `rfc_solicitante`.
+3. `rfc_emisor`, si aplica.
+4. `rfc_receptor`, si aplica.
+5. `rfc_receptores`, si aplica.
+6. `fecha_inicial_sat`.
+7. `fecha_final_sat`.
+8. `tipo_solicitud=CFDI`.
+9. `estado_comprobante=Vigente`.
+10. `tipo_comprobante`, si aplica.
+11. `complemento`, si aplica.
+
+Reglas de serializacion:
+
+- `operacion_sat` usa `SolicitaDescargaEmitidos` o `SolicitaDescargaRecibidos`.
+- RFCs normalizados: trim, mayusculas y sin espacios internos.
+- Fechas SAT: `YYYY-MM-DDThh:mm:ss` en hora Centro de Mexico, sin offset. Las
+  fechas capturadas como dia completo se expanden a `T00:00:00` y `T23:59:59`.
+- `rfc_receptores` se normaliza, deduplica, ordena por bytes UTF-8 y se une con
+  coma sin espacios.
+- Opcionales ausentes, string vacio o listas vacias omiten la linea completa.
+  Nunca se serializa `clave=`.
+- Valores con LF, `=` o `,` se rechazan en dominio antes de generar la clave.
+- No se incluyen `perfil_sat_id`, UUIDs locales, usuario ni timestamps.
+
+Los tests deben fijar vectores golden con el string canonico pre-hash y el
+SHA-256 esperado calculado fuera de la implementacion. Cambiar campos, orden,
+normalizacion, separadores, hash, prefijo o filtros SAT que afecten equivalencia
+exige una nueva version y una migracion de datos.
 
 ## Acciones pendientes
 
