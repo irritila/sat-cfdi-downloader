@@ -30,7 +30,7 @@ Se necesita un resultado visible temprano, pero todavia no deben introducirse SQ
 - Ventana principal QML.
 - Navegacion base entre solicitudes, nueva solicitud y detalle.
 - View models y datos simulados en memoria.
-- Pruebas basicas de compilacion y carga de QML.
+- Pruebas basicas de compilacion, dominio/aplicacion demo y carga de QML.
 
 ### No incluye
 
@@ -40,6 +40,9 @@ Se necesita un resultado visible temprano, pero todavia no deben introducirse SQ
 - Llamadas SAT, worker o ejecutor serial productivo.
 - Menu bar, autostart y notificaciones; pertenecen a `T004`.
 - Formularios completos de perfiles y credenciales.
+- Pagina de perfiles SAT; T002 solo incluye un modelo demo de perfiles activos para el selector de nueva solicitud.
+- Worker, temporizadores, cola serial, backoff, recuperacion o transiciones asincronas.
+- Escritura o lectura de ZIP.
 
 ## Dependencias
 
@@ -55,7 +58,21 @@ Se necesita un resultado visible temprano, pero todavia no deben introducirse SQ
 4. Crear los esqueletos de contratos en `satcfdi_ports`, sin fijar detalles SOAP que dependan del spike SAT.
 5. Crear un modelo fake de solicitudes y view models para lista, nueva solicitud y detalle.
 6. Implementar navegacion minima entre las vistas.
-7. Agregar una prueba automatizada minima para confirmar que el proyecto compila y registra sus tests.
+7. Agregar pruebas automatizadas minimas separadas para dominio/aplicacion y presentacion.
+8. Documentar prerrequisitos locales para encontrar Qt 6.8 mediante `CMAKE_PREFIX_PATH` cuando aplique.
+
+## Decisiones cerradas del refinamiento
+
+- T002 usa `QApplication` para quedar alineada con el stack futuro, pero no implementa menu bar ni ciclo de vida macOS. En T002, cerrar la ventana termina el proceso.
+- `satcfdi_infrastructure` existe solo como target minimo para conservar el grafo; no contiene adaptadores SQLite, SAT, Keychain, archivos ni macOS.
+- Los puertos de `satcfdi_ports` son fronteras compilables con destructor virtual y documentacion de responsabilidad. En T002 no declaran metodos, DTO SAT, codigos, envelopes SOAP, rutas ni detalles de firma.
+- El contrato funcional consumido por presentacion vive en `satcfdi_application` como `SolicitudesService` demo, con `listar`, `obtener`, `crear` y notificacion de solicitud actualizada.
+- `DemoSolicitudesService` se arma exclusivamente en el composition root y se marca como demo. T003 podra reemplazarlo sin cambiar las vistas.
+- Los view models se inyectan desde el composition root mediante propiedades iniciales o `required`; no se usan singletons globales.
+- Todo corre en el hilo grafico. No se crean hilos ni timers de simulacion.
+- Los datos demo cubren estados representativos de `docs/design/operational-rules.md`, pero no implementan transiciones reales.
+- No se incluye `PerfilesSatPage`. `NuevaSolicitudViewModel` expone `perfilesDisponibles` como modelo demo de solo lectura con perfiles activos.
+- Las pruebas de presentacion van en un ejecutable separado `satcfdi_presentation_tests`.
 
 ## Restricciones tecnicas
 
@@ -65,20 +82,44 @@ Se necesita un resultado visible temprano, pero todavia no deben introducirse SQ
 - El composition root es el unico punto que conecta implementaciones concretas.
 - El shell debe poder reemplazar los datos fake por repositorios sin redisenar las vistas.
 - Los contratos iniciales son fronteras compilables; los DTOs SAT pueden ajustarse despues de `T006` sin quebrar los targets.
+- `estado_local` y `estado_solicitud_sat` se modelan por separado desde el primer shell.
+- QML recibe claves estables de estado, no texto de negocio persistido; el texto visible se resuelve en presentacion.
+- La seleccion de detalle se hace por `id`, nunca por indice de fila.
+
+## Contrato minimo de presentacion
+
+- `SolicitudesListModel` expone roles `id`, `perfilRfc`, `rfcContraparte`, `tipoDescarga`, `fechaInicial`, `fechaFinal`, `estadoLocal`, `estadoSat`, `estadoResumen`, `creadaEn` y `totalPaquetes`.
+- `estadoSat` es nulo cuando no existe estado SAT.
+- `estadoResumen` usa claves estables como `Creada`, `Enviando`, `Enviada`, `EnvioFallido`, `EnvioIncierto`, `Aceptada`, `EnProceso`, `Terminada`, `ErrorSat`, `Rechazada` y `Vencida`.
+- `NuevaSolicitudViewModel` expone campos editables, `perfilesDisponibles`, `canSubmit`, `ocupado`, `errorMessage`, comando `submit()` y senal `submitted(id)`.
+- La validacion del formulario es superficial: campos requeridos y fecha final mayor o igual a fecha inicial.
+- `SolicitudDetailViewModel` carga por `id` y muestra metadata, estado local, estado SAT y paquetes simulados.
+- El demo puede emitir errores de validacion; deduplicacion, limites SAT, codigos SAT y advertencias productivas quedan fuera.
 
 ## Criterios de aceptacion
 
-- [ ] `cmake -S . -B build` configura el proyecto correctamente.
+- [ ] `cmake -S . -B build` configura el proyecto correctamente cuando el entorno puede encontrar Qt 6.8; si hace falta, la tarea documenta `CMAKE_PREFIX_PATH`.
 - [ ] `cmake --build build` genera `satcfdi_app` como bundle macOS.
 - [ ] `ctest --test-dir build` se ejecuta sin fallos.
 - [ ] La app abre una ventana principal QML sin errores de carga.
 - [ ] La ventana muestra una lista de solicitudes simuladas.
 - [ ] Se puede navegar de la lista a nueva solicitud y al detalle.
 - [ ] El detalle muestra metadata simulada de la solicitud seleccionada.
+- [ ] Al enviar una nueva solicitud simulada valida, se abre el detalle por `id` y la solicitud aparece en la lista al regresar.
+- [ ] Con datos demo vacios, la lista muestra un estado vacio.
+- [ ] Con fechas invalidas o sin perfil, el formulario impide enviar y muestra error visible.
+- [ ] El detalle separa estado local, estado SAT y paquetes simulados.
+- [ ] Las filas de lista y badges de estado usan texto accesible y no dependen solo de color.
+- [ ] El flujo lista, nueva solicitud y detalle puede recorrerse con teclado.
+- [ ] Redimensionar la ventana no corta contenido esencial.
 - [ ] QML no accede directamente a SQLite, archivos, secretos ni SAT.
 - [ ] La estructura de targets y carpetas coincide con `qt-project-structure.md`.
 - [ ] Existen contratos compilables en `satcfdi_ports` para SAT, secretos, sistema operativo, paquetes, logs y repositorios.
 - [ ] Los contratos no contienen detalles SOAP inventados ni implementaciones concretas.
+- [ ] `satcfdi_ports` no declara metodos productivos que adelanten T003, T006 o T007.
+- [ ] `satcfdi_presentation_tests` carga el modulo QML y verifica roles/navegacion basica.
+- [ ] T002 no contiene `QSystemTrayIcon`, `setQuitOnLastWindowClosed(false)`, `LSUIElement`, instancia unica, `MacOSIntegration` ni `FakeOSIntegration`.
+- [ ] T002 no agrega dependencias Qt `Sql` ni `Network`.
 - [ ] No se introducen tablas, migraciones ni dependencias de integracion SAT en esta tarea.
 
 ## Verificacion
@@ -87,7 +128,9 @@ Se necesita un resultado visible temprano, pero todavia no deben introducirse SQ
 2. Ejecutar `ctest`.
 3. Abrir el `.app` generado.
 4. Recorrer lista, nueva solicitud y detalle.
-5. Revisar imports QML y dependencias de los targets para confirmar las fronteras de capa.
+5. Probar el recorrido con teclado.
+6. Revisar imports QML y dependencias de los targets para confirmar las fronteras de capa.
+7. Confirmar que la consola no muestra errores de carga QML.
 
 ## Definicion de terminado
 
@@ -96,6 +139,7 @@ Se necesita un resultado visible temprano, pero todavia no deben introducirse SQ
 - El puente C++/QML esta funcionando.
 - Las pruebas y comandos de compilacion documentados pasan.
 - `T003` puede reemplazar los datos fake por persistencia sin modificar la estructura de navegacion.
+- `T004` puede agregar menu bar/ciclo de vida sin retirar comportamiento oculto dentro de T002.
 
 ## Resultado
 

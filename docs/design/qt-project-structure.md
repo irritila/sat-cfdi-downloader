@@ -25,10 +25,11 @@ Este diseno asume `ADR 0011`: Qt 6, QML / Qt Quick Controls, C++ y CMake.
 | `satcfdi_domain` | static lib | Entidades, estados, filtros normalizados, reglas de transicion y retencion local. | `Qt6::Core` |
 | `satcfdi_ports` | interface lib | Contratos C++: SAT, secretos, repositorios, paquetes, SO y sanitizacion. | `satcfdi_domain` |
 | `satcfdi_application` | static lib | Casos de uso, ejecutor serial, worker, acciones manuales, coordinacion de repositorios y logs. | `satcfdi_domain`, `satcfdi_ports`, `Qt6::Core` |
-| `satcfdi_infrastructure` | static lib | Adaptadores SQLite, SAT, archivos, macOS, Keychain y notificaciones. | `satcfdi_domain`, `satcfdi_ports`, `Qt6::Core`, `Qt6::Sql`, `Qt6::Network`, `Qt6::Widgets` |
-| `satcfdi_presentation` | static lib / qml module | View models C++ y QML expuesto por la app. | `satcfdi_application`, `satcfdi_domain`, `Qt6::Core`, `Qt6::Qml`, `Qt6::Quick` |
+| `satcfdi_infrastructure` | static lib | Adaptadores SQLite, SAT, archivos, macOS, Keychain y notificaciones. En T002 puede existir como target minimo sin adaptadores productivos. | `satcfdi_domain`, `satcfdi_ports`, `Qt6::Core`; los adaptadores posteriores agregan `Qt6::Sql`, `Qt6::Network` o `Qt6::Widgets` cuando corresponda |
+| `satcfdi_presentation` | static lib / qml module | View models C++ y QML expuesto por la app. | `satcfdi_application`, `satcfdi_domain`, `Qt6::Core`, `Qt6::Qml`, `Qt6::Quick`, `Qt6::QuickControls2` |
 | `satcfdi_app` | executable `MACOSX_BUNDLE` | `main.cpp`, composition root, recursos, bundle macOS. | Todos los targets anteriores, `Qt6::Widgets`, `Qt6::Quick` |
 | `satcfdi_tests` | test executable | Tests unitarios de dominio y aplicacion con fakes. | `satcfdi_domain`, `satcfdi_application`, `satcfdi_ports`, `Qt6::Test` |
+| `satcfdi_presentation_tests` | test executable | Tests de carga QML, roles de modelos y navegacion basica con fakes. | `satcfdi_presentation`, `satcfdi_application`, `satcfdi_domain`, `Qt6::Test`, `Qt6::QuickTest` |
 
 ## Dependencias permitidas
 
@@ -41,6 +42,7 @@ flowchart TB
     domain["satcfdi_domain<br/>reglas y entidades"]
     infrastructure["satcfdi_infrastructure<br/>adaptadores"]
     tests["satcfdi_tests"]
+    presentation_tests["satcfdi_presentation_tests"]
 
     app --> presentation
     app --> application
@@ -59,6 +61,9 @@ flowchart TB
     tests --> domain
     tests --> application
     tests --> ports
+    presentation_tests --> presentation
+    presentation_tests --> application
+    presentation_tests --> domain
 ```
 
 Reglas:
@@ -69,7 +74,12 @@ Reglas:
 - `presentation` no ejecuta SQL, SOAP, filesystem ni Keychain directamente.
 - `app` es el unico lugar donde se arma el grafo de objetos concretos.
 
-## Arbol inicial de carpetas
+## Arbol objetivo M1 de carpetas
+
+Este arbol describe la forma objetivo del milestone M1. T002 solo crea el
+subconjunto necesario para el shell Qt/QML ejecutable. Las carpetas de SQLite,
+adaptadores SAT, archivos, macOS, secretos y UI de perfiles pueden quedar vacias
+o ausentes hasta sus tareas correspondientes.
 
 ```text
 .
@@ -111,7 +121,7 @@ Reglas:
 │   │   ├── persistence/
 │   │   │   ├── sqlite/
 │   │   │   └── migrations/
-│   │   │       └── 001_initial_schema.sql
+│   │   │       └── 001_initial_schema.sql   # T001/T003
 │   │   ├── sat/
 │   │   ├── storage/
 │   │   ├── os/
@@ -125,18 +135,26 @@ Reglas:
 │       │   └── screens/
 │       │       ├── SolicitudesPage.qml
 │       │       ├── NuevaSolicitudPage.qml
-│       │       ├── DetalleSolicitudPage.qml
-│       │       └── PerfilesSatPage.qml
+│       │       └── DetalleSolicitudPage.qml
 │       └── viewmodels/
 │           ├── AppViewModel.h
 │           ├── SolicitudesListModel.h
 │           ├── SolicitudDetailViewModel.h
 │           ├── NuevaSolicitudViewModel.h
-│           └── PerfilesSatViewModel.h
+│           └── PerfilesSatViewModel.h       # T005.1
 └── tests/
     ├── unit/
     └── fakes/
 ```
+
+Subconjunto T002:
+
+- No crea `001_initial_schema.sql`, migraciones ni adaptadores SQLite.
+- No crea `PerfilesSatPage.qml` ni `PerfilesSatViewModel.h`.
+- Puede crear carpetas vacias o targets minimos cuando CMake lo requiera, pero
+  sin implementaciones productivas fuera del shell.
+- `NuevaSolicitudViewModel` expone un modelo demo de perfiles activos para el
+  selector de formulario.
 
 ## QML y C++
 
@@ -202,25 +220,29 @@ Motivos:
 
 Consecuencia tecnica: `main.cpp` debe crear `QApplication`, no solo `QGuiApplication`.
 
+T002 usa `QApplication` para quedar alineada con esta decision futura, pero no
+implementa `QSystemTrayIcon`, cierre a segundo plano, instancia unica,
+`LSUIElement`, autostart ni notificaciones. Ese comportamiento pertenece a T004.
+Mientras T004 no exista, cerrar la ventana termina el proceso.
+
 ## Fakes iniciales
 
 Para avanzar M1 sin depender del SAT real desde el primer commit de codigo:
 
-- `FakeSatGateway`: simula crear solicitud, verificar estados y devolver paquetes.
-- `InMemorySecretStore`: solo para pruebas unitarias; la app real debe usar `MacOSSecretStore`.
-- `FakeOSIntegration`: para tests de aplicacion.
-- `TempPackageStorage`: para tests con carpetas temporales.
+- `DemoSolicitudesService`: entrega solicitudes y paquetes simulados para validar el puente C++/QML sin repositorios.
+- `InMemorySecretStore`: solo para pruebas unitarias futuras; la app real debe usar `MacOSSecretStore`.
+- `TempPackageStorage`: para tests futuros con carpetas temporales.
 
 Los fakes no deben esconderse como implementacion productiva.
 
-El uso de fakes permite construir el esqueleto de UI y estados, pero no completa el MVP SAT. Antes de depender de flujos funcionales productivos debe existir un spike de firma/autenticacion/operaciones SAT reales.
+El uso de fakes permite construir el esqueleto de UI y estados, pero no completa el MVP SAT. Antes de depender de flujos funcionales productivos debe existir un spike de firma/autenticacion/operaciones SAT reales. T002 no implementa `FakeSatGateway`, `FakeOSIntegration`, timers de worker ni transiciones asincronas.
 
 ## CMake esperado
 
 El `CMakeLists.txt` raiz debe:
 
 - Declarar C++20.
-- Buscar Qt 6 con componentes `Core`, `Qml`, `Quick`, `Sql`, `Network`, `Widgets` y `Test`.
+- Buscar Qt 6 con componentes `Core`, `Gui`, `Widgets`, `Qml`, `Quick`, `QuickControls2`, `Test` y `QuickTest` para T002. `Sql` y `Network` entran con las tareas que implementen persistencia o SAT.
 - Definir targets internos por capa.
 - Definir `satcfdi_app` como `MACOSX_BUNDLE`.
 - Registrar QML con `qt_add_qml_module`.
@@ -241,7 +263,12 @@ El primer corte de codigo previo al spike SAT no debe tocar SAT real. Debe entre
 - App Qt que abre una ventana QML.
 - Targets CMake por capa compilando.
 - Composition root inicial.
-- Menu bar/system tray basico con abrir y salir.
 - Un view model fake conectado a QML para validar el puente C++/QML.
+- Navegacion lista -> nueva solicitud -> detalle con datos demo en memoria.
+- Pruebas separadas para dominio/aplicacion y presentacion.
 
-Despues de ese corte se debe ejecutar el spike SAT de firma/autenticacion/operaciones antes de ampliar UI, repositorios o worker que dependan de contratos SOAP no comprobados. Luego se implementa SQLite real y se conecta el flujo con fakes o adaptadores productivos segun el resultado del spike.
+El menu bar/system tray basico con abrir y salir se implementa en T004. Despues
+del primer corte se debe ejecutar el spike SAT de firma/autenticacion/operaciones
+antes de ampliar UI, repositorios o worker que dependan de contratos SOAP no
+comprobados. Luego se implementa SQLite real y se conecta el flujo con fakes o
+adaptadores productivos segun el resultado del spike.
