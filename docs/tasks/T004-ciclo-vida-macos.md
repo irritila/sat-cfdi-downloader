@@ -49,6 +49,9 @@ La app debe permanecer ejecutandose para que el worker pueda monitorear solicitu
 - `T003-persistencia-local.md` para guardar preferencias y estado de cierre.
 - ADR 0003 y ADR 0009.
 - `docs/design/qt-project-structure.md`.
+- `ConfiguracionAppRepository` de T003 debe permitir actualizar
+  `inicio_automatico_habilitado`, `monitoreo_pausado` y `ultimo_cierre_en` a
+  traves de `PersistenceDispatcher`.
 
 ## Trabajo esperado
 
@@ -61,13 +64,47 @@ La app debe permanecer ejecutandose para que el worker pueda monitorear solicitu
 7. Integrar solicitudes de permiso y estado de notificaciones.
 8. Crear un fake o harness de `OSIntegration` para pruebas de aplicacion.
 
-## Decisiones que debe cerrar esta tarea
+## Decisiones cerradas del refinamiento
 
-- Version minima de macOS soportada por el MVP.
-- Politica de activacion de la app al iniciar automaticamente y al abrirse manualmente.
-- Mecanismo de instancia unica y reenvio de activacion.
-- Comportamiento de la app cuando macOS rechaza el Login Item.
-- Comportamiento visible cuando las notificaciones estan denegadas.
+- El MVP soporta macOS 13.0 o superior y usa `SMAppService.mainApp` para el
+  Login Item. No se agrega `LaunchAgent`, daemon ni helper.
+- El contexto de arranque se obtiene de AppKit mediante el Apple Event de
+  apertura (`kAELaunchedAsLogInItem`), no de la preferencia local, PID o
+  argumentos.
+- La instancia unica usa `QLocalServer`/`QLocalSocket` por usuario y
+  `CFBundleIdentifier`, complementado por el evento `kAEReopenApplication`.
+  Una segunda apertura envia `ActivateWindow` a la instancia primaria y
+  termina.
+- El identificador recomendado del bundle es
+  `mx.adenium.satcfdi-downloader`. La prueba real de Login Item requiere un
+  bundle macOS firmado con identidad estable.
+- `OSIntegration` expone estados observables y no permite que QML llame APIs
+  de AppKit, ServiceManagement o UserNotifications directamente.
+- La preferencia local de inicio automatico y el estado efectivo reportado por
+  macOS se almacenan y muestran por separado.
+- Solicitar permiso de notificaciones requiere una accion explicita del
+  usuario. Un permiso denegado no impide usar ventana, menu bar o worker.
+
+### Estados del contrato
+
+```text
+LaunchContext: Manual | LoginItem
+LoginItemStatus: Disabled | Enabled | RequiresApproval | Rejected | Unavailable
+NotificationStatus: NotDetermined | Granted | Denied | Unavailable
+```
+
+El adaptador emite intenciones de mostrar, ocultar, enfocar, crear una nueva
+solicitud, pausar/reanudar y salir. `AppLifecycleController` las conecta con
+servicios de aplicacion y navegacion; `MacOSIntegration` no modifica solicitudes
+ni escribe SQLite directamente.
+
+## Pendientes no bloqueantes
+
+- Confirmar en la configuracion de distribucion la identidad de firma y el
+  `CFBundleIdentifier` definitivo antes de la prueba empaquetada de
+  `SMAppService`.
+- Ajustar textos visibles del menu bar y de los estados de permiso a la guia
+  visual de la aplicacion.
 
 ## Restricciones tecnicas
 
@@ -79,20 +116,40 @@ La app debe permanecer ejecutandose para que el worker pueda monitorear solicitu
 
 ## Criterios de aceptacion
 
-- [ ] La app muestra un icono en el menu bar al iniciar manualmente.
-- [ ] Abrir manualmente la app muestra la ventana principal.
-- [ ] Abrir manualmente la app cuando ya existe el proceso enfoca la ventana existente y no crea otra instancia funcional.
-- [ ] Cerrar la ventana la oculta y mantiene vivo el proceso.
-- [ ] El menu bar permite mostrar la ventana y salir explicitamente.
-- [ ] Salir desde menu bar termina el proceso.
-- [ ] El Login Item esta apagado por defecto.
-- [ ] Al habilitar el Login Item, la preferencia local y el estado efectivo de macOS pueden distinguirse.
-- [ ] Un inicio automatico muestra solo el icono de menu bar y no la ventana principal.
-- [ ] Un Login Item rechazado o no disponible se muestra como estado explicito y no rompe la app.
-- [ ] La app puede solicitar permiso de notificaciones y conserva el funcionamiento si el permiso es denegado.
-- [ ] Una notificacion de prueba puede emitirse cuando el permiso esta concedido.
+- [ ] Dado un arranque manual, cuando inicia la app, entonces crea el menu bar,
+  cambia a foreground y muestra/enfoca la ventana principal.
+- [ ] Dado un arranque por Login Item, cuando inicia la app, entonces crea el
+  menu bar, mantiene el proceso activo y no muestra la ventana.
+- [ ] Dado un proceso primario activo, cuando se abre el mismo bundle otra vez,
+  entonces la segunda instancia envia `ActivateWindow` y termina, y la primaria
+  muestra/enfoca su ventana sin crear un segundo grafo funcional.
+- [ ] Dado un canal de instancia obsoleto, cuando se confirma que no existe el
+  proceso primario, entonces la nueva instancia puede asumir el rol primario.
+- [ ] Dada una ventana visible, cuando el usuario la cierra, entonces se oculta
+  y el proceso, menu bar y worker permanecen activos.
+- [ ] Dado el menu bar, cuando se elige Mostrar ventana o Nueva solicitud,
+  entonces la ventana se muestra/enfoca y Nueva solicitud navega a la ruta QML
+  existente.
+- [ ] Dado el menu bar, cuando se elige Pausar/Reanudar, entonces se emite el
+  comando al servicio de aplicacion y el estado persistido se actualiza tras
+  confirmar el resultado.
+- [ ] Dado el menu bar, cuando se elige Salir, entonces se detienen worker y
+  menu bar y termina el proceso; cerrar la ventana por si solo no lo termina.
+- [ ] Dada una instalacion nueva, entonces el Login Item permanece deshabilitado
+  por defecto y la preferencia local es `false`.
+- [ ] Dado cualquier estado efectivo de Login Item, entonces la UI distingue la
+  preferencia solicitada de `Disabled`, `Enabled`, `RequiresApproval`,
+  `Rejected` o `Unavailable`.
+- [ ] Dado un permiso de notificaciones `NotDetermined`, cuando el usuario
+  solicita permiso, entonces se consulta a macOS y se expone el estado real.
+- [ ] Dado un permiso `Denied`, cuando se intenta enviar una notificacion,
+  entonces se muestra que esta deshabilitada y la app sigue operativa.
+- [ ] Dado un permiso `Granted`, cuando se emite la notificacion de prueba,
+  entonces macOS recibe el titulo y cuerpo esperados.
+- [ ] Dado `FakeOSIntegration`, entonces las pruebas cubren arranque manual,
+  Login Item, segunda apertura, cierre de ventana, salida, estados de permiso
+  y fallos sin SAT, Keychain ni credenciales reales.
 - [ ] La implementacion no crea daemon, LaunchAgent ni helper independiente.
-- [ ] Las pruebas no dependen de un worker SAT ni de credenciales reales.
 
 ## Verificacion
 
@@ -104,6 +161,10 @@ La app debe permanecer ejecutandose para que el worker pueda monitorear solicitu
 6. Habilitar y deshabilitar Login Item, incluyendo rechazo o estado no disponible.
 7. Probar arranque automatico sin abrir ventana.
 8. Probar notificaciones con permiso concedido y denegado.
+9. Ejecutar las pruebas automatizadas con `FakeOSIntegration` y `QSignalSpy` sin
+   esperas no deterministas.
+10. Repetir la apertura concurrente del bundle para verificar que no se duplique
+    el proceso funcional ni el menu bar.
 
 ## Definicion de terminado
 
@@ -122,6 +183,9 @@ Pendiente.
 - El comportamiento de Login Item y notificaciones depende de permisos y configuracion del sistema.
 - Esta tarea no prueba el flujo SAT; solo la frontera del sistema operativo.
 - El worker y las notificaciones de negocio se conectaran en tareas posteriores.
+- La prueba real de Login Item requiere un bundle firmado y una identidad de
+  aplicacion estable; los estados rechazado/no disponible se cubren de forma
+  determinista con el fake cuando macOS no permita inducirlos.
 
 ## Referencias
 
@@ -130,4 +194,3 @@ Pendiente.
 - `docs/architecture.md`
 - ADR 0003
 - ADR 0009
-
