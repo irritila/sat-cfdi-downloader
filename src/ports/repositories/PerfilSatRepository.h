@@ -5,7 +5,9 @@
 #include "domain/perfiles/PerfilSat.h"
 #include "ports/persistence/ErrorPersistencia.h"
 
+#include <QDateTime>
 #include <QList>
+#include <QString>
 #include <QStringView>
 
 #include <optional>
@@ -42,6 +44,18 @@ public:
     // Perfiles visibles con activo = 1, ordenados por rfc ASC. Tx: opcional.
     // Errores: Almacenamiento, Interno.
     virtual Resultado<QList<PerfilSat>, ErrorPersistencia> listarActivosVisibles() = 0;
+
+    // T005.1: perfiles visibles (activos E inactivos), ordenados por rfc ASC.
+    // Tx: opcional. Errores: Almacenamiento, Interno.
+    virtual Resultado<QList<PerfilSat>, ErrorPersistencia> listarVisibles() = 0;
+
+    // T005.1: cambia SOLO nombre y actualizado_en de un perfil visible (activo
+    // o inactivo); nunca el RFC. Devuelve la fila actualizada o nullopt si no
+    // existe o esta eliminado. `nombre` ya recortado y no vacio.
+    // Tx: requerida. Errores: Integridad (CHECK nombre); Transaccion; Ocupado;
+    // Almacenamiento.
+    virtual Resultado<std::optional<PerfilSat>, ErrorPersistencia>
+    actualizarNombreVisible(const PerfilId& id, const QString& nombre, const QDateTime& actualizadoEn) = 0;
 };
 
 } // namespace satcfdi

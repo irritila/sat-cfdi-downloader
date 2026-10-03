@@ -19,5 +19,5 @@ private slots:
     void timestampUtcIdaYVuelta();
     void dispatcherEjecutaFueraDelHiloGrafico();
     void demoEvaluaCreaYEliminaConSenales();
-    void demoPerfilSimulado();
+    void demoPerfilCrearYSembrar();
 };

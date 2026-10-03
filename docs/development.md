@@ -227,6 +227,11 @@ cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt \
 cmake --build build --target satcfdi_app
 ```
 
+Las excepciones del hardened runtime viven en la plantilla de entitlements
+(compartida por la app y por `satcfdi_keychain_real_tests`). El paso de firma
+de la app falla si a los entitlements EFECTIVOS les falta `allow-jit`,
+`disable-library-validation` o `keychain-access-groups`.
+
 Tras enlazar, un paso POST_BUILD copia el perfil a
 `Contents/embedded.provisionprofile`, firma el bundle con
 `resources/macos/satcfdi.entitlements.in` (generado en el directorio de build),
@@ -239,6 +244,12 @@ Entitlements generados:
 - `keychain-access-groups = [<TEAM>.<bundle id>]`. Es el grupo por defecto de
   SecItem* (el primero de la lista); `KeychainApiMacOS` no fija
   `kSecAttrAccessGroup`.
+- `com.apple.security.cs.allow-jit`: Qt compila con JIT (memoria `MAP_JIT`)
+  las expresiones de `QRegularExpression`/PCRE2 y el JavaScript del motor QML
+  (V4). Con hardened runtime y sin esta excepcion, el proceso muere con
+  `EXC_BREAKPOINT` en `pthread_jit_write_protect_np`; por ejemplo al abrir el
+  FileDialog nativo (`QPlatformFileDialogHelper::cleanFilterList`). No hace
+  falta `allow-unsigned-executable-memory`.
 - `com.apple.security.cs.disable-library-validation`: el hardened runtime
   activa library validation y dyld rechaza las bibliotecas de Homebrew (Qt,
   OpenSSL), firmadas ad-hoc o por otro equipo ("different Team IDs"). Una

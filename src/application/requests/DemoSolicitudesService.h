@@ -43,7 +43,7 @@ public:
                                     Datos datos = Datos::Representativos,
                                     QObject* parent = nullptr);
 
-    // Reemplaza el catalogo de perfiles (p. ej. tras crearPerfilSimulado en
+    // Reemplaza el catalogo de perfiles (p. ej. tras crear() o sembrar() en
     // DemoPerfilesSatService). No altera solicitudes existentes.
     void setPerfiles(QList<PerfilResumen> perfiles);
 

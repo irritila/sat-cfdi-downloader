@@ -61,16 +61,16 @@ std::optional<PerfilId> perfilConCredencial(const QString& dir, FakeSecretStore&
     if (!root) {
         return std::nullopt;
     }
-    const auto perfil = esperar(root->perfiles().crearPerfilSimulado({kRfc, QStringLiteral("Perfil"), true}));
+    const auto perfil = esperar(root->perfiles().crear(kRfc, QStringLiteral("Perfil")));
     if (!perfil || !perfil->esExito()) {
         return std::nullopt;
     }
     const auto importada =
-        esperar(root->credenciales().importar(perfil->valor(), entradaCon(store.contrasenaValida)));
+        esperar(root->credenciales().importar(perfil->valor().id, entradaCon(store.contrasenaValida)));
     if (!importada || !importada->esExito()) {
         return std::nullopt;
     }
-    return perfil->valor();
+    return perfil->valor().id;
 }
 
 } // namespace
@@ -168,10 +168,10 @@ void TestCredencialesArranque::contrasenaNoLlegaASqlite()
 
     auto root = abrir(tmp.path(), store);
     QVERIFY(root);
-    const auto perfil = esperar(root->perfiles().crearPerfilSimulado({kRfc, QStringLiteral("Perfil"), true}));
+    const auto perfil = esperar(root->perfiles().crear(kRfc, QStringLiteral("Perfil")));
     QVERIFY(perfil && perfil->esExito());
     const auto importada =
-        esperar(root->credenciales().importar(perfil->valor(), entradaCon(store.contrasenaValida)));
+        esperar(root->credenciales().importar(perfil->valor().id, entradaCon(store.contrasenaValida)));
     QVERIFY(importada && importada->esExito());
 
     // Con la base abierta (WAL vivo) y despues de cerrar.

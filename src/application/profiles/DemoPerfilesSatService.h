@@ -6,25 +6,30 @@
 
 namespace satcfdi {
 
-// DEMO (T002, adaptado al contrato T003): catalogo de perfiles en memoria
-// SOLO para el shell y pruebas de presentacion. Sin credenciales, Keychain ni
-// persistencia. Futures ya completados; senales sincronas antes de devolver.
+// DEMO (T002, adaptado a T003 y T005.1): catalogo de perfiles en memoria SOLO
+// para el shell demo y pruebas de presentacion; el root productivo no lo
+// usa. Sin credenciales, Keychain ni persistencia. Futures ya completados;
+// senales sincronas antes de devolver. Siembra con sembrar().
 class DemoPerfilesSatService final : public PerfilesSatService {
     Q_OBJECT
 
 public:
-    // Catalogo demo: dos perfiles activos y uno inactivo (para probar que el
-    // inactivo no aparece ni se acepta al crear). Ids y RFC deterministas.
+    // Catalogo demo: dos perfiles activos y uno inactivo. Ids y RFC
+    // deterministas.
     static QList<PerfilResumen> perfilesDemo();
 
     explicit DemoPerfilesSatService(QList<PerfilResumen> perfiles = perfilesDemo(),
                                     QObject* parent = nullptr);
 
-    QFuture<ResultadoLista> listarActivos() override;
+    QFuture<ResultadoLista> listarNoEliminados() override;
+    QFuture<ResultadoPerfil> obtener(const PerfilId& id) override;
+    QFuture<ResultadoCrear> crear(const QString& rfc, const QString& nombre) override;
+    QFuture<ResultadoActualizar> actualizarNombre(const PerfilId& id, const QString& nombre) override;
 
-    // Valida RFC (normalizado) y razon social; RFC ya existente ->
-    // ErrorCrearPerfil::Integridad. Agrega el perfil y emite perfilesCambiaron().
-    QFuture<ResultadoCrearPerfil> crearPerfilSimulado(const NuevoPerfilSimuladoRequest& request) override;
+    // Siembra de datos demo/prueba (fuera del contrato): misma validacion que
+    // crear() y RFC existente -> RfcDuplicado, pero respeta `activo`. Emite
+    // perfilesCambiaron() al agregar.
+    Resultado<PerfilResumen, ErrorCrearPerfil> sembrar(const QString& rfc, const QString& nombre, bool activo);
 
     // Catalogo completo actual (incluye inactivos), para sincronizar
     // DemoSolicitudesService::setPerfiles().

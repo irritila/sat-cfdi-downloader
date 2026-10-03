@@ -9,6 +9,8 @@ set(_satcfdi_qml_files
     qml/screens/SolicitudesPage.qml
     qml/screens/NuevaSolicitudPage.qml
     qml/screens/DetalleSolicitudPage.qml
+    qml/screens/PerfilesSatPage.qml
+    qml/components/EFirmaDialogo.qml
     qml/components/EstadoBadge.qml
     qml/components/BotonAccion.qml
     qml/components/CampoDetalle.qml
@@ -38,6 +40,12 @@ qt_add_qml_module(satcfdi_presentation
         viewmodels/SolicitudesListModel.cpp
         viewmodels/PerfilesDisponiblesModel.h
         viewmodels/PerfilesDisponiblesModel.cpp
+        viewmodels/PerfilesSatListModel.h
+        viewmodels/PerfilesSatListModel.cpp
+        viewmodels/PerfilesSatViewModel.h
+        viewmodels/PerfilesSatViewModel.cpp
+        viewmodels/EFirmaFormViewModel.h
+        viewmodels/EFirmaFormViewModel.cpp
         viewmodels/NuevaSolicitudViewModel.h
         viewmodels/NuevaSolicitudViewModel.cpp
         viewmodels/SolicitudDetailViewModel.h

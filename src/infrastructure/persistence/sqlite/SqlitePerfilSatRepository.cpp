@@ -148,8 +148,18 @@ SqlitePerfilSatRepository::obtenerVigentePorRfc(QStringView rfcNormalizado)
 
 Resultado<QList<PerfilSat>, ErrorPersistencia> SqlitePerfilSatRepository::listarActivosVisibles()
 {
+    return listar(true, u"perfil_sat.listar_activos");
+}
+
+Resultado<QList<PerfilSat>, ErrorPersistencia> SqlitePerfilSatRepository::listarVisibles()
+{
+    return listar(false, u"perfil_sat.listar_visibles");
+}
+
+Resultado<QList<PerfilSat>, ErrorPersistencia> SqlitePerfilSatRepository::listar(bool soloActivos,
+                                                                              QStringView contexto)
+{
     using R = Resultado<QList<PerfilSat>, ErrorPersistencia>;
-    constexpr QStringView kContexto = u"perfil_sat.listar_activos";
     auto conexion = sqlite::conexionLectura(m_proveedor);
     if (!conexion) {
         return R::fallo(std::move(conexion).error());
@@ -160,9 +170,10 @@ Resultado<QList<PerfilSat>, ErrorPersistencia> SqlitePerfilSatRepository::listar
     if (auto r = sqlite::ejecutarDirecto(
             q,
             QStringLiteral("SELECT ") + kColumnas
-                + QStringLiteral(" FROM perfil_sat WHERE eliminado_en IS NULL AND activo = 1 "
-                                 "ORDER BY rfc ASC"),
-            kContexto);
+                + QStringLiteral(" FROM perfil_sat WHERE eliminado_en IS NULL")
+                + (soloActivos ? QStringLiteral(" AND activo = 1") : QString())
+                + QStringLiteral(" ORDER BY rfc ASC"),
+            contexto);
         !r) {
         return R::fallo(std::move(r).error());
     }
@@ -175,6 +186,39 @@ Resultado<QList<PerfilSat>, ErrorPersistencia> SqlitePerfilSatRepository::listar
         perfiles.append(std::move(perfil).valor());
     }
     return R::exito(std::move(perfiles));
+}
+
+Resultado<std::optional<PerfilSat>, ErrorPersistencia>
+SqlitePerfilSatRepository::actualizarNombreVisible(const PerfilId& id, const QString& nombre,
+                                                   const QDateTime& actualizadoEn)
+{
+    using R = Resultado<std::optional<PerfilSat>, ErrorPersistencia>;
+    constexpr QStringView kContexto = u"perfil_sat.actualizar_nombre";
+    auto conexion = sqlite::conexionEscritura(m_proveedor, kContexto);
+    if (!conexion) {
+        return R::fallo(std::move(conexion).error());
+    }
+    QSqlDatabase db = conexion.valor();
+    QSqlQuery q(db);
+    // Solo nombre y actualizado_en: el RFC es inmutable (T005.1).
+    if (auto r = sqlite::preparar(q,
+                                  QStringLiteral("UPDATE perfil_sat SET nombre = :nombre, "
+                                                 "actualizado_en = :actualizado_en "
+                                                 "WHERE id = :id AND eliminado_en IS NULL"),
+                                  kContexto);
+        !r) {
+        return R::fallo(std::move(r).error());
+    }
+    q.bindValue(QStringLiteral(":nombre"), sqlite::texto(nombre));
+    q.bindValue(QStringLiteral(":actualizado_en"), sqlite::instante(actualizadoEn));
+    q.bindValue(QStringLiteral(":id"), sqlite::texto(id.texto()));
+    if (auto r = sqlite::ejecutar(q, kContexto); !r) {
+        return R::fallo(std::move(r).error());
+    }
+    if (q.numRowsAffected() != 1) {
+        return R::exito(std::nullopt);
+    }
+    return obtener(id);
 }
 
 } // namespace satcfdi

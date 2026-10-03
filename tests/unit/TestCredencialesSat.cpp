@@ -767,3 +767,85 @@ void TestCredencialesSat::reconciliarTerminaAntesDePrepararEncolado()
     QMutexLocker l(&mutexOrden);
     QCOMPARE(orden, (QStringList{u"reconciliar"_s, u"preparar"_s}));
 }
+
+// --- T005.1 ------------------------------------------------------------------
+
+void TestCredencialesSat::origenDeErrorNormalizado()
+{
+    using O = OrigenErrorEFirma;
+    QCOMPARE(ErrorCredencialSat::almacen(Cat::ContrasenaIncorrecta).origen, O::Contrasena);
+    QCOMPARE(ErrorCredencialSat::almacen(Cat::ContrasenaIncorrecta, O::Llave).origen, O::Contrasena);
+    QCOMPARE(ErrorCredencialSat::almacen(Cat::FormatoInvalido, O::Certificado).origen, O::Certificado);
+    QCOMPARE(ErrorCredencialSat::almacen(Cat::ArchivoIlegible, O::Llave).origen, O::Llave);
+    QCOMPARE(ErrorCredencialSat::almacen(Cat::FormatoInvalido, O::Contrasena).origen, O::Ninguno);
+    QCOMPARE(ErrorCredencialSat::almacen(Cat::FormatoInvalido).origen, O::Ninguno);
+    for (Cat c : kCategoriasErrorSecretStore) {
+        if (c != Cat::ContrasenaIncorrecta && c != Cat::FormatoInvalido && c != Cat::ArchivoIlegible) {
+            QCOMPARE(ErrorCredencialSat::almacen(c, O::Llave).origen, O::Ninguno);
+        }
+    }
+    QCOMPARE(ErrorCredencialSat::existente().origen, O::Ninguno);
+    QCOMPARE(ErrorCredencialSat::perfil(ErrorCredencialSat::CodigoPerfil::PerfilInactivo).origen, O::Ninguno);
+    QCOMPARE(ErrorCredencialSat::hiloNoPermitido().origen, O::Ninguno);
+    QSet<QString> claves;
+    for (O o : {O::Ninguno, O::Certificado, O::Llave, O::Contrasena}) {
+        claves.insert(claveEstable(o));
+    }
+    QCOMPARE(claves.size(), 4);
+}
+
+void TestCredencialesSat::importarPropagaOrigenDelAlmacen()
+{
+    {
+        Entorno e; // validaciones propias del fake
+        const auto pwd = esperar(e.servicio.importar(e.perfil, e.entrada(QByteArrayLiteral("mala"))));
+        QCOMPARE(pwd->error().origen, OrigenErrorEFirma::Contrasena);
+        EntradaEFirma sinCer = e.entrada();
+        sinCer.rutaCertificado.clear();
+        QCOMPARE(esperar(e.servicio.importar(e.perfil, std::move(sinCer)))->error().origen,
+                 OrigenErrorEFirma::Certificado);
+        EntradaEFirma sinKey = e.entrada();
+        sinKey.rutaLlavePrivada.clear();
+        QCOMPARE(esperar(e.servicio.importar(e.perfil, std::move(sinKey)))->error().origen, OrigenErrorEFirma::Llave);
+    }
+    {
+        Entorno e; // fallo inyectado con origen configurado
+        e.store.fallos.insert(FakeSecretStore::Operacion::Preparar, Cat::FormatoInvalido);
+        e.store.origenFalloPreparar = OrigenErrorEFirma::Llave;
+        const auto r = esperar(e.servicio.reemplazar(e.perfil, e.entrada()));
+        QVERIFY(r && !r->esExito()); // sin credencial previa: no llega al store
+        const auto imp = esperar(e.servicio.importar(e.perfil, e.entrada()));
+        QCOMPARE(*imp->error().categoria, Cat::FormatoInvalido);
+        QCOMPARE(imp->error().origen, OrigenErrorEFirma::Llave);
+        // Categoria sin campo: el servicio descarta el origen.
+        e.store.fallos.insert(FakeSecretStore::Operacion::Preparar, Cat::AlmacenBloqueado);
+        QCOMPARE(esperar(e.servicio.importar(e.perfil, e.entrada()))->error().origen, OrigenErrorEFirma::Ninguno);
+    }
+}
+
+void TestCredencialesSat::obtenerResumenIncluyeVigenciaSinDescifrar()
+{
+    Entorno e;
+    const auto sin = esperar(e.servicio.obtenerResumen(e.perfil));
+    QVERIFY(sin && sin->esExito());
+    QCOMPARE(sin->valor().estado, EstadoCredencial::SinCredencial);
+    QVERIFY(!sin->valor().vigenteHasta);
+
+    QVERIFY(esperar(e.servicio.importar(e.perfil, e.entrada()))->esExito());
+    const auto lista = esperar(e.servicio.obtenerResumen(e.perfil));
+    QVERIFY(lista && lista->esExito());
+    QCOMPARE(lista->valor().estado, EstadoCredencial::Lista);
+    QCOMPARE(lista->valor().vigenteDesde, std::optional<QDateTime>(e.store.vigenteDesde));
+    QCOMPARE(lista->valor().vigenteHasta, std::optional<QDateTime>(e.store.vigenteHasta));
+    QVERIFY(e.store.materialesEntregados().isEmpty()); // no descifro material
+
+    // Fila previa a 002: estado sin vigencia.
+    e.almacen.credenciales.first().vigenteHasta.reset();
+    e.almacen.credenciales.first().vigenteDesde.reset();
+    QVERIFY(!esperar(e.servicio.obtenerResumen(e.perfil))->valor().vigenteHasta);
+
+    e.store.fallos.insert(FakeSecretStore::Operacion::Estado, Cat::AlmacenBloqueado);
+    const auto bloqueado = esperar(e.servicio.obtenerResumen(e.perfil));
+    QCOMPARE(*bloqueado->error().categoria, Cat::AlmacenBloqueado);
+    QCOMPARE(*esperar(e.servicio.obtenerEstado(e.perfil))->error().categoria, Cat::AlmacenBloqueado);
+}

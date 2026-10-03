@@ -5,6 +5,7 @@
 #include "ports/persistence/ErrorPersistencia.h"
 #include "ports/secrets/SecretStoreTypes.h"
 
+#include <QDateTime>
 #include <QFuture>
 #include <QObject>
 #include <QString>
@@ -37,12 +38,19 @@ struct ErrorCredencialSat {
     std::optional<CodigoPerfil> codigoPerfil;
     std::optional<ErrorSecretStore::Categoria> categoria;
     std::optional<ErrorPersistencia> causa;
+    // T005.1 (DA4): campo del formulario que provoco el error. Ninguno salvo
+    // en Almacen con ArchivoIlegible/FormatoInvalido (Certificado|Llave) o
+    // ContrasenaIncorrecta (Contrasena). Perfil, persistencia, hilo y demas
+    // categorias: Ninguno.
+    OrigenErrorEFirma origen = OrigenErrorEFirma::Ninguno;
     QString mensaje;
 
     static ErrorCredencialSat perfil(CodigoPerfil codigo);
     static ErrorCredencialSat existente();
-    // Descarta `diagnostico` y `codigoNativo` del error del puerto.
-    static ErrorCredencialSat almacen(ErrorSecretStore::Categoria categoria);
+    // Descarta `diagnostico` y `codigoNativo` del error del puerto y normaliza
+    // `origen` con la regla de arriba (lo que no cumple queda en Ninguno).
+    static ErrorCredencialSat almacen(ErrorSecretStore::Categoria categoria,
+                                      OrigenErrorEFirma origen = OrigenErrorEFirma::Ninguno);
     static ErrorCredencialSat persistencia(ErrorPersistencia causa);
     static ErrorCredencialSat hiloNoPermitido();
 };
@@ -58,6 +66,16 @@ struct CredencialImportada {
     // el commit; queda para la reconciliacion del siguiente arranque. La
     // nueva credencial sigue activa.
     bool limpiezaPendiente = false;
+};
+
+// Resumen NO secreto de la credencial de un perfil (T005.1, DA2). Se obtiene
+// sin descifrar: `estado` del SecretStore (o SinCredencial/Validando) y la
+// vigencia desde la metadata 002 de credencial_sat (nullopt si no hay fila o
+// la fila es previa a 002).
+struct ResumenCredencial {
+    EstadoCredencial estado = EstadoCredencial::SinCredencial;
+    std::optional<QDateTime> vigenteDesde;
+    std::optional<QDateTime> vigenteHasta;
 };
 
 // Resultado de eliminar().
@@ -84,6 +102,7 @@ class CredencialesSatService : public QObject {
 public:
     using ResultadoImportacion = Resultado<CredencialImportada, ErrorCredencialSat>;
     using ResultadoEstado = Resultado<EstadoCredencial, ErrorCredencialSat>;
+    using ResultadoResumen = Resultado<ResumenCredencial, ErrorCredencialSat>;
     using ResultadoEliminacion = Resultado<CredencialEliminada, ErrorCredencialSat>;
     using ResultadoMaterial = Resultado<MaterialFirma, ErrorCredencialSat>;
     using ResultadoReconciliacion = Resultado<ResumenReconciliacion, ErrorCredencialSat>;
@@ -110,6 +129,10 @@ public:
     // importacion/reemplazo de ese perfil esta en curso; si no, el estado del
     // SecretStore con el reloj inyectado. Perfil existente (activo o no).
     virtual QFuture<ResultadoEstado> obtenerEstado(const PerfilId& perfilId) = 0;
+
+    // T005.1: como obtenerEstado() y ademas la vigencia de la metadata 002
+    // leida de credencial_sat (sin descifrar). Mismos errores.
+    virtual QFuture<ResultadoResumen> obtenerResumen(const PerfilId& perfilId) = 0;
 
     // Borra la fila (COMMIT) y despues la generacion. Idempotente.
     virtual QFuture<ResultadoEliminacion> eliminar(const PerfilId& perfilId) = 0;

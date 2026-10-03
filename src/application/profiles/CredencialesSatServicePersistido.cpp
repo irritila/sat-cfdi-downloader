@@ -66,12 +66,21 @@ ErrorCredencialSat ErrorCredencialSat::existente()
     return e;
 }
 
-ErrorCredencialSat ErrorCredencialSat::almacen(ErrorSecretStore::Categoria categoria)
+ErrorCredencialSat ErrorCredencialSat::almacen(ErrorSecretStore::Categoria categoria,
+                                               OrigenErrorEFirma origen)
 {
+    using C = ErrorSecretStore::Categoria;
     ErrorCredencialSat e;
     e.tipo = Tipo::Almacen;
     e.categoria = categoria;
     e.mensaje = mensajeVisible(categoria);
+    // Normalizacion DA4: el origen solo aplica a entradas del formulario.
+    if (categoria == C::ContrasenaIncorrecta) {
+        e.origen = OrigenErrorEFirma::Contrasena;
+    } else if ((categoria == C::ArchivoIlegible || categoria == C::FormatoInvalido)
+               && (origen == OrigenErrorEFirma::Certificado || origen == OrigenErrorEFirma::Llave)) {
+        e.origen = origen;
+    }
     return e;
 }
 
@@ -123,7 +132,7 @@ ErrorCredencialSat errorAlmacen(const Registro& registro, QStringView operacion,
                                 const ErrorSecretStore& error)
 {
     registro(operacion, error.categoria);
-    return ErrorCredencialSat::almacen(error.categoria);
+    return ErrorCredencialSat::almacen(error.categoria, error.origen);
 }
 
 } // namespace
@@ -298,16 +307,29 @@ CredencialesSatServicePersistido::registrar(const PerfilId& perfilId, EntradaEFi
 QFuture<CredencialesSatService::ResultadoEstado>
 CredencialesSatServicePersistido::obtenerEstado(const PerfilId& perfilId)
 {
+    return obtenerResumen(perfilId).then([](ResultadoResumen r) {
+        if (!r.esExito()) {
+            return ResultadoEstado::fallo(std::move(r).error());
+        }
+        return ResultadoEstado::exito(r.valor().estado);
+    });
+}
+
+QFuture<CredencialesSatService::ResultadoResumen>
+CredencialesSatServicePersistido::obtenerResumen(const PerfilId& perfilId)
+{
     if (m_validando.contains(perfilId)) {
-        return QtFuture::makeReadyValueFuture(ResultadoEstado::exito(EstadoCredencial::Validando));
+        ResumenCredencial validando;
+        validando.estado = EstadoCredencial::Validando;
+        return QtFuture::makeReadyValueFuture(ResultadoResumen::exito(validando));
     }
     const QDateTime ahora = m_reloj();
     PerfilSatRepository* perfiles = &m_perfiles;
     CredencialSatRepository* credenciales = &m_credenciales;
     SecretStore* store = &m_secretStore;
     const Registro registro = m_registro;
-    return m_dispatcher.despachar<ResultadoEstado>([=]() -> ResultadoEstado {
-        using R = ResultadoEstado;
+    return m_dispatcher.despachar<ResultadoResumen>([=]() -> ResultadoResumen {
+        using R = ResultadoResumen;
         if (auto perfil = validarPerfil(*perfiles, perfilId, false); !perfil) {
             return R::fallo(std::move(perfil).error());
         }
@@ -315,20 +337,27 @@ CredencialesSatServicePersistido::obtenerEstado(const PerfilId& perfilId)
         if (!fila) {
             return R::fallo(ErrorCredencialSat::persistencia(std::move(fila).error()));
         }
+        ResumenCredencial resumen;
         if (!fila.valor()) {
-            return R::exito(EstadoCredencial::SinCredencial);
+            resumen.estado = EstadoCredencial::SinCredencial;
+            return R::exito(resumen);
         }
         const CredencialSat& c = *fila.valor();
+        // Vigencia desde la metadata 002 de SQLite: no descifra nada.
+        resumen.vigenteDesde = c.vigenteDesde;
+        resumen.vigenteHasta = c.vigenteHasta;
         const auto ref =
             CredencialRef::desdeReferencias(c.certificadoRef, c.llavePrivadaRef, c.contrasenaRef);
         if (!ref) {
-            return R::exito(EstadoCredencial::MaterialDanado);
+            resumen.estado = EstadoCredencial::MaterialDanado;
+            return R::exito(resumen);
         }
         auto estado = store->obtenerEstado(*ref, ahora);
         if (!estado) {
             return R::fallo(errorAlmacen(registro, u"credencial.estado", estado.error()));
         }
-        return R::exito(estado.valor());
+        resumen.estado = estado.valor();
+        return R::exito(resumen);
     });
 }
 

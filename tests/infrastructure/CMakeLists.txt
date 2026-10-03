@@ -19,6 +19,8 @@ qt_add_executable(satcfdi_infrastructure_tests
     TestSqliteConfiguracion.cpp
     TestSqliteCredenciales.h
     TestSqliteCredenciales.cpp
+    TestSqlitePerfiles.h
+    TestSqlitePerfiles.cpp
 )
 
 target_compile_definitions(satcfdi_infrastructure_tests PRIVATE

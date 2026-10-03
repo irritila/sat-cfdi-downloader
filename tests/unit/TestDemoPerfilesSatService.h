@@ -6,6 +6,6 @@ class TestDemoPerfilesSatService : public QObject {
     Q_OBJECT
 
 private slots:
-    void listarActivosExcluyeInactivosYOrdenaPorRfc();
-    void listarActivosVacio();
+    void listarNoEliminadosIncluyeInactivosYOrdenaPorRfc();
+    void listarNoEliminadosVacio();
 };

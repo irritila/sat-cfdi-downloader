@@ -1,6 +1,7 @@
 #include "TestConfiguracionAppService.h"
 #include "TestContratoT003.h"
 #include "TestCredencialesSat.h"
+#include "TestPreparacionPerfiles.h"
 #include "TestDemoPerfilesSatService.h"
 #include "TestDemoSolicitudesService.h"
 #include "TestDominio.h"
@@ -30,5 +31,6 @@ int main(int argc, char* argv[])
     ejecutar(TestOSIntegration());
     ejecutar(TestConfiguracionAppService());
     ejecutar(TestCredencialesSat());
+    ejecutar(TestPreparacionPerfiles());
     return fallos == 0 ? 0 : 1;
 }

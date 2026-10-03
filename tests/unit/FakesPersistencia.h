@@ -199,6 +199,44 @@ public:
         return R::exito(r);
     }
 
+    // T005.1: activos e inactivos no eliminados, por RFC.
+    Resultado<QList<PerfilSat>, ErrorPersistencia> listarVisibles() override
+    {
+        using R = Resultado<QList<PerfilSat>, ErrorPersistencia>;
+        if (auto e = m_a.registrar(QStringLiteral("listarPerfilesVisibles"))) {
+            return R::fallo(*e);
+        }
+        QList<PerfilSat> r;
+        for (const PerfilSat& p : m_a.perfiles) {
+            if (!p.eliminadoEn) {
+                r.append(p);
+            }
+        }
+        std::sort(r.begin(), r.end(), [](const PerfilSat& x, const PerfilSat& y) { return x.rfc < y.rfc; });
+        return R::exito(r);
+    }
+
+    // T005.1: solo nombre y actualizadoEn; exige transaccion.
+    Resultado<std::optional<PerfilSat>, ErrorPersistencia>
+    actualizarNombreVisible(const PerfilId& id, const QString& nombre, const QDateTime& en) override
+    {
+        using R = Resultado<std::optional<PerfilSat>, ErrorPersistencia>;
+        if (auto e = m_a.registrar(QStringLiteral("actualizarNombrePerfil"))) {
+            return R::fallo(*e);
+        }
+        if (!m_a.snapshot) {
+            return R::fallo(error(ErrorPersistencia::Tipo::Transaccion));
+        }
+        for (PerfilSat& p : m_a.perfiles) {
+            if (p.id == id && !p.eliminadoEn) {
+                p.nombre = nombre;
+                p.actualizadoEn = en;
+                return R::exito(p);
+            }
+        }
+        return R::exito(std::nullopt);
+    }
+
 private:
     Almacen& m_a;
 };

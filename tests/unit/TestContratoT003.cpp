@@ -331,20 +331,29 @@ void TestContratoT003::demoEvaluaCreaYEliminaConSenales()
     QCOMPARE(servicio.evaluarDuplicado(malo).result().error().tipo, ErrorCrear::Tipo::FiltroInvalido);
 }
 
-void TestContratoT003::demoPerfilSimulado()
+void TestContratoT003::demoPerfilCrearYSembrar()
 {
     DemoPerfilesSatService servicio({});
     QSignalSpy cambio(&servicio, &PerfilesSatService::perfilesCambiaron);
-    const auto r = servicio.crearPerfilSimulado({QStringLiteral(" eku9003173c9 "),
-                                                 QStringLiteral("Simulado"), true}).result();
+    const auto r = servicio.crear(QStringLiteral(" eku9003173c9 "), QStringLiteral(" Demo ")).result();
     QVERIFY(r.esExito());
+    QCOMPARE(r.valor().rfc, u"EKU9003173C9"_s);
+    QCOMPARE(r.valor().nombre, u"Demo"_s);
     QCOMPARE(cambio.count(), 1);
-    QCOMPARE(servicio.listarActivos().result().valor().constFirst().rfc, u"EKU9003173C9"_s);
+    QCOMPARE(servicio.listarNoEliminados().result().valor().constFirst().rfc, u"EKU9003173C9"_s);
 
-    const auto dup = servicio.crearPerfilSimulado({QStringLiteral("EKU9003173C9"),
-                                                   QStringLiteral("Otro"), true}).result();
-    QCOMPARE(dup.error().tipo, ErrorCrearPerfil::Tipo::Integridad);
-    const auto invalido = servicio.crearPerfilSimulado({QStringLiteral("x"), QString(), true}).result();
+    const auto dup = servicio.crear(QStringLiteral("EKU9003173C9"), QStringLiteral("Otro")).result();
+    QCOMPARE(dup.error().tipo, ErrorCrearPerfil::Tipo::RfcDuplicado);
+    const auto invalido = servicio.crear(QStringLiteral("x"), QString()).result();
     QCOMPARE(invalido.error().validaciones.size(), 2);
     QCOMPARE(cambio.count(), 1);
+
+    // Siembra fuera del contrato: respeta `activo`.
+    const auto sembrado = servicio.sembrar(QStringLiteral("CACX7605101P8"), QStringLiteral("Inactivo"), false);
+    QVERIFY(sembrado.esExito() && !sembrado.valor().activo);
+    QCOMPARE(servicio.obtener(sembrado.valor().id).result().valor()->nombre, u"Inactivo"_s);
+    const auto renombrado = servicio.actualizarNombre(sembrado.valor().id, QStringLiteral("Renombrado")).result();
+    QVERIFY(renombrado.esExito());
+    QCOMPARE(renombrado.valor().rfc, u"CACX7605101P8"_s);
+    QCOMPARE(cambio.count(), 3);
 }

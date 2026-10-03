@@ -20,5 +20,21 @@
 	<array>
 		<string>@SATCFDI_TEAM_ID@.@SATCFDI_BUNDLE_IDENTIFIER@</string>
 	</array>
-@SATCFDI_ENTITLEMENTS_RUNTIME@</dict>
+	<!--
+	  Excepciones minimas del hardened runtime (opcion runtime de codesign):
+	  - allow-jit: Qt compila con JIT (MAP_JIT) las expresiones de
+	    QRegularExpression/PCRE2 (p. ej. filtros del FileDialog nativo) y el
+	    JavaScript del motor QML (V4). Sin ella el proceso muere con
+	    EXC_BREAKPOINT en pthread_jit_write_protect_np.
+	  - disable-library-validation: Qt y OpenSSL de Homebrew no estan firmados
+	    con el Team ID de la app; con library validation dyld los rechaza
+	    ("different Team IDs"). Una distribucion que copie y firme sus
+	    dependencias dentro del bundle podria retirarla.
+	  No se usa allow-unsigned-executable-memory: MAP_JIT basta.
+	-->
+	<key>com.apple.security.cs.allow-jit</key>
+	<true/>
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
+</dict>
 </plist>

@@ -99,12 +99,13 @@ MacOSSecretStore::prepararEFirma(EntradaEFirma&& entrada, QStringView rfcEsperad
     EntradaEFirma local = std::move(entrada);
 
     auto certificado = secrets::leerArchivoEntrada(local.rutaCertificado, crypto::kMaxCertificadoDer);
+    // T005.1 (DA4): ArchivoIlegible/FormatoInvalido de lectura -> origen por archivo.
     if (!certificado) {
-        return R::fallo(std::move(certificado).error());
+        return R::fallo(std::move(certificado).error().conOrigen(OrigenErrorEFirma::Certificado));
     }
     auto llave = secrets::leerArchivoEntrada(local.rutaLlavePrivada, crypto::kMaxLlaveDer);
     if (!llave) {
-        return R::fallo(std::move(llave).error());
+        return R::fallo(std::move(llave).error().conOrigen(OrigenErrorEFirma::Llave));
     }
 
     // Todo se valida antes de escribir nada.

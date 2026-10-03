@@ -59,13 +59,8 @@ if(APPLE AND _satcfdi_firma_definidas EQUAL 3)
     endif()
     find_program(SATCFDI_CODESIGN codesign REQUIRED)
 
-    # Hardened runtime activa library validation: solo carga bibliotecas
-    # firmadas por Apple o por el mismo Team ID. Qt y OpenSSL de Homebrew estan
-    # firmados ad-hoc, asi que el bundle local necesita desactivarla. Una
-    # distribucion que copie y firme sus dependencias (macdeployqt) podria
-    # retirarla.
-    set(SATCFDI_ENTITLEMENTS_RUNTIME
-        "\t<key>com.apple.security.cs.disable-library-validation</key>\n\t<true/>\n")
+    # Las excepciones del hardened runtime (allow-jit, disable-library-validation)
+    # estan en la plantilla, justificadas alli y en docs/development.md.
     set(_satcfdi_entitlements "${CMAKE_CURRENT_BINARY_DIR}/satcfdi_app.entitlements")
     configure_file("${PROJECT_SOURCE_DIR}/resources/macos/satcfdi.entitlements.in"
                    "${_satcfdi_entitlements}" @ONLY)
@@ -80,6 +75,11 @@ if(APPLE AND _satcfdi_firma_definidas EQUAL 3)
                 --entitlements "${_satcfdi_entitlements}" --options runtime --timestamp=none
                 "$<TARGET_BUNDLE_DIR:satcfdi_app>"
         COMMAND "${SATCFDI_CODESIGN}" --verify --strict --verbose=1 "$<TARGET_BUNDLE_DIR:satcfdi_app>"
+        # Falla el build si a los entitlements EFECTIVOS les falta una
+        # excepcion requerida por el hardened runtime (regresion T005.1: sin
+        # allow-jit, el FileDialog mataba la app al compilar PCRE2 con JIT).
+        COMMAND /bin/sh -c "for k in com.apple.security.cs.allow-jit com.apple.security.cs.disable-library-validation keychain-access-groups; do \"$0\" -d --entitlements - --xml \"$1\" 2>/dev/null | grep -q \"<key>$k</key>\" || { echo \"error: falta el entitlement $k en $1\" >&2; exit 1; }; done"
+                "${SATCFDI_CODESIGN}" "$<TARGET_BUNDLE_DIR:satcfdi_app>"
         COMMENT "Firmando satcfdi_app.app con entitlements"
         VERBATIM
     )

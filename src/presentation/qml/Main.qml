@@ -18,6 +18,8 @@ ApplicationWindow {
     required property SolicitudesListModel solicitudesModel
     required property NuevaSolicitudViewModel nuevaSolicitudViewModel
     required property SolicitudDetailViewModel detalleViewModel
+    required property PerfilesSatViewModel perfilesViewModel
+    required property EFirmaFormViewModel eFirmaViewModel
 
     width: 960
     height: 640
@@ -34,6 +36,8 @@ ApplicationWindow {
             return nuevaComponente
         case AppViewModel.Detalle:
             return detalleComponente
+        case AppViewModel.Perfiles:
+            return perfilesComponente
         default:
             return listaComponente
         }
@@ -77,6 +81,14 @@ ApplicationWindow {
         DetalleSolicitudPage {
             app: ventana.appViewModel
             detalle: ventana.detalleViewModel
+        }
+    }
+    Component {
+        id: perfilesComponente
+        PerfilesSatPage {
+            app: ventana.appViewModel
+            perfiles: ventana.perfilesViewModel
+            eFirma: ventana.eFirmaViewModel
         }
     }
 }

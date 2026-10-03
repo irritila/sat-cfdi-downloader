@@ -63,6 +63,8 @@ struct EFirmaValidada {
 //  6. subject.OU no vacio (DU2)                          -> NoEsEFirma
 //  7. RFC 2.5.4.45 == rfcEsperado (ya normalizado)       -> RfcNoCoincide
 //  8. vigencia: ahora < notBefore -> NoVigenteAun; ahora >= notAfter -> Vencida
+// T005.1: `ErrorSecretStore::origen` = Certificado en 1, Llave en 2 y 4,
+// Contrasena en 3; Ninguno en el resto.
 Resultado<EFirmaValidada, ErrorSecretStore> validarEFirma(const BufferSecreto& certificadoDer,
                                                           const BufferSecreto& llaveCifradaDer,
                                                           const BufferSecreto& contrasena,

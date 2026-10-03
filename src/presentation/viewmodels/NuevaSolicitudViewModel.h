@@ -14,6 +14,8 @@
 
 namespace satcfdi {
 
+class ConsultaPreparacionPerfiles;
+class CredencialesSatService;
 class PerfilesSatService;
 class SolicitudesService;
 
@@ -31,16 +33,21 @@ class SolicitudesService;
 // cancelarDuplicado() lo descarta. Si crear() devuelve RequiereConfirmacion
 // (carrera) se abre la misma confirmacion. Exito: submitted(id).
 //
-// Sin perfiles activos (sinPerfiles) se ofrece "Crear perfil simulado" con
-// perfilSimuladoRfc/perfilSimuladoRazonSocial (prellenados con valores demo
-// editables). El perfil creado se selecciona al refrescar perfilesDisponibles.
+// Selector (T005.1, DA2): perfilesDisponibles contiene SOLO perfiles
+// listoParaSolicitudes (ConsultaPreparacionPerfiles::
+// listarListosParaSolicitudes; activo && e.firma Lista). Sin perfiles listos
+// (sinPerfiles) QML ofrece "Administrar perfiles SAT" (navega a Perfiles). El
+// selector no es frontera de seguridad: la creacion revalida (T009).
+// Los perfiles se cargan en reiniciar() (al abrir el formulario), no al
+// construir, para no consultar el almacen de credenciales en el arranque; se
+// recargan con perfilesCambiaron/credencialCambio una vez cargados.
 //
 // Cada operacion asincrona usa su token de generacion: respuestas tardias de
 // una operacion invalidada (reiniciar, cancelar, nueva peticion) se descartan.
 class NuevaSolicitudViewModel : public QObject {
     Q_OBJECT
     QML_ELEMENT
-    QML_UNCREATABLE("Lo crea el composition root con SolicitudesService y PerfilesSatService.")
+    QML_UNCREATABLE("Lo crea PresentacionViewModels.")
 
     Q_PROPERTY(QString perfilId READ perfilId WRITE setPerfilId NOTIFY perfilIdChanged)
     Q_PROPERTY(QString tipoDescarga READ tipoDescarga WRITE setTipoDescarga NOTIFY tipoDescargaChanged)
@@ -54,11 +61,6 @@ class NuevaSolicitudViewModel : public QObject {
     Q_PROPERTY(bool cargandoPerfiles READ cargandoPerfiles NOTIFY estadoChanged)
     Q_PROPERTY(bool sinPerfiles READ sinPerfiles NOTIFY estadoChanged)
 
-    Q_PROPERTY(QString perfilSimuladoRfc READ perfilSimuladoRfc WRITE setPerfilSimuladoRfc NOTIFY perfilSimuladoChanged)
-    Q_PROPERTY(QString perfilSimuladoRazonSocial READ perfilSimuladoRazonSocial WRITE setPerfilSimuladoRazonSocial NOTIFY perfilSimuladoChanged)
-    Q_PROPERTY(bool creandoPerfil READ creandoPerfil NOTIFY estadoChanged)
-    Q_PROPERTY(QString errorPerfilMessage READ errorPerfilMessage NOTIFY estadoChanged)
-
     Q_PROPERTY(bool canSubmit READ canSubmit NOTIFY canSubmitChanged)
     Q_PROPERTY(bool ocupado READ ocupado NOTIFY ocupadoChanged)
     Q_PROPERTY(QString errorMessage READ errorMessage NOTIFY errorMessageChanged)
@@ -68,14 +70,11 @@ class NuevaSolicitudViewModel : public QObject {
     Q_PROPERTY(QString solicitudExistenteId READ solicitudExistenteId NOTIFY estadoChanged)
 
 public:
-    // Valores por defecto del perfil simulado (RFC de pruebas publicado por el
-    // SAT; editable en la UI).
-    static QString rfcSimuladoPorDefecto();
-    static QString razonSocialSimuladaPorDefecto();
-
-    // Ambos servicios son obligatorios y deben vivir mas que el view model.
+    // Los tres servicios son obligatorios y deben vivir mas que el view
+    // model. Construye su propia ConsultaPreparacionPerfiles.
     NuevaSolicitudViewModel(SolicitudesService* solicitudes,
                             PerfilesSatService* perfiles,
+                            CredencialesSatService* credenciales,
                             QObject* parent = nullptr);
 
     QString perfilId() const { return m_perfilId; }
@@ -89,11 +88,6 @@ public:
     PerfilesDisponiblesModel* perfilesDisponibles() const { return m_perfilesDisponibles; }
     bool cargandoPerfiles() const { return m_cargandoPerfiles; }
     bool sinPerfiles() const;
-
-    QString perfilSimuladoRfc() const { return m_perfilSimuladoRfc; }
-    QString perfilSimuladoRazonSocial() const { return m_perfilSimuladoRazonSocial; }
-    bool creandoPerfil() const { return m_creandoPerfil; }
-    QString errorPerfilMessage() const { return m_errorPerfil; }
 
     bool canSubmit() const;
     bool ocupado() const { return m_ocupado; }
@@ -110,8 +104,6 @@ public:
     void setRfcContraparte(const QString& valor);
     void setTipoComprobante(const QString& valor);
     void setComplemento(const QString& valor);
-    void setPerfilSimuladoRfc(const QString& valor);
-    void setPerfilSimuladoRazonSocial(const QString& valor);
 
     Q_INVOKABLE void submit();
     Q_INVOKABLE void confirmarDuplicado();
@@ -119,7 +111,6 @@ public:
     // Limpia el formulario, invalida operaciones en curso y recarga perfiles.
     Q_INVOKABLE void reiniciar();
     Q_INVOKABLE void cargarPerfiles();
-    Q_INVOKABLE void crearPerfilSimulado();
 
 signals:
     void perfilIdChanged();
@@ -129,11 +120,10 @@ signals:
     void rfcContraparteChanged();
     void tipoComprobanteChanged();
     void complementoChanged();
-    void perfilSimuladoChanged();
     void canSubmitChanged();
     void ocupadoChanged();
     void errorMessageChanged();
-    // Cambio en estados derivados: perfiles, perfil simulado y confirmacion.
+    // Cambio en estados derivados: perfiles y confirmacion.
     void estadoChanged();
     void submitted(const QString& id);
 
@@ -144,8 +134,6 @@ private:
         QString error;
         bool cargandoPerfiles;
         bool sinPerfiles;
-        bool creandoPerfil;
-        QString errorPerfil;
         bool pendiente;
         QString motivo;
         QString existente;
@@ -161,6 +149,8 @@ private:
     template <typename F>
     void editar(F&& cambio);
 
+    // Valores iniciales del formulario sin cargar perfiles.
+    void restablecerCampos();
     QString validar() const;
     NuevaSolicitudRequest construirRequest() const;
     void crearConfirmacion(const NuevaSolicitudRequest& request, ConfirmacionDuplicado confirmacion);
@@ -168,7 +158,7 @@ private:
     void aplicarErrorCrear(const ErrorCrear& error, const NuevaSolicitudRequest& request);
 
     QPointer<SolicitudesService> m_solicitudes;
-    QPointer<PerfilesSatService> m_perfiles;
+    ConsultaPreparacionPerfiles* m_consulta;
     PerfilesDisponiblesModel* m_perfilesDisponibles;
 
     QString m_perfilId;
@@ -179,18 +169,12 @@ private:
     QString m_tipoComprobante;
     QString m_complemento;
 
-    QString m_perfilSimuladoRfc;
-    QString m_perfilSimuladoRazonSocial;
-    QString m_perfilPorSeleccionar;
-
     bool m_ocupado = false;
     bool m_tocado = false;
     bool m_cargandoPerfiles = false;
     bool m_perfilesCargados = false;
-    bool m_creandoPerfil = false;
     QString m_errorValidacion;
     QString m_errorServicio;
-    QString m_errorPerfil;
 
     std::optional<NuevaSolicitudRequest> m_snapshot; // confirmacion pendiente
     QString m_motivoDuplicado;
@@ -199,7 +183,6 @@ private:
     // Tokens de generacion (DA6).
     quint64 m_genEnvio = 0;
     quint64 m_genPerfiles = 0;
-    quint64 m_genPerfilSimulado = 0;
 };
 
 } // namespace satcfdi

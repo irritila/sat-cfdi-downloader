@@ -5,12 +5,16 @@
 //
 // Dos grafos de servicios:
 // - Escenario: DemoSolicitudesService (via SolicitudesServiceEspia) y
-//   DemoPerfilesSatService, con futures ya completados.
+//   DemoPerfilesSatService, con futures ya completados, y
+//   CredencialesSatServiceListo (toda e.firma Lista).
 // - EscenarioAsincrono: fakes con QPromise controlados por la prueba, para
 //   estados de carga, errores y respuestas tardias o desordenadas.
 
+#include "CredencialesSatServiceListo.h"
 #include "ServiciosAsincronosFake.h"
 #include "SolicitudesServiceEspia.h"
+#include "fakes/FakeCredencialesSatService.h"
+#include "fakes/FakePerfilesSatService.h"
 
 #include "application/profiles/DemoPerfilesSatService.h"
 #include "AppViewModel.h"
@@ -98,8 +102,9 @@ void procesarEventos()
 // View models + engine sobre servicios abstractos (como el composition root).
 // Orden de miembros: view models -> engine (el engine se destruye primero).
 struct Vista {
-    Vista(SolicitudesService* solicitudes, PerfilesSatService* perfiles)
-        : vms(solicitudes, perfiles)
+    Vista(SolicitudesService* solicitudes, PerfilesSatService* perfiles,
+          CredencialesSatService* credenciales)
+        : vms(solicitudes, perfiles, credenciales)
     {
     }
 
@@ -160,11 +165,13 @@ struct ServiciosDemo {
     }
 
     DemoPerfilesSatService perfiles;
+    CredencialesSatServiceListo credenciales;
     SolicitudesServiceEspia solicitudes;
 };
 
 struct ServiciosAsincronos {
-    PerfilesSatServiceAsincrono perfiles;
+    fakes::FakePerfilesSatService perfiles;
+    fakes::FakeCredencialesSatService credenciales;
     SolicitudesServiceAsincrono solicitudes;
 };
 
@@ -173,14 +180,14 @@ struct ServiciosAsincronos {
 struct Escenario : ServiciosDemo, Vista {
     explicit Escenario(DemoSolicitudesService::Datos datos)
         : ServiciosDemo(datos)
-        , Vista(&solicitudes, &perfiles)
+        , Vista(&solicitudes, &perfiles, &credenciales)
     {
     }
 };
 
 struct EscenarioAsincrono : ServiciosAsincronos, Vista {
     EscenarioAsincrono()
-        : Vista(&solicitudes, &perfiles)
+        : Vista(&solicitudes, &perfiles, &credenciales)
     {
     }
 };
@@ -249,7 +256,23 @@ EvaluacionDuplicado evaluacion(ClasificacionDuplicado clasificacion, MotivoDupli
 using ResultadoListaSol = SolicitudesService::ResultadoLista;
 using ResultadoListaPerfiles = PerfilesSatService::ResultadoLista;
 
-// Escenario asincrono en la pagina "Nueva solicitud" con un perfil activo
+// Resuelve la carga `indice` de perfiles (listarNoEliminados) con `perfiles`
+// y despues cada consulta de resumen de credencial que provoque con `estado`.
+bool resolverPerfiles(EscenarioAsincrono& e, int indice, const QList<PerfilResumen>& perfiles,
+                      EstadoCredencial estado = EstadoCredencial::Lista)
+{
+    const int base = e.credenciales.resumenes.size();
+    e.perfiles.listas.resolver(indice, ResultadoListaPerfiles::exito(perfiles));
+    if (!QTest::qWaitFor([&] { return e.credenciales.resumenes.size() == base + perfiles.size(); })) {
+        return false;
+    }
+    for (int i = 0; i < perfiles.size(); ++i) {
+        e.credenciales.resolverResumen(base + i, estado);
+    }
+    return true;
+}
+
+// Escenario asincrono en la pagina "Nueva solicitud" con un perfil listo
 // seleccionado y fechas validas.
 bool prepararFormulario(EscenarioAsincrono& e)
 {
@@ -257,13 +280,14 @@ bool prepararFormulario(EscenarioAsincrono& e)
         return false;
     }
     e.solicitudes.lista.resolver(0, ResultadoListaSol::exito({}));
-    e.vms.app()->mostrarNueva();
-    // 0: construccion del view model; 1: reiniciar() de mostrarNueva().
-    if (e.perfiles.lista.size() != 2) {
+    // Construir no consulta perfiles (ni el almacen de credenciales).
+    if (e.perfiles.listas.size() != 0) {
         return false;
     }
-    e.perfiles.lista.resolver(0, ResultadoListaPerfiles::exito({}));
-    e.perfiles.lista.resolver(1, ResultadoListaPerfiles::exito({perfilDePrueba()}));
+    e.vms.app()->mostrarNueva();
+    if (e.perfiles.listas.size() != 1 || !resolverPerfiles(e, 0, {perfilDePrueba()})) {
+        return false;
+    }
     NuevaSolicitudViewModel* f = e.vms.nuevaSolicitud();
     if (!QTest::qWaitFor([&] { return f->perfilesDisponibles()->count() == 1; })) {
         return false;
@@ -305,7 +329,7 @@ private slots:
     void listaDescartaRespuestaTardia();
 
     // T003: perfiles y nueva solicitud
-    void sinPerfilesCreaPerfilSimulado();
+    void sinPerfilesListosMuestraAdministrarPerfiles();
     void perfilesDescartaRespuestaTardia();
     void duplicadoRequiereConfirmacionYSeConfirma();
     void duplicadoRequiereConfirmacionYSeCancela();
@@ -526,7 +550,7 @@ void TestPresentacion::envioValidoAbreDetalleYApareceEnLista()
     NuevaSolicitudViewModel* f = e.vms.nuevaSolicitud();
     QTRY_COMPARE(f->perfilesDisponibles()->count(), 2); // solo activos
     QVERIFY(!f->sinPerfiles());
-    QVERIFY(!e.item(QStringLiteral("seccionPerfilSimulado"))->isVisible());
+    QVERIFY(!e.item(QStringLiteral("seccionSinPerfiles"))->isVisible());
     QSignalSpy enviado(f, &NuevaSolicitudViewModel::submitted);
     f->setPerfilId(f->perfilesDisponibles()->index(0).data(PerfilesDisponiblesModel::IdRole).toString());
     f->setTipoDescarga(QStringLiteral("Recibidos"));
@@ -739,8 +763,7 @@ void TestPresentacion::paginasExponenTextoAccesible()
     for (const char* control : {"campoPerfil", "campoTipoDescarga", "campoFechaInicial",
                                 "campoFechaFinal", "campoRfcContraparte", "campoTipoComprobante",
                                 "campoComplemento", "botonCrearSolicitud", "botonRegresar",
-                                "campoRfcSimulado", "campoRazonSocialSimulada",
-                                "botonCrearPerfilSimulado"}) {
+                                "botonAdministrarPerfiles", "botonPerfilesSat"}) {
         QVERIFY2(!nombreAccesible(e.item(QString::fromLatin1(control))).isEmpty(), control);
     }
     QVERIFY(!nombreAccesible(e.itemDeDialogo(QStringLiteral("dialogoDuplicado"),
@@ -774,6 +797,8 @@ void TestPresentacion::qmlSinImportsProhibidos()
     const QStringList permitidos = {
         QStringLiteral("QtQuick"), QStringLiteral("QtQuick.Controls"),
         QStringLiteral("QtQuick.Layouts"), QStringLiteral("\"Etiquetas.js\""),
+        // T005.1 (DA4): selector de archivos de e.firma; entrega QUrl.
+        QStringLiteral("QtQuick.Dialogs"),
     };
     const QRegularExpression prohibido(
         QStringLiteral("eliminado_?en|dedup|sql|keychain|\\.zip|file:|XMLHttpRequest|"
@@ -797,7 +822,7 @@ void TestPresentacion::qmlSinImportsProhibidos()
                  qPrintable(archivo.fileName() + QStringLiteral(": ") + termino.captured(0)));
         ++archivos;
     }
-    QCOMPARE(archivos, 10); // 9 .qml + Etiquetas.js
+    QCOMPARE(archivos, 12); // 11 .qml + Etiquetas.js
 }
 
 // ---------------------------------------------------------------------------
@@ -883,90 +908,80 @@ void TestPresentacion::listaDescartaRespuestaTardia()
 // ---------------------------------------------------------------------------
 // T003: perfiles y nueva solicitud
 
-void TestPresentacion::sinPerfilesCreaPerfilSimulado()
+void TestPresentacion::sinPerfilesListosMuestraAdministrarPerfiles()
 {
     EscenarioAsincrono e;
     QVERIFY(e.cargar());
     QVERIFY(e.activar());
     e.solicitudes.lista.resolver(0, ResultadoListaSol::exito({}));
     NuevaSolicitudViewModel* f = e.vms.nuevaSolicitud();
+    QCOMPARE(e.perfiles.listas.size(), 0); // nada al construir
 
     e.vms.app()->mostrarNueva();
     QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaNuevaSolicitud"));
-    QCOMPARE(e.perfiles.lista.size(), 2);
+    QCOMPARE(e.perfiles.listas.size(), 1);
     QVERIFY(f->cargandoPerfiles());
     QVERIFY(!f->sinPerfiles()); // aun no se sabe
-    e.perfiles.lista.resolver(0, ResultadoListaPerfiles::exito({}));
-    e.perfiles.lista.resolver(1, ResultadoListaPerfiles::exito({}));
+
+    // Ninguno listo: inactivo con e.firma Lista, activo sin e.firma, activo vencido.
+    PerfilResumen inactivo = fakes::FakePerfilesSatService::perfil("AAA010101AAA", "Inactivo", false);
+    PerfilResumen sinEFirma = fakes::FakePerfilesSatService::perfil("BBB010101BBB", "Sin e.firma");
+    PerfilResumen vencido = fakes::FakePerfilesSatService::perfil("CCC010101CCC", "Vencido");
+    e.perfiles.listas.resolver(0, ResultadoListaPerfiles::exito({inactivo, sinEFirma, vencido}));
+    QTRY_COMPARE(e.credenciales.resumenes.size(), 3);
+    e.credenciales.resolverResumen(0, EstadoCredencial::Lista);
+    e.credenciales.resolverResumen(1, EstadoCredencial::SinCredencial);
+    e.credenciales.resolverResumen(2, EstadoCredencial::Vencida);
     QTRY_VERIFY(f->sinPerfiles());
     QVERIFY(!f->cargandoPerfiles());
+    QCOMPARE(f->perfilesDisponibles()->count(), 0);
 
-    // Accion visible "Crear perfil simulado" con foco en el RFC prellenado.
-    auto* seccion = e.item(QStringLiteral("seccionPerfilSimulado"));
-    QTRY_VERIFY(seccion->isVisible());
+    // "Administrar perfiles SAT" visible y con foco; ya no existe el perfil simulado.
+    QTRY_VERIFY(e.item(QStringLiteral("seccionSinPerfiles"))->isVisible());
+    QVERIFY(e.item(QStringLiteral("seccionPerfilSimulado")) == nullptr);
+    QVERIFY(e.item(QStringLiteral("botonCrearPerfilSimulado")) == nullptr);
     QVERIFY(!e.item(QStringLiteral("campoPerfil"))->isEnabled());
-    auto* boton = e.item(QStringLiteral("botonCrearPerfilSimulado"));
-    QCOMPARE(nombreAccesible(boton), QStringLiteral("Crear perfil simulado"));
-    QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("campoRfcSimulado"));
-    QCOMPARE(f->perfilSimuladoRfc(), NuevaSolicitudViewModel::rfcSimuladoPorDefecto());
+    auto* administrar = e.item(QStringLiteral("botonAdministrarPerfiles"));
+    QCOMPARE(nombreAccesible(administrar), QStringLiteral("Administrar perfiles SAT"));
+    QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("botonAdministrarPerfiles"));
+    QVERIFY(!e.perfiles.historial.contains(QStringLiteral("crearPerfilSimulado")));
 
-    // Return en el campo crea el perfil; el servicio responde con error.
-    QTest::keyClick(e.ventana, Qt::Key_Return);
-    QCOMPARE(e.perfiles.requestsPerfil.size(), 1);
-    QCOMPARE(e.perfiles.requestsPerfil.constFirst().rfc, NuevaSolicitudViewModel::rfcSimuladoPorDefecto());
-    QVERIFY(f->creandoPerfil());
-    QTRY_VERIFY(!boton->isEnabled());
-    ErrorCrearPerfil errorPerfil;
-    errorPerfil.tipo = ErrorCrearPerfil::Tipo::Integridad;
-    e.perfiles.creacion.resolver(0, PerfilesSatService::ResultadoCrearPerfil::fallo(errorPerfil));
-    QTRY_VERIFY(!f->errorPerfilMessage().isEmpty());
-    auto* errorVisible = e.item(QStringLiteral("errorPerfilSimulado"));
-    QTRY_VERIFY(errorVisible->isVisible());
-    QVERIFY(nombreAccesible(errorVisible).contains(f->errorPerfilMessage()));
-    QVERIFY(boton->isEnabled());
-
-    // Segundo intento por clic: commit -> perfilesCambiaron -> recarga.
-    f->setPerfilSimuladoRfc(QStringLiteral("AAA010101AAA"));
-    QVERIFY(f->errorPerfilMessage().isEmpty());
-    QMetaObject::invokeMethod(boton, "click");
-    QCOMPARE(e.perfiles.requestsPerfil.size(), 2);
-    const PerfilResumen perfil = perfilDePrueba();
-    emit e.perfiles.perfilesCambiaron(); // antes de completar el future
-    QCOMPARE(e.perfiles.lista.size(), 3);
-    e.perfiles.creacion.resolver(1, PerfilesSatService::ResultadoCrearPerfil::exito(perfil.id));
-    e.perfiles.lista.resolver(2, ResultadoListaPerfiles::exito({perfil}));
-
+    // Un perfil queda listo (credencialCambio): el selector lo ofrece.
+    e.credenciales.emitirCambio(sinEFirma.id);
+    QTRY_COMPARE(e.perfiles.listas.size(), 2);
+    QVERIFY(resolverPerfiles(e, 1, {sinEFirma}));
     QTRY_VERIFY(!f->sinPerfiles());
-    QTRY_COMPARE(f->perfilId(), perfil.id.texto()); // se selecciona el perfil creado
-    QVERIFY(!f->creandoPerfil());
-    QTRY_VERIFY(!seccion->isVisible());
-    QVERIFY(e.item(QStringLiteral("campoPerfil"))->isEnabled());
+    QCOMPARE(f->perfilesDisponibles()->count(), 1);
+    QCOMPARE(f->perfilesDisponibles()->filaDe(sinEFirma.id.texto()), 0);
+    QTRY_VERIFY(!e.item(QStringLiteral("seccionSinPerfiles"))->isVisible());
     QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("campoPerfil"));
+
+    // De vuelta sin listos, Enter en "Administrar perfiles SAT" abre Perfiles.
+    emit e.perfiles.perfilesCambiaron();
+    QTRY_COMPARE(e.perfiles.listas.size(), 3);
+    e.perfiles.listas.resolver(2, ResultadoListaPerfiles::exito({}));
+    QTRY_VERIFY(f->sinPerfiles());
+    QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("botonAdministrarPerfiles"));
+    QTest::keyClick(e.ventana, Qt::Key_Return);
+    QTRY_COMPARE(e.vms.app()->pagina(), Pagina::Perfiles);
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaPerfilesSat"));
 }
 
 void TestPresentacion::perfilesDescartaRespuestaTardia()
 {
     EscenarioAsincrono e;
     NuevaSolicitudViewModel* f = e.vms.nuevaSolicitud();
-    QCOMPARE(e.perfiles.lista.size(), 1);
+    QCOMPARE(e.perfiles.listas.size(), 0);
     f->cargarPerfiles();
-    QCOMPARE(e.perfiles.lista.size(), 2);
+    f->cargarPerfiles();
+    QCOMPARE(e.perfiles.listas.size(), 2);
 
-    e.perfiles.lista.resolver(1, ResultadoListaPerfiles::exito({}));
+    QVERIFY(resolverPerfiles(e, 1, {}));
     QTRY_VERIFY(f->sinPerfiles());
-    e.perfiles.lista.resolver(0, ResultadoListaPerfiles::exito({perfilDePrueba()}));
+    QVERIFY(resolverPerfiles(e, 0, {perfilDePrueba()}));
     procesarEventos();
     QVERIFY(f->sinPerfiles());
     QCOMPARE(f->perfilesDisponibles()->count(), 0);
-
-    // Un perfil simulado pedido antes de reiniciar() no se aplica despues.
-    f->crearPerfilSimulado();
-    QCOMPARE(e.perfiles.requestsPerfil.size(), 1);
-    f->reiniciar();
-    e.perfiles.creacion.resolver(0, PerfilesSatService::ResultadoCrearPerfil::exito(perfilDePrueba().id));
-    procesarEventos();
-    QVERIFY(!f->creandoPerfil());
-    QVERIFY(f->perfilId().isEmpty());
 }
 
 void TestPresentacion::duplicadoRequiereConfirmacionYSeConfirma()
@@ -1187,7 +1202,7 @@ void TestPresentacion::nuevaSolicitudDescartaRespuestasTardias()
     QVERIFY(!f->ocupado());
 
     // Creacion invalidada por reiniciar(): no navega ni muestra error.
-    e.perfiles.lista.resolverUltima(ResultadoListaPerfiles::exito({perfilDePrueba()}));
+    QVERIFY(resolverPerfiles(e, e.perfiles.listas.size() - 1, {perfilDePrueba()}));
     QTRY_COMPARE(f->perfilesDisponibles()->count(), 1);
     f->setPerfilId(perfilDePrueba().id.texto());
     QVERIFY(f->canSubmit());
@@ -1205,7 +1220,7 @@ void TestPresentacion::nuevaSolicitudDescartaRespuestasTardias()
 
     // Confirmacion pendiente invalidada al editar el formulario: un
     // RequiereConfirmacion tardio de otra evaluacion no abre el dialogo.
-    e.perfiles.lista.resolverUltima(ResultadoListaPerfiles::exito({perfilDePrueba()}));
+    QVERIFY(resolverPerfiles(e, e.perfiles.listas.size() - 1, {perfilDePrueba()}));
     QTRY_COMPARE(f->perfilesDisponibles()->count(), 1);
     f->setPerfilId(perfilDePrueba().id.texto());
     f->submit();

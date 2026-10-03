@@ -281,6 +281,17 @@ QString claveEstable(EstadoCredencial estado)
     return {};
 }
 
+QString claveEstable(OrigenErrorEFirma origen)
+{
+    switch (origen) {
+    case OrigenErrorEFirma::Ninguno: return QStringLiteral("Ninguno");
+    case OrigenErrorEFirma::Certificado: return QStringLiteral("Certificado");
+    case OrigenErrorEFirma::Llave: return QStringLiteral("Llave");
+    case OrigenErrorEFirma::Contrasena: return QStringLiteral("Contrasena");
+    }
+    return {};
+}
+
 QString claveEstable(ErrorSecretStore::Categoria categoria)
 {
     using C = ErrorSecretStore::Categoria;

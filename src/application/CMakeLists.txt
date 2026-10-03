@@ -13,10 +13,12 @@ qt_add_library(satcfdi_application STATIC
     persistence/PersistenceDispatcher.h
     persistence/PersistenceDispatcher.cpp
     persistence/PuertosPersistencia.h
+    profiles/ConsultaPreparacionPerfiles.h
+    profiles/ConsultaPreparacionPerfiles.cpp
     profiles/CredencialesSatService.h
     profiles/CredencialesSatServicePersistido.h
     profiles/CredencialesSatServicePersistido.cpp
-    profiles/NuevoPerfilSimuladoRequest.h
+    profiles/PerfilConPreparacion.h
     profiles/PerfilResumen.h
     profiles/PerfilesSatService.h
     profiles/PerfilesSatServicePersistido.h

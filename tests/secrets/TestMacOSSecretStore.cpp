@@ -236,27 +236,36 @@ private slots:
         QTest::addColumn<QByteArray>("contrasena");
         QTest::addColumn<QDateTime>("ahora");
         QTest::addColumn<int>("categoria");
+        QTest::addColumn<int>("origen");
         const QByteArray ok; // vacio = contrasena del fixture
         const auto c = [](Categoria x) { return static_cast<int>(x); };
+        // T005.1 (DA4): columna `origen` esperado (OrigenErrorEFirma).
+        const auto o = [](OrigenErrorEFirma x) { return static_cast<int>(x); };
+        const int ninguno = o(OrigenErrorEFirma::Ninguno);
         QTest::newRow("contrasena") << "efirma.cer" << "efirma.key" << QByteArray("mala") << fixtures::ahoraVigente()
-                                    << c(Categoria::ContrasenaIncorrecta);
+                                    << c(Categoria::ContrasenaIncorrecta) << o(OrigenErrorEFirma::Contrasena);
         QTest::newRow("pareja") << "efirma.cer" << "segundo_par.key" << ok << fixtures::ahoraVigente()
-                                << c(Categoria::ParejaIncompatible);
-        QTest::newRow("csd") << "csd.cer" << "csd.key" << ok << fixtures::ahoraVigente() << c(Categoria::NoEsEFirma);
+                                << c(Categoria::ParejaIncompatible) << ninguno;
+        QTest::newRow("csd") << "csd.cer" << "csd.key" << ok << fixtures::ahoraVigente() << c(Categoria::NoEsEFirma)
+                             << ninguno;
         QTest::newRow("rfc") << "otro_rfc.cer" << "otro_rfc.key" << ok << fixtures::ahoraVigente()
-                             << c(Categoria::RfcNoCoincide);
+                             << c(Categoria::RfcNoCoincide) << ninguno;
         QTest::newRow("vencida") << "efirma.cer" << "efirma.key" << ok << fixtures::despuesDeVigencia()
-                                 << c(Categoria::Vencida);
+                                 << c(Categoria::Vencida) << ninguno;
         QTest::newRow("no vigente") << "efirma.cer" << "efirma.key" << ok << fixtures::antesDeVigencia()
-                                    << c(Categoria::NoVigenteAun);
+                                    << c(Categoria::NoVigenteAun) << ninguno;
         QTest::newRow("pem") << "efirma.pem" << "efirma.key" << ok << fixtures::ahoraVigente()
-                             << c(Categoria::FormatoInvalido);
+                             << c(Categoria::FormatoInvalido) << o(OrigenErrorEFirma::Certificado);
         QTest::newRow("sin cifrar") << "efirma.cer" << "llave_sin_cifrar.key" << ok << fixtures::ahoraVigente()
-                                    << c(Categoria::FormatoInvalido);
+                                    << c(Categoria::FormatoInvalido) << o(OrigenErrorEFirma::Llave);
         QTest::newRow("cer inexistente") << "no-existe.cer" << "efirma.key" << ok << fixtures::ahoraVigente()
-                                         << c(Categoria::ArchivoIlegible);
+                                         << c(Categoria::ArchivoIlegible) << o(OrigenErrorEFirma::Certificado);
         QTest::newRow("key directorio") << "efirma.cer" << "." << ok << fixtures::ahoraVigente()
-                                        << c(Categoria::ArchivoIlegible);
+                                        << c(Categoria::ArchivoIlegible) << o(OrigenErrorEFirma::Llave);
+        QTest::newRow("key inexistente") << "efirma.cer" << "no-existe.key" << ok << fixtures::ahoraVigente()
+                                         << c(Categoria::ArchivoIlegible) << o(OrigenErrorEFirma::Llave);
+        QTest::newRow("cer en lugar de key") << "efirma.cer" << "efirma.cer" << ok << fixtures::ahoraVigente()
+                                             << c(Categoria::FormatoInvalido) << o(OrigenErrorEFirma::Llave);
     }
     void fallosDeValidacionNoDejanResiduos()
     {
@@ -265,6 +274,7 @@ private slots:
         QFETCH(QByteArray, contrasena);
         QFETCH(QDateTime, ahora);
         QFETCH(int, categoria);
+        QFETCH(int, origen);
         EntradaEFirma e = fx->entrada(cer, key);
         if (!contrasena.isEmpty()) {
             e.contrasena = fixtures::FixturesEFirma::bufferDe(contrasena);
@@ -272,6 +282,7 @@ private slots:
         const auto r = store->prepararEFirma(std::move(e), fixtures::kRfc, ahora);
         QVERIFY(!r.esExito());
         QCOMPARE(claveEstable(r.error().categoria), claveEstable(static_cast<Categoria>(categoria)));
+        QCOMPARE(claveEstable(r.error().origen), claveEstable(static_cast<OrigenErrorEFirma>(origen)));
         QVERIFY(e.contrasena.vacio()); // la entrada se consumio
         verificarSinResiduos();
         QVERIFY(!QFileInfo::exists(dirCredenciales())); // nada se escribio
@@ -305,6 +316,7 @@ private slots:
         QVERIFY(!r.esExito());
         QCOMPARE(claveEstable(r.error().categoria), claveEstable(static_cast<Categoria>(categoria)));
         QCOMPARE(r.error().codigoNativo, std::optional<int>(status));
+        QCOMPARE(r.error().origen, OrigenErrorEFirma::Ninguno); // fallos de almacen: sin campo
         verificarSinResiduos();
         verificarCentinelas({r.error().diagnostico});
     }

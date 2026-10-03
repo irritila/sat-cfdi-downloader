@@ -1,6 +1,5 @@
 #pragma once
 
-#include "application/profiles/PerfilesSatService.h"
 #include "application/requests/SolicitudesService.h"
 
 #include <QFuture>
@@ -10,7 +9,8 @@
 #include <memory>
 #include <utility>
 
-// Fakes asincronos reales (solo tests/presentation). Cada llamada crea un
+// Fake asincrono de solicitudes (solo tests/presentation). Perfiles y
+// credenciales usan los fakes compartidos de tests/fakes (T005.1). Cada llamada crea un
 // QPromise pendiente; la prueba decide cuando y en que orden se completa con
 // resolver(i, valor). Asi se reproducen respuestas tardias y desordenadas
 // como las de PersistenceDispatcher. Las senales del contrato se emiten desde
@@ -89,23 +89,4 @@ public:
     QList<satcfdi::NuevaSolicitudRequest> requestsCrear;
     QList<satcfdi::ConfirmacionDuplicado> confirmaciones;
     QList<satcfdi::SolicitudId> idsEliminar;
-};
-
-class PerfilesSatServiceAsincrono final : public satcfdi::PerfilesSatService {
-    Q_OBJECT
-
-public:
-    using PerfilesSatService::PerfilesSatService;
-
-    QFuture<ResultadoLista> listarActivos() override { return lista.nueva(); }
-
-    QFuture<ResultadoCrearPerfil> crearPerfilSimulado(const satcfdi::NuevoPerfilSimuladoRequest& request) override
-    {
-        requestsPerfil.append(request);
-        return creacion.nueva();
-    }
-
-    Pendientes<ResultadoLista> lista;
-    Pendientes<ResultadoCrearPerfil> creacion;
-    QList<satcfdi::NuevoPerfilSimuladoRequest> requestsPerfil;
 };

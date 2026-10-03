@@ -293,26 +293,31 @@ Resultado<EFirmaValidada, ErrorSecretStore> validarEFirma(const BufferSecreto& c
 {
     using R = Resultado<EFirmaValidada, ErrorSecretStore>;
 
+    // T005.1 (DA4): origen no sensible del error para enfocar el formulario.
     auto cert = parsearCertificado(certificadoDer.datos(), certificadoDer.tamano());
     if (!cert) {
-        return R::fallo(std::move(cert).error());
+        return R::fallo(std::move(cert).error().conOrigen(OrigenErrorEFirma::Certificado));
     }
     CertificadoParseado parseado = std::move(cert).valor();
 
     auto p8 = descifrarPkcs8(llaveCifradaDer, contrasena);
     if (!p8) {
-        return R::fallo(std::move(p8).error());
+        ErrorSecretStore e = std::move(p8).error();
+        const OrigenErrorEFirma origen = e.categoria == Categoria::ContrasenaIncorrecta
+                                             ? OrigenErrorEFirma::Contrasena
+                                             : OrigenErrorEFirma::Llave;
+        return R::fallo(std::move(e).conOrigen(origen));
     }
     PkeyPtr llave(EVP_PKCS82PKEY_ex(p8.valor().get(), nullptr, nullptr));
     if (!llave) {
-        return R::fallo(fallo(Categoria::FormatoInvalido, "pkcs8.pkey"));
+        return R::fallo(fallo(Categoria::FormatoInvalido, "pkcs8.pkey").conOrigen(OrigenErrorEFirma::Llave));
     }
     PkeyCtxPtr ctx(EVP_PKEY_CTX_new_from_pkey(nullptr, llave.get(), nullptr));
     if (!ctx) {
         return R::fallo(fallo(Categoria::Interno, "pkey.ctx"));
     }
     if (EVP_PKEY_private_check(ctx.get()) != 1 || EVP_PKEY_pairwise_check(ctx.get()) != 1) {
-        return R::fallo(fallo(Categoria::FormatoInvalido, "pkey.check"));
+        return R::fallo(fallo(Categoria::FormatoInvalido, "pkey.check").conOrigen(OrigenErrorEFirma::Llave));
     }
     if (X509_check_private_key(parseado.x509.get(), llave.get()) != 1) {
         return R::fallo(fallo(Categoria::ParejaIncompatible, "x509.check_private_key"));

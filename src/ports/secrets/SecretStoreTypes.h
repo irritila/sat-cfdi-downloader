@@ -253,6 +253,22 @@ inline constexpr std::array<EstadoCredencial, 7> kEstadosCredencial = {
 // Clave estable PascalCase (logs y pruebas; la UI traduce).
 QString claveEstable(EstadoCredencial estado);
 
+// Origen NO sensible de un error de importacion (T005.1, DA4): que entrada
+// del formulario lo provoco, para enfocar el control correcto. Nunca incluye
+// la ruta ni el contenido. Regla del adaptador:
+// - ArchivoIlegible / FormatoInvalido del .cer -> Certificado;
+// - ArchivoIlegible / FormatoInvalido de la .key -> Llave;
+// - ContrasenaIncorrecta -> Contrasena;
+// - cualquier otra categoria -> Ninguno.
+enum class OrigenErrorEFirma {
+    Ninguno,
+    Certificado,
+    Llave,
+    Contrasena,
+};
+
+QString claveEstable(OrigenErrorEFirma origen);
+
 // Error del puerto. Catalogo CERRADO de 17 categorias visibles (T005).
 // `diagnostico`: texto tecnico saneado SOLO para logs sanitizados (p. ej.
 // "keychain.copy", "pkcs8.decrypt"); nunca contiene rutas, RFC, contrasena,
@@ -282,6 +298,20 @@ struct ErrorSecretStore {
     Categoria categoria = Categoria::Interno;
     QString diagnostico;
     std::optional<int> codigoNativo;
+    // T005.1: solo significativo en prepararEFirma (ver OrigenErrorEFirma).
+    OrigenErrorEFirma origen = OrigenErrorEFirma::Ninguno;
+
+    ErrorSecretStore conOrigen(OrigenErrorEFirma nuevo) const&
+    {
+        ErrorSecretStore e = *this;
+        e.origen = nuevo;
+        return e;
+    }
+    ErrorSecretStore conOrigen(OrigenErrorEFirma nuevo) &&
+    {
+        origen = nuevo;
+        return std::move(*this);
+    }
 
     static ErrorSecretStore de(Categoria categoria, QString diagnostico = {},
                                std::optional<int> codigoNativo = std::nullopt)

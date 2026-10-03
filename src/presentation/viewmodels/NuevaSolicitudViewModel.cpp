@@ -1,5 +1,7 @@
 #include "NuevaSolicitudViewModel.h"
 
+#include "application/profiles/ConsultaPreparacionPerfiles.h"
+#include "application/profiles/CredencialesSatService.h"
 #include "application/profiles/PerfilesSatService.h"
 #include "application/requests/SolicitudesService.h"
 #include "domain/perfiles/PerfilId.h"
@@ -73,51 +75,29 @@ QString textoDeMotivo(MotivoDuplicado motivo)
     return {};
 }
 
-QString textoDeErrorPerfil(const ErrorCrearPerfil& error)
-{
-    switch (error.tipo) {
-    case ErrorCrearPerfil::Tipo::Validacion: {
-        QStringList partes;
-        for (ErrorCrearPerfil::CodigoValidacion c : error.validaciones) {
-            partes.append(c == ErrorCrearPerfil::CodigoValidacion::RfcInvalido
-                              ? QObject::tr("El RFC no es valido.")
-                              : QObject::tr("Indica la razon social."));
-        }
-        return partes.isEmpty() ? QObject::tr("El perfil no es valido.") : partes.join(QLatin1Char(' '));
-    }
-    case ErrorCrearPerfil::Tipo::Integridad:
-        return QObject::tr("Ya existe un perfil SAT con ese RFC.");
-    case ErrorCrearPerfil::Tipo::Persistencia:
-        return QObject::tr("No se pudo guardar el perfil. Intenta de nuevo.");
-    }
-    return QObject::tr("No se pudo crear el perfil.");
-}
-
 } // namespace
-
-QString NuevaSolicitudViewModel::rfcSimuladoPorDefecto()
-{
-    return QStringLiteral("EKU9003173C9");
-}
-
-QString NuevaSolicitudViewModel::razonSocialSimuladaPorDefecto()
-{
-    return QStringLiteral("Perfil simulado");
-}
 
 NuevaSolicitudViewModel::NuevaSolicitudViewModel(SolicitudesService* solicitudes,
                                                  PerfilesSatService* perfiles,
+                                                 CredencialesSatService* credenciales,
                                                  QObject* parent)
     : QObject(parent)
     , m_solicitudes(solicitudes)
-    , m_perfiles(perfiles)
+    , m_consulta(new ConsultaPreparacionPerfiles(*perfiles, *credenciales, this))
     , m_perfilesDisponibles(new PerfilesDisponiblesModel(this))
 {
     Q_ASSERT(solicitudes != nullptr);
     Q_ASSERT(perfiles != nullptr);
-    connect(perfiles, &PerfilesSatService::perfilesCambiaron, this,
-            &NuevaSolicitudViewModel::cargarPerfiles);
-    reiniciar();
+    Q_ASSERT(credenciales != nullptr);
+    // Solo se recarga si el selector ya se uso (no en el arranque).
+    const auto recargar = [this] {
+        if (m_perfilesCargados || m_cargandoPerfiles) {
+            cargarPerfiles();
+        }
+    };
+    connect(perfiles, &PerfilesSatService::perfilesCambiaron, this, recargar);
+    connect(credenciales, &CredencialesSatService::credencialCambio, this, recargar);
+    restablecerCampos();
 }
 
 bool NuevaSolicitudViewModel::sinPerfiles() const
@@ -140,10 +120,9 @@ QString NuevaSolicitudViewModel::errorMessage() const
 
 NuevaSolicitudViewModel::Observables NuevaSolicitudViewModel::observables() const
 {
-    return {canSubmit(),         ocupado(),          errorMessage(),
-            m_cargandoPerfiles,  sinPerfiles(),      m_creandoPerfil,
-            m_errorPerfil,       confirmacionPendiente(), m_motivoDuplicado,
-            m_solicitudExistenteId};
+    return {canSubmit(),        ocupado(),     errorMessage(),
+            m_cargandoPerfiles, sinPerfiles(), confirmacionPendiente(),
+            m_motivoDuplicado,  m_solicitudExistenteId};
 }
 
 template <typename F>
@@ -163,7 +142,6 @@ void NuevaSolicitudViewModel::actualizar(F&& cambio)
         emit errorMessageChanged();
     }
     if (antes.cargandoPerfiles != despues.cargandoPerfiles || antes.sinPerfiles != despues.sinPerfiles
-        || antes.creandoPerfil != despues.creandoPerfil || antes.errorPerfil != despues.errorPerfil
         || antes.pendiente != despues.pendiente || antes.motivo != despues.motivo
         || antes.existente != despues.existente) {
         emit estadoChanged();
@@ -280,30 +258,6 @@ void NuevaSolicitudViewModel::setComplemento(const QString& valor)
     }
     editar([&] { m_complemento = valor; });
     emit complementoChanged();
-}
-
-void NuevaSolicitudViewModel::setPerfilSimuladoRfc(const QString& valor)
-{
-    if (m_perfilSimuladoRfc == valor) {
-        return;
-    }
-    actualizar([&] {
-        m_perfilSimuladoRfc = valor;
-        m_errorPerfil.clear();
-    });
-    emit perfilSimuladoChanged();
-}
-
-void NuevaSolicitudViewModel::setPerfilSimuladoRazonSocial(const QString& valor)
-{
-    if (m_perfilSimuladoRazonSocial == valor) {
-        return;
-    }
-    actualizar([&] {
-        m_perfilSimuladoRazonSocial = valor;
-        m_errorPerfil.clear();
-    });
-    emit perfilSimuladoChanged();
 }
 
 NuevaSolicitudRequest NuevaSolicitudViewModel::construirRequest() const
@@ -467,7 +421,7 @@ void NuevaSolicitudViewModel::cancelarDuplicado()
     });
 }
 
-void NuevaSolicitudViewModel::reiniciar()
+void NuevaSolicitudViewModel::restablecerCampos()
 {
     const QDate hoy = QDate::currentDate();
     const QString inicial = QDate(hoy.year(), hoy.month(), 1).toString(Qt::ISODate);
@@ -481,12 +435,9 @@ void NuevaSolicitudViewModel::reiniciar()
     const bool cambiaRfc = !m_rfcContraparte.isEmpty();
     const bool cambiaComprobante = !m_tipoComprobante.isEmpty();
     const bool cambiaComplemento = !m_complemento.isEmpty();
-    const bool cambiaSimulado = m_perfilSimuladoRfc != rfcSimuladoPorDefecto()
-                                || m_perfilSimuladoRazonSocial != razonSocialSimuladaPorDefecto();
 
     actualizar([&] {
         ++m_genEnvio;
-        ++m_genPerfilSimulado;
         m_perfilId.clear();
         m_tipoDescarga = tipo;
         m_fechaInicial = inicial;
@@ -494,14 +445,9 @@ void NuevaSolicitudViewModel::reiniciar()
         m_rfcContraparte.clear();
         m_tipoComprobante.clear();
         m_complemento.clear();
-        m_perfilSimuladoRfc = rfcSimuladoPorDefecto();
-        m_perfilSimuladoRazonSocial = razonSocialSimuladaPorDefecto();
-        m_perfilPorSeleccionar.clear();
         m_tocado = false;
         m_ocupado = false;
-        m_creandoPerfil = false;
         m_errorServicio.clear();
-        m_errorPerfil.clear();
         m_snapshot.reset();
         m_motivoDuplicado.clear();
         m_solicitudExistenteId.clear();
@@ -527,72 +473,37 @@ void NuevaSolicitudViewModel::reiniciar()
     if (cambiaComplemento) {
         emit complementoChanged();
     }
-    if (cambiaSimulado) {
-        emit perfilSimuladoChanged();
-    }
+}
+
+void NuevaSolicitudViewModel::reiniciar()
+{
+    restablecerCampos();
     cargarPerfiles();
 }
 
 void NuevaSolicitudViewModel::cargarPerfiles()
 {
-    if (!m_perfiles) {
-        return;
-    }
     const quint64 generacion = ++m_genPerfiles;
     actualizar([&] { m_cargandoPerfiles = true; });
-    m_perfiles->listarActivos().then(this, [this, generacion](PerfilesSatService::ResultadoLista r) {
-        if (generacion != m_genPerfiles) {
-            return; // respuesta de una carga anterior
-        }
-        actualizar([&] {
-            m_cargandoPerfiles = false;
-            if (r.esExito()) {
-                m_perfilesDisponibles->reemplazar(std::move(r).valor());
-                m_perfilesCargados = true;
-            } else {
-                m_errorServicio = tr("No se pudieron cargar los perfiles SAT.");
+    m_consulta->listarListosParaSolicitudes().then(
+        this, [this, generacion](ConsultaPreparacionPerfiles::ResultadoLista r) {
+            if (generacion != m_genPerfiles) {
+                return; // respuesta de una carga anterior
             }
-        });
-        if (!m_perfilPorSeleccionar.isEmpty() && m_perfilesDisponibles->contiene(m_perfilPorSeleccionar)) {
-            const QString id = std::exchange(m_perfilPorSeleccionar, QString());
-            setPerfilId(id);
-        }
-    });
-}
-
-void NuevaSolicitudViewModel::crearPerfilSimulado()
-{
-    if (!m_perfiles || m_creandoPerfil) {
-        return;
-    }
-    NuevoPerfilSimuladoRequest request;
-    request.rfc = m_perfilSimuladoRfc;
-    request.razonSocial = m_perfilSimuladoRazonSocial;
-    const quint64 generacion = ++m_genPerfilSimulado;
-    actualizar([&] {
-        m_creandoPerfil = true;
-        m_errorPerfil.clear();
-    });
-    m_perfiles->crearPerfilSimulado(request).then(
-        this, [this, generacion](PerfilesSatService::ResultadoCrearPerfil r) {
-            if (generacion != m_genPerfilSimulado) {
-                return;
-            }
-            if (r.esExito()) {
-                const QString id = r.valor().texto();
-                actualizar([&] { m_creandoPerfil = false; });
-                if (m_perfilesDisponibles->contiene(id)) {
-                    setPerfilId(id);
-                } else {
-                    // Se selecciona cuando llegue la recarga por perfilesCambiaron.
-                    m_perfilPorSeleccionar = id;
-                }
-                return;
-            }
-            const QString mensaje = textoDeErrorPerfil(r.error());
             actualizar([&] {
-                m_creandoPerfil = false;
-                m_errorPerfil = mensaje;
+                m_cargandoPerfiles = false;
+                if (r.esExito()) {
+                    QList<PerfilResumen> listos;
+                    for (const PerfilConPreparacion& p : r.valor()) {
+                        if (p.listoParaSolicitudes) { // la consulta ya filtra; defensa
+                            listos.append(p.perfil);
+                        }
+                    }
+                    m_perfilesDisponibles->reemplazar(std::move(listos));
+                    m_perfilesCargados = true;
+                } else {
+                    m_errorServicio = tr("No se pudieron cargar los perfiles SAT.");
+                }
             });
         });
 }

@@ -7,7 +7,9 @@
 
 namespace satcfdi {
 
+class EFirmaFormViewModel;
 class NuevaSolicitudViewModel;
+class PerfilesSatViewModel;
 class SolicitudDetailViewModel;
 
 // Navegacion del shell: pagina actual y solicitud seleccionada por id (UUID).
@@ -17,6 +19,11 @@ class SolicitudDetailViewModel;
 // - NuevaSolicitudViewModel::submitted(id) abre el detalle de la nueva
 //   solicitud. La lista se refresca sola con listaCambiada.
 // - SolicitudDetailViewModel::eliminada(id) regresa a la lista.
+// - mostrarPerfiles() abre Perfiles SAT (T005.1 DA5) y recarga la lista de
+//   perfiles; al salir de Perfiles se descarta la captura de e.firma (rutas
+//   privadas incluidas) y el formulario de perfil.
+// mostrarLista(), mostrarNueva() y mostrarPerfiles() son publicas e
+// invocables desde C++ (AppLifecycleController, menu bar) y QML.
 class AppViewModel : public QObject {
     Q_OBJECT
     QML_ELEMENT
@@ -31,12 +38,15 @@ public:
         Lista,
         Nueva,
         Detalle,
+        Perfiles,
     };
     Q_ENUM(Pagina)
 
-    // Ambos view models son obligatorios y deben vivir mas que este objeto.
+    // Todos los view models son obligatorios y deben vivir mas que este objeto.
     AppViewModel(NuevaSolicitudViewModel* nuevaSolicitud,
                  SolicitudDetailViewModel* detalle,
+                 PerfilesSatViewModel* perfiles,
+                 EFirmaFormViewModel* eFirma,
                  QObject* parent = nullptr);
 
     Pagina pagina() const { return m_pagina; }
@@ -44,6 +54,7 @@ public:
 
     Q_INVOKABLE void mostrarLista();
     Q_INVOKABLE void mostrarNueva();
+    Q_INVOKABLE void mostrarPerfiles();
     // Devuelve false (sin navegar) si `id` no es un UUID canonico.
     Q_INVOKABLE bool abrirDetalle(const QString& id);
 
@@ -56,6 +67,8 @@ private:
 
     QPointer<NuevaSolicitudViewModel> m_nuevaSolicitud;
     QPointer<SolicitudDetailViewModel> m_detalle;
+    QPointer<PerfilesSatViewModel> m_perfiles;
+    QPointer<EFirmaFormViewModel> m_eFirma;
     Pagina m_pagina = Pagina::Lista;
     QString m_solicitudSeleccionadaId;
 };

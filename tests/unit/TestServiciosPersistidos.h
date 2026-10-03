@@ -23,8 +23,10 @@ private slots:
     void falloTrasInsertarHaceRollbackSinSenales();
     void eliminarEsTransaccionalEIdempotente();
     void eliminarConFalloHaceRollbackSinSenales();
-    void crearPerfilSimulado();
-    void crearPerfilDuplicadoEsIntegridad();
+    void crearPerfilNormalizaYEmite();
+    void crearPerfilDuplicadoEsRfcDuplicado();
     void crearPerfilInvalidoNoTocaPersistencia();
+    void listarNoEliminadosYObtenerIncluyenInactivos();
+    void actualizarNombreSoloCambiaNombre();
     void hiloGraficoNoSeBloquea();
 };

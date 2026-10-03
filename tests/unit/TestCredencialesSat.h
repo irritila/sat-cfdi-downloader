@@ -37,4 +37,8 @@ private slots:
     void materialConcurrenteEsperaAReemplazoEnCurso();
     void reemplazoEsperaAMaterialEnCurso();
     void reconciliarTerminaAntesDePrepararEncolado();
+    // T005.1
+    void origenDeErrorNormalizado();
+    void importarPropagaOrigenDelAlmacen();
+    void obtenerResumenIncluyeVigenciaSinDescifrar();
 };

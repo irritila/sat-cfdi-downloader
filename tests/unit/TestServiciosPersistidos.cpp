@@ -39,7 +39,8 @@ struct Entorno {
     SolicitudesServicePersistido servicio{
         dispatcher, PuertosPersistencia{perfiles, solicitudes, paquetes, logs, uow, sanitizer},
         [] { return kAhora; }};
-    PerfilesSatServicePersistido perfilesServicio{dispatcher, perfiles, uow, [] { return kAhora; }};
+    QDateTime ahora = kAhora; // reloj de perfilesServicio (T005.1)
+    PerfilesSatServicePersistido perfilesServicio{dispatcher, perfiles, uow, [this] { return ahora; }};
 
     PerfilId perfilActivo = PerfilId::generar();
 
@@ -207,8 +208,8 @@ void TestServiciosPersistidos::senalesDeEliminarYPerfilAntesDeCompletarFuture()
     QCOMPARE(orden, (QStringList{u"listaCambiada"_s, u"solicitudEliminada"_s}));
     QVERIFY(!eliminarTerminado);
 
-    QFuture<PerfilesSatService::ResultadoCrearPerfil> fp =
-        e.perfilesServicio.crearPerfilSimulado({u"CACX7605101P8"_s, u"Simulado"_s, true});
+    QFuture<PerfilesSatService::ResultadoCrear> fp =
+        e.perfilesServicio.crear(u"CACX7605101P8"_s, u"Nuevo"_s);
     bool perfilTerminado = true;
     bool perfilEnGrafico = false;
     connect(&e.perfilesServicio, &PerfilesSatService::perfilesCambiaron, this, [&] {
@@ -533,50 +534,121 @@ void TestServiciosPersistidos::eliminarConFalloHaceRollbackSinSenales()
     QCOMPARE(eliminada.count(), 0);
 }
 
-void TestServiciosPersistidos::crearPerfilSimulado()
+void TestServiciosPersistidos::crearPerfilNormalizaYEmite()
 {
     Entorno e;
     QSignalSpy cambio(&e.perfilesServicio, &PerfilesSatService::perfilesCambiaron);
-    const auto r = esperar(e.perfilesServicio.crearPerfilSimulado(
-        {u" cacx 7605101p8 "_s, u"  Persona Simulada "_s, true}));
+    const auto r = esperar(e.perfilesServicio.crear(u" cacx 7605101p8 "_s, u"  Persona Fisica "_s));
     QVERIFY(r && r->esExito());
     QCOMPARE(cambio.count(), 1);
     const PerfilSat& p = e.almacen.perfiles.last();
-    QCOMPARE(p.id, r->valor());
+    QCOMPARE(r->valor(), (PerfilResumen{p.id, u"CACX7605101P8"_s, u"Persona Fisica"_s, true}));
     QCOMPARE(p.rfc, u"CACX7605101P8"_s);
-    QCOMPARE(p.nombre, u"Persona Simulada"_s);
+    QCOMPARE(p.nombre, u"Persona Fisica"_s);
+    QVERIFY(p.activo);
     QCOMPARE(p.creadoEn, kAhora);
     QCOMPARE(contar(e.almacen.eventos, "commit"), 1);
 
-    const auto lista = esperar(e.perfilesServicio.listarActivos());
+    const auto lista = esperar(e.perfilesServicio.listarNoEliminados());
     QVERIFY(lista && lista->esExito());
     QCOMPARE(lista->valor().size(), 2);
     QCOMPARE(lista->valor().constFirst().rfc, u"CACX7605101P8"_s); // orden por RFC
 }
 
-void TestServiciosPersistidos::crearPerfilDuplicadoEsIntegridad()
+void TestServiciosPersistidos::crearPerfilDuplicadoEsRfcDuplicado()
 {
     Entorno e;
+    // El RFC queda reservado aunque el perfil este inactivo.
+    e.almacen.perfiles.first().activo = false;
     QSignalSpy cambio(&e.perfilesServicio, &PerfilesSatService::perfilesCambiaron);
-    const auto r = esperar(e.perfilesServicio.crearPerfilSimulado({u"EKU9003173C9"_s, u"Dup"_s, true}));
+    const auto r = esperar(e.perfilesServicio.crear(u"EKU9003173C9"_s, u"Dup"_s));
     QVERIFY(r && !r->esExito());
-    QCOMPARE(r->error().tipo, ErrorCrearPerfil::Tipo::Integridad);
+    QCOMPARE(r->error().tipo, ErrorCrearPerfil::Tipo::RfcDuplicado);
     QCOMPARE(r->error().causa->restriccion, u"ux_perfil_sat_rfc_vigente"_s);
+    QVERIFY(!r->error().mensaje.contains(u"EKU9003173C9"_s));
     QCOMPARE(contar(e.almacen.eventos, "rollback"), 1);
     QCOMPARE(e.almacen.perfiles.size(), 1);
     QCOMPARE(cambio.count(), 0);
+
+    // Otra restriccion o fallo de almacenamiento NO es RfcDuplicado.
+    e.almacen.fallos.insert(u"insertarPerfil"_s, fakes::error(ErrorPersistencia::Tipo::Integridad, "ck_x"));
+    const auto otra = esperar(e.perfilesServicio.crear(u"CACX7605101P8"_s, u"Otro"_s));
+    QCOMPARE(otra->error().tipo, ErrorCrearPerfil::Tipo::Persistencia);
+    e.almacen.fallos.insert(u"insertarPerfil"_s, fakes::error(ErrorPersistencia::Tipo::Unicidad, "pk_perfil_sat"));
+    const auto pk = esperar(e.perfilesServicio.crear(u"CACX7605101P8"_s, u"Otro"_s));
+    QCOMPARE(pk->error().tipo, ErrorCrearPerfil::Tipo::Persistencia);
 }
 
 void TestServiciosPersistidos::crearPerfilInvalidoNoTocaPersistencia()
 {
     Entorno e;
-    const auto r = esperar(e.perfilesServicio.crearPerfilSimulado({u"NO-RFC"_s, u"  "_s, true}));
+    const auto r = esperar(e.perfilesServicio.crear(u"NO-RFC"_s, u"  "_s));
     QVERIFY(r && !r->esExito());
     QCOMPARE(r->error().tipo, ErrorCrearPerfil::Tipo::Validacion);
     QCOMPARE(r->error().validaciones,
-             (QList<ErrorCrearPerfil::CodigoValidacion>{ErrorCrearPerfil::CodigoValidacion::RfcInvalido,
-                                                        ErrorCrearPerfil::CodigoValidacion::RazonSocialRequerida}));
+             (QList<CodigoValidacionPerfil>{CodigoValidacionPerfil::RfcInvalido,
+                                            CodigoValidacionPerfil::NombreRequerido}));
+    QVERIFY(r->error().tieneErrorEn(CampoPerfil::Rfc));
+    QVERIFY(r->error().tieneErrorEn(CampoPerfil::Nombre));
+    const auto soloNombre = esperar(e.perfilesServicio.crear(u"CACX7605101P8"_s, u""_s));
+    QVERIFY(!soloNombre->error().tieneErrorEn(CampoPerfil::Rfc));
+    QVERIFY(soloNombre->error().tieneErrorEn(CampoPerfil::Nombre));
     QVERIFY(e.almacen.eventos.isEmpty());
+}
+
+void TestServiciosPersistidos::listarNoEliminadosYObtenerIncluyenInactivos()
+{
+    Entorno e;
+    const PerfilId inactivo = PerfilId::generar();
+    const PerfilId eliminado = PerfilId::generar();
+    e.almacen.perfiles.append(PerfilSat{inactivo, u"AAA010101AAA"_s, u"Inactivo"_s, false, kAhora, kAhora, std::nullopt});
+    e.almacen.perfiles.append(PerfilSat{eliminado, u"ZZZ010101ZZZ"_s, u"Eliminado"_s, true, kAhora, kAhora, kAhora});
+
+    const auto lista = esperar(e.perfilesServicio.listarNoEliminados());
+    QVERIFY(lista && lista->esExito());
+    QCOMPARE(lista->valor().size(), 2);
+    QCOMPARE(lista->valor().at(0), (PerfilResumen{inactivo, u"AAA010101AAA"_s, u"Inactivo"_s, false}));
+    QCOMPARE(lista->valor().at(1).id, e.perfilActivo);
+
+    const auto activo = esperar(e.perfilesServicio.obtener(inactivo));
+    QVERIFY(activo && activo->esExito() && activo->valor());
+    QVERIFY(!activo->valor()->activo);
+    QVERIFY(!esperar(e.perfilesServicio.obtener(eliminado))->valor());
+    QVERIFY(!esperar(e.perfilesServicio.obtener(PerfilId()))->valor());
+
+    e.almacen.fallos.insert(u"listarPerfilesVisibles"_s, fakes::error(ErrorPersistencia::Tipo::Almacenamiento));
+    const auto fallo = esperar(e.perfilesServicio.listarNoEliminados());
+    QVERIFY(fallo && !fallo->esExito());
+}
+
+void TestServiciosPersistidos::actualizarNombreSoloCambiaNombre()
+{
+    Entorno e;
+    e.almacen.perfiles.first().activo = false; // tambien inactivos
+    const QDateTime despues = kAhora.addSecs(60);
+    e.ahora = despues;
+    QSignalSpy cambio(&e.perfilesServicio, &PerfilesSatService::perfilesCambiaron);
+    const auto r = esperar(e.perfilesServicio.actualizarNombre(e.perfilActivo, u"  Nuevo nombre "_s));
+    QVERIFY(r && r->esExito());
+    QCOMPARE(r->valor(), (PerfilResumen{e.perfilActivo, u"EKU9003173C9"_s, u"Nuevo nombre"_s, false}));
+    QCOMPARE(e.almacen.perfiles.first().rfc, u"EKU9003173C9"_s);
+    QCOMPARE(e.almacen.perfiles.first().actualizadoEn, despues);
+    QCOMPARE(cambio.count(), 1);
+
+    const auto vacio = esperar(e.perfilesServicio.actualizarNombre(e.perfilActivo, u"   "_s));
+    QCOMPARE(vacio->error().tipo, ErrorActualizarPerfil::Tipo::Validacion);
+    QVERIFY(vacio->error().tieneErrorEn(CampoPerfil::Nombre));
+    QVERIFY(!vacio->error().tieneErrorEn(CampoPerfil::Rfc));
+
+    const auto inexistente = esperar(e.perfilesServicio.actualizarNombre(PerfilId::generar(), u"X"_s));
+    QCOMPARE(inexistente->error().tipo, ErrorActualizarPerfil::Tipo::PerfilInexistente);
+    QVERIFY(contar(e.almacen.eventos, "rollback") >= 1);
+
+    e.almacen.fallos.insert(u"commit"_s, fakes::error(ErrorPersistencia::Tipo::Ocupado));
+    const auto commit = esperar(e.perfilesServicio.actualizarNombre(e.perfilActivo, u"Otro"_s));
+    QCOMPARE(commit->error().tipo, ErrorActualizarPerfil::Tipo::Persistencia);
+    QCOMPARE(e.almacen.perfiles.first().nombre, u"Nuevo nombre"_s); // rollback
+    QCOMPARE(cambio.count(), 1);
 }
 
 void TestServiciosPersistidos::hiloGraficoNoSeBloquea()

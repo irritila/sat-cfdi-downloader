@@ -8,9 +8,10 @@
 
 namespace satcfdi {
 
-// Modelo de solo lectura de perfiles SAT activos para el selector de
-// NuevaSolicitudPage. Roles: id (UUID texto), rfc, razonSocial y etiqueta
-// (texto visible "RFC - razon social"). No expone credenciales.
+// Modelo de solo lectura de perfiles SAT LISTOS para solicitudes (T005.1:
+// ConsultaPreparacionPerfiles::listarListosParaSolicitudes) para el selector de
+// NuevaSolicitudPage. Roles: id (UUID texto), rfc, nombre y etiqueta
+// (texto visible "RFC - nombre"). No expone credenciales.
 class PerfilesDisponiblesModel : public QAbstractListModel {
     Q_OBJECT
     QML_ELEMENT
@@ -22,7 +23,7 @@ public:
     enum Rol {
         IdRole = Qt::UserRole + 1,
         RfcRole,
-        RazonSocialRole,
+        NombreRole,
         EtiquetaRole,
     };
     Q_ENUM(Rol)

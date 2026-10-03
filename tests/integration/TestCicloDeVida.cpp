@@ -10,6 +10,7 @@
 #include "presentation/viewmodels/PresentacionViewModels.h"
 
 #include "fakes/FakeConfiguracionAppService.h"
+#include "fakes/FakeCredencialesSatService.h"
 #include "fakes/FakeOSIntegration.h"
 #include "fakes/FakeSecretStore.h"
 
@@ -67,7 +68,8 @@ struct Escenario {
     const QList<PerfilResumen> perfiles = DemoPerfilesSatService::perfilesDemo();
     DemoPerfilesSatService perfilesService{perfiles};
     DemoSolicitudesService solicitudesService{perfiles};
-    PresentacionViewModels vms{&solicitudesService, &perfilesService};
+    fakes::FakeCredencialesSatService credencialesService;
+    PresentacionViewModels vms{&solicitudesService, &perfilesService, &credencialesService};
     FakeOSIntegration os;
     FakeConfiguracionAppService config;
     ExtensionEspia extension;

@@ -6,7 +6,7 @@ import QtQuick.Layouts
 
 // Formulario de nueva solicitud. Solo layout y estado visual: validacion,
 // evaluacion de duplicados y envio viven en NuevaSolicitudViewModel.
-// Teclado: foco inicial en el selector de perfil (o en "Crear perfil simulado"
+// Teclado: foco inicial en el selector de perfil (o en "Administrar perfiles SAT"
 // si no hay perfiles); Tab recorre los campos; Enter en un campo de texto o en
 // "Crear solicitud" envia; Escape o "Regresar" vuelve a la lista. El dialogo de
 // duplicado inicia en "Cancelar" y Escape lo cancela.
@@ -33,7 +33,7 @@ Page {
         if (dialogoDuplicado.visible)
             return
         if (pagina.formulario.sinPerfiles)
-            campoRfcSimulado.forceActiveFocus(Qt.TabFocusReason)
+            botonAdministrarPerfiles.forceActiveFocus(Qt.TabFocusReason)
         else
             selectorPerfil.forceActiveFocus(Qt.TabFocusReason)
     }
@@ -54,13 +54,13 @@ Page {
     Connections {
         target: pagina.formulario
         function onEstadoChanged() {
-            // Mueve el foco si la seccion de perfil simulado aparece o se oculta.
+            // Mueve el foco si la seccion sin perfiles listos aparece o se oculta.
             if (pagina.formulario.sinPerfiles !== pagina.sinPerfilesAnterior) {
                 pagina.sinPerfilesAnterior = pagina.formulario.sinPerfiles
                 // El dialogo modal, si esta abierto, conserva el foco.
                 if (!dialogoDuplicado.visible) {
                     if (pagina.formulario.sinPerfiles)
-                        campoRfcSimulado.forceActiveFocus(Qt.OtherFocusReason)
+                        botonAdministrarPerfiles.forceActiveFocus(Qt.OtherFocusReason)
                     else
                         selectorPerfil.forceActiveFocus(Qt.OtherFocusReason)
                 }
@@ -95,6 +95,13 @@ Page {
         titulo: qsTr("Nueva solicitud")
         mostrarRegresar: true
         onRegresarSolicitado: pagina.regresar()
+
+        BotonAccion {
+            objectName: "botonPerfilesSat"
+            text: qsTr("Perfiles SAT")
+            descripcion: qsTr("Administrar perfiles SAT y su e.firma")
+            onClicked: pagina.app.mostrarPerfiles()
+        }
     }
 
     ScrollView {
@@ -109,67 +116,30 @@ Page {
 
             Item { implicitHeight: 8 }
 
-            // Sin perfiles activos: accion explicita "Crear perfil simulado".
-            GroupBox {
-                id: seccionPerfilSimulado
-                objectName: "seccionPerfilSimulado"
+            // Sin perfiles listos (activo + e.firma Lista): ir a Perfiles SAT.
+            ColumnLayout {
+                id: seccionSinPerfiles
+                objectName: "seccionSinPerfiles"
                 visible: pagina.formulario.sinPerfiles
-                title: qsTr("No hay perfiles SAT activos")
                 Layout.fillWidth: true
                 Layout.leftMargin: 16
                 Layout.rightMargin: 16
-                Accessible.role: Accessible.Grouping
-                Accessible.name: title
+                spacing: 6
 
-                ColumnLayout {
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    spacing: 6
-
-                    Label {
-                        text: qsTr("Crea un perfil simulado (sin credenciales) para poder registrar solicitudes locales.")
-                        wrapMode: Text.WordWrap
-                        Layout.fillWidth: true
-                    }
-                    Label { text: qsTr("RFC del perfil"); Accessible.ignored: true }
-                    TextField {
-                        id: campoRfcSimulado
-                        objectName: "campoRfcSimulado"
-                        Layout.fillWidth: true
-                        text: pagina.formulario.perfilSimuladoRfc
-                        maximumLength: 13
-                        onTextEdited: pagina.formulario.perfilSimuladoRfc = text
-                        onAccepted: pagina.formulario.crearPerfilSimulado()
-                        Accessible.name: qsTr("RFC del perfil simulado")
-                    }
-                    Label { text: qsTr("Razon social"); Accessible.ignored: true }
-                    TextField {
-                        objectName: "campoRazonSocialSimulada"
-                        Layout.fillWidth: true
-                        text: pagina.formulario.perfilSimuladoRazonSocial
-                        onTextEdited: pagina.formulario.perfilSimuladoRazonSocial = text
-                        onAccepted: pagina.formulario.crearPerfilSimulado()
-                        Accessible.name: qsTr("Razon social del perfil simulado")
-                    }
-                    Label {
-                        objectName: "errorPerfilSimulado"
-                        visible: text.length > 0
-                        text: pagina.formulario.errorPerfilMessage
-                        color: "#b00020"
-                        font.bold: true
-                        wrapMode: Text.WordWrap
-                        Layout.fillWidth: true
-                        Accessible.role: Accessible.AlertMessage
-                        Accessible.name: qsTr("Error: %1").arg(text)
-                    }
-                    BotonAccion {
-                        objectName: "botonCrearPerfilSimulado"
-                        text: qsTr("Crear perfil simulado")
-                        descripcion: qsTr("Crear un perfil SAT simulado sin credenciales")
-                        enabled: !pagina.formulario.creandoPerfil
-                        Layout.alignment: Qt.AlignRight
-                        onClicked: pagina.formulario.crearPerfilSimulado()
-                    }
+                Label {
+                    objectName: "mensajeSinPerfiles"
+                    text: qsTr("No hay perfiles SAT listos para solicitudes. Un perfil necesita estar activo y tener su e.firma registrada y vigente.")
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
+                    Accessible.role: Accessible.StaticText
+                    Accessible.name: text
+                }
+                BotonAccion {
+                    id: botonAdministrarPerfiles
+                    objectName: "botonAdministrarPerfiles"
+                    text: qsTr("Administrar perfiles SAT")
+                    descripcion: qsTr("Abrir Perfiles SAT para crear perfiles y registrar su e.firma")
+                    onClicked: pagina.app.mostrarPerfiles()
                 }
             }
 

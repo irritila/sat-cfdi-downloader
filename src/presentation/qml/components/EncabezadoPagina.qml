@@ -8,6 +8,8 @@ ToolBar {
 
     property string titulo: ""
     property bool mostrarRegresar: false
+    property string textoRegresar: qsTr("Regresar")
+    property string descripcionRegresar: qsTr("Regresar a la lista de solicitudes (Escape)")
     // Primer elemento enfocable del encabezado (boton de regreso).
     readonly property alias botonRegresar: regresar
     default property alias acciones: contenedorAcciones.data
@@ -27,8 +29,8 @@ ToolBar {
             id: regresar
             objectName: "botonRegresar"
             visible: encabezado.mostrarRegresar
-            text: qsTr("Regresar")
-            descripcion: qsTr("Regresar a la lista de solicitudes (Escape)")
+            text: encabezado.textoRegresar
+            descripcion: encabezado.descripcionRegresar
             onClicked: encabezado.regresarSolicitado()
         }
         Label {

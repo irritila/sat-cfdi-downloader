@@ -36,8 +36,10 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
         *m_dispatcher, p.configuracion(), p.unidadDeTrabajo());
     m_credencialesService = std::make_unique<CredencialesSatServicePersistido>(
         *m_dispatcher, p.perfiles(), p.credenciales(), p.unidadDeTrabajo(), secretStore);
-    m_viewModels = std::make_unique<PresentacionViewModels>(m_solicitudesService.get(),
-                                                            m_perfilesService.get());
+    // T005.1: la presentacion de perfiles y e.firma consume el mismo servicio
+    // de credenciales persistido.
+    m_viewModels = std::make_unique<PresentacionViewModels>(
+        m_solicitudesService.get(), m_perfilesService.get(), m_credencialesService.get());
 
     // Primera tarea del dispatcher serial: limpia generaciones huerfanas del
     // SecretStore (residuos de fallos previos). No se espera aqui; las

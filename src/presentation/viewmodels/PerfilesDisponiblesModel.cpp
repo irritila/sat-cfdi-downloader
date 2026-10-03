@@ -25,12 +25,12 @@ QVariant PerfilesDisponiblesModel::data(const QModelIndex& index, int role) cons
         return p.id.texto();
     case RfcRole:
         return p.rfc;
-    case RazonSocialRole:
-        return p.razonSocial;
+    case NombreRole:
+        return p.nombre;
     case EtiquetaRole:
     case Qt::DisplayRole:
-        return p.razonSocial.isEmpty() ? p.rfc
-                                       : QStringLiteral("%1 - %2").arg(p.rfc, p.razonSocial);
+        return p.nombre.isEmpty() ? p.rfc
+                                       : QStringLiteral("%1 - %2").arg(p.rfc, p.nombre);
     default:
         return {};
     }
@@ -41,7 +41,7 @@ QHash<int, QByteArray> PerfilesDisponiblesModel::roleNames() const
     return {
         {IdRole, "id"},
         {RfcRole, "rfc"},
-        {RazonSocialRole, "razonSocial"},
+        {NombreRole, "nombre"},
         {EtiquetaRole, "etiqueta"},
     };
 }

@@ -29,8 +29,13 @@ public:
     Resultado<std::optional<PerfilSat>, ErrorPersistencia>
     obtenerVigentePorRfc(QStringView rfcNormalizado) override;
     Resultado<QList<PerfilSat>, ErrorPersistencia> listarActivosVisibles() override;
+    Resultado<QList<PerfilSat>, ErrorPersistencia> listarVisibles() override;
+    Resultado<std::optional<PerfilSat>, ErrorPersistencia>
+    actualizarNombreVisible(const PerfilId& id, const QString& nombre, const QDateTime& actualizadoEn) override;
 
 private:
+    Resultado<QList<PerfilSat>, ErrorPersistencia> listar(bool soloActivos, QStringView contexto);
+
     SqliteConnectionProvider& m_proveedor;
 };
 

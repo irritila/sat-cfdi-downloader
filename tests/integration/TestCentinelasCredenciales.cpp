@@ -264,9 +264,9 @@ void TestCentinelasCredenciales::verificar(const QString& momento)
 void TestCentinelasCredenciales::centinelasEnTodosLosDestinos()
 {
     abrirGrafo();
-    const auto perfil = esperar(m_perfiles->crearPerfilSimulado({fixtures::kRfc, QStringLiteral("Perfil"), true}));
+    const auto perfil = esperar(m_perfiles->crear(fixtures::kRfc, QStringLiteral("Perfil")));
     QVERIFY(perfil && perfil->esExito());
-    const PerfilId id = perfil->valor();
+    const PerfilId id = perfil->valor().id;
     auto entrada = [&](const QString& key, std::optional<QByteArray> contrasena = std::nullopt) {
         EntradaEFirma e = m_fx->entrada(QStringLiteral("efirma.cer"), key);
         if (contrasena) {

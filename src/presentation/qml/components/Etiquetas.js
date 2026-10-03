@@ -103,17 +103,23 @@ function tono(clave) {
     switch (clave) {
     case "Terminada":
     case "Descargado":
+    case "Lista":
         return "exito"
     case "EnvioFallido":
+    case "MaterialDanado":
+    case "MaterialFaltante":
     case "ErrorSat":
     case "Error":
     case "Rechazada":
         return "error"
     case "EnvioIncierto":
+    case "NoVigenteAun":
+    case "EstadoNoDisponible":
     case "Vencida":
     case "Vencido":
         return "advertencia"
     case "Enviando":
+    case "Verificando":
     case "Aceptada":
     case "EnProceso":
     case "Descargando":

@@ -154,6 +154,32 @@ private slots:
         esperarCategoria(con(cer, QByteArray("no es der")), Categoria::FormatoInvalido);
     }
 
+    // T005.1 (DA4): origen no sensible del error en validarEFirma.
+    void origenDelError()
+    {
+        const auto origen = [](const Resultado<crypto::EFirmaValidada, ErrorSecretStore>& r) {
+            return r.esExito() ? QStringLiteral("exito") : claveEstable(r.error().origen);
+        };
+        const QString cert = QStringLiteral("Certificado");
+        const QString llave = QStringLiteral("Llave");
+        const QString pwd = QStringLiteral("Contrasena");
+        const QString ninguno = QStringLiteral("Ninguno");
+        QCOMPARE(origen(validar(QStringLiteral("efirma.pem"), QStringLiteral("efirma.key"), fx->contrasena())), cert);
+        QCOMPARE(origen(validar(QStringLiteral("efirma.key"), QStringLiteral("efirma.key"), fx->contrasena())), cert);
+        QCOMPARE(origen(validar(QStringLiteral("efirma.cer"), QStringLiteral("llave_sin_cifrar.key"), fx->contrasena())),
+                 llave);
+        QCOMPARE(origen(validar(QStringLiteral("efirma.cer"), QStringLiteral("efirma.cer"), fx->contrasena())), llave);
+        QCOMPARE(origen(validar(QStringLiteral("efirma.cer"), QStringLiteral("efirma.key"), "otra-clave")), pwd);
+        QCOMPARE(origen(validar(QStringLiteral("efirma.cer"), QStringLiteral("segundo_par.key"), fx->contrasena())),
+                 ninguno);
+        QCOMPARE(origen(validar(QStringLiteral("csd.cer"), QStringLiteral("csd.key"), fx->contrasena())), ninguno);
+        QCOMPARE(origen(validar(QStringLiteral("otro_rfc.cer"), QStringLiteral("otro_rfc.key"), fx->contrasena())),
+                 ninguno);
+        QCOMPARE(origen(validar(QStringLiteral("efirma.cer"), QStringLiteral("efirma.key"), fx->contrasena(),
+                                fixtures::kRfc, fixtures::despuesDeVigencia())),
+                 ninguno);
+    }
+
     void descifrarLlaveDevuelvePkcs8SinCifrar()
     {
         const auto r = crypto::descifrarLlavePkcs8(buffer(fx->leer(QStringLiteral("efirma.key"))),

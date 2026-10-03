@@ -213,10 +213,9 @@ void TestComposicionPersistida::reinicioConservaDatos()
     {
         auto root = abrir(tmp.path());
         QVERIFY(root);
-        const auto perfil = esperar(root->perfiles().crearPerfilSimulado(
-            {QStringLiteral("EKU9003173C9"), QStringLiteral("Perfil de prueba"), true}));
+        const auto perfil = esperar(root->perfiles().crear(QStringLiteral("EKU9003173C9"), QStringLiteral("Perfil de prueba")));
         QVERIFY(perfil && perfil->esExito());
-        perfilId = perfil->valor();
+        perfilId = perfil->valor().id;
 
         const auto creada = esperar(root->solicitudes().crear(solicitudDe(perfilId)));
         QVERIFY(creada && creada->esExito());
@@ -230,13 +229,13 @@ void TestComposicionPersistida::reinicioConservaDatos()
     auto root = abrir(tmp.path());
     QVERIFY(root);
 
-    const auto perfiles = esperar(root->perfiles().listarActivos());
+    const auto perfiles = esperar(root->perfiles().listarNoEliminados());
     QVERIFY(perfiles && perfiles->esExito());
     QCOMPARE(perfiles->valor().size(), 1);
     const PerfilResumen& p = perfiles->valor().constFirst();
     QCOMPARE(p.id, perfilId);
     QCOMPARE(p.rfc, QStringLiteral("EKU9003173C9"));
-    QCOMPARE(p.razonSocial, QStringLiteral("Perfil de prueba"));
+    QCOMPARE(p.nombre, QStringLiteral("Perfil de prueba"));
     QVERIFY(p.activo);
 
     const auto lista = esperar(root->solicitudes().listar());
@@ -282,10 +281,9 @@ void TestComposicionPersistida::eliminarYReiniciarDaNoEncontrado()
     {
         auto root = abrir(tmp.path());
         QVERIFY(root);
-        const auto perfil = esperar(root->perfiles().crearPerfilSimulado(
-            {QStringLiteral("EKU9003173C9"), QStringLiteral("Perfil"), true}));
+        const auto perfil = esperar(root->perfiles().crear(QStringLiteral("EKU9003173C9"), QStringLiteral("Perfil")));
         QVERIFY(perfil && perfil->esExito());
-        const auto creada = esperar(root->solicitudes().crear(solicitudDe(perfil->valor())));
+        const auto creada = esperar(root->solicitudes().crear(solicitudDe(perfil->valor().id)));
         QVERIFY(creada && creada->esExito());
         id = creada->valor();
 

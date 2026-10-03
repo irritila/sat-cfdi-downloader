@@ -61,6 +61,7 @@ public:
     QFuture<ResultadoImportacion> importar(const PerfilId& perfilId, EntradaEFirma&& entrada) override;
     QFuture<ResultadoImportacion> reemplazar(const PerfilId& perfilId, EntradaEFirma&& entrada) override;
     QFuture<ResultadoEstado> obtenerEstado(const PerfilId& perfilId) override;
+    QFuture<ResultadoResumen> obtenerResumen(const PerfilId& perfilId) override;
     QFuture<ResultadoEliminacion> eliminar(const PerfilId& perfilId) override;
     QFuture<ResultadoReconciliacion> reconciliar() override;
     ResultadoMaterial obtenerMaterialFirma(const PerfilId& perfilId) override;

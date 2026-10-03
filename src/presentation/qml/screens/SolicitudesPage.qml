@@ -60,8 +60,16 @@ Page {
             text: qsTr("Nueva solicitud")
             descripcion: qsTr("Abrir el formulario de nueva solicitud")
             highlighted: true
-            KeyNavigation.tab: lista.visible ? lista : (botonReintentar.visible ? botonReintentar : null)
+            KeyNavigation.tab: botonPerfiles
             onClicked: pagina.app.mostrarNueva()
+        }
+        BotonAccion {
+            id: botonPerfiles
+            objectName: "botonPerfilesSat"
+            text: qsTr("Perfiles SAT")
+            descripcion: qsTr("Administrar perfiles SAT y su e.firma")
+            KeyNavigation.tab: lista.visible ? lista : (botonReintentar.visible ? botonReintentar : botonNueva)
+            onClicked: pagina.app.mostrarPerfiles()
         }
     }
 

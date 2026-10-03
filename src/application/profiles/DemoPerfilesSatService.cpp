@@ -11,12 +11,12 @@ namespace satcfdi {
 
 namespace {
 
-PerfilResumen perfil(const char* id, const char* rfc, const char* razonSocial, bool activo)
+PerfilResumen perfil(const char* id, const char* rfc, const char* nombre, bool activo)
 {
     PerfilResumen p;
     p.id = *PerfilId::desdeTexto(QString::fromLatin1(id));
     p.rfc = QString::fromLatin1(rfc);
-    p.razonSocial = QString::fromUtf8(razonSocial);
+    p.nombre = QString::fromUtf8(nombre);
     p.activo = activo;
     return p;
 }
@@ -41,52 +41,83 @@ DemoPerfilesSatService::DemoPerfilesSatService(QList<PerfilResumen> perfiles, QO
 {
 }
 
-QFuture<PerfilesSatService::ResultadoLista> DemoPerfilesSatService::listarActivos()
+namespace {
+
+QList<PerfilResumen> ordenados(QList<PerfilResumen> lista)
 {
-    QList<PerfilResumen> activos;
-    std::copy_if(m_perfiles.cbegin(), m_perfiles.cend(), std::back_inserter(activos),
-                 [](const PerfilResumen& p) { return p.activo; });
-    std::sort(activos.begin(), activos.end(),
+    std::sort(lista.begin(), lista.end(),
               [](const PerfilResumen& a, const PerfilResumen& b) { return a.rfc < b.rfc; });
-    return QtFuture::makeReadyValueFuture(ResultadoLista::exito(std::move(activos)));
+    return lista;
 }
 
-QFuture<PerfilesSatService::ResultadoCrearPerfil>
-DemoPerfilesSatService::crearPerfilSimulado(const NuevoPerfilSimuladoRequest& request)
+} // namespace
+
+QFuture<PerfilesSatService::ResultadoLista> DemoPerfilesSatService::listarNoEliminados()
 {
-    ErrorCrearPerfil error;
-    const std::optional<QString> rfc = rfc::normalizarYValidar(request.rfc);
-    const QString razonSocial = request.razonSocial.trimmed();
+    return QtFuture::makeReadyValueFuture(ResultadoLista::exito(ordenados(m_perfiles)));
+}
+
+QFuture<PerfilesSatService::ResultadoPerfil> DemoPerfilesSatService::obtener(const PerfilId& id)
+{
+    for (const PerfilResumen& p : std::as_const(m_perfiles)) {
+        if (!id.esNulo() && p.id == id) {
+            return QtFuture::makeReadyValueFuture(ResultadoPerfil::exito(p));
+        }
+    }
+    return QtFuture::makeReadyValueFuture(ResultadoPerfil::exito(std::nullopt));
+}
+
+Resultado<PerfilResumen, ErrorCrearPerfil>
+DemoPerfilesSatService::sembrar(const QString& rfcCapturado, const QString& nombreCapturado, bool activo)
+{
+    using R = Resultado<PerfilResumen, ErrorCrearPerfil>;
+    const std::optional<QString> rfc = rfc::normalizarYValidar(rfcCapturado);
+    const QString nombre = nombreCapturado.trimmed();
+    QList<CodigoValidacionPerfil> invalidos;
     if (!rfc) {
-        error.validaciones.append(ErrorCrearPerfil::CodigoValidacion::RfcInvalido);
+        invalidos.append(CodigoValidacionPerfil::RfcInvalido);
     }
-    if (razonSocial.isEmpty()) {
-        error.validaciones.append(ErrorCrearPerfil::CodigoValidacion::RazonSocialRequerida);
+    if (nombre.isEmpty()) {
+        invalidos.append(CodigoValidacionPerfil::NombreRequerido);
     }
-    if (!error.validaciones.isEmpty()) {
-        error.tipo = ErrorCrearPerfil::Tipo::Validacion;
-        error.mensaje = QStringLiteral("El perfil simulado no es valido.");
-        return QtFuture::makeReadyValueFuture(ResultadoCrearPerfil::fallo(std::move(error)));
+    if (!invalidos.isEmpty()) {
+        return R::fallo(ErrorCrearPerfil::validacion(std::move(invalidos)));
     }
     const bool duplicado = std::any_of(m_perfiles.cbegin(), m_perfiles.cend(),
                                        [&](const PerfilResumen& p) { return p.rfc == *rfc; });
     if (duplicado) {
-        error.tipo = ErrorCrearPerfil::Tipo::Integridad;
-        error.causa = ErrorPersistencia::de(ErrorPersistencia::Tipo::Unicidad,
-                                            QStringLiteral("RFC vigente duplicado."),
-                                            QStringLiteral("ux_perfil_sat_rfc_vigente"));
-        error.mensaje = error.causa->mensaje;
-        return QtFuture::makeReadyValueFuture(ResultadoCrearPerfil::fallo(std::move(error)));
+        return R::fallo(ErrorCrearPerfil::desdePersistencia(
+            ErrorPersistencia::de(ErrorPersistencia::Tipo::Unicidad, QStringLiteral("RFC vigente duplicado."),
+                                  QStringLiteral("ux_perfil_sat_rfc_vigente"))));
     }
-
-    PerfilResumen p;
-    p.id = PerfilId::generar();
-    p.rfc = *rfc;
-    p.razonSocial = razonSocial;
-    p.activo = request.activo;
+    PerfilResumen p{PerfilId::generar(), *rfc, nombre, activo};
     m_perfiles.append(p);
     emit perfilesCambiaron();
-    return QtFuture::makeReadyValueFuture(ResultadoCrearPerfil::exito(p.id));
+    return R::exito(p);
+}
+
+QFuture<PerfilesSatService::ResultadoCrear> DemoPerfilesSatService::crear(const QString& rfc,
+                                                                         const QString& nombre)
+{
+    return QtFuture::makeReadyValueFuture(sembrar(rfc, nombre, true));
+}
+
+QFuture<PerfilesSatService::ResultadoActualizar>
+DemoPerfilesSatService::actualizarNombre(const PerfilId& id, const QString& nombreCapturado)
+{
+    const QString nombre = nombreCapturado.trimmed();
+    if (nombre.isEmpty()) {
+        return QtFuture::makeReadyValueFuture(ResultadoActualizar::fallo(ErrorActualizarPerfil::nombreRequerido()));
+    }
+    for (PerfilResumen& p : m_perfiles) {
+        if (!id.esNulo() && p.id == id) {
+            p.nombre = nombre;
+            const PerfilResumen actualizado = p;
+            emit perfilesCambiaron();
+            return QtFuture::makeReadyValueFuture(ResultadoActualizar::exito(actualizado));
+        }
+    }
+    return QtFuture::makeReadyValueFuture(ResultadoActualizar::fallo(ErrorActualizarPerfil::inexistente()));
 }
 
 } // namespace satcfdi

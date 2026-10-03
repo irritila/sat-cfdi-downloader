@@ -6,8 +6,11 @@
 namespace satcfdi {
 
 class AppViewModel;
+class CredencialesSatService;
+class EFirmaFormViewModel;
 class NuevaSolicitudViewModel;
 class PerfilesSatService;
+class PerfilesSatViewModel;
 class SolicitudDetailViewModel;
 class SolicitudesListModel;
 class SolicitudesService;
@@ -21,23 +24,32 @@ class PresentacionViewModels : public QObject {
     Q_OBJECT
 
 public:
+    // Los tres servicios son obligatorios (T005.1 DA6: el root productivo
+    // pasa los persistidos; las pruebas, fakes). Construye las consultas de
+    // preparacion que necesitan NuevaSolicitudViewModel y PerfilesSatViewModel.
     PresentacionViewModels(SolicitudesService* solicitudes,
                            PerfilesSatService* perfiles,
+                           CredencialesSatService* credenciales,
                            QObject* parent = nullptr);
 
     AppViewModel* app() const { return m_app; }
     SolicitudesListModel* solicitudes() const { return m_solicitudes; }
     NuevaSolicitudViewModel* nuevaSolicitud() const { return m_nuevaSolicitud; }
     SolicitudDetailViewModel* detalle() const { return m_detalle; }
+    PerfilesSatViewModel* perfiles() const { return m_perfiles; }
+    EFirmaFormViewModel* eFirma() const { return m_eFirma; }
 
     // {"appViewModel", "solicitudesModel", "nuevaSolicitudViewModel",
-    //  "detalleViewModel"} para QQmlApplicationEngine::setInitialProperties.
+    //  "detalleViewModel", "perfilesViewModel", "eFirmaViewModel"} para
+    //  QQmlApplicationEngine::setInitialProperties.
     QVariantMap initialProperties() const;
 
 private:
     SolicitudesListModel* m_solicitudes;
     NuevaSolicitudViewModel* m_nuevaSolicitud;
     SolicitudDetailViewModel* m_detalle;
+    PerfilesSatViewModel* m_perfiles;
+    EFirmaFormViewModel* m_eFirma;
     AppViewModel* m_app;
 };
 

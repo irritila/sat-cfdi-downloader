@@ -17,7 +17,7 @@ namespace satcfdi {
 // visible a partir de tipos y codigos.
 //
 // ErrorPersistencia (ports/persistence/ErrorPersistencia.h) se reexpone aqui
-// porque listar/eliminar/listarActivos lo devuelven directamente. T003 lo movio
+// porque listar/eliminar/listarNoEliminados lo devuelven directamente. T003 lo movio
 // desde este archivo a ports; conserva el campo `mensaje`.
 
 struct ErrorObtener {
@@ -131,24 +131,119 @@ struct ErrorCrear {
     }
 };
 
-// Error de PerfilesSatService::crearPerfilSimulado().
+// Validacion por campo de perfiles (T005.1, DA1).
+enum class CodigoValidacionPerfil {
+    RfcInvalido,     // campo rfc
+    NombreRequerido, // campo nombre
+};
+
+enum class CampoPerfil {
+    Rfc,
+    Nombre,
+};
+
+inline CampoPerfil campoDe(CodigoValidacionPerfil codigo)
+{
+    return codigo == CodigoValidacionPerfil::RfcInvalido ? CampoPerfil::Rfc : CampoPerfil::Nombre;
+}
+
+inline bool tieneErrorEn(const QList<CodigoValidacionPerfil>& validaciones, CampoPerfil campo)
+{
+    for (CodigoValidacionPerfil c : validaciones) {
+        if (campoDe(c) == campo) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Error de PerfilesSatService::crear() (T005.1, DA1): Validacion (RfcInvalido
+// -> rfc, NombreRequerido -> nombre), RfcDuplicado (SOLO Unicidad de
+// ux_perfil_sat_rfc_vigente; el RFC queda reservado aunque el perfil este
+// inactivo) o Persistencia (resto, incluidas otras restricciones).
+// `mensaje` es texto fijo sin el RFC capturado; la UI traduce por tipo/campo.
 struct ErrorCrearPerfil {
     enum class Tipo {
         Validacion,   // `validaciones` no vacia
-        Integridad,   // RFC vigente duplicado (ux_perfil_sat_rfc_vigente) u
-                      // otra restriccion; `causa`
+        RfcDuplicado, // `causa` = Unicidad ux_perfil_sat_rfc_vigente
         Persistencia, // `causa`
     };
+    using CodigoValidacion = CodigoValidacionPerfil;
 
-    enum class CodigoValidacion {
-        RfcInvalido,
-        RazonSocialRequerida,
+    Tipo tipo = Tipo::Validacion;
+    QList<CodigoValidacionPerfil> validaciones;
+    std::optional<ErrorPersistencia> causa;
+    QString mensaje;
+
+    bool tieneErrorEn(CampoPerfil campo) const { return satcfdi::tieneErrorEn(validaciones, campo); }
+
+    static ErrorCrearPerfil validacion(QList<CodigoValidacionPerfil> codigos)
+    {
+        ErrorCrearPerfil e;
+        e.tipo = Tipo::Validacion;
+        e.validaciones = std::move(codigos);
+        e.mensaje = QStringLiteral("Revisa los datos del perfil.");
+        return e;
+    }
+
+    // Traduccion de un error de escritura de perfil_sat.
+    static ErrorCrearPerfil desdePersistencia(ErrorPersistencia causa)
+    {
+        ErrorCrearPerfil e;
+        if (causa.tipo == ErrorPersistencia::Tipo::Unicidad
+            && causa.restriccion == QStringLiteral("ux_perfil_sat_rfc_vigente")) {
+            e.tipo = Tipo::RfcDuplicado;
+            e.mensaje = QStringLiteral("Ya existe un perfil con ese RFC.");
+        } else {
+            e.tipo = Tipo::Persistencia;
+            e.mensaje = QStringLiteral("No se pudo guardar el perfil.");
+        }
+        e.causa = std::move(causa);
+        return e;
+    }
+};
+
+// Error de PerfilesSatService::actualizarNombre() (T005.1, DA1): Validacion
+// (solo NombreRequerido), PerfilInexistente o Persistencia. Nunca RFC.
+struct ErrorActualizarPerfil {
+    enum class Tipo {
+        Validacion,        // `validaciones` = {NombreRequerido}
+        PerfilInexistente, // id nulo, desconocido o eliminado
+        Persistencia,      // `causa`
     };
 
     Tipo tipo = Tipo::Validacion;
-    QList<CodigoValidacion> validaciones;
+    QList<CodigoValidacionPerfil> validaciones;
     std::optional<ErrorPersistencia> causa;
     QString mensaje;
+
+    bool tieneErrorEn(CampoPerfil campo) const { return satcfdi::tieneErrorEn(validaciones, campo); }
+
+    static ErrorActualizarPerfil nombreRequerido()
+    {
+        ErrorActualizarPerfil e;
+        e.tipo = Tipo::Validacion;
+        e.validaciones = {CodigoValidacionPerfil::NombreRequerido};
+        e.mensaje = QStringLiteral("Indica el nombre del perfil.");
+        return e;
+    }
+
+    static ErrorActualizarPerfil inexistente()
+    {
+        ErrorActualizarPerfil e;
+        e.tipo = Tipo::PerfilInexistente;
+        e.mensaje = QStringLiteral("El perfil no existe.");
+        return e;
+    }
+
+    static ErrorActualizarPerfil persistencia(ErrorPersistencia causa)
+    {
+        ErrorActualizarPerfil e;
+        e.tipo = Tipo::Persistencia;
+        e.mensaje = QStringLiteral("No se pudo guardar el perfil.");
+        e.causa = std::move(causa);
+        return e;
+    }
 };
 
 } // namespace satcfdi

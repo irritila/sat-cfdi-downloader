@@ -6,7 +6,7 @@
 //
 // Comportamiento de prepararEFirma (en este orden):
 // 1. `fallos[Operacion::Preparar]` inyectado -> esa categoria.
-// 2. Ruta de .cer o .key vacia -> ArchivoIlegible.
+// 2. Ruta de .cer o .key vacia -> ArchivoIlegible (origen Certificado|Llave).
 // 3. Contrasena distinta de `contrasenaValida` -> ContrasenaIncorrecta.
 // 4. `rfcCertificado` distinto de rfcEsperado -> RfcNoCoincide.
 // 5. ahora < vigenteDesde -> NoVigenteAun; ahora >= vigenteHasta -> Vencida.
@@ -63,6 +63,11 @@ public:
     QDateTime vigenteHasta = QDateTime(QDate(2029, 1, 1), QTime(0, 0), QTimeZone::UTC);
     QHash<Operacion, ErrorSecretStore::Categoria> fallos;
     QSet<QString> noBorrables; // uuids que reconciliar no logra borrar
+    // T005.1 (DA4): origen que acompana al fallo inyectado en Preparar (el
+    // adaptador real lo llena; el servicio lo normaliza). Las validaciones
+    // propias del fake ya traen origen: ruta .cer vacia -> Certificado, ruta
+    // .key vacia -> Llave, contrasena distinta -> Contrasena.
+    OrigenErrorEFirma origenFalloPreparar = OrigenErrorEFirma::Ninguno;
     std::function<void(Operacion)> alEntrar;
 
     // Categorias que el contrato permite a cada operacion.
@@ -148,14 +153,20 @@ public:
         entrar(Operacion::Preparar);
         QMutexLocker l(&m_mutex);
         if (auto f = fallo(Operacion::Preparar)) {
-            return R::fallo(*f);
+            return R::fallo(f->conOrigen(origenFalloPreparar));
         }
-        if (entrada.rutaCertificado.isEmpty() || entrada.rutaLlavePrivada.isEmpty()) {
-            return R::fallo(ErrorSecretStore::de(ErrorSecretStore::Categoria::ArchivoIlegible));
+        if (entrada.rutaCertificado.isEmpty()) {
+            return R::fallo(ErrorSecretStore::de(ErrorSecretStore::Categoria::ArchivoIlegible)
+                                .conOrigen(OrigenErrorEFirma::Certificado));
+        }
+        if (entrada.rutaLlavePrivada.isEmpty()) {
+            return R::fallo(ErrorSecretStore::de(ErrorSecretStore::Categoria::ArchivoIlegible)
+                                .conOrigen(OrigenErrorEFirma::Llave));
         }
         if (!entrada.contrasena.igualA(contrasenaValida.constData(),
                                        static_cast<std::size_t>(contrasenaValida.size()))) {
-            return R::fallo(ErrorSecretStore::de(ErrorSecretStore::Categoria::ContrasenaIncorrecta));
+            return R::fallo(ErrorSecretStore::de(ErrorSecretStore::Categoria::ContrasenaIncorrecta)
+                                .conOrigen(OrigenErrorEFirma::Contrasena));
         }
         if (rfcEsperado != rfcCertificado) {
             return R::fallo(ErrorSecretStore::de(ErrorSecretStore::Categoria::RfcNoCoincide));

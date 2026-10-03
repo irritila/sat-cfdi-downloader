@@ -76,8 +76,6 @@ if(APPLE)
             )
             find_program(SATCFDI_CODESIGN codesign REQUIRED)
             # Mismos entitlements que satcfdi_app (ver src/app/CMakeLists.txt).
-            set(SATCFDI_ENTITLEMENTS_RUNTIME
-                "\t<key>com.apple.security.cs.disable-library-validation</key>\n\t<true/>\n")
             set(_satcfdi_entitlements_prueba "${CMAKE_CURRENT_BINARY_DIR}/satcfdi_keychain_real_tests.entitlements")
             configure_file("${PROJECT_SOURCE_DIR}/resources/macos/satcfdi.entitlements.in"
                            "${_satcfdi_entitlements_prueba}" @ONLY)
