@@ -1,10 +1,13 @@
 # satcfdi_ports: contratos C++. Desde T004 es una libreria estatica minima
 # (Qt Core + MOC) porque OSIntegration es un QObject abstracto con senales y
-# Q_ENUM. El resto de puertos siguen siendo solo headers. Sin SQL, red,
+# Q_ENUM. Desde T005 incluye secrets/SecretStoreTypes.cpp (buffers move-only
+# con limpieza best effort, CredencialRef). El resto de puertos son headers. Sin SQL, red,
 # Widgets ni frameworks nativos.
 qt_add_library(satcfdi_ports STATIC
     SatGateway.h
     SecretStore.h
+    secrets/SecretStoreTypes.h
+    secrets/SecretStoreTypes.cpp
     OSIntegration.h
     OSIntegration.cpp
     PackageStorage.h
@@ -12,6 +15,7 @@ qt_add_library(satcfdi_ports STATIC
     persistence/ErrorPersistencia.h
     persistence/Exito.h
     repositories/PerfilSatRepository.h
+    repositories/CredencialSatRepository.h
     repositories/SolicitudMasivaRepository.h
     repositories/PaqueteSolicitudRepository.h
     repositories/LogSolicitudRepository.h

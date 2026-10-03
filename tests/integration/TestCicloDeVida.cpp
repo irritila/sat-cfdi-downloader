@@ -11,6 +11,7 @@
 
 #include "fakes/FakeConfiguracionAppService.h"
 #include "fakes/FakeOSIntegration.h"
+#include "fakes/FakeSecretStore.h"
 
 #include <QCoreApplication>
 #include <QQmlApplicationEngine>
@@ -370,8 +371,9 @@ void TestCicloDeVida::rootPersistidoConCicloDeVida()
         const auto arranque = AppBootstrapper(opciones).preparar();
         QVERIFY(arranque);
         FakeOSIntegration os;
+        fakes::FakeSecretStore secretos;
         int salidas = 0;
-        AppCompositionRoot root(arranque.valor().rutaBase);
+        AppCompositionRoot root(arranque.valor().rutaBase, secretos);
         QVERIFY(root.cargar());
         AppLifecycleController& ctrl = root.iniciarCicloDeVida(os, nullptr, [&salidas] { ++salidas; });
         QVERIFY(os.inicializado);
@@ -395,7 +397,8 @@ void TestCicloDeVida::rootPersistidoConCicloDeVida()
 
     const auto arranque = AppBootstrapper(opciones).preparar();
     QVERIFY(arranque);
-    AppCompositionRoot root(arranque.valor().rutaBase);
+    fakes::FakeSecretStore secretos;
+    AppCompositionRoot root(arranque.valor().rutaBase, secretos);
     const auto c = esperar(root.configuracion().obtener());
     QVERIFY(c && c->esExito());
     QVERIFY(c->valor().monitoreoPausado);

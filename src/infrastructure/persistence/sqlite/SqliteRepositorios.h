@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ports/repositories/ConfiguracionAppRepository.h"
+#include "ports/repositories/CredencialSatRepository.h"
 #include "ports/repositories/LogSolicitudRepository.h"
 #include "ports/repositories/PaqueteSolicitudRepository.h"
 #include "ports/repositories/PerfilSatRepository.h"
@@ -91,6 +92,23 @@ public:
     Resultado<ConfiguracionApp, ErrorPersistencia> actualizarMonitoreoPausado(bool pausado,
                                                                               const QDateTime& en) override;
     Resultado<ConfiguracionApp, ErrorPersistencia> registrarUltimoCierre(const QDateTime& en) override;
+
+private:
+    SqliteConnectionProvider& m_proveedor;
+};
+
+// credencial_sat (T005). Solo referencias opacas y metadata no secreta.
+class SqliteCredencialSatRepository final : public CredencialSatRepository {
+public:
+    explicit SqliteCredencialSatRepository(SqliteConnectionProvider& proveedor);
+
+    Resultado<Exito, ErrorPersistencia> insertar(const CredencialSat& credencial) override;
+    Resultado<Exito, ErrorPersistencia> reemplazar(const PerfilId& perfilId,
+                                                   const CredencialSat& nueva) override;
+    Resultado<std::optional<CredencialSat>, ErrorPersistencia>
+    obtenerPorPerfil(const PerfilId& perfilId) override;
+    Resultado<bool, ErrorPersistencia> eliminarPorPerfil(const PerfilId& perfilId) override;
+    Resultado<QList<CredencialRef>, ErrorPersistencia> listarReferenciasVigentes() override;
 
 private:
     SqliteConnectionProvider& m_proveedor;

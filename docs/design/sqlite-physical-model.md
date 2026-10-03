@@ -89,11 +89,17 @@ Referencias no secretas a la e.firma vigente de un perfil. Relacion 1 a 0..1.
 | `contrasena_ref` | `TEXT` | No | - | Referencia opaca no vacia. |
 | `registrada_en` | `TEXT` | No | - | Timestamp. |
 | `actualizada_en` | `TEXT` | No | - | Timestamp. |
+| `numero_serie` | `TEXT` | Si | - | Migracion 002. Serie del certificado, 1 a 64 caracteres. |
+| `vigente_desde` | `TEXT` | Si | - | Migracion 002. Timestamp UTC `yyyy-MM-ddTHH:mm:ss.zzzZ`. |
+| `vigente_hasta` | `TEXT` | Si | - | Migracion 002. Timestamp UTC; `vigente_desde < vigente_hasta`. |
 
 - `ux_credencial_sat_perfil`: `UNIQUE (perfil_sat_id)`. Tambien sirve la FK.
 - Sin `eliminado_en`: al eliminar la credencial vigente se borra la fila (D006).
   El reemplazo actualiza la misma fila; no hay historial en SQLite.
 - Nunca guarda certificado, llave, contrasena ni token; solo referencias.
+- Las referencias usan el formato `scs1:<uuid>:cert|container|password` (T005): sin rutas ni secretos.
+- La metadata de 002 es anulable para filas anteriores; las escrituras nuevas la exigen y la vigencia va
+  completa o ausente.
 
 ### `solicitud_masiva`
 

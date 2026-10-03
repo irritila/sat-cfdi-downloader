@@ -17,6 +17,7 @@ class SolicitudMasivaRepository;
 class PaqueteSolicitudRepository;
 class LogSolicitudRepository;
 class ConfiguracionAppRepository;
+class CredencialSatRepository;
 class UnitOfWork;
 
 // API PUBLICA de persistencia SQLite para bootstrap y composition root
@@ -36,11 +37,12 @@ Resultado<InformeInicializacionSqlite, ErrorPersistencia>
 inicializarBaseSqlite(const QString& rutaBase, const QList<MigracionSql>& migraciones,
                       OpcionesConexionSqlite opciones = {});
 
-// Igual, con las migraciones embebidas (`:/migrations/001_initial_schema.sql`).
+// Igual, con las migraciones embebidas (`:/migrations/001_initial_schema.sql`
+// y `:/migrations/002_credencial_metadata.sql`).
 Resultado<InformeInicializacionSqlite, ErrorPersistencia>
 inicializarBaseSqlite(const QString& rutaBase);
 
-// Migraciones embebidas como recurso Qt, en orden (hoy solo la 001).
+// Migraciones embebidas como recurso Qt, en orden (001 y 002).
 Resultado<QList<MigracionSql>, ErrorPersistencia> migracionesSqliteEmbebidas();
 
 // Grafo de persistencia SQLite de trabajo: proveedor de conexiones por hilo +
@@ -67,6 +69,7 @@ public:
     PaqueteSolicitudRepository& paquetes() noexcept;
     LogSolicitudRepository& logs() noexcept;
     ConfiguracionAppRepository& configuracion() noexcept;
+    CredencialSatRepository& credenciales() noexcept; // T005
     UnitOfWork& unidadDeTrabajo() noexcept;
 
     // Cierra y retira la conexion del hilo actual (revierte una transaccion

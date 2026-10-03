@@ -6,6 +6,13 @@ qt_add_executable(satcfdi_app MACOSX_BUNDLE
     main.cpp
     OSIntegrationFactory.h
     OSIntegrationFactory.cpp
+    SecretStoreFactory.h
+    SecretStoreFactory.cpp
+)
+
+# Bundle id efectivo para los servicios Keychain del SecretStore.
+target_compile_definitions(satcfdi_app PRIVATE
+    SATCFDI_BUNDLE_ID="${SATCFDI_BUNDLE_IDENTIFIER}"
 )
 
 set_target_properties(satcfdi_app PROPERTIES
@@ -23,9 +30,60 @@ target_link_libraries(satcfdi_app PRIVATE
     Qt6::Quick
 )
 
-# Adaptador de SO (MacOSIntegration): solo satcfdi_app lo enlaza.
+# Adaptadores macOS (MacOSIntegration, MacOSSecretStore): solo satcfdi_app los
+# enlaza; app_core recibe los puertos por inyeccion.
 if(APPLE)
-    target_link_libraries(satcfdi_app PRIVATE satcfdi_os_macos)
+    target_link_libraries(satcfdi_app PRIVATE satcfdi_os_macos satcfdi_secrets_macos)
 endif()
 
 satcfdi_enable_warnings(satcfdi_app)
+
+# Firma opcional con entitlements (T005 corte F). Solo si las tres opciones de
+# la raiz estan definidas; si no, queda la firma ad-hoc del linker.
+set(_satcfdi_opciones_firma SATCFDI_CODESIGN_IDENTITY SATCFDI_PROVISIONING_PROFILE SATCFDI_TEAM_ID)
+set(_satcfdi_firma_definidas 0)
+foreach(_opcion IN LISTS _satcfdi_opciones_firma)
+    if(NOT "${${_opcion}}" STREQUAL "")
+        math(EXPR _satcfdi_firma_definidas "${_satcfdi_firma_definidas} + 1")
+    endif()
+endforeach()
+
+if(_satcfdi_firma_definidas GREATER 0 AND NOT _satcfdi_firma_definidas EQUAL 3)
+    message(FATAL_ERROR "Firma del bundle: definir las tres opciones SATCFDI_CODESIGN_IDENTITY, "
+                        "SATCFDI_PROVISIONING_PROFILE y SATCFDI_TEAM_ID, o ninguna.")
+endif()
+
+if(APPLE AND _satcfdi_firma_definidas EQUAL 3)
+    if(NOT EXISTS "${SATCFDI_PROVISIONING_PROFILE}")
+        message(FATAL_ERROR "SATCFDI_PROVISIONING_PROFILE no existe: ${SATCFDI_PROVISIONING_PROFILE}")
+    endif()
+    find_program(SATCFDI_CODESIGN codesign REQUIRED)
+
+    # Hardened runtime activa library validation: solo carga bibliotecas
+    # firmadas por Apple o por el mismo Team ID. Qt y OpenSSL de Homebrew estan
+    # firmados ad-hoc, asi que el bundle local necesita desactivarla. Una
+    # distribucion que copie y firme sus dependencias (macdeployqt) podria
+    # retirarla.
+    set(SATCFDI_ENTITLEMENTS_RUNTIME
+        "\t<key>com.apple.security.cs.disable-library-validation</key>\n\t<true/>\n")
+    set(_satcfdi_entitlements "${CMAKE_CURRENT_BINARY_DIR}/satcfdi_app.entitlements")
+    configure_file("${PROJECT_SOURCE_DIR}/resources/macos/satcfdi.entitlements.in"
+                   "${_satcfdi_entitlements}" @ONLY)
+
+    # POST_BUILD: despues del linker (y de su firma ad-hoc). Ningun otro paso
+    # modifica el bundle despues; si se agrega uno (p. ej. macdeployqt), debe ir
+    # antes de esta firma.
+    add_custom_command(TARGET satcfdi_app POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E copy "${SATCFDI_PROVISIONING_PROFILE}"
+                "$<TARGET_BUNDLE_CONTENT_DIR:satcfdi_app>/embedded.provisionprofile"
+        COMMAND "${SATCFDI_CODESIGN}" --force --sign "${SATCFDI_CODESIGN_IDENTITY}"
+                --entitlements "${_satcfdi_entitlements}" --options runtime --timestamp=none
+                "$<TARGET_BUNDLE_DIR:satcfdi_app>"
+        COMMAND "${SATCFDI_CODESIGN}" --verify --strict --verbose=1 "$<TARGET_BUNDLE_DIR:satcfdi_app>"
+        COMMENT "Firmando satcfdi_app.app con entitlements"
+        VERBATIM
+    )
+    set_property(TARGET satcfdi_app APPEND PROPERTY LINK_DEPENDS
+                 "${_satcfdi_entitlements}" "${SATCFDI_PROVISIONING_PROFILE}")
+    message(STATUS "satcfdi_app: firma con entitlements habilitada (team ${SATCFDI_TEAM_ID})")
+endif()

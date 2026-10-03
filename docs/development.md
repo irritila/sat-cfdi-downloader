@@ -24,6 +24,26 @@ pruebas. Network (T004) solo lo enlaza `satcfdi_app_core` para la instancia
 unica con `QLocalServer`/`QLocalSocket` (IPC local, sin red); el cliente HTTP
 del SAT llega con su tarea.
 
+## OpenSSL 3 (T005)
+
+La validacion de e.firma y el cifrado de contenedores (`satcfdi_crypto`) usan
+OpenSSL 3 como dependencia directa (`find_package(OpenSSL 3 COMPONENTS Crypto)`):
+
+```bash
+brew install openssl@3
+```
+
+En macOS, si no se indica `OPENSSL_ROOT_DIR`, la configuracion usa
+`/opt/homebrew/opt/openssl@3` (o `/usr/local/opt/openssl@3` en Intel). Para
+otra instalacion:
+
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt \
+      -DOPENSSL_ROOT_DIR=/ruta/a/openssl@3
+```
+
+Empaquetar `libcrypto` dentro del bundle queda para la distribucion.
+
 ## Encontrar Qt (`CMAKE_PREFIX_PATH`)
 
 Qt de Homebrew no esta en las rutas de busqueda por defecto de CMake. Indicarlo
@@ -55,6 +75,7 @@ ctest --test-dir build -L unit            # satcfdi_tests: dominio y aplicacion
 ctest --test-dir build -L infrastructure  # satcfdi_infrastructure_tests: SQLite real
 ctest --test-dir build -L integration     # satcfdi_integration_tests: arranque y composition root
 ctest --test-dir build -L presentation    # satcfdi_presentation_tests: QML y view models
+ctest --test-dir build -L secrets         # crypto y SecretStore macOS (Keychain falso)
 ```
 
 Las pruebas de infraestructura e integracion usan bases en `QTemporaryDir` y
@@ -64,6 +85,11 @@ Opciones de CMake del proyecto:
 
 - `-DSATCFDI_WARNINGS_AS_ERRORS=ON`: trata advertencias como errores en los
   targets del proyecto (desactivado por defecto).
+- `-DSATCFDI_KEYCHAIN_REAL_TESTS=ON` (T005, macOS): compila y registra
+  `satcfdi_keychain_real_tests` (label `keychain-real`) contra el Keychain real.
+  Apagado por defecto. Requiere sesion grafica y un ejecutable firmado con
+  entitlements para el data protection keychain; sin ellos la prueba hace
+  QSKIP (`errSecMissingEntitlement`).
 - `-DSATCFDI_BUNDLE_IDENTIFIER=<id>`: cambia el `CFBundleIdentifier` del bundle
   (por defecto `mx.adenium.satcfdi-downloader`, desde T004). Es una variable de
   cache: si un directorio de build existente tiene exactamente el id anterior
@@ -137,6 +163,13 @@ el hilo grafico no ejecuta SQL:
 Junto a la base pueden aparecer `satcfdi.sqlite3-wal` y `satcfdi.sqlite3-shm`
 (modo WAL). T003 no crea carpeta de paquetes ZIP.
 
+Credenciales e.firma (T005): los contenedores cifrados viven en
+`<directorio de datos>/credentials/` y la contrasena y la clave de envoltura en
+el Keychain (servicios `<bundle id>.efirma.v1.*`). El directorio se crea con
+permisos 0700 en la primera importacion, no al arrancar. Al arrancar, la app
+encola una reconciliacion que elimina generaciones huerfanas (residuos de
+fallos previos) sin bloquear la UI; si falla, no borra nada y la app sigue.
+
 Si la base no se puede abrir o migrar (por ejemplo, una base creada por una
 version mas nueva de la app), la app muestra un dialogo de error, no carga la
 UI, no modifica la base y termina con codigo distinto de cero.
@@ -166,6 +199,92 @@ bundle autocontenido (`macdeployqt`, firma, notarizacion) queda fuera del alcanc
   `build/compile_commands.json`. Para clangd, enlazarlo en la raiz
   (`ln -s build/compile_commands.json .`) o configurar `--compile-commands-dir`.
   El enlace y el indice `.cache/` estan ignorados por git.
+
+## Firma con entitlements (opcional, T005)
+
+El data protection keychain que usa `MacOSSecretStore` exige un ejecutable
+firmado con entitlements (`com.apple.application-identifier`,
+`keychain-access-groups`). Sin firma, el almacen devuelve
+`AlmacenMalConfigurado` y no se pueden guardar credenciales e.firma. Por
+defecto el build usa la firma ad-hoc del linker y no requiere nada de esto.
+
+Tres opciones de CMake, vacias por defecto (definir las tres o ninguna):
+
+- `SATCFDI_CODESIGN_IDENTITY`: identidad de `codesign`. Usar el hash SHA-1 que
+  muestra `security find-identity -v -p codesigning`, no el nombre: si hay
+  certificados con el mismo nombre (por ejemplo uno vencido), firmar por
+  nombre es ambiguo.
+- `SATCFDI_PROVISIONING_PROFILE`: ruta del `.provisionprofile` cuyo
+  `application-identifier` sea `<TEAM>.mx.adenium.satcfdi-downloader`
+  (Xcode los guarda en `~/Library/Developer/Xcode/UserData/Provisioning Profiles/`).
+- `SATCFDI_TEAM_ID`: Team ID de la cuenta.
+
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt \
+      -DSATCFDI_CODESIGN_IDENTITY=<sha1> \
+      -DSATCFDI_PROVISIONING_PROFILE=<ruta al .provisionprofile> \
+      -DSATCFDI_TEAM_ID=<team id>
+cmake --build build --target satcfdi_app
+```
+
+Tras enlazar, un paso POST_BUILD copia el perfil a
+`Contents/embedded.provisionprofile`, firma el bundle con
+`resources/macos/satcfdi.entitlements.in` (generado en el directorio de build),
+`--options runtime --timestamp=none` y verifica con `codesign --verify --strict`.
+Los valores solo viven en la cache de CMake; no se versionan.
+
+Entitlements generados:
+
+- `com.apple.application-identifier` y `com.apple.developer.team-identifier`.
+- `keychain-access-groups = [<TEAM>.<bundle id>]`. Es el grupo por defecto de
+  SecItem* (el primero de la lista); `KeychainApiMacOS` no fija
+  `kSecAttrAccessGroup`.
+- `com.apple.security.cs.disable-library-validation`: el hardened runtime
+  activa library validation y dyld rechaza las bibliotecas de Homebrew (Qt,
+  OpenSSL), firmadas ad-hoc o por otro equipo ("different Team IDs"). Una
+  distribucion que copie y firme sus dependencias dentro del bundle podria
+  retirarla.
+
+Comprobar:
+
+```bash
+codesign --verify --strict --verbose=2 build/src/app/satcfdi_app.app
+codesign -dvv build/src/app/satcfdi_app.app            # Authority, TeamIdentifier, flags=runtime
+codesign -d --entitlements - --xml build/src/app/satcfdi_app.app | plutil -p -
+security cms -D -i build/src/app/satcfdi_app.app/Contents/embedded.provisionprofile | plutil -p -
+```
+
+Perfil de cuenta gratuita: dura 7 dias (`ExpirationDate` en la salida de
+`security cms -D`). Para renovarlo, abrir en Xcode un proyecto macOS vacio con
+el mismo bundle id y equipo y compilarlo: Xcode genera un perfil nuevo en la
+misma carpeta (puede cambiar el nombre del archivo). Reconfigurar con la nueva
+ruta y volver a compilar `satcfdi_app`.
+
+### Prueba contra el Keychain real
+
+Con `-DSATCFDI_KEYCHAIN_REAL_TESTS=ON` y las tres opciones de firma,
+`satcfdi_keychain_real_tests` se construye como bundle con el mismo bundle id
+que la app (el perfil esta atado a ese App ID), embebe el perfil y se firma con
+los mismos entitlements. Usa servicios aislados y aleatorios
+(`<bundle id>.test-<aleatorio>.*`), no toca los items de la app y borra todo lo
+que crea. Sin las opciones de firma, la prueba hace QSKIP
+(`errSecMissingEntitlement`, -34018).
+
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt \
+      -DSATCFDI_KEYCHAIN_REAL_TESTS=ON \
+      -DSATCFDI_CODESIGN_IDENTITY=<sha1> \
+      -DSATCFDI_PROVISIONING_PROFILE=<ruta al .provisionprofile> \
+      -DSATCFDI_TEAM_ID=<team id>
+cmake --build build --target satcfdi_keychain_real_tests
+ctest --test-dir build -R keychain --output-on-failure
+```
+
+Requiere sesion grafica con el llavero desbloqueado. Si macOS muestra un
+dialogo, no debe aceptarse a ciegas: la prueba no deberia pedir nada. Nota:
+`security find-generic-password` solo consulta los llaveros de archivo; no ve
+los items del data protection keychain. La ausencia de residuos la comprueba la
+propia prueba (lista vacia tras borrar).
 
 ## Directorios de build
 

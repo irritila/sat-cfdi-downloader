@@ -45,6 +45,15 @@ if(SATCFDI_BUNDLE_IDENTIFIER STREQUAL "mx.adenium.satcfdi")
     set(SATCFDI_BUNDLE_IDENTIFIER "mx.adenium.satcfdi-downloader" CACHE STRING
         "CFBundleIdentifier de satcfdi_app" FORCE)
 endif()
+# Firma opcional del bundle (T005 corte F). Vacias por defecto: el build queda
+# con la firma ad-hoc del linker y nada cambia. Con las tres definidas,
+# satcfdi_app embebe el perfil y se firma con entitlements (data protection
+# keychain). Los valores se pasan al configurar; nunca se versionan.
+set(SATCFDI_CODESIGN_IDENTITY "" CACHE STRING
+    "Identidad de codesign (preferir el hash SHA-1 si hay certificados con el mismo nombre)")
+set(SATCFDI_PROVISIONING_PROFILE "" CACHE FILEPATH
+    "Perfil de aprovisionamiento (.provisionprofile) a embeber en el bundle")
+set(SATCFDI_TEAM_ID "" CACHE STRING "Team ID de Apple para los entitlements")
 set(SATCFDI_MACOS_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/resources/macos/Info.plist.in")
 
 # LSMinimumSystemVersion. Sin CMAKE_OSX_DEPLOYMENT_TARGET explicito, clang toma
@@ -66,6 +75,10 @@ endif()
 
 enable_testing()
 
+# T005 (DA8): pruebas contra el Keychain real del sistema. Requieren bundle
+# firmado con entitlements; sin ellos hacen QSKIP. Las define tests/secrets.
+option(SATCFDI_KEYCHAIN_REAL_TESTS "Compilar y registrar pruebas contra Keychain real (macOS)" OFF)
+
 # Capas en orden de dependencia.
 add_subdirectory(src/domain)
 add_subdirectory(src/ports)
@@ -78,5 +91,8 @@ add_subdirectory(src/app)
 # Pruebas por label: unit, infrastructure, integration, presentation.
 add_subdirectory(tests/unit)
 add_subdirectory(tests/infrastructure)
+# T005: crypto (portable) y SecretStore macOS con KeychainApi falsa; labels
+# secrets;infrastructure. Keychain real solo con SATCFDI_KEYCHAIN_REAL_TESTS.
+add_subdirectory(tests/secrets)
 add_subdirectory(tests/integration)
 add_subdirectory(tests/presentation)

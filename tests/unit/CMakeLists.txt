@@ -1,7 +1,8 @@
 # satcfdi_tests: pruebas unitarias Qt Test de dominio, puertos y aplicacion
 # (servicios demo y persistidos con fakes, contrato T003, dispatcher,
 # RegexLogSanitizer, contrato OSIntegration y servicio de configuracion con
-# fakes). Sin presentacion, SQL, red ni archivos.
+# fakes; T005: tipos SecretStore y CredencialesSatService con FakeSecretStore).
+# Sin presentacion, SQL, red ni archivos.
 qt_add_executable(satcfdi_tests
     main.cpp
     TestDominio.h
@@ -25,9 +26,12 @@ qt_add_executable(satcfdi_tests
     TestOSIntegration.cpp
     TestConfiguracionAppService.h
     TestConfiguracionAppService.cpp
+    TestCredencialesSat.h
+    TestCredencialesSat.cpp
     # Fakes compartidos header-only (T004); listados aqui para AUTOMOC.
     ../fakes/FakeOSIntegration.h
     ../fakes/FakeConfiguracionAppService.h
+    ../fakes/FakeSecretStore.h
 )
 
 # Permite #include "fakes/FakeOSIntegration.h".

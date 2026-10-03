@@ -351,7 +351,9 @@ void TestSqliteRepositorios::restriccionesSinApiDeEscrituraTraducidas()
     };
 
     const QString credencial = QStringLiteral(
-        "INSERT INTO credencial_sat VALUES (%1, %2, 'cert-ref', 'key-ref', 'pwd-ref', %3, %3)");
+        "INSERT INTO credencial_sat (id, perfil_sat_id, certificado_ref, llave_privada_ref, "
+        "contrasena_ref, registrada_en, actualizada_en) "
+        "VALUES (%1, %2, 'cert-ref', 'key-ref', 'pwd-ref', %3, %3)");
     QVERIFY(ejecutarTraducido(credencial.arg(citar(uuid::generarCanonico()), citar(perfil.texto()),
                                              citar(kAhora))));
     auto credDuplicada = ejecutarTraducido(

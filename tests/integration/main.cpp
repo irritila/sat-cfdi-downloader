@@ -6,6 +6,7 @@
 int ejecutarTestComposicionPersistida(int argc, char* argv[]);
 int ejecutarTestInstanciaUnica(int argc, char* argv[]);
 int ejecutarTestCicloDeVida(int argc, char* argv[]);
+int ejecutarTestCredencialesArranque(int argc, char* argv[]);
 
 // satcfdi_integration_tests (T003 + T004). Offscreen (ver CMakeLists).
 int main(int argc, char* argv[])
@@ -19,5 +20,6 @@ int main(int argc, char* argv[])
     fallos += ejecutarTestComposicionPersistida(argc, argv);
     fallos += ejecutarTestInstanciaUnica(argc, argv);
     fallos += ejecutarTestCicloDeVida(argc, argv);
+    fallos += ejecutarTestCredencialesArranque(argc, argv);
     return fallos == 0 ? 0 : 1;
 }

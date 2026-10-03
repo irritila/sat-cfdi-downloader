@@ -4,6 +4,7 @@
 #include "SingleInstanceCoordinator.h"
 #include "application/configuration/ConfiguracionAppServicePersistido.h"
 #include "application/logging/RegexLogSanitizer.h"
+#include "application/profiles/CredencialesSatServicePersistido.h"
 #include "application/persistence/PersistenceDispatcher.h"
 #include "application/persistence/PuertosPersistencia.h"
 #include "application/profiles/PerfilesSatServicePersistido.h"
@@ -18,7 +19,7 @@
 
 namespace satcfdi {
 
-AppCompositionRoot::AppCompositionRoot(const QString& rutaBase)
+AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& secretStore)
     : m_persistencia(std::make_unique<SqlitePersistencia>(rutaBase))
     , m_dispatcher(std::make_unique<PersistenceDispatcher>())
     , m_sanitizer(std::make_unique<RegexLogSanitizer>())
@@ -33,8 +34,15 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase)
     m_solicitudesService = std::make_unique<SolicitudesServicePersistido>(*m_dispatcher, puertos);
     m_configuracionService = std::make_unique<ConfiguracionAppServicePersistido>(
         *m_dispatcher, p.configuracion(), p.unidadDeTrabajo());
+    m_credencialesService = std::make_unique<CredencialesSatServicePersistido>(
+        *m_dispatcher, p.perfiles(), p.credenciales(), p.unidadDeTrabajo(), secretStore);
     m_viewModels = std::make_unique<PresentacionViewModels>(m_solicitudesService.get(),
                                                             m_perfilesService.get());
+
+    // Primera tarea del dispatcher serial: limpia generaciones huerfanas del
+    // SecretStore (residuos de fallos previos). No se espera aqui; las
+    // operaciones de credencial posteriores se encolan detras.
+    m_reconciliacionInicial = m_credencialesService->reconciliar();
 }
 
 AppCompositionRoot::~AppCompositionRoot()
@@ -43,6 +51,7 @@ AppCompositionRoot::~AppCompositionRoot()
     m_engine.reset();
     m_controlador.reset();
     m_viewModels.reset();
+    m_credencialesService.reset();
     m_configuracionService.reset();
     m_solicitudesService.reset();
     m_perfilesService.reset();
@@ -90,6 +99,11 @@ AppLifecycleController& AppCompositionRoot::iniciarCicloDeVida(OSIntegration& os
         instancia->habilitarEntrega();
     }
     return *m_controlador;
+}
+
+CredencialesSatService& AppCompositionRoot::credenciales() const
+{
+    return *m_credencialesService;
 }
 
 ConfiguracionAppService& AppCompositionRoot::configuracion() const

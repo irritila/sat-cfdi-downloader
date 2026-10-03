@@ -5,6 +5,7 @@
 #include "application/requests/DemoSolicitudesService.h"
 #include "application/requests/SolicitudesService.h"
 #include "infrastructure/persistence/sqlite/SqlitePersistencia.h"
+#include "fakes/FakeSecretStore.h"
 #include "presentation/viewmodels/PresentacionViewModels.h"
 #include "presentation/viewmodels/SolicitudesListModel.h"
 
@@ -48,6 +49,14 @@ QByteArray hashArchivo(const QString& ruta)
     return h.result();
 }
 
+// SecretStore en memoria compartido por estas pruebas (no usan credenciales).
+// Static: vive mas que cualquier root, como exige el contrato.
+SecretStore& secretStoreDePrueba()
+{
+    static fakes::FakeSecretStore store;
+    return store;
+}
+
 std::unique_ptr<AppCompositionRoot> abrir(const QString& directorio)
 {
     AppBootstrapper::Opciones opciones;
@@ -57,7 +66,21 @@ std::unique_ptr<AppCompositionRoot> abrir(const QString& directorio)
         qWarning("bootstrap fallo: %s", qUtf8Printable(arranque.error().mensaje));
         return nullptr;
     }
-    return std::make_unique<AppCompositionRoot>(arranque.valor().rutaBase);
+    return std::make_unique<AppCompositionRoot>(arranque.valor().rutaBase, secretStoreDePrueba());
+}
+
+// Versiones de las migraciones embebidas, en orden (001, 002, ...). Las
+// pruebas no fijan cuantas hay para no romperse con cada migracion nueva.
+QList<int> versionesEmbebidas()
+{
+    QList<int> versiones;
+    const auto embebidas = migracionesSqliteEmbebidas();
+    if (embebidas) {
+        for (const MigracionSql& m : embebidas.valor()) {
+            versiones.append(m.version);
+        }
+    }
+    return versiones;
 }
 
 NuevaSolicitudRequest solicitudDe(const PerfilId& perfil)
@@ -155,7 +178,7 @@ void TestComposicionPersistida::bootstrapSqlFueraDelHiloPrincipal()
     QVERIFY(hiloSeguiaCorriendo);
     QVERIFY(hiloInicializacion != QCoreApplication::instance()->thread());
     QVERIFY(hiloInicializacion != QThread::currentThread());
-    QCOMPARE(r.valor().informe.migracion.aplicadas, QList<int>{1});
+    QCOMPARE(r.valor().informe.migracion.aplicadas, versionesEmbebidas());
 }
 
 void TestComposicionPersistida::bootstrapCreaDirectorioYMigraUnaVez()
@@ -168,13 +191,15 @@ void TestComposicionPersistida::bootstrapCreaDirectorioYMigraUnaVez()
     const auto primero = AppBootstrapper(opciones).preparar();
     QVERIFY(primero);
     QVERIFY(QFile::exists(tmp.filePath(QStringLiteral("a/b/satcfdi.sqlite3"))));
-    QCOMPARE(primero.valor().informe.migracion.aplicadas, QList<int>{1});
+    const QList<int> versiones = versionesEmbebidas();
+    QVERIFY(versiones.size() >= 2); // 001 (T003) y 002 (T005) como minimo
+    QCOMPARE(primero.valor().informe.migracion.aplicadas, versiones);
     QCOMPARE(primero.valor().informe.journalMode, QStringLiteral("wal"));
 
     const auto segundo = AppBootstrapper(opciones).preparar();
     QVERIFY(segundo);
     QVERIFY(segundo.valor().informe.migracion.aplicadas.isEmpty());
-    QCOMPARE(segundo.valor().informe.migracion.versionFinal, 1);
+    QCOMPARE(segundo.valor().informe.migracion.versionFinal, versiones.constLast());
 }
 
 void TestComposicionPersistida::reinicioConservaDatos()
@@ -325,11 +350,14 @@ void TestComposicionPersistida::bootstrapRechazaVersionFutura()
     QTemporaryDir tmp;
     QVERIFY(tmp.isValid());
 
-    // Base creada por una "version futura": 001 embebida + 002 desconocida.
+    // Base creada por una "version futura": embebidas + una version siguiente
+    // desconocida para esta compilacion.
     auto embebidas = migracionesSqliteEmbebidas();
     QVERIFY(embebidas);
+    QVERIFY(!embebidas.valor().isEmpty());
     QList<MigracionSql> futuras = embebidas.valor();
-    futuras.append(MigracionSql{2, QStringLiteral("002_futura"),
+    const int versionFutura = futuras.constLast().version + 1;
+    futuras.append(MigracionSql{versionFutura, QStringLiteral("futura"),
                                 QStringLiteral("CREATE TABLE tabla_futura (id INTEGER)\n;\n")});
     AppBootstrapper::Opciones conFutura;
     conFutura.directorioDatos = tmp.path();

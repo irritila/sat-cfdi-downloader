@@ -1,4 +1,5 @@
 #include "OSIntegrationFactory.h"
+#include "SecretStoreFactory.h"
 #include "app_core/AppBootstrapper.h"
 #include "app_core/ArranqueProceso.h"
 #include "app_core/AppCompositionRoot.h"
@@ -54,7 +55,15 @@ int main(int argc, char* argv[])
     // su hilo con wait(). Se declara despues de `app` y antes de `root`: vive
     // mas que el root/controlador y se destruye antes que QApplication.
     const std::unique_ptr<satcfdi::OSIntegration> os = satcfdi::crearOSIntegracion();
-    satcfdi::AppCompositionRoot root(preparacion.arranque.rutaBase);
+    // SecretStore (T005): lo posee main y vive mas que el root y que toda
+    // CredencialPreparada (se destruye despues de cerrar el dispatcher).
+    const std::unique_ptr<satcfdi::SecretStore> secretStore =
+        satcfdi::crearSecretStore(preparacion.arranque.directorioDatos);
+    if (!secretStore) {
+        return errorFatal(QStringLiteral("El almacen de credenciales no esta disponible en esta "
+                                         "plataforma."));
+    }
+    satcfdi::AppCompositionRoot root(preparacion.arranque.rutaBase, *secretStore);
     if (!root.cargar()) {
         return 1;
     }

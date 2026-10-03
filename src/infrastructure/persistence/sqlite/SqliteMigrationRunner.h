@@ -47,7 +47,8 @@ public:
     // texto empieza con BOM.
     static Resultado<QStringList, ErrorPersistencia> dividirSentencias(QStringView sql);
 
-    // Migraciones embebidas como recurso Qt (`:/migrations/001_initial_schema.sql`).
+    // Migraciones embebidas como recurso Qt (`:/migrations/001_initial_schema.sql`,
+    // `:/migrations/002_credencial_metadata.sql`), en orden.
     static Resultado<QList<MigracionSql>, ErrorPersistencia> migracionesEmbebidas();
 
 private:

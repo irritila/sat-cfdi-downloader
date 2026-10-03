@@ -10,6 +10,7 @@
 
 #include "domain/solicitudes/Duplicados.h"
 #include "ports/repositories/ConfiguracionAppRepository.h"
+#include "ports/repositories/CredencialSatRepository.h"
 #include "ports/repositories/LogSolicitudRepository.h"
 #include "ports/repositories/PaqueteSolicitudRepository.h"
 #include "ports/repositories/PerfilSatRepository.h"
@@ -37,6 +38,8 @@ struct Almacen {
     QList<LogPersistido> logs;
     // Fila unica configuracion_app (T004); valores por defecto de la migracion.
     std::optional<ConfiguracionApp> configuracion = ConfiguracionApp{};
+    // credencial_sat (T005).
+    QList<CredencialSat> credenciales;
 
     // Traza de operaciones ("begin", "commit", "rollback", "insertarCreada", ...).
     QStringList eventos;
@@ -65,6 +68,7 @@ struct Almacen {
         QList<PaquetePersistido> paquetes;
         QList<LogPersistido> logs;
         std::optional<ConfiguracionApp> configuracion;
+        QList<CredencialSat> credenciales;
     };
     std::optional<Estado> snapshot;
 
@@ -97,7 +101,8 @@ public:
             return Resultado<Exito, ErrorPersistencia>::fallo(error(ErrorPersistencia::Tipo::Transaccion));
         }
         m_a.snapshot =
-            Almacen::Estado{m_a.perfiles, m_a.solicitudes, m_a.paquetes, m_a.logs, m_a.configuracion};
+            Almacen::Estado{m_a.perfiles, m_a.solicitudes, m_a.paquetes, m_a.logs, m_a.configuracion,
+                           m_a.credenciales};
         return Resultado<Exito, ErrorPersistencia>::exito({});
     }
 
@@ -122,6 +127,7 @@ public:
             m_a.paquetes = m_a.snapshot->paquetes;
             m_a.logs = m_a.snapshot->logs;
             m_a.configuracion = m_a.snapshot->configuracion;
+            m_a.credenciales = m_a.snapshot->credenciales;
             m_a.snapshot.reset();
         }
         return Resultado<Exito, ErrorPersistencia>::exito({});
@@ -486,6 +492,117 @@ private:
         aplicar(*m_a.configuracion);
         m_a.configuracion->actualizadaEn = en;
         return R::exito(*m_a.configuracion);
+    }
+
+    Almacen& m_a;
+};
+
+// credencial_sat en memoria (T005): escrituras exigen transaccion, FK de
+// perfil, unicidad por perfil, metadata completa; listarReferenciasVigentes
+// es fail-safe ante referencias ilegibles. Operaciones: "insertarCredencial",
+// "reemplazarCredencial", "obtenerCredencial", "eliminarCredencial",
+// "listarReferencias".
+class FakeCredenciales final : public CredencialSatRepository {
+public:
+    explicit FakeCredenciales(Almacen& a) : m_a(a) {}
+
+    Resultado<Exito, ErrorPersistencia> insertar(const CredencialSat& c) override
+    {
+        using R = Resultado<Exito, ErrorPersistencia>;
+        if (auto e = escritura(QStringLiteral("insertarCredencial"), c)) {
+            return R::fallo(*e);
+        }
+        const bool perfilExiste = std::any_of(m_a.perfiles.cbegin(), m_a.perfiles.cend(),
+                                              [&](const PerfilSat& p) { return p.id == c.perfilSatId; });
+        if (!perfilExiste) {
+            return R::fallo(error(ErrorPersistencia::Tipo::Integridad, "foreign_key"));
+        }
+        for (const CredencialSat& x : m_a.credenciales) {
+            if (x.perfilSatId == c.perfilSatId) {
+                return R::fallo(error(ErrorPersistencia::Tipo::Unicidad, "ux_credencial_sat_perfil"));
+            }
+        }
+        m_a.credenciales.append(c);
+        return R::exito({});
+    }
+
+    Resultado<Exito, ErrorPersistencia> reemplazar(const PerfilId& perfilId, const CredencialSat& n) override
+    {
+        using R = Resultado<Exito, ErrorPersistencia>;
+        if (auto e = escritura(QStringLiteral("reemplazarCredencial"), n)) {
+            return R::fallo(*e);
+        }
+        for (CredencialSat& x : m_a.credenciales) {
+            if (x.perfilSatId == perfilId) {
+                const QString id = x.id;
+                const QDateTime registrada = x.registradaEn;
+                x = n;
+                x.id = id;
+                x.perfilSatId = perfilId;
+                x.registradaEn = registrada;
+                return R::exito({});
+            }
+        }
+        return R::fallo(error(ErrorPersistencia::Tipo::NoEncontrado));
+    }
+
+    Resultado<std::optional<CredencialSat>, ErrorPersistencia> obtenerPorPerfil(const PerfilId& perfilId) override
+    {
+        using R = Resultado<std::optional<CredencialSat>, ErrorPersistencia>;
+        if (auto e = m_a.registrar(QStringLiteral("obtenerCredencial"))) {
+            return R::fallo(*e);
+        }
+        for (const CredencialSat& x : m_a.credenciales) {
+            if (x.perfilSatId == perfilId) {
+                return R::exito(x);
+            }
+        }
+        return R::exito(std::nullopt);
+    }
+
+    Resultado<bool, ErrorPersistencia> eliminarPorPerfil(const PerfilId& perfilId) override
+    {
+        using R = Resultado<bool, ErrorPersistencia>;
+        if (auto e = m_a.registrar(QStringLiteral("eliminarCredencial"))) {
+            return R::fallo(*e);
+        }
+        if (!m_a.snapshot) {
+            return R::fallo(error(ErrorPersistencia::Tipo::Transaccion));
+        }
+        const auto n = m_a.credenciales.removeIf([&](const CredencialSat& x) { return x.perfilSatId == perfilId; });
+        return R::exito(n > 0);
+    }
+
+    Resultado<QList<CredencialRef>, ErrorPersistencia> listarReferenciasVigentes() override
+    {
+        using R = Resultado<QList<CredencialRef>, ErrorPersistencia>;
+        if (auto e = m_a.registrar(QStringLiteral("listarReferencias"))) {
+            return R::fallo(*e);
+        }
+        QList<CredencialRef> refs;
+        for (const CredencialSat& x : m_a.credenciales) {
+            const auto r = CredencialRef::desdeReferencias(x.certificadoRef, x.llavePrivadaRef, x.contrasenaRef);
+            if (!r) {
+                return R::fallo(error(ErrorPersistencia::Tipo::Interno));
+            }
+            refs.append(*r);
+        }
+        return R::exito(refs);
+    }
+
+private:
+    std::optional<ErrorPersistencia> escritura(const QString& op, const CredencialSat& c)
+    {
+        if (auto e = m_a.registrar(op)) {
+            return e;
+        }
+        if (!m_a.snapshot) {
+            return error(ErrorPersistencia::Tipo::Transaccion);
+        }
+        if (!c.metadataCompleta()) {
+            return error(ErrorPersistencia::Tipo::Integridad, "credencial_sat.metadata");
+        }
+        return std::nullopt;
     }
 
     Almacen& m_a;

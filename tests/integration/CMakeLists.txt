@@ -8,6 +8,8 @@ qt_add_executable(satcfdi_integration_tests
     TestCicloDeVida.cpp
     ../fakes/FakeOSIntegration.h
     ../fakes/FakeConfiguracionAppService.h
+    ../fakes/FakeSecretStore.h
+    TestCredencialesArranque.cpp
 )
 
 # Permite #include "fakes/FakeOSIntegration.h".
@@ -37,3 +39,34 @@ set_tests_properties(satcfdi_integration_tests PROPERTIES
     LABELS integration
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )
+
+# DS5 (T005): centinelas de fuga con MacOSSecretStore real sobre
+# FakeKeychainApi, CredencialesSatServicePersistido y SQLite real. Solo Apple.
+# Reutiliza FakeKeychainApi.h y FixturesEFirma.h de tests/secrets (sin
+# modificarlos) y el openssl que fija tests/secrets (SATCFDI_OPENSSL_EXECUTABLE).
+if(APPLE)
+    qt_add_executable(satcfdi_credenciales_centinelas_tests
+        TestCentinelasCredenciales.cpp
+        ../secrets/FakeKeychainApi.h
+        ../secrets/FixturesEFirma.h
+    )
+    target_include_directories(satcfdi_credenciales_centinelas_tests PRIVATE
+        ${PROJECT_SOURCE_DIR}/tests/secrets
+    )
+    target_compile_definitions(satcfdi_credenciales_centinelas_tests PRIVATE
+        SATCFDI_OPENSSL_EXECUTABLE="${SATCFDI_OPENSSL_EXECUTABLE}"
+        SATCFDI_SCRIPT_FIXTURES="${PROJECT_SOURCE_DIR}/tests/secrets/fixtures/generar_fixtures.sh"
+    )
+    target_link_libraries(satcfdi_credenciales_centinelas_tests PRIVATE
+        satcfdi_app_core
+        satcfdi_secrets_macos
+        Qt6::Gui
+        Qt6::Test
+    )
+    satcfdi_enable_warnings(satcfdi_credenciales_centinelas_tests)
+    add_test(NAME satcfdi_credenciales_centinelas_tests COMMAND satcfdi_credenciales_centinelas_tests)
+    set_tests_properties(satcfdi_credenciales_centinelas_tests PROPERTIES
+        LABELS "integration;secrets"
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    )
+endif()

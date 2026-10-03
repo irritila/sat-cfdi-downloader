@@ -20,7 +20,7 @@ Ejemplo: `T001-modelo-fisico-sqlite.md`.
 | [T002](T002-shell-qt-qml.md) | Completada | Shell Qt/QML ejecutable |
 | [T003](T003-persistencia-local.md) | Completada | Persistencia local de solicitudes |
 | [T004](T004-ciclo-vida-macos.md) | Completada | Ciclo de vida macOS y menu bar |
-| [T005](T005-secret-store-keychain.md) | Pendiente | SecretStore con Keychain |
+| [T005](T005-secret-store-keychain.md) | Completada | SecretStore con Keychain |
 | [T005.1](T005.1-ui-perfiles-sat.md) | Pendiente | UI de perfiles SAT y e.firma |
 | [T006](T006-spike-sat.md) | Pendiente | Spike de integracion SAT |
 | [T007](T007-worker-ejecutor-serial.md) | Pendiente | Worker y ejecutor serial |

@@ -2,7 +2,7 @@
 
 ## Estado
 
-Pendiente
+Completada
 
 ## Prioridad y tamano
 
@@ -154,7 +154,7 @@ tecnicos solo pueden aparecer en logs sanitizados.
 - Determinar si los metadatos no secretos `numero_serie`, `vigente_desde` y
   `vigente_hasta` requieren columnas adicionales en `credencial_sat`.
 - Unificar el nombre del fake entre `FakeSecretStore` y cualquier referencia
-  previa a `InMemorySecretStore`.
+  previa a `InMemorySecretStore`. (Resuelto: `FakeSecretStore`.)
 
 ## Restricciones tecnicas
 
@@ -167,36 +167,36 @@ tecnicos solo pueden aparecer en logs sanitizados.
 
 ## Criterios de aceptacion
 
-- [ ] Dado un perfil activo y fixtures validos, cuando se importa una e.firma,
+- [x] Dado un perfil activo y fixtures validos, cuando se importa una e.firma,
   entonces se crea una referencia opaca y el perfil queda listo.
-- [ ] Dada una contraseña incorrecta, cuando se importa, entonces devuelve
+- [x] Dada una contraseña incorrecta, cuando se importa, entonces devuelve
   `ContrasenaIncorrecta` y no activa ninguna credencial.
-- [ ] Dado un certificado y una llave incompatibles, cuando se importan,
+- [x] Dado un certificado y una llave incompatibles, cuando se importan,
   entonces devuelve `ParejaIncompatible` sin residuos.
-- [ ] Dado un RFC de certificado distinto al perfil, cuando se importa,
+- [x] Dado un RFC de certificado distinto al perfil, cuando se importa,
   entonces devuelve `RfcNoCoincide` sin exponer el RFC en el mensaje visible.
-- [ ] Dado un certificado vencido o aún no vigente, cuando se importa,
+- [x] Dado un certificado vencido o aún no vigente, cuando se importa,
   entonces devuelve la categoria correspondiente usando el `Clock` inyectado.
-- [ ] Dado un certificado no admisible como e.firma, cuando se importa,
+- [x] Dado un certificado no admisible como e.firma, cuando se importa,
   entonces devuelve `NoEsEFirma` sin inferirlo por nombre o extensión.
-- [ ] Dada una credencial activa, cuando un reemplazo falla en validacion,
+- [x] Dada una credencial activa, cuando un reemplazo falla en validacion,
   Keychain, escritura o commit, entonces la credencial anterior sigue usable.
-- [ ] Dado un reemplazo valido, cuando termina el commit, entonces existe una
+- [x] Dado un reemplazo valido, cuando termina el commit, entonces existe una
   sola generacion activa y la anterior queda pendiente de limpieza.
-- [ ] Dado un cierre inesperado o fallo de limpieza posterior al commit, cuando
+- [x] Dado un cierre inesperado o fallo de limpieza posterior al commit, cuando
   inicia la app, entonces la reconciliacion elimina generaciones huerfanas sin
   tocar la credencial vigente.
-- [ ] Dada una referencia recuperada desde SQLite, entonces no contiene
+- [x] Dada una referencia recuperada desde SQLite, entonces no contiene
   contraseña, llave, DER, token ni ruta absoluta.
-- [ ] Dado `obtenerMaterialFirma`, entonces devuelve `MaterialFirma` move-only
+- [x] Dado `obtenerMaterialFirma`, entonces devuelve `MaterialFirma` move-only
   y no persiste ni expone el material fuera de la operacion.
-- [ ] Dado Keychain cancelado, denegado, bloqueado o no disponible, entonces la
+- [x] Dado Keychain cancelado, denegado, bloqueado o no disponible, entonces la
   UI recibe categorias distintas y el worker no genera prompts en bucle.
-- [ ] Dado cualquier flujo de importacion/reemplazo, entonces ningun secreto
+- [x] Dado cualquier flujo de importacion/reemplazo, entonces ningun secreto
   aparece en SQLite, WAL/SHM, logs, QML, mensajes visibles ni temporales.
-- [ ] Dado `FakeSecretStore`, entonces los servicios pueden probar exito,
+- [x] Dado `FakeSecretStore`, entonces los servicios pueden probar exito,
   fallos y reemplazo sin Keychain real.
-- [ ] La tarea no agrega token persistente, exportacion, CSD productivo,
+- [x] La tarea no agrega token persistente, exportacion, CSD productivo,
   multiusuario ni migracion de credenciales.
 
 ## Verificacion
@@ -228,7 +228,15 @@ tecnicos solo pueden aparecer en logs sanitizados.
 
 ## Resultado
 
-Pendiente.
+Completada el 2026-10-04.
+
+- `SecretStore` con tipos move-only; `MacOSSecretStore` con OpenSSL 3 (parseo, validacion, AES-256-GCM) y Security.framework solo para Keychain (data protection keychain, sin prompts).
+- `CredencialesSatService` con importar, reemplazar, estado, material, eliminar y reconciliar; exclusion entre operaciones y verificacion de hilo en runtime.
+- `CredencialSatRepository` y migracion `002_credencial_metadata.sql` (serie y vigencia); referencias `scs1:<uuid>:<rol>`.
+- Regla e.firma/CSD: `OU` no vacio => `NoEsEFirma` (decision del usuario; confirmar en T006).
+- Firma opcional del bundle con entitlements de Keychain; prueba contra el Keychain real firmada sin omisiones.
+- `ctest`: 8 suites pasan, incluidas centinelas de secretos con control positivo.
+- Pendientes: prueba manual con e.firma real (T005.1); `disable-library-validation` solo en desarrollo; perfil gratuito de 7 dias; empaquetado de OpenSSL en distribucion.
 
 ## Riesgos y notas
 

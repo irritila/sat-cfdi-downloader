@@ -17,7 +17,13 @@ namespace {
 
 using ResultadoMig = Resultado<ResultadoMigracion, ErrorPersistencia>;
 
-const QString kRecurso001 = QStringLiteral(":/migrations/001_initial_schema.sql");
+// Migraciones embebidas en orden (recurso `:/migrations/<nombre>.sql`).
+// Agregar una migracion: archivo en persistence/migrations, entrada aqui y en
+// qt_add_resources de src/infrastructure/CMakeLists.txt.
+const std::pair<int, QString> kMigracionesEmbebidas[] = {
+    {1, QStringLiteral("001_initial_schema")},
+    {2, QStringLiteral("002_credencial_metadata")}, // T005
+};
 
 ErrorPersistencia errorMigracion(const QString& mensaje)
 {
@@ -135,16 +141,21 @@ Resultado<QStringList, ErrorPersistencia> SqliteMigrationRunner::dividirSentenci
 Resultado<QList<MigracionSql>, ErrorPersistencia> SqliteMigrationRunner::migracionesEmbebidas()
 {
     using R = Resultado<QList<MigracionSql>, ErrorPersistencia>;
-    QFile archivo(kRecurso001);
-    if (!archivo.open(QIODevice::ReadOnly)) {
-        return R::fallo(errorMigracion(QStringLiteral("recurso de migracion 001 no disponible")));
+    QList<MigracionSql> lista;
+    for (const auto& [version, nombre] : kMigracionesEmbebidas) {
+        const QString etiqueta = QStringLiteral("%1").arg(version, 3, 10, QLatin1Char('0'));
+        QFile archivo(QStringLiteral(":/migrations/%1.sql").arg(nombre));
+        if (!archivo.open(QIODevice::ReadOnly)) {
+            return R::fallo(errorMigracion(
+                QStringLiteral("recurso de migracion %1 no disponible").arg(etiqueta)));
+        }
+        const QByteArray bytes = archivo.readAll();
+        if (bytes.startsWith("\xEF\xBB\xBF")) {
+            return R::fallo(errorMigracion(QStringLiteral("migracion %1 con BOM (DM2)").arg(etiqueta)));
+        }
+        lista.append(MigracionSql{version, nombre, QString::fromUtf8(bytes)});
     }
-    const QByteArray bytes = archivo.readAll();
-    if (bytes.startsWith("\xEF\xBB\xBF")) {
-        return R::fallo(errorMigracion(QStringLiteral("migracion 001 con BOM (DM2)")));
-    }
-    return R::exito({MigracionSql{1, QStringLiteral("001_initial_schema"),
-                                  QString::fromUtf8(bytes)}});
+    return R::exito(std::move(lista));
 }
 
 Resultado<ResultadoMigracion, ErrorPersistencia> SqliteMigrationRunner::migrar()

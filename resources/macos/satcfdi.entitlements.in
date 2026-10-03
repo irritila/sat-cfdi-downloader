@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Entitlements de satcfdi_app para la firma opcional (T005 corte F). Solo se
+  usan si se configura SATCFDI_CODESIGN_IDENTITY, SATCFDI_PROVISIONING_PROFILE
+  y SATCFDI_TEAM_ID; CMake sustituye las variables @...@.
+
+  keychain-access-groups: el primer grupo es el grupo por defecto de SecItem*.
+  KeychainApiMacOS no fija kSecAttrAccessGroup, asi que sus elementos del data
+  protection keychain quedan en <TEAM>.<bundle id>. Deben estar permitidos por
+  el perfil de aprovisionamiento.
+-->
+<plist version="1.0">
+<dict>
+	<key>com.apple.application-identifier</key>
+	<string>@SATCFDI_TEAM_ID@.@SATCFDI_BUNDLE_IDENTIFIER@</string>
+	<key>com.apple.developer.team-identifier</key>
+	<string>@SATCFDI_TEAM_ID@</string>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>@SATCFDI_TEAM_ID@.@SATCFDI_BUNDLE_IDENTIFIER@</string>
+	</array>
+@SATCFDI_ENTITLEMENTS_RUNTIME@</dict>
+</plist>
