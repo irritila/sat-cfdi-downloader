@@ -42,4 +42,15 @@ QString claveEstable(TipoDescarga tipo);
 // Inversa de claveEstable(TipoDescarga): "Emitidos" o "Recibidos".
 std::optional<TipoDescarga> tipoDescargaDesdeClave(QStringView clave);
 
+// Inversas de claveEstable para leer columnas persistidas. Las claves de
+// EstadoLocal y EstadoSolicitudSat coinciden con los CHECK de
+// solicitud_masiva.estado_local y estado_solicitud_sat (T001).
+std::optional<EstadoLocal> estadoLocalDesdeClave(QStringView clave);
+std::optional<EstadoSolicitudSat> estadoSolicitudSatDesdeClave(QStringView clave);
+
+// Valor de la columna solicitud_masiva.tipo_cfdi: "emitidos" / "recibidos".
+// Distinto de claveEstable(TipoDescarga), que es la clave de UI.
+QString valorTipoCfdi(TipoDescarga tipo);
+std::optional<TipoDescarga> tipoDescargaDesdeTipoCfdi(QStringView valor);
+
 } // namespace satcfdi

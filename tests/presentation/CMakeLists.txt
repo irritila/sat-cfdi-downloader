@@ -1,9 +1,11 @@
 # satcfdi_presentation_tests: Qt Test + QQmlApplicationEngine sobre el modulo
 # QML real (DA2, DA7). Inyecta view models con setInitialProperties usando los
-# servicios demo y un espia local. Corre en -platform offscreen.
+# servicios demo (via un espia local) y fakes asincronos con QPromise
+# controlados por la prueba (T003). Corre en -platform offscreen.
 qt_add_executable(satcfdi_presentation_tests
     TestPresentacion.cpp
     SolicitudesServiceEspia.h
+    ServiciosAsincronosFake.h
 )
 
 target_link_libraries(satcfdi_presentation_tests PRIVATE

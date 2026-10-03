@@ -15,7 +15,8 @@ class SolicitudDetailViewModel;
 // - mostrarNueva() reinicia el formulario.
 // - abrirDetalle(id) carga el detalle por id; ids no canonicos se rechazan.
 // - NuevaSolicitudViewModel::submitted(id) abre el detalle de la nueva
-//   solicitud. La lista se refresca sola con solicitudActualizada.
+//   solicitud. La lista se refresca sola con listaCambiada.
+// - SolicitudDetailViewModel::eliminada(id) regresa a la lista.
 class AppViewModel : public QObject {
     Q_OBJECT
     QML_ELEMENT

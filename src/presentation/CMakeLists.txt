@@ -13,6 +13,7 @@ set(_satcfdi_qml_files
     qml/components/BotonAccion.qml
     qml/components/CampoDetalle.qml
     qml/components/EncabezadoPagina.qml
+    qml/components/DialogoConfirmacion.qml
     qml/components/Etiquetas.js
 )
 

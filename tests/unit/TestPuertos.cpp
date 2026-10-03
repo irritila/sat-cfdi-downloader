@@ -24,9 +24,10 @@ namespace {
 // destructor virtual y no tiene datos miembro (tamano igual al de una clase con
 // solo vptr).
 //
-// Que NO prueba: la ausencia de metodos. Agregar metodos (virtuales o no) no
-// cambia sizeof y C++20 no tiene reflexion para enumerarlos. La regla "sin
-// metodos en T002" se verifica por revision de src/ports/.
+// Que NO prueba: la forma de los metodos. Desde T003 los repositorios,
+// UnitOfWork y LogSanitizer tienen metodos virtuales puros (no cambian
+// sizeof); SatGateway, SecretStore, OSIntegration y PackageStorage siguen sin
+// metodos, lo que se verifica por revision de src/ports/.
 struct SoloVptr {
     virtual ~SoloVptr() = default;
 };

@@ -11,6 +11,20 @@
 
 namespace satcfdi {
 
+namespace {
+
+QString texto(const std::optional<QString>& valor)
+{
+    return valor.value_or(QString());
+}
+
+QVariant fechaONulo(const std::optional<QDateTime>& valor)
+{
+    return valor ? QVariant(*valor) : QVariant::fromValue(nullptr);
+}
+
+} // namespace
+
 SolicitudDetailViewModel::SolicitudDetailViewModel(SolicitudesService* servicio, QObject* parent)
     : QObject(parent)
     , m_servicio(servicio)
@@ -18,45 +32,82 @@ SolicitudDetailViewModel::SolicitudDetailViewModel(SolicitudesService* servicio,
     Q_ASSERT(servicio != nullptr);
     connect(servicio, &SolicitudesService::solicitudActualizada, this,
             [this](const SolicitudId& id) {
-                if (!m_solicitudId.isEmpty() && id.texto() == m_solicitudId) {
-                    cargar(m_solicitudId);
+                if (!m_solicitudId.isEmpty() && id.texto() == m_solicitudId
+                    && m_estado != Estado::NoEncontrada) {
+                    recargar();
                 }
+            });
+    connect(servicio, &SolicitudesService::solicitudEliminada, this,
+            [this](const SolicitudId& id) {
+                if (m_solicitudId.isEmpty() || id.texto() != m_solicitudId) {
+                    return;
+                }
+                ++m_genCarga; // ninguna lectura anterior puede restaurar el detalle
+                setDetalle(std::nullopt);
+                setEstado(Estado::NoEncontrada);
             });
 }
 
+#define SATCFDI_RESUMEN(expr, vacio) (m_detalle ? (expr) : (vacio))
+
 QString SolicitudDetailViewModel::perfilRfc() const
 {
-    return m_detalle ? m_detalle->resumen.perfilRfc : QString();
+    return SATCFDI_RESUMEN(m_detalle->resumen.perfilRfc, QString());
 }
 
 QString SolicitudDetailViewModel::rfcContraparte() const
 {
-    return m_detalle ? m_detalle->resumen.rfcContraparte.value_or(QString()) : QString();
+    return SATCFDI_RESUMEN(texto(m_detalle->resumen.rfcContraparte), QString());
 }
 
 QString SolicitudDetailViewModel::tipoDescarga() const
 {
-    return m_detalle ? claveEstable(m_detalle->resumen.tipoDescarga) : QString();
+    return SATCFDI_RESUMEN(claveEstable(m_detalle->resumen.tipoDescarga), QString());
 }
 
 QString SolicitudDetailViewModel::fechaInicial() const
 {
-    return m_detalle ? m_detalle->resumen.fechaInicial.toString(Qt::ISODate) : QString();
+    return SATCFDI_RESUMEN(m_detalle->resumen.fechaInicial.toString(Qt::ISODate), QString());
 }
 
 QString SolicitudDetailViewModel::fechaFinal() const
 {
-    return m_detalle ? m_detalle->resumen.fechaFinal.toString(Qt::ISODate) : QString();
+    return SATCFDI_RESUMEN(m_detalle->resumen.fechaFinal.toString(Qt::ISODate), QString());
 }
 
 QDateTime SolicitudDetailViewModel::creadaEn() const
 {
-    return m_detalle ? m_detalle->resumen.creadaEn : QDateTime();
+    return SATCFDI_RESUMEN(m_detalle->resumen.creadaEn, QDateTime());
+}
+
+QString SolicitudDetailViewModel::fechaInicialSat() const
+{
+    return SATCFDI_RESUMEN(m_detalle->fechaInicialSat, QString());
+}
+
+QString SolicitudDetailViewModel::fechaFinalSat() const
+{
+    return SATCFDI_RESUMEN(m_detalle->fechaFinalSat, QString());
+}
+
+QStringList SolicitudDetailViewModel::rfcContrapartes() const
+{
+    return SATCFDI_RESUMEN(m_detalle->rfcContrapartes, QStringList());
+}
+
+QString SolicitudDetailViewModel::tipoComprobante() const
+{
+    return SATCFDI_RESUMEN(texto(m_detalle->tipoComprobante), QString());
+}
+
+QString SolicitudDetailViewModel::complemento() const
+{
+    return SATCFDI_RESUMEN(texto(m_detalle->complemento), QString());
 }
 
 QString SolicitudDetailViewModel::estadoLocal() const
 {
-    return m_detalle ? claveEstable(m_detalle->resumen.estadoLocal) : QString();
+    return SATCFDI_RESUMEN(claveEstable(m_detalle->resumen.estadoLocal), QString());
 }
 
 QVariant SolicitudDetailViewModel::estadoSat() const
@@ -69,12 +120,60 @@ QVariant SolicitudDetailViewModel::estadoSat() const
 
 QString SolicitudDetailViewModel::estadoResumen() const
 {
-    if (!m_detalle) {
-        return {};
-    }
-    return claveEstable(
-        derivarEstadoResumen(m_detalle->resumen.estadoLocal, m_detalle->resumen.estadoSat));
+    return SATCFDI_RESUMEN(claveEstable(derivarEstadoResumen(m_detalle->resumen.estadoLocal,
+                                                             m_detalle->resumen.estadoSat)),
+                           QString());
 }
+
+QString SolicitudDetailViewModel::idSolicitudSat() const
+{
+    return SATCFDI_RESUMEN(texto(m_detalle->idSolicitudSat), QString());
+}
+
+QString SolicitudDetailViewModel::codEstatusSolicitud() const
+{
+    return SATCFDI_RESUMEN(texto(m_detalle->codEstatusSolicitud), QString());
+}
+
+QString SolicitudDetailViewModel::mensajeSolicitudSat() const
+{
+    return SATCFDI_RESUMEN(texto(m_detalle->mensajeSolicitudSat), QString());
+}
+
+QString SolicitudDetailViewModel::codigoEstadoSolicitud() const
+{
+    return SATCFDI_RESUMEN(texto(m_detalle->codigoEstadoSolicitud), QString());
+}
+
+QString SolicitudDetailViewModel::mensajeVerificacionSat() const
+{
+    return SATCFDI_RESUMEN(texto(m_detalle->mensajeVerificacionSat), QString());
+}
+
+QVariant SolicitudDetailViewModel::numeroCfdi() const
+{
+    if (m_detalle && m_detalle->numeroCfdi) {
+        return QVariant::fromValue(*m_detalle->numeroCfdi);
+    }
+    return QVariant::fromValue(nullptr);
+}
+
+QVariant SolicitudDetailViewModel::enviadaEn() const
+{
+    return m_detalle ? fechaONulo(m_detalle->enviadaEn) : QVariant::fromValue(nullptr);
+}
+
+QVariant SolicitudDetailViewModel::ultimaVerificacionEn() const
+{
+    return m_detalle ? fechaONulo(m_detalle->ultimaVerificacionEn) : QVariant::fromValue(nullptr);
+}
+
+QString SolicitudDetailViewModel::ultimoError() const
+{
+    return SATCFDI_RESUMEN(texto(m_detalle->ultimoError), QString());
+}
+
+#undef SATCFDI_RESUMEN
 
 QVariantList SolicitudDetailViewModel::paquetes() const
 {
@@ -88,8 +187,9 @@ QVariantList SolicitudDetailViewModel::paquetes() const
         mapa.insert(QStringLiteral("idPaqueteSat"), p.idPaqueteSat);
         mapa.insert(QStringLiteral("estadoDescarga"), claveEstable(p.estadoDescarga));
         mapa.insert(QStringLiteral("disponibleEn"), p.disponibleEn);
-        mapa.insert(QStringLiteral("descargadoEn"),
-                    p.descargadoEn ? QVariant(*p.descargadoEn) : QVariant::fromValue(nullptr));
+        mapa.insert(QStringLiteral("descargadoEn"), fechaONulo(p.descargadoEn));
+        mapa.insert(QStringLiteral("vencidoEn"), fechaONulo(p.vencidoEn));
+        mapa.insert(QStringLiteral("codigoDescargaSat"), texto(p.codigoDescargaSat));
         lista.append(mapa);
     }
     return lista;
@@ -100,65 +200,114 @@ int SolicitudDetailViewModel::totalPaquetes() const
     return m_detalle ? int(m_detalle->paquetes.size()) : 0;
 }
 
+QVariantList SolicitudDetailViewModel::logs() const
+{
+    QVariantList lista;
+    if (!m_detalle) {
+        return lista;
+    }
+    lista.reserve(m_detalle->logs.size());
+    for (const LogResumen& l : m_detalle->logs) {
+        QVariantMap mapa;
+        mapa.insert(QStringLiteral("tipoEvento"), claveEstable(l.tipoEvento));
+        mapa.insert(QStringLiteral("origen"), claveEstable(l.origen));
+        mapa.insert(QStringLiteral("origenCodigoSat"),
+                    l.origenCodigoSat ? claveEstable(*l.origenCodigoSat) : QString());
+        mapa.insert(QStringLiteral("codigoSat"), texto(l.codigoSat));
+        mapa.insert(QStringLiteral("mensajeSat"), texto(l.mensajeSat));
+        mapa.insert(QStringLiteral("creadoEn"), l.creadoEn);
+        lista.append(mapa);
+    }
+    return lista;
+}
+
 void SolicitudDetailViewModel::cargar(const QString& id)
 {
     if (m_solicitudId != id) {
         m_solicitudId = id;
         emit solicitudIdChanged();
         setDetalle(std::nullopt);
+        ++m_genEliminar; // una eliminacion de otra solicitud ya no aplica aqui
+        setEliminacion(false, QString());
     }
-    const quint64 generacion = ++m_generacion;
+    const quint64 generacion = ++m_genCarga;
     const std::optional<SolicitudId> solicitudId = SolicitudId::desdeTexto(id);
     if (!solicitudId || !m_servicio) {
-        setCargando(false);
-        setErrorMessage(tr("La solicitud seleccionada no es valida."));
+        setDetalle(std::nullopt);
+        setEstado(Estado::NoEncontrada);
         return;
     }
-    setCargando(true);
+    setEstado(Estado::Cargando);
     m_servicio->obtener(*solicitudId)
         .then(this, [this, generacion](SolicitudesService::ResultadoDetalle r) {
-            if (generacion != m_generacion) {
-                return; // respuesta de una seleccion anterior
+            if (generacion != m_genCarga) {
+                return; // respuesta de una seleccion o carga anterior
             }
-            setCargando(false);
             if (r.esExito()) {
-                setErrorMessage(QString());
                 setDetalle(std::move(r).valor());
+                setEstado(Estado::ConDatos);
+                return;
+            }
+            setDetalle(std::nullopt);
+            if (r.error().tipo == ErrorObtener::Tipo::NoEncontrada) {
+                setEstado(Estado::NoEncontrada);
             } else {
-                setDetalle(std::nullopt);
-                setErrorMessage(r.error().tipo == ErrorObtener::Tipo::NoEncontrada
-                                    ? tr("La solicitud ya no existe.")
-                                    : tr("No se pudo cargar la solicitud."));
+                setEstado(Estado::Error, tr("No se pudo cargar la solicitud."));
             }
         });
 }
 
+void SolicitudDetailViewModel::recargar()
+{
+    if (!m_solicitudId.isEmpty()) {
+        cargar(m_solicitudId);
+    }
+}
+
 void SolicitudDetailViewModel::limpiar()
 {
-    ++m_generacion;
+    ++m_genCarga;
+    ++m_genEliminar;
     if (!m_solicitudId.isEmpty()) {
         m_solicitudId.clear();
         emit solicitudIdChanged();
     }
-    setCargando(false);
-    setErrorMessage(QString());
     setDetalle(std::nullopt);
+    setEstado(Estado::Ninguno);
+    setEliminacion(false, QString());
 }
 
-void SolicitudDetailViewModel::setCargando(bool valor)
+void SolicitudDetailViewModel::eliminar()
 {
-    if (m_cargando != valor) {
-        m_cargando = valor;
-        emit cargandoChanged();
+    const std::optional<SolicitudId> id = SolicitudId::desdeTexto(m_solicitudId);
+    if (!id || !m_servicio || m_eliminando) {
+        return;
     }
+    const quint64 generacion = ++m_genEliminar;
+    const QString texto = m_solicitudId;
+    setEliminacion(true, QString());
+    m_servicio->eliminar(*id).then(
+        this, [this, generacion, texto](SolicitudesService::ResultadoEliminar r) {
+            if (generacion != m_genEliminar) {
+                return;
+            }
+            if (r.esExito()) {
+                setEliminacion(false, QString());
+                emit eliminada(texto);
+                return;
+            }
+            setEliminacion(false, tr("No se pudo eliminar la solicitud. Intenta de nuevo."));
+        });
 }
 
-void SolicitudDetailViewModel::setErrorMessage(const QString& mensaje)
+void SolicitudDetailViewModel::setEstado(Estado estado, const QString& mensaje)
 {
-    if (m_errorMessage != mensaje) {
-        m_errorMessage = mensaje;
-        emit errorMessageChanged();
+    if (m_estado == estado && m_errorMessage == mensaje) {
+        return;
     }
+    m_estado = estado;
+    m_errorMessage = mensaje;
+    emit estadoChanged();
 }
 
 void SolicitudDetailViewModel::setDetalle(std::optional<SolicitudDetalle> detalle)
@@ -168,6 +317,16 @@ void SolicitudDetailViewModel::setDetalle(std::optional<SolicitudDetalle> detall
     }
     m_detalle = std::move(detalle);
     emit datosChanged();
+}
+
+void SolicitudDetailViewModel::setEliminacion(bool eliminando, const QString& error)
+{
+    if (m_eliminando == eliminando && m_errorEliminacion == error) {
+        return;
+    }
+    m_eliminando = eliminando;
+    m_errorEliminacion = error;
+    emit eliminacionChanged();
 }
 
 } // namespace satcfdi

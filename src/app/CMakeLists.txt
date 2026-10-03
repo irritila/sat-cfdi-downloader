@@ -1,9 +1,8 @@
-# satcfdi_app: ejecutable MACOSX_BUNDLE con main.cpp y el composition root de
-# T002. Sin satcfdi_app_core (entra con T003). Sin Sql ni Network.
+# satcfdi_app: ejecutable MACOSX_BUNDLE con main.cpp. El arranque y el
+# composition root viven en satcfdi_app_core (T003). Sin Network; Qt6::Sql
+# solo llega de forma transitiva desde satcfdi_infrastructure (estatica).
 qt_add_executable(satcfdi_app MACOSX_BUNDLE
     main.cpp
-    AppCompositionRoot.h
-    AppCompositionRoot.cpp
 )
 
 set_target_properties(satcfdi_app PROPERTIES
@@ -15,10 +14,8 @@ set_target_properties(satcfdi_app PROPERTIES
 )
 
 target_link_libraries(satcfdi_app PRIVATE
-    satcfdi_presentation
+    satcfdi_app_core
     satcfdi_presentationplugin
-    satcfdi_application
-    satcfdi_infrastructure
     Qt6::Widgets
     Qt6::Quick
 )

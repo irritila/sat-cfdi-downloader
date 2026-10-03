@@ -3,10 +3,12 @@
 #include "application/profiles/PerfilesSatService.h"
 #include "application/requests/SolicitudesService.h"
 #include "domain/perfiles/PerfilId.h"
+#include "domain/solicitudes/Duplicados.h"
 #include "domain/solicitudes/EstadosSolicitud.h"
 
 #include <QDate>
 #include <QFuture>
+#include <QStringList>
 
 #include <utility>
 
@@ -17,6 +19,14 @@ namespace {
 QDate fechaDesdeTexto(const QString& texto)
 {
     return QDate::fromString(texto.trimmed(), Qt::ISODate);
+}
+
+bool tipoComprobanteValido(const QString& valor)
+{
+    static const QStringList validos = {QString(), QStringLiteral("I"), QStringLiteral("E"),
+                                        QStringLiteral("T"), QStringLiteral("N"),
+                                        QStringLiteral("P")};
+    return validos.contains(valor);
 }
 
 QString textoDeValidacion(ErrorValidacion::Codigo codigo)
@@ -37,7 +47,63 @@ QString textoDeValidacion(ErrorValidacion::Codigo codigo)
     return QObject::tr("La solicitud no es valida.");
 }
 
+QString textoDeMotivo(MotivoDuplicado motivo)
+{
+    using M = MotivoDuplicado;
+    switch (motivo) {
+    case M::SinCoincidencias:
+        return {};
+    case M::SolicitudEnCurso:
+        return QObject::tr("Hay una solicitud equivalente en curso.");
+    case M::TerminadaConPaquetesPendientes:
+        return QObject::tr("Hay una solicitud equivalente terminada con paquetes pendientes de descargar.");
+    case M::TerminadaDescargada:
+        return QObject::tr("Ya existe una solicitud equivalente terminada y descargada.");
+    case M::TerminadaConPaquetesVencidos:
+        return QObject::tr("Existe una solicitud equivalente terminada cuyos paquetes vencieron.");
+    case M::TerminadaSinPaquetes:
+        return QObject::tr("Existe una solicitud equivalente terminada sin paquetes.");
+    case M::EnvioIncierto:
+        return QObject::tr("Existe una solicitud equivalente con envio incierto: el SAT pudo haberla recibido.");
+    case M::SolicitudSinExito:
+        return QObject::tr("Existe una solicitud equivalente que no tuvo exito.");
+    case M::SolicitudEliminada:
+        return QObject::tr("Existe una solicitud equivalente que eliminaste localmente.");
+    }
+    return {};
+}
+
+QString textoDeErrorPerfil(const ErrorCrearPerfil& error)
+{
+    switch (error.tipo) {
+    case ErrorCrearPerfil::Tipo::Validacion: {
+        QStringList partes;
+        for (ErrorCrearPerfil::CodigoValidacion c : error.validaciones) {
+            partes.append(c == ErrorCrearPerfil::CodigoValidacion::RfcInvalido
+                              ? QObject::tr("El RFC no es valido.")
+                              : QObject::tr("Indica la razon social."));
+        }
+        return partes.isEmpty() ? QObject::tr("El perfil no es valido.") : partes.join(QLatin1Char(' '));
+    }
+    case ErrorCrearPerfil::Tipo::Integridad:
+        return QObject::tr("Ya existe un perfil SAT con ese RFC.");
+    case ErrorCrearPerfil::Tipo::Persistencia:
+        return QObject::tr("No se pudo guardar el perfil. Intenta de nuevo.");
+    }
+    return QObject::tr("No se pudo crear el perfil.");
+}
+
 } // namespace
+
+QString NuevaSolicitudViewModel::rfcSimuladoPorDefecto()
+{
+    return QStringLiteral("EKU9003173C9");
+}
+
+QString NuevaSolicitudViewModel::razonSocialSimuladaPorDefecto()
+{
+    return QStringLiteral("Perfil simulado");
+}
 
 NuevaSolicitudViewModel::NuevaSolicitudViewModel(SolicitudesService* solicitudes,
                                                  PerfilesSatService* perfiles,
@@ -49,7 +115,19 @@ NuevaSolicitudViewModel::NuevaSolicitudViewModel(SolicitudesService* solicitudes
 {
     Q_ASSERT(solicitudes != nullptr);
     Q_ASSERT(perfiles != nullptr);
+    connect(perfiles, &PerfilesSatService::perfilesCambiaron, this,
+            &NuevaSolicitudViewModel::cargarPerfiles);
     reiniciar();
+}
+
+bool NuevaSolicitudViewModel::sinPerfiles() const
+{
+    return m_perfilesCargados && m_perfilesDisponibles->count() == 0;
+}
+
+bool NuevaSolicitudViewModel::canSubmit() const
+{
+    return m_errorValidacion.isEmpty() && !m_ocupado && !confirmacionPendiente();
 }
 
 QString NuevaSolicitudViewModel::errorMessage() const
@@ -60,19 +138,53 @@ QString NuevaSolicitudViewModel::errorMessage() const
     return m_tocado ? m_errorValidacion : QString();
 }
 
+NuevaSolicitudViewModel::Observables NuevaSolicitudViewModel::observables() const
+{
+    return {canSubmit(),         ocupado(),          errorMessage(),
+            m_cargandoPerfiles,  sinPerfiles(),      m_creandoPerfil,
+            m_errorPerfil,       confirmacionPendiente(), m_motivoDuplicado,
+            m_solicitudExistenteId};
+}
+
 template <typename F>
 void NuevaSolicitudViewModel::actualizar(F&& cambio)
 {
-    const bool podiaEnviar = canSubmit();
-    const QString errorPrevio = errorMessage();
+    const Observables antes = observables();
     std::forward<F>(cambio)();
     m_errorValidacion = validar();
-    if (podiaEnviar != canSubmit()) {
+    const Observables despues = observables();
+    if (antes.canSubmit != despues.canSubmit) {
         emit canSubmitChanged();
     }
-    if (errorPrevio != errorMessage()) {
+    if (antes.ocupado != despues.ocupado) {
+        emit ocupadoChanged();
+    }
+    if (antes.error != despues.error) {
         emit errorMessageChanged();
     }
+    if (antes.cargandoPerfiles != despues.cargandoPerfiles || antes.sinPerfiles != despues.sinPerfiles
+        || antes.creandoPerfil != despues.creandoPerfil || antes.errorPerfil != despues.errorPerfil
+        || antes.pendiente != despues.pendiente || antes.motivo != despues.motivo
+        || antes.existente != despues.existente) {
+        emit estadoChanged();
+    }
+}
+
+template <typename F>
+void NuevaSolicitudViewModel::editar(F&& cambio)
+{
+    actualizar([&] {
+        std::forward<F>(cambio)();
+        m_errorServicio.clear();
+        m_solicitudExistenteId.clear();
+        if (m_snapshot) {
+            // Editar invalida una confirmacion pendiente (el snapshot ya no
+            // corresponde al formulario).
+            ++m_genEnvio;
+            m_snapshot.reset();
+            m_motivoDuplicado.clear();
+        }
+    });
 }
 
 QString NuevaSolicitudViewModel::validar() const
@@ -103,10 +215,9 @@ void NuevaSolicitudViewModel::setPerfilId(const QString& valor)
     if (m_perfilId == valor) {
         return;
     }
-    actualizar([&] {
+    editar([&] {
         m_perfilId = valor;
         m_tocado = true;
-        m_errorServicio.clear();
     });
     emit perfilIdChanged();
 }
@@ -116,10 +227,7 @@ void NuevaSolicitudViewModel::setTipoDescarga(const QString& valor)
     if (m_tipoDescarga == valor || !tipoDescargaDesdeClave(valor)) {
         return;
     }
-    actualizar([&] {
-        m_tipoDescarga = valor;
-        m_errorServicio.clear();
-    });
+    editar([&] { m_tipoDescarga = valor; });
     emit tipoDescargaChanged();
 }
 
@@ -128,10 +236,9 @@ void NuevaSolicitudViewModel::setFechaInicial(const QString& valor)
     if (m_fechaInicial == valor) {
         return;
     }
-    actualizar([&] {
+    editar([&] {
         m_fechaInicial = valor;
         m_tocado = true;
-        m_errorServicio.clear();
     });
     emit fechaInicialChanged();
 }
@@ -141,10 +248,9 @@ void NuevaSolicitudViewModel::setFechaFinal(const QString& valor)
     if (m_fechaFinal == valor) {
         return;
     }
-    actualizar([&] {
+    editar([&] {
         m_fechaFinal = valor;
         m_tocado = true;
-        m_errorServicio.clear();
     });
     emit fechaFinalChanged();
 }
@@ -154,23 +260,54 @@ void NuevaSolicitudViewModel::setRfcContraparte(const QString& valor)
     if (m_rfcContraparte == valor) {
         return;
     }
-    actualizar([&] {
-        m_rfcContraparte = valor;
-        m_errorServicio.clear();
-    });
+    editar([&] { m_rfcContraparte = valor; });
     emit rfcContraparteChanged();
 }
 
-void NuevaSolicitudViewModel::submit()
+void NuevaSolicitudViewModel::setTipoComprobante(const QString& valor)
 {
-    if (m_ocupado || !m_solicitudes) {
+    if (m_tipoComprobante == valor || !tipoComprobanteValido(valor)) {
         return;
     }
-    actualizar([&] { m_tocado = true; });
-    if (!m_errorValidacion.isEmpty()) {
-        return; // error visible; no se llama al servicio
-    }
+    editar([&] { m_tipoComprobante = valor; });
+    emit tipoComprobanteChanged();
+}
 
+void NuevaSolicitudViewModel::setComplemento(const QString& valor)
+{
+    if (m_complemento == valor) {
+        return;
+    }
+    editar([&] { m_complemento = valor; });
+    emit complementoChanged();
+}
+
+void NuevaSolicitudViewModel::setPerfilSimuladoRfc(const QString& valor)
+{
+    if (m_perfilSimuladoRfc == valor) {
+        return;
+    }
+    actualizar([&] {
+        m_perfilSimuladoRfc = valor;
+        m_errorPerfil.clear();
+    });
+    emit perfilSimuladoChanged();
+}
+
+void NuevaSolicitudViewModel::setPerfilSimuladoRazonSocial(const QString& valor)
+{
+    if (m_perfilSimuladoRazonSocial == valor) {
+        return;
+    }
+    actualizar([&] {
+        m_perfilSimuladoRazonSocial = valor;
+        m_errorPerfil.clear();
+    });
+    emit perfilSimuladoChanged();
+}
+
+NuevaSolicitudRequest NuevaSolicitudViewModel::construirRequest() const
+{
     NuevaSolicitudRequest request;
     request.perfilId = PerfilId::desdeTexto(m_perfilId).value_or(PerfilId());
     request.tipoDescarga = tipoDescargaDesdeClave(m_tipoDescarga).value_or(TipoDescarga::Emitidos);
@@ -180,22 +317,153 @@ void NuevaSolicitudViewModel::submit()
     if (!rfc.isEmpty()) {
         request.rfcContraparte = rfc;
     }
+    if (!m_tipoComprobante.isEmpty()) {
+        request.tipoComprobante = m_tipoComprobante;
+    }
+    const QString complemento = m_complemento.trimmed();
+    if (!complemento.isEmpty()) {
+        request.complemento = complemento;
+    }
+    return request;
+}
 
-    setOcupado(true);
-    m_solicitudes->crear(request).then(this, [this](SolicitudesService::ResultadoCrear r) {
-        setOcupado(false);
+void NuevaSolicitudViewModel::submit()
+{
+    if (m_ocupado || confirmacionPendiente() || !m_solicitudes) {
+        return;
+    }
+    actualizar([&] {
+        m_tocado = true;
+        m_errorServicio.clear();
+        m_solicitudExistenteId.clear();
+    });
+    if (!m_errorValidacion.isEmpty()) {
+        return; // error visible; no se llama al servicio
+    }
+
+    const NuevaSolicitudRequest request = construirRequest(); // snapshot inmutable
+    const quint64 generacion = ++m_genEnvio;
+    actualizar([&] { m_ocupado = true; });
+
+    m_solicitudes->evaluarDuplicado(request).then(
+        this, [this, generacion, request](SolicitudesService::ResultadoEvaluarDuplicado r) {
+            if (generacion != m_genEnvio) {
+                return; // operacion invalidada
+            }
+            if (!r.esExito()) {
+                actualizar([&] { m_ocupado = false; });
+                aplicarErrorCrear(r.error(), request);
+                return;
+            }
+            const EvaluacionDuplicado& e = r.valor();
+            switch (e.clasificacion) {
+            case ClasificacionDuplicado::Libre:
+                crearConfirmacion(request, ConfirmacionDuplicado::SinConfirmar);
+                return;
+            case ClasificacionDuplicado::Bloqueado:
+                actualizar([&] { m_ocupado = false; });
+                aplicarErrorCrear(ErrorCrear::dedupBloqueado(e), request);
+                return;
+            case ClasificacionDuplicado::RequiereConfirmacion:
+                actualizar([&] { m_ocupado = false; });
+                aplicarErrorCrear(ErrorCrear::requiereConfirmacion(e), request);
+                return;
+            }
+        });
+}
+
+void NuevaSolicitudViewModel::crearConfirmacion(const NuevaSolicitudRequest& request,
+                                                ConfirmacionDuplicado confirmacion)
+{
+    if (!m_solicitudes) {
+        return;
+    }
+    const quint64 generacion = ++m_genEnvio;
+    actualizar([&] { m_ocupado = true; });
+    QFuture<SolicitudesService::ResultadoCrear> futuro =
+        confirmacion == ConfirmacionDuplicado::SinConfirmar
+            ? m_solicitudes->crear(request)
+            : m_solicitudes->crearLocal(request, confirmacion);
+    futuro.then(this, [this, generacion, request](SolicitudesService::ResultadoCrear r) {
+        if (generacion != m_genEnvio) {
+            return;
+        }
+        actualizar([&] { m_ocupado = false; });
         if (r.esExito()) {
             emit submitted(r.valor().texto());
             return;
         }
-        const ErrorCrear& error = r.error();
-        actualizar([&] {
-            if (error.tipo == ErrorCrear::Tipo::Validacion && !error.validaciones.isEmpty()) {
-                m_errorServicio = textoDeValidacion(error.validaciones.constFirst().codigo);
-            } else {
-                m_errorServicio = tr("No se pudo guardar la solicitud. Intenta de nuevo.");
+        aplicarErrorCrear(r.error(), request);
+    });
+}
+
+void NuevaSolicitudViewModel::aplicarErrorCrear(const ErrorCrear& error,
+                                                const NuevaSolicitudRequest& request)
+{
+    actualizar([&] {
+        m_errorServicio.clear();
+        m_solicitudExistenteId.clear();
+        switch (error.tipo) {
+        case ErrorCrear::Tipo::Validacion:
+            m_errorServicio = error.validaciones.isEmpty()
+                                  ? tr("La solicitud no es valida.")
+                                  : textoDeValidacion(error.validaciones.constFirst().codigo);
+            break;
+        case ErrorCrear::Tipo::FiltroInvalido: {
+            QStringList mensajes;
+            for (const ErrorSolicitudCanonica& f : error.filtros) {
+                mensajes.append(f.mensaje);
             }
-        });
+            m_errorServicio = mensajes.isEmpty() ? tr("Algun filtro no es valido.")
+                                                 : mensajes.join(QLatin1Char(' '));
+            break;
+        }
+        case ErrorCrear::Tipo::DedupBloqueado:
+            m_errorServicio = tr("No se puede crear: ya existe una solicitud equivalente.");
+            if (error.duplicado) {
+                const QString motivo = textoDeMotivo(error.duplicado->motivo);
+                if (!motivo.isEmpty()) {
+                    m_errorServicio += QLatin1Char(' ') + motivo;
+                }
+                if (error.duplicado->solicitudReferencia) {
+                    m_solicitudExistenteId = error.duplicado->solicitudReferencia->texto();
+                }
+            }
+            break;
+        case ErrorCrear::Tipo::RequiereConfirmacion:
+            ++m_genEnvio;
+            m_snapshot = request;
+            m_motivoDuplicado = error.duplicado ? textoDeMotivo(error.duplicado->motivo)
+                                                : tr("Existe una solicitud equivalente.");
+            break;
+        case ErrorCrear::Tipo::Persistencia:
+        case ErrorCrear::Tipo::Integridad:
+            m_errorServicio = tr("No se pudo guardar la solicitud. Intenta de nuevo.");
+            break;
+        }
+    });
+}
+
+void NuevaSolicitudViewModel::confirmarDuplicado()
+{
+    if (!m_snapshot || m_ocupado) {
+        return;
+    }
+    const NuevaSolicitudRequest request = *m_snapshot;
+    actualizar([&] {
+        m_snapshot.reset();
+        m_motivoDuplicado.clear();
+    });
+    crearConfirmacion(request, ConfirmacionDuplicado::Confirmada);
+}
+
+void NuevaSolicitudViewModel::cancelarDuplicado()
+{
+    actualizar([&] {
+        ++m_genEnvio;
+        m_snapshot.reset();
+        m_motivoDuplicado.clear();
+        m_ocupado = false;
     });
 }
 
@@ -211,15 +479,32 @@ void NuevaSolicitudViewModel::reiniciar()
     const bool cambiaInicial = m_fechaInicial != inicial;
     const bool cambiaFinal = m_fechaFinal != final_;
     const bool cambiaRfc = !m_rfcContraparte.isEmpty();
+    const bool cambiaComprobante = !m_tipoComprobante.isEmpty();
+    const bool cambiaComplemento = !m_complemento.isEmpty();
+    const bool cambiaSimulado = m_perfilSimuladoRfc != rfcSimuladoPorDefecto()
+                                || m_perfilSimuladoRazonSocial != razonSocialSimuladaPorDefecto();
 
     actualizar([&] {
+        ++m_genEnvio;
+        ++m_genPerfilSimulado;
         m_perfilId.clear();
         m_tipoDescarga = tipo;
         m_fechaInicial = inicial;
         m_fechaFinal = final_;
         m_rfcContraparte.clear();
+        m_tipoComprobante.clear();
+        m_complemento.clear();
+        m_perfilSimuladoRfc = rfcSimuladoPorDefecto();
+        m_perfilSimuladoRazonSocial = razonSocialSimuladaPorDefecto();
+        m_perfilPorSeleccionar.clear();
         m_tocado = false;
+        m_ocupado = false;
+        m_creandoPerfil = false;
         m_errorServicio.clear();
+        m_errorPerfil.clear();
+        m_snapshot.reset();
+        m_motivoDuplicado.clear();
+        m_solicitudExistenteId.clear();
     });
     if (cambiaPerfil) {
         emit perfilIdChanged();
@@ -236,6 +521,15 @@ void NuevaSolicitudViewModel::reiniciar()
     if (cambiaRfc) {
         emit rfcContraparteChanged();
     }
+    if (cambiaComprobante) {
+        emit tipoComprobanteChanged();
+    }
+    if (cambiaComplemento) {
+        emit complementoChanged();
+    }
+    if (cambiaSimulado) {
+        emit perfilSimuladoChanged();
+    }
     cargarPerfiles();
 }
 
@@ -244,25 +538,63 @@ void NuevaSolicitudViewModel::cargarPerfiles()
     if (!m_perfiles) {
         return;
     }
-    m_perfiles->listarActivos().then(this, [this](PerfilesSatService::ResultadoLista r) {
+    const quint64 generacion = ++m_genPerfiles;
+    actualizar([&] { m_cargandoPerfiles = true; });
+    m_perfiles->listarActivos().then(this, [this, generacion](PerfilesSatService::ResultadoLista r) {
+        if (generacion != m_genPerfiles) {
+            return; // respuesta de una carga anterior
+        }
         actualizar([&] {
+            m_cargandoPerfiles = false;
             if (r.esExito()) {
                 m_perfilesDisponibles->reemplazar(std::move(r).valor());
+                m_perfilesCargados = true;
             } else {
-                m_perfilesDisponibles->reemplazar({});
                 m_errorServicio = tr("No se pudieron cargar los perfiles SAT.");
             }
         });
+        if (!m_perfilPorSeleccionar.isEmpty() && m_perfilesDisponibles->contiene(m_perfilPorSeleccionar)) {
+            const QString id = std::exchange(m_perfilPorSeleccionar, QString());
+            setPerfilId(id);
+        }
     });
 }
 
-void NuevaSolicitudViewModel::setOcupado(bool valor)
+void NuevaSolicitudViewModel::crearPerfilSimulado()
 {
-    if (m_ocupado == valor) {
+    if (!m_perfiles || m_creandoPerfil) {
         return;
     }
-    actualizar([&] { m_ocupado = valor; });
-    emit ocupadoChanged();
+    NuevoPerfilSimuladoRequest request;
+    request.rfc = m_perfilSimuladoRfc;
+    request.razonSocial = m_perfilSimuladoRazonSocial;
+    const quint64 generacion = ++m_genPerfilSimulado;
+    actualizar([&] {
+        m_creandoPerfil = true;
+        m_errorPerfil.clear();
+    });
+    m_perfiles->crearPerfilSimulado(request).then(
+        this, [this, generacion](PerfilesSatService::ResultadoCrearPerfil r) {
+            if (generacion != m_genPerfilSimulado) {
+                return;
+            }
+            if (r.esExito()) {
+                const QString id = r.valor().texto();
+                actualizar([&] { m_creandoPerfil = false; });
+                if (m_perfilesDisponibles->contiene(id)) {
+                    setPerfilId(id);
+                } else {
+                    // Se selecciona cuando llegue la recarga por perfilesCambiaron.
+                    m_perfilPorSeleccionar = id;
+                }
+                return;
+            }
+            const QString mensaje = textoDeErrorPerfil(r.error());
+            actualizar([&] {
+                m_creandoPerfil = false;
+                m_errorPerfil = mensaje;
+            });
+        });
 }
 
 } // namespace satcfdi

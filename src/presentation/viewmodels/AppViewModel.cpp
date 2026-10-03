@@ -18,6 +18,9 @@ AppViewModel::AppViewModel(NuevaSolicitudViewModel* nuevaSolicitud,
     Q_ASSERT(detalle != nullptr);
     connect(nuevaSolicitud, &NuevaSolicitudViewModel::submitted, this,
             [this](const QString& id) { abrirDetalle(id); });
+    // Tras eliminar desde el detalle se regresa a la lista (T003 2c).
+    connect(detalle, &SolicitudDetailViewModel::eliminada, this,
+            [this](const QString&) { mostrarLista(); });
 }
 
 void AppViewModel::mostrarLista()

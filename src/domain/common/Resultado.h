@@ -9,6 +9,7 @@ namespace satcfdi {
 
 // Resultado de una operacion: contiene exactamente un valor T (exito) o un
 // error E (fallo). Tipo propio C++20; no depende de std::expected.
+// Vive en domain para que domain, ports y application compartan el mismo tipo.
 //
 // Precondicion de acceso: valor() solo si esExito(); error() solo si
 // !esExito(). Violarla es un error de programacion (Q_ASSERT en debug).

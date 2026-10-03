@@ -14,6 +14,7 @@ SolicitudesListModel::SolicitudesListModel(SolicitudesService* servicio, QObject
     , m_servicio(servicio)
 {
     Q_ASSERT(servicio != nullptr);
+    connect(servicio, &SolicitudesService::listaCambiada, this, &SolicitudesListModel::refrescar);
     connect(servicio, &SolicitudesService::solicitudActualizada, this,
             [this](const SolicitudId&) { refrescar(); });
     refrescar();
@@ -91,35 +92,58 @@ QString SolicitudesListModel::idEn(int fila) const
     return (fila >= 0 && fila < m_filas.size()) ? m_filas.at(fila).id.texto() : QString();
 }
 
+SolicitudesListModel::Estado SolicitudesListModel::estado() const
+{
+    if (!m_errorMessage.isEmpty()) {
+        return m_cargando ? Estado::Cargando : Estado::Error;
+    }
+    if (!m_cargado) {
+        return Estado::Cargando;
+    }
+    return m_filas.isEmpty() ? Estado::Vacia : Estado::ConDatos;
+}
+
+template <typename F>
+void SolicitudesListModel::notificar(F&& cambio)
+{
+    const Estado estadoPrevio = estado();
+    const int conteoPrevio = count();
+    const bool vacioPrevio = vacio();
+    std::forward<F>(cambio)();
+    if (conteoPrevio != count()) {
+        emit countChanged();
+    }
+    if (vacioPrevio != vacio()) {
+        emit vacioChanged();
+    }
+    if (estadoPrevio != estado()) {
+        emit estadoChanged();
+    }
+}
+
 void SolicitudesListModel::refrescar()
 {
     if (!m_servicio) {
         return;
     }
     const quint64 generacion = ++m_generacion;
-    setCargando(true);
+    notificar([&] { setCargando(true); });
     m_servicio->listar().then(this, [this, generacion](SolicitudesService::ResultadoLista r) {
         if (generacion != m_generacion) {
-            return; // llego una respuesta mas reciente
+            return; // llego (o llegara) una respuesta mas reciente
         }
-        const bool estabaVacio = vacio();
-        const int conteoPrevio = count();
-        if (r.esExito()) {
-            beginResetModel();
-            m_filas = std::move(r).valor();
-            m_cargado = true;
-            endResetModel();
-            setErrorMessage(QString());
-        } else {
-            setErrorMessage(tr("No se pudo cargar la lista de solicitudes."));
-        }
-        setCargando(false);
-        if (conteoPrevio != count()) {
-            emit countChanged();
-        }
-        if (estabaVacio != vacio()) {
-            emit vacioChanged();
-        }
+        notificar([&] {
+            if (r.esExito()) {
+                beginResetModel();
+                m_filas = std::move(r).valor();
+                m_cargado = true;
+                endResetModel();
+                setErrorMessage(QString());
+            } else {
+                setErrorMessage(tr("No se pudo cargar la lista de solicitudes."));
+            }
+            setCargando(false);
+        });
     });
 }
 

@@ -47,6 +47,41 @@ const tiposDescarga = {
     "Recibidos": "Recibidos"
 }
 
+const tiposComprobante = {
+    "I": "Ingreso",
+    "E": "Egreso",
+    "T": "Traslado",
+    "N": "Nomina",
+    "P": "Pago"
+}
+
+const eventosLog = {
+    "solicitud_creada": "Solicitud creada",
+    "duplicado_confirmado": "Duplicado confirmado por el usuario",
+    "envio_iniciado": "Envio iniciado",
+    "solicitud_enviada": "Solicitud enviada",
+    "envio_fallido": "Envio fallido",
+    "envio_incierto": "Envio incierto",
+    "verificacion_realizada": "Verificacion realizada",
+    "verificacion_fallida": "Verificacion fallida",
+    "paquetes_registrados": "Paquetes registrados",
+    "descarga_iniciada": "Descarga iniciada",
+    "paquete_descargado": "Paquete descargado",
+    "descarga_fallida": "Descarga fallida",
+    "descarga_interrumpida": "Descarga interrumpida",
+    "paquete_reconciliado": "Paquete reconciliado",
+    "paquete_vencido": "Paquete vencido",
+    "archivo_huerfano": "Archivo huerfano",
+    "accion_pendiente_registrada": "Accion pendiente registrada",
+    "accion_pendiente_descartada": "Accion pendiente descartada"
+}
+
+const origenesLog = {
+    "worker": "Automatico",
+    "usuario": "Usuario",
+    "recuperacion": "Recuperacion"
+}
+
 function texto(tabla, clave, siVacio) {
     if (clave === null || clave === undefined || clave === "")
         return siVacio
@@ -59,6 +94,9 @@ function estadoLocal(clave) { return texto(estadosLocales, clave, "Sin estado") 
 function estadoSat(clave) { return texto(estadosSat, clave, "Sin respuesta del SAT") }
 function estadoDescarga(clave) { return texto(estadosDescarga, clave, "Sin estado") }
 function tipoDescarga(clave) { return texto(tiposDescarga, clave, "") }
+function tipoComprobante(clave) { return texto(tiposComprobante, clave, "Todos") }
+function eventoLog(clave) { return texto(eventosLog, clave, "Evento") }
+function origenLog(clave) { return texto(origenesLog, clave, "") }
 
 // Categoria visual (solo refuerza el texto; nunca lo sustituye).
 function tono(clave) {

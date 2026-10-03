@@ -14,4 +14,15 @@ QString claveEstable(EstadoDescarga estado)
     Q_UNREACHABLE_RETURN(QString());
 }
 
+std::optional<EstadoDescarga> estadoDescargaDesdeClave(QStringView clave)
+{
+    using D = EstadoDescarga;
+    for (D e : {D::Disponible, D::Descargando, D::Descargado, D::Error, D::Vencido}) {
+        if (clave == claveEstable(e)) {
+            return e;
+        }
+    }
+    return std::nullopt;
+}
+
 } // namespace satcfdi

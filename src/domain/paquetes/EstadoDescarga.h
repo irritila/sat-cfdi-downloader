@@ -1,6 +1,9 @@
 #pragma once
 
 #include <QString>
+#include <QStringView>
+
+#include <optional>
 
 namespace satcfdi {
 
@@ -15,6 +18,8 @@ enum class EstadoDescarga {
 };
 
 // Clave estable identica al nombre del enumerador.
+// Coincide con el CHECK de paquete_solicitud.estado_descarga (T001).
 QString claveEstable(EstadoDescarga estado);
+std::optional<EstadoDescarga> estadoDescargaDesdeClave(QStringView clave);
 
 } // namespace satcfdi

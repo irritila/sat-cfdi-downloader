@@ -18,19 +18,33 @@ class SolicitudesService;
 // estadoSat (clave o null), estadoResumen (clave derivada), creadaEn
 // (QDateTime UTC) y totalPaquetes.
 //
-// Se refresca al construirse y con SolicitudesService::solicitudActualizada.
-// Consume QFuture con then(this, ...); nunca bloquea el hilo grafico.
+// Estados (propiedad `estado`): Cargando (primera carga o reintento tras
+// error), Vacia, Error y ConDatos. Un refresco con datos ya visibles conserva
+// ConDatos y solo activa `cargando`.
+//
+// Se refresca al construirse y con SolicitudesService::listaCambiada y
+// solicitudActualizada. Consume QFuture con then(this, ...) y un token de
+// generacion: respuestas tardias de una carga anterior se descartan.
 class SolicitudesListModel : public QAbstractListModel {
     Q_OBJECT
     QML_ELEMENT
     QML_UNCREATABLE("Lo crea el composition root con un SolicitudesService.")
 
+    Q_PROPERTY(Estado estado READ estado NOTIFY estadoChanged)
     Q_PROPERTY(int count READ count NOTIFY countChanged)
     Q_PROPERTY(bool cargando READ cargando NOTIFY cargandoChanged)
     Q_PROPERTY(bool vacio READ vacio NOTIFY vacioChanged)
     Q_PROPERTY(QString errorMessage READ errorMessage NOTIFY errorMessageChanged)
 
 public:
+    enum class Estado {
+        Cargando,
+        Vacia,
+        Error,
+        ConDatos,
+    };
+    Q_ENUM(Estado)
+
     enum Rol {
         IdRole = Qt::UserRole + 1,
         PerfilRfcRole,
@@ -53,6 +67,7 @@ public:
     QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
     QHash<int, QByteArray> roleNames() const override;
 
+    Estado estado() const;
     int count() const { return int(m_filas.size()); }
     bool cargando() const { return m_cargando; }
     // Verdadero solo despues de una carga exitosa sin filas.
@@ -69,6 +84,7 @@ public slots:
     void refrescar();
 
 signals:
+    void estadoChanged();
     void countChanged();
     void cargandoChanged();
     void vacioChanged();
@@ -77,6 +93,9 @@ signals:
 private:
     void setCargando(bool valor);
     void setErrorMessage(const QString& mensaje);
+    // Ejecuta `cambio` y notifica estado/count/vacio si cambiaron.
+    template <typename F>
+    void notificar(F&& cambio);
 
     QPointer<SolicitudesService> m_servicio;
     QList<SolicitudResumen> m_filas;

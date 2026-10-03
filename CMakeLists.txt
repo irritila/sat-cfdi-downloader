@@ -14,8 +14,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(warnings)
 
-# Componentes Qt de T002. Prohibidos en T002: Sql (entra con T003) y Network
-# (entra con las tareas SAT).
+# Componentes Qt. Sql (T003) solo lo enlaza satcfdi_infrastructure (y sus
+# pruebas). Network sigue prohibido hasta las tareas SAT.
 find_package(Qt6 6.8 REQUIRED COMPONENTS
     Core
     Gui
@@ -23,6 +23,7 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS
     Qml
     Quick
     QuickControls2
+    Sql
     Test
     QuickTest
 )
@@ -60,8 +61,11 @@ add_subdirectory(src/ports)
 add_subdirectory(src/application)
 add_subdirectory(src/infrastructure)
 add_subdirectory(src/presentation)
+add_subdirectory(src/app_core)
 add_subdirectory(src/app)
 
-# Pruebas.
+# Pruebas por label: unit, infrastructure, integration, presentation.
 add_subdirectory(tests/unit)
+add_subdirectory(tests/infrastructure)
+add_subdirectory(tests/integration)
 add_subdirectory(tests/presentation)

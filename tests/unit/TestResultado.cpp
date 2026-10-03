@@ -1,6 +1,6 @@
 #include "TestResultado.h"
 
-#include "application/common/Resultado.h"
+#include "domain/common/Resultado.h"
 
 #include <QString>
 #include <QTest>

@@ -6,7 +6,8 @@ import QtQuick.Layouts
 
 import "Etiquetas.js" as Etiquetas
 
-// Lista de solicitudes. Teclado: foco inicial en la lista (o en "Nueva
+// Lista de solicitudes con estados Cargando, Vacia, Error y ConDatos
+// (SolicitudesListModel.estado). Teclado: foco inicial en la lista (o en "Nueva
 // solicitud" si esta vacia); flechas para moverse; Enter/Return/Espacio abre
 // el detalle por id; Tab alterna entre lista y boton.
 Page {
@@ -24,10 +25,24 @@ Page {
     Component.onCompleted: Qt.callLater(pagina.enfocarInicial)
 
     function enfocarInicial() {
-        if (lista.count > 0)
+        if (lista.visible && lista.count > 0)
             lista.forceActiveFocus(Qt.TabFocusReason)
         else
             botonNueva.forceActiveFocus(Qt.TabFocusReason)
+    }
+
+    // Si la primera carga termina despues del foco inicial, el foco pasa a la
+    // lista (solo desde el estado Cargando, para no mover el foco del usuario).
+    property int estadoAnterior: pagina.modelo.estado
+    Connections {
+        target: pagina.modelo
+        function onEstadoChanged() {
+            if (pagina.estadoAnterior === SolicitudesListModel.Cargando
+                    && pagina.modelo.estado === SolicitudesListModel.ConDatos
+                    && botonNueva.activeFocus)
+                lista.forceActiveFocus(Qt.OtherFocusReason)
+            pagina.estadoAnterior = pagina.modelo.estado
+        }
     }
 
     function abrir(id) {
@@ -45,7 +60,7 @@ Page {
             text: qsTr("Nueva solicitud")
             descripcion: qsTr("Abrir el formulario de nueva solicitud")
             highlighted: true
-            KeyNavigation.tab: lista.count > 0 ? lista : null
+            KeyNavigation.tab: lista.visible ? lista : (botonReintentar.visible ? botonReintentar : null)
             onClicked: pagina.app.mostrarNueva()
         }
     }
@@ -57,7 +72,7 @@ Page {
         anchors.margins: 8
         clip: true
         spacing: 4
-        visible: count > 0
+        visible: pagina.modelo.estado === SolicitudesListModel.ConDatos
         model: pagina.modelo
         currentIndex: count > 0 ? 0 : -1
         activeFocusOnTab: true
@@ -138,12 +153,12 @@ Page {
         }
     }
 
-    // Estado vacio
+    // Estado: vacia
     ColumnLayout {
         objectName: "estadoVacio"
         anchors.centerIn: parent
         width: Math.min(parent.width - 32, 420)
-        visible: pagina.modelo.vacio
+        visible: pagina.modelo.estado === SolicitudesListModel.Vacia
         spacing: 12
 
         Accessible.role: Accessible.StaticText
@@ -166,24 +181,54 @@ Page {
         }
     }
 
-    // Carga y error
-    BusyIndicator {
+    // Estado: cargando
+    ColumnLayout {
+        objectName: "estadoCargando"
         anchors.centerIn: parent
-        running: pagina.modelo.cargando && lista.count === 0
-        visible: running
+        visible: pagina.modelo.estado === SolicitudesListModel.Cargando
+        spacing: 8
+        Accessible.role: Accessible.StaticText
         Accessible.name: qsTr("Cargando solicitudes")
+
+        BusyIndicator {
+            running: parent.visible
+            Layout.alignment: Qt.AlignHCenter
+            Accessible.ignored: true
+        }
+        Label {
+            text: qsTr("Cargando solicitudes...")
+            Layout.alignment: Qt.AlignHCenter
+            Accessible.ignored: true
+        }
     }
-    Label {
-        objectName: "errorLista"
-        anchors.bottom: parent.bottom
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.margins: 8
-        visible: text.length > 0
-        text: pagina.modelo.errorMessage
-        color: "#b00020"
-        wrapMode: Text.WordWrap
-        Accessible.role: Accessible.AlertMessage
-        Accessible.name: text
+
+    // Estado: error
+    ColumnLayout {
+        objectName: "estadoError"
+        anchors.centerIn: parent
+        width: Math.min(parent.width - 32, 420)
+        visible: pagina.modelo.estado === SolicitudesListModel.Error
+        spacing: 12
+
+        Label {
+            objectName: "errorLista"
+            text: pagina.modelo.errorMessage
+            color: "#b00020"
+            font.bold: true
+            wrapMode: Text.WordWrap
+            horizontalAlignment: Text.AlignHCenter
+            Layout.fillWidth: true
+            Accessible.role: Accessible.AlertMessage
+            Accessible.name: qsTr("Error: %1").arg(text)
+        }
+        BotonAccion {
+            id: botonReintentar
+            objectName: "botonReintentarLista"
+            text: qsTr("Reintentar")
+            descripcion: qsTr("Volver a cargar la lista de solicitudes")
+            Layout.alignment: Qt.AlignHCenter
+            KeyNavigation.tab: botonNueva
+            onClicked: pagina.modelo.refrescar()
+        }
     }
 }

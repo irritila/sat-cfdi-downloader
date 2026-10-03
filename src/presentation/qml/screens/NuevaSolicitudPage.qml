@@ -4,10 +4,12 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// Formulario de nueva solicitud. Solo layout y estado visual: la validacion y
-// el envio viven en NuevaSolicitudViewModel. Teclado: foco inicial en el
-// selector de perfil; Tab recorre los campos; Enter en un campo de texto o en
-// "Crear solicitud" envia; Escape o "Regresar" vuelve a la lista.
+// Formulario de nueva solicitud. Solo layout y estado visual: validacion,
+// evaluacion de duplicados y envio viven en NuevaSolicitudViewModel.
+// Teclado: foco inicial en el selector de perfil (o en "Crear perfil simulado"
+// si no hay perfiles); Tab recorre los campos; Enter en un campo de texto o en
+// "Crear solicitud" envia; Escape o "Regresar" vuelve a la lista. El dialogo de
+// duplicado inicia en "Cancelar" y Escape lo cancela.
 Page {
     id: pagina
     objectName: "paginaNuevaSolicitud"
@@ -20,17 +22,74 @@ Page {
     Accessible.name: qsTr("Nueva solicitud de descarga masiva")
 
     // Foco inicial diferido: la pagina ya esta en la ventana.
-    Component.onCompleted: Qt.callLater(pagina.enfocarInicial)
+    Component.onCompleted: {
+        pagina.sinPerfilesAnterior = pagina.formulario.sinPerfiles
+        Qt.callLater(pagina.enfocarInicial)
+    }
 
+    // El foco inicial es diferido: si para entonces ya hay un dialogo
+    // abierto, no se le quita el foco.
     function enfocarInicial() {
-        selectorPerfil.forceActiveFocus(Qt.TabFocusReason)
+        if (dialogoDuplicado.visible)
+            return
+        if (pagina.formulario.sinPerfiles)
+            campoRfcSimulado.forceActiveFocus(Qt.TabFocusReason)
+        else
+            selectorPerfil.forceActiveFocus(Qt.TabFocusReason)
     }
 
     function regresar() {
         pagina.app.mostrarLista()
     }
 
+    function enfocarEnviar() {
+        botonEnviar.forceActiveFocus(Qt.TabFocusReason)
+    }
+
     Keys.onEscapePressed: regresar()
+
+    // Valor previo (sin binding) para detectar transiciones.
+    property bool sinPerfilesAnterior: false
+
+    Connections {
+        target: pagina.formulario
+        function onEstadoChanged() {
+            // Mueve el foco si la seccion de perfil simulado aparece o se oculta.
+            if (pagina.formulario.sinPerfiles !== pagina.sinPerfilesAnterior) {
+                pagina.sinPerfilesAnterior = pagina.formulario.sinPerfiles
+                // El dialogo modal, si esta abierto, conserva el foco.
+                if (!dialogoDuplicado.visible) {
+                    if (pagina.formulario.sinPerfiles)
+                        campoRfcSimulado.forceActiveFocus(Qt.OtherFocusReason)
+                    else
+                        selectorPerfil.forceActiveFocus(Qt.OtherFocusReason)
+                }
+            }
+
+            if (pagina.formulario.confirmacionPendiente && !dialogoDuplicado.opened)
+                dialogoDuplicado.open()
+            else if (!pagina.formulario.confirmacionPendiente && dialogoDuplicado.opened) {
+                dialogoDuplicado.resuelto = true
+                dialogoDuplicado.close()
+            }
+        }
+    }
+
+    DialogoConfirmacion {
+        id: dialogoDuplicado
+        objectName: "dialogoDuplicado"
+        prefijoNombre: "dialogoDuplicado"
+        title: qsTr("Solicitud posiblemente duplicada")
+        mensaje: qsTr("%1\n\nPuedes crear otra solicitud con los mismos filtros o cancelar.")
+                     .arg(pagina.formulario.motivoDuplicado)
+        textoConfirmar: qsTr("Crear de todos modos")
+        textoCancelar: qsTr("Cancelar")
+        onConfirmado: pagina.formulario.confirmarDuplicado()
+        onCancelado: {
+            pagina.formulario.cancelarDuplicado()
+            Qt.callLater(pagina.enfocarEnviar)
+        }
+    }
 
     header: EncabezadoPagina {
         titulo: qsTr("Nueva solicitud")
@@ -50,6 +109,70 @@ Page {
 
             Item { implicitHeight: 8 }
 
+            // Sin perfiles activos: accion explicita "Crear perfil simulado".
+            GroupBox {
+                id: seccionPerfilSimulado
+                objectName: "seccionPerfilSimulado"
+                visible: pagina.formulario.sinPerfiles
+                title: qsTr("No hay perfiles SAT activos")
+                Layout.fillWidth: true
+                Layout.leftMargin: 16
+                Layout.rightMargin: 16
+                Accessible.role: Accessible.Grouping
+                Accessible.name: title
+
+                ColumnLayout {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    spacing: 6
+
+                    Label {
+                        text: qsTr("Crea un perfil simulado (sin credenciales) para poder registrar solicitudes locales.")
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
+                    }
+                    Label { text: qsTr("RFC del perfil"); Accessible.ignored: true }
+                    TextField {
+                        id: campoRfcSimulado
+                        objectName: "campoRfcSimulado"
+                        Layout.fillWidth: true
+                        text: pagina.formulario.perfilSimuladoRfc
+                        maximumLength: 13
+                        onTextEdited: pagina.formulario.perfilSimuladoRfc = text
+                        onAccepted: pagina.formulario.crearPerfilSimulado()
+                        Accessible.name: qsTr("RFC del perfil simulado")
+                    }
+                    Label { text: qsTr("Razon social"); Accessible.ignored: true }
+                    TextField {
+                        objectName: "campoRazonSocialSimulada"
+                        Layout.fillWidth: true
+                        text: pagina.formulario.perfilSimuladoRazonSocial
+                        onTextEdited: pagina.formulario.perfilSimuladoRazonSocial = text
+                        onAccepted: pagina.formulario.crearPerfilSimulado()
+                        Accessible.name: qsTr("Razon social del perfil simulado")
+                    }
+                    Label {
+                        objectName: "errorPerfilSimulado"
+                        visible: text.length > 0
+                        text: pagina.formulario.errorPerfilMessage
+                        color: "#b00020"
+                        font.bold: true
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
+                        Accessible.role: Accessible.AlertMessage
+                        Accessible.name: qsTr("Error: %1").arg(text)
+                    }
+                    BotonAccion {
+                        objectName: "botonCrearPerfilSimulado"
+                        text: qsTr("Crear perfil simulado")
+                        descripcion: qsTr("Crear un perfil SAT simulado sin credenciales")
+                        enabled: !pagina.formulario.creandoPerfil
+                        Layout.alignment: Qt.AlignRight
+                        onClicked: pagina.formulario.crearPerfilSimulado()
+                    }
+                }
+            }
+
             Label {
                 text: qsTr("Perfil SAT")
                 Layout.leftMargin: 16
@@ -62,6 +185,7 @@ Page {
                 Layout.leftMargin: 16
                 Layout.rightMargin: 16
                 focusPolicy: Qt.StrongFocus
+                enabled: !pagina.formulario.sinPerfiles
                 model: pagina.formulario.perfilesDisponibles
                 textRole: "etiqueta"
                 valueRole: "id"
@@ -69,18 +193,12 @@ Page {
                 currentIndex: pagina.formulario.perfilesDisponibles.count > 0
                               ? pagina.formulario.perfilesDisponibles.filaDe(pagina.formulario.perfilId)
                               : -1
-                displayText: currentIndex < 0 ? qsTr("Selecciona un perfil SAT") : currentText
+                displayText: pagina.formulario.cargandoPerfiles && count === 0
+                             ? qsTr("Cargando perfiles...")
+                             : (currentIndex < 0 ? qsTr("Selecciona un perfil SAT") : currentText)
                 onActivated: (indice) => { pagina.formulario.perfilId = valueAt(indice) }
                 Accessible.name: qsTr("Perfil SAT")
                 Accessible.description: displayText
-            }
-            Label {
-                visible: pagina.formulario.perfilesDisponibles.count === 0
-                text: qsTr("No hay perfiles SAT activos disponibles.")
-                wrapMode: Text.WordWrap
-                Layout.fillWidth: true
-                Layout.leftMargin: 16
-                Layout.rightMargin: 16
             }
 
             Label {
@@ -121,7 +239,6 @@ Page {
                     Layout.fillWidth: true
                     Label { text: qsTr("Fecha inicial (AAAA-MM-DD)"); Accessible.ignored: true }
                     TextField {
-                        id: campoFechaInicial
                         objectName: "campoFechaInicial"
                         Layout.fillWidth: true
                         text: pagina.formulario.fechaInicial
@@ -136,7 +253,6 @@ Page {
                     Layout.fillWidth: true
                     Label { text: qsTr("Fecha final (AAAA-MM-DD)"); Accessible.ignored: true }
                     TextField {
-                        id: campoFechaFinal
                         objectName: "campoFechaFinal"
                         Layout.fillWidth: true
                         text: pagina.formulario.fechaFinal
@@ -156,7 +272,6 @@ Page {
                 Accessible.ignored: true
             }
             TextField {
-                id: campoRfc
                 objectName: "campoRfcContraparte"
                 Layout.fillWidth: true
                 Layout.leftMargin: 16
@@ -168,8 +283,53 @@ Page {
                 Accessible.name: qsTr("RFC contraparte, opcional")
             }
 
+            GridLayout {
+                columns: desplazamiento.availableWidth >= 520 ? 2 : 1
+                columnSpacing: 16
+                rowSpacing: 6
+                Layout.fillWidth: true
+                Layout.leftMargin: 16
+                Layout.rightMargin: 16
+                Layout.topMargin: 8
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    Label { text: qsTr("Tipo de comprobante (opcional)"); Accessible.ignored: true }
+                    ComboBox {
+                        objectName: "campoTipoComprobante"
+                        Layout.fillWidth: true
+                        focusPolicy: Qt.StrongFocus
+                        textRole: "texto"
+                        valueRole: "clave"
+                        model: [
+                            { clave: "", texto: qsTr("Todos") },
+                            { clave: "I", texto: qsTr("I - Ingreso") },
+                            { clave: "E", texto: qsTr("E - Egreso") },
+                            { clave: "T", texto: qsTr("T - Traslado") },
+                            { clave: "N", texto: qsTr("N - Nomina") },
+                            { clave: "P", texto: qsTr("P - Pago") }
+                        ]
+                        currentIndex: indexOfValue(pagina.formulario.tipoComprobante)
+                        onActivated: (indice) => { pagina.formulario.tipoComprobante = valueAt(indice) }
+                        Accessible.name: qsTr("Tipo de comprobante, opcional")
+                        Accessible.description: displayText
+                    }
+                }
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    Label { text: qsTr("Complemento (opcional)"); Accessible.ignored: true }
+                    TextField {
+                        objectName: "campoComplemento"
+                        Layout.fillWidth: true
+                        text: pagina.formulario.complemento
+                        onTextEdited: pagina.formulario.complemento = text
+                        onAccepted: pagina.formulario.submit()
+                        Accessible.name: qsTr("Complemento, opcional")
+                    }
+                }
+            }
+
             Label {
-                id: mensajeError
                 objectName: "mensajeError"
                 visible: text.length > 0
                 text: pagina.formulario.errorMessage
@@ -192,6 +352,13 @@ Page {
                 Layout.bottomMargin: 16
                 spacing: 8
 
+                BotonAccion {
+                    objectName: "botonVerSolicitudExistente"
+                    visible: pagina.formulario.solicitudExistenteId.length > 0
+                    text: qsTr("Ver solicitud existente")
+                    descripcion: qsTr("Abrir el detalle de la solicitud equivalente")
+                    onClicked: pagina.app.abrirDetalle(pagina.formulario.solicitudExistenteId)
+                }
                 Item { Layout.fillWidth: true }
                 BusyIndicator {
                     running: pagina.formulario.ocupado

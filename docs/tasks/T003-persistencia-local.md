@@ -2,7 +2,7 @@
 
 ## Estado
 
-Pendiente
+Completada
 
 ## Prioridad y tamano
 
@@ -262,25 +262,25 @@ Reglas defensivas sobre texto libre:
 
 ## Criterios de aceptacion
 
-- [ ] La app fija `organizationName="Adenium"` y `applicationName="SAT CFDI Downloader"` antes de resolver la ruta de datos.
-- [ ] La app crea o abre `satcfdi.sqlite3` en `QStandardPaths::AppDataLocation` o en `--data-dir` cuando se use esa opcion.
-- [ ] La migracion inicial se carga desde `:/migrations/001_initial_schema.sql`, se aplica una sola vez y una segunda apertura no duplica tablas, indices, `schema_migrations` ni `configuracion_app`.
-- [ ] Una base con version futura se rechaza sin modificar el archivo.
-- [ ] Cada conexion SQLite verifica `foreign_keys=ON`, `busy_timeout` y WAL cuando aplique.
-- [ ] Se puede crear un perfil SAT simulado de forma visible cuando no hay perfiles activos, y consultarlo por RFC.
-- [ ] Se puede crear una solicitud local simulada con `estado_local=Creada`, estado SAT, `id_solicitud_sat`, codigos y mensajes en `NULL`, `rfc_solicitante` del perfil y `dedup_key v1`.
-- [ ] La clasificacion de duplicados cumple la matriz de esta tarea y la UI permite confirmar solo los casos `RequiereConfirmacion`.
-- [ ] Una solicitud creada aparece en la lista y detalle despues de reiniciar la app.
-- [ ] El detalle muestra filtros, estados, codigos y fechas persistidos; estados/codigos que T003 no produce se verifican con fixtures.
-- [ ] Los paquetes y logs relacionados se consultan por solicitud; paquetes representativos provienen de fixtures de prueba.
-- [ ] La accion visible de eliminar marca logicamente solicitud, paquetes y logs en una sola transaccion, sin borrar fisicamente registros.
-- [ ] Una solicitud eliminada no aparece en consultas normales; `obtener(id)` devuelve `NoEncontrado` y el detalle muestra "solicitud no encontrada".
-- [ ] Eliminar un id inexistente o ya eliminado devuelve exito idempotente con `cambio=false`.
-- [ ] Las restricciones de RFC, credencial unica, paquete unico, configuracion unica y FK se verifican con SQLite real; las violaciones se traducen a errores tipados sin exponer `QSqlError`.
-- [ ] Ninguna operacion SQL se ejecuta en el hilo grafico, y la UI procesa eventos mientras un repositorio fake esta bloqueado.
-- [ ] `LogSanitizer` redacta con el catalogo cerrado de marcadores, preserva identificadores no sensibles, es idempotente y respeta limites de longitud.
-- [ ] Los tests de centinela confirman que secretos no aparecen en `.sqlite3`, `-wal` ni `-shm` antes del cierre; tras cerrar, la ausencia de `-wal`/`-shm` es valida y el archivo principal queda limpio.
-- [ ] No se agregan llamadas SAT, `Qt6::Network`, Keychain/Security framework, worker, `OperacionExecutor`, creacion de carpeta ZIP ni escritura de ZIP.
+- [x] La app fija `organizationName="Adenium"` y `applicationName="SAT CFDI Downloader"` antes de resolver la ruta de datos.
+- [x] La app crea o abre `satcfdi.sqlite3` en `QStandardPaths::AppDataLocation` o en `--data-dir` cuando se use esa opcion.
+- [x] La migracion inicial se carga desde `:/migrations/001_initial_schema.sql`, se aplica una sola vez y una segunda apertura no duplica tablas, indices, `schema_migrations` ni `configuracion_app`.
+- [x] Una base con version futura se rechaza sin modificar el archivo.
+- [x] Cada conexion SQLite verifica `foreign_keys=ON`, `busy_timeout` y WAL cuando aplique.
+- [x] Se puede crear un perfil SAT simulado de forma visible cuando no hay perfiles activos, y consultarlo por RFC.
+- [x] Se puede crear una solicitud local simulada con `estado_local=Creada`, estado SAT, `id_solicitud_sat`, codigos y mensajes en `NULL`, `rfc_solicitante` del perfil y `dedup_key v1`.
+- [x] La clasificacion de duplicados cumple la matriz de esta tarea y la UI permite confirmar solo los casos `RequiereConfirmacion`.
+- [x] Una solicitud creada aparece en la lista y detalle despues de reiniciar la app.
+- [x] El detalle muestra filtros, estados, codigos y fechas persistidos; estados/codigos que T003 no produce se verifican con fixtures.
+- [x] Los paquetes y logs relacionados se consultan por solicitud; paquetes representativos provienen de fixtures de prueba.
+- [x] La accion visible de eliminar marca logicamente solicitud, paquetes y logs en una sola transaccion, sin borrar fisicamente registros.
+- [x] Una solicitud eliminada no aparece en consultas normales; `obtener(id)` devuelve `NoEncontrado` y el detalle muestra "solicitud no encontrada".
+- [x] Eliminar un id inexistente o ya eliminado devuelve exito idempotente con `cambio=false`.
+- [x] Las restricciones de RFC, credencial unica, paquete unico, configuracion unica y FK se verifican con SQLite real; las violaciones se traducen a errores tipados sin exponer `QSqlError`.
+- [x] Ninguna operacion SQL se ejecuta en el hilo grafico, y la UI procesa eventos mientras un repositorio fake esta bloqueado.
+- [x] `LogSanitizer` redacta con el catalogo cerrado de marcadores, preserva identificadores no sensibles, es idempotente y respeta limites de longitud.
+- [x] Los tests de centinela confirman que secretos no aparecen en `.sqlite3`, `-wal` ni `-shm` antes del cierre; tras cerrar, la ausencia de `-wal`/`-shm` es valida y el archivo principal queda limpio.
+- [x] No se agregan llamadas SAT, `Qt6::Network`, Keychain/Security framework, worker, `OperacionExecutor`, creacion de carpeta ZIP ni escritura de ZIP.
 
 ## Verificacion
 
@@ -334,7 +334,16 @@ Manual:
 
 ## Resultado
 
-Pendiente.
+Completada el 2026-10-03.
+
+- Persistencia SQLite real: `SqlitePersistencia`, repositorios, `UnitOfWork` con `BEGIN IMMEDIATE`, migracion embebida y rechazo de version futura.
+- `AppBootstrapper` en `satcfdi_app_core`: `--data-dir`, `AppDataLocation`, migracion en hilo temporal antes de QML y error fatal minimo.
+- `PersistenceDispatcher` en hilo dedicado; servicios persistidos con senales tras commit; `crear()` conservado como fachada.
+- `dedup_key v1` con vectores golden; matriz de duplicados y confirmacion en UI.
+- `RegexLogSanitizer` reusable, revisado por seguridad; centinelas en `.sqlite3`, `-wal` y `-shm`.
+- `ctest`: unit, infrastructure, integration y presentation pasan; build sin warnings con `SATCFDI_WARNINGS_AS_ERRORS=ON`.
+- Comprobacion manual con `--data-dir`: perfil simulado, creacion, reinicio y eliminacion correctos.
+- Limitaciones: el sanitizer redacta Authorization hasta fin de linea y rutas largas como base64; "solicitud no encontrada" solo se verifica con pruebas; `libqsqlite` no se copia al bundle.
 
 ## Riesgos y notas
 
