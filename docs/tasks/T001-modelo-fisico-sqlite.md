@@ -2,7 +2,7 @@
 
 ## Estado
 
-Pendiente
+Completada
 
 ## Prioridad y tamano
 
@@ -132,30 +132,30 @@ El refinamiento de T001 cerro las reglas de vencimiento, deduplicacion, perfiles
 
 ## Criterios de aceptacion
 
-- [ ] El documento fisico describe las seis tablas, todas sus columnas, tipos, nulabilidad y restricciones.
-- [ ] `solicitud_masiva` separa `estado_local` de `estado_solicitud_sat`.
-- [ ] Los codigos y mensajes de creacion, verificacion y descarga no se mezclan.
-- [ ] `paquete_solicitud` conserva ruta local, estado de descarga, motivo/origen de vencimiento y datos de reconciliacion.
-- [ ] Las cuatro entidades con eliminacion logica tienen `eliminado_en` y reglas de consulta documentadas.
-- [ ] El esquema permite como maximo una credencial vigente por perfil y permite perfil sin credencial.
-- [ ] El esquema impide perfiles no eliminados duplicados por RFC, incluso si alguno tiene `activo=false`.
-- [ ] La regla de solicitudes equivalentes por `dedup_key` queda expresada mediante indice o validacion documentada.
-- [ ] `dedup_key` no incluye `perfil_sat_id` y `solicitud_masiva` persiste `rfc_solicitante`.
-- [ ] El indice parcial no bloquea D002, D003 ni D008, y la validacion transaccional documenta sus advertencias y confirmaciones.
-- [ ] Una solicitud `Terminada` con todos sus paquetes no eliminados en `Descargado` sigue bloqueando una solicitud equivalente.
-- [ ] `estado_local` no contiene `EliminadaLocalmente` y `estado_descarga` no contiene `EliminadoLocalmente`.
-- [ ] `estado_solicitud_sat` no se escribe desde la respuesta de creacion.
-- [ ] `Rechazada` solo representa `EstadoSolicitud=5`; `Vencida` solo representa `EstadoSolicitud=6`.
-- [ ] Vencimiento de paquete por `5007` o estimacion local no cambia `estado_solicitud_sat`.
-- [ ] `configuracion_app` queda restringida a un solo registro.
-- [ ] Los indices cubren monitoreo, paquetes pendientes y logs del detalle.
-- [ ] La migracion se aplica correctamente sobre una base vacia.
-- [ ] La migracion no modifica una base ya actualizada cuando se ejecuta nuevamente.
-- [ ] Si la migracion falla a mitad, se revierte y no avanza `schema_migrations`.
-- [ ] `PRAGMA integrity_check` y `PRAGMA foreign_key_check` no reportan errores.
-- [ ] Cada CHECK y UNIQUE relevante tiene al menos un caso negativo documentado o verificado.
-- [ ] Las transacciones de crear, verificar, descargar, recuperar y eliminar estan descritas y son compatibles con el esquema.
-- [ ] No existe ninguna columna para XML, CFDI individual, clientes, usuarios o funcionalidades fuera del MVP.
+- [x] El documento fisico describe las seis tablas, todas sus columnas, tipos, nulabilidad y restricciones.
+- [x] `solicitud_masiva` separa `estado_local` de `estado_solicitud_sat`.
+- [x] Los codigos y mensajes de creacion, verificacion y descarga no se mezclan.
+- [x] `paquete_solicitud` conserva ruta local, estado de descarga, motivo/origen de vencimiento y datos de reconciliacion.
+- [x] Las cuatro entidades con eliminacion logica tienen `eliminado_en` y reglas de consulta documentadas.
+- [x] El esquema permite como maximo una credencial vigente por perfil y permite perfil sin credencial.
+- [x] El esquema impide perfiles no eliminados duplicados por RFC, incluso si alguno tiene `activo=false`.
+- [x] La regla de solicitudes equivalentes por `dedup_key` queda expresada mediante indice o validacion documentada.
+- [x] `dedup_key` no incluye `perfil_sat_id` y `solicitud_masiva` persiste `rfc_solicitante`.
+- [x] El indice parcial no bloquea D002, D003 ni D008, y la validacion transaccional documenta sus advertencias y confirmaciones.
+- [x] Una solicitud `Terminada` con todos sus paquetes no eliminados en `Descargado` sigue bloqueando una solicitud equivalente.
+- [x] `estado_local` no contiene `EliminadaLocalmente` y `estado_descarga` no contiene `EliminadoLocalmente`.
+- [x] `estado_solicitud_sat` no se escribe desde la respuesta de creacion.
+- [x] `Rechazada` solo representa `EstadoSolicitud=5`; `Vencida` solo representa `EstadoSolicitud=6`.
+- [x] Vencimiento de paquete por `5007` o estimacion local no cambia `estado_solicitud_sat`.
+- [x] `configuracion_app` queda restringida a un solo registro.
+- [x] Los indices cubren monitoreo, paquetes pendientes y logs del detalle.
+- [x] La migracion se aplica correctamente sobre una base vacia.
+- [x] La migracion no modifica una base ya actualizada cuando se ejecuta nuevamente.
+- [x] Si la migracion falla a mitad, se revierte y no avanza `schema_migrations`.
+- [x] `PRAGMA integrity_check` y `PRAGMA foreign_key_check` no reportan errores.
+- [x] Cada CHECK y UNIQUE relevante tiene al menos un caso negativo documentado o verificado.
+- [x] Las transacciones de crear, verificar, descargar, recuperar y eliminar estan descritas y son compatibles con el esquema.
+- [x] No existe ninguna columna para XML, CFDI individual, clientes, usuarios o funcionalidades fuera del MVP.
 
 ## Verificacion
 
@@ -177,7 +177,14 @@ El refinamiento de T001 cerro las reglas de vencimiento, deduplicacion, perfiles
 
 ## Resultado
 
-Pendiente.
+Completada el 2026-10-03.
+
+- Modelo fisico: `docs/design/sqlite-physical-model.md`.
+- Migracion inicial: `src/infrastructure/persistence/migrations/001_initial_schema.sql`.
+- Verificacion reproducible sin Qt: `python3 tests/infrastructure/sql/verify_t001.py` (14 tests OK con SQLite 3.51.0).
+- Contrato de migraciones fijado: el runner de T003 es propietario de `schema_migrations`; cada sentencia del SQL termina con una linea que solo contiene `;`; sintaxis limitada a SQLite >= 3.9.0 con JSON1.
+- Todos los criterios de aceptacion tienen evidencia; el bloqueo transaccional de `Terminada` y las excepciones D002/D003/D008 quedan documentados para `evaluarDuplicado` en T003.
+- Pendiente para T003: verificar la SQLite efectiva de `QSQLITE` (`sqlite_version()` y `json_valid`).
 
 ## Riesgos y notas
 

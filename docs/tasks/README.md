@@ -16,7 +16,7 @@ Ejemplo: `T001-modelo-fisico-sqlite.md`.
 
 | Tarea | Estado | Resultado |
 | --- | --- | --- |
-| [T001](T001-modelo-fisico-sqlite.md) | Pendiente | Modelo fisico SQLite |
+| [T001](T001-modelo-fisico-sqlite.md) | Completada | Modelo fisico SQLite |
 | [T002](T002-shell-qt-qml.md) | Pendiente | Shell Qt/QML ejecutable |
 | [T003](T003-persistencia-local.md) | Pendiente | Persistencia local de solicitudes |
 | [T004](T004-ciclo-vida-macos.md) | Pendiente | Ciclo de vida macOS y menu bar |
