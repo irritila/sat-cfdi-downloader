@@ -5,6 +5,9 @@
 # solo se instancian en el composition root (o en pruebas).
 qt_add_library(satcfdi_application STATIC
     common/Errores.h
+    configuration/ConfiguracionAppService.h
+    configuration/ConfiguracionAppServicePersistido.h
+    configuration/ConfiguracionAppServicePersistido.cpp
     logging/RegexLogSanitizer.h
     logging/RegexLogSanitizer.cpp
     persistence/PersistenceDispatcher.h

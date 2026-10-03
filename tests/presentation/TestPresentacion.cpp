@@ -103,7 +103,9 @@ struct Vista {
     {
     }
 
-    bool cargar()
+    // Main.qml arranca oculta (T004); por defecto el fixture la muestra como
+    // lo haria AppLifecycleController en un arranque manual.
+    bool cargar(bool mostrar = true)
     {
         engine.setInitialProperties(vms.initialProperties());
         engine.loadFromModule("SatCfdiDownloader", "Main");
@@ -111,6 +113,9 @@ struct Vista {
             return false;
         }
         ventana = qobject_cast<QQuickWindow*>(engine.rootObjects().constFirst());
+        if (ventana && mostrar) {
+            ventana->show();
+        }
         return ventana != nullptr;
     }
 
@@ -285,6 +290,8 @@ private slots:
     // T002 (adaptadas al contrato T003)
     void rolesDelModelo();
     void cargaQmlSinWarnings();
+    void ventanaArrancaOculta();
+    void nuevaSolicitudDesdeCppConVentanaOculta();
     void estadoVacioConDatosVacios();
     void navegacionListaADetallePorId();
     void envioValidoAbreDetalleYApareceEnLista();
@@ -391,6 +398,47 @@ void TestPresentacion::cargaQmlSinWarnings()
     QVERIFY(!e.item(QStringLiteral("estadoCargando"))->isVisible());
     QVERIFY(!e.item(QStringLiteral("estadoError"))->isVisible());
     QVERIFY(e.ventana->minimumWidth() > 0 && e.ventana->minimumHeight() > 0);
+}
+
+void TestPresentacion::ventanaArrancaOculta()
+{
+    Escenario e(DemoSolicitudesService::Datos::Representativos);
+    QVERIFY(e.cargar(false));
+    QCOMPARE(e.ventana->isVisible(), false);
+    QCOMPARE(e.ventana->property("visible").toBool(), false);
+    // Oculta, la app sigue funcionando: la lista carga y la pagina existe.
+    QTRY_COMPARE(e.vms.solicitudes()->rowCount(), 11);
+    QTRY_VERIFY(e.pagina() != nullptr);
+    QCOMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
+    procesarEventos();
+    QVERIFY(!e.ventana->isVisible()); // nada en QML la muestra por su cuenta
+}
+
+void TestPresentacion::nuevaSolicitudDesdeCppConVentanaOculta()
+{
+    Escenario e(DemoSolicitudesService::Datos::Representativos);
+    QVERIFY(e.cargar(false));
+    QTRY_COMPARE(e.vms.solicitudes()->rowCount(), 11);
+
+    // Lo que hace AppLifecycleController para "Nueva solicitud" del menu bar.
+    QVERIFY(QMetaObject::invokeMethod(e.vms.app(), "mostrarNueva")); // invocable
+    QCOMPARE(e.vms.app()->pagina(), Pagina::Nueva);
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaNuevaSolicitud"));
+    QVERIFY(!e.ventana->isVisible());
+    QTRY_COMPARE(e.vms.nuevaSolicitud()->perfilesDisponibles()->count(), 2);
+
+    // Despues se muestra y enfoca: el formulario queda listo con foco en perfil.
+    e.ventana->show();
+    QVERIFY(e.activar());
+    QVERIFY(e.ventana->isVisible());
+    QCOMPARE(e.pagina()->objectName(), QStringLiteral("paginaNuevaSolicitud"));
+    QVERIFY(e.item(QStringLiteral("campoPerfil"))->isVisible());
+    QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("campoPerfil"));
+
+    // Mostrar de nuevo con el formulario abierto lo reinicia sin warnings.
+    e.vms.nuevaSolicitud()->setRfcContraparte(QStringLiteral("XAXX010101000"));
+    e.vms.app()->mostrarNueva();
+    QVERIFY(e.vms.nuevaSolicitud()->rfcContraparte().isEmpty());
 }
 
 void TestPresentacion::estadoVacioConDatosVacios()

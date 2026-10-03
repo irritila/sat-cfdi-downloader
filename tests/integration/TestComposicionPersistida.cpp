@@ -354,12 +354,8 @@ void TestComposicionPersistida::bootstrapRechazaVersionFutura()
 
 #include "TestComposicionPersistida.moc"
 
-int main(int argc, char* argv[])
+int ejecutarTestComposicionPersistida(int argc, char* argv[])
 {
-    // Red de seguridad: ninguna prueba toca rutas reales del usuario.
-    QStandardPaths::setTestModeEnabled(true);
-    QGuiApplication app(argc, argv);
-    configurarIdentidadAplicacion();
     TestComposicionPersistida prueba;
     return QTest::qExec(&prueba, argc, argv);
 }

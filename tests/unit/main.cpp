@@ -1,7 +1,9 @@
+#include "TestConfiguracionAppService.h"
 #include "TestContratoT003.h"
 #include "TestDemoPerfilesSatService.h"
 #include "TestDemoSolicitudesService.h"
 #include "TestDominio.h"
+#include "TestOSIntegration.h"
 #include "TestPuertos.h"
 #include "TestRegexLogSanitizer.h"
 #include "TestResultado.h"
@@ -24,5 +26,7 @@ int main(int argc, char* argv[])
     ejecutar(TestContratoT003());
     ejecutar(TestRegexLogSanitizer());
     ejecutar(TestServiciosPersistidos());
+    ejecutar(TestOSIntegration());
+    ejecutar(TestConfiguracionAppService());
     return fallos == 0 ? 0 : 1;
 }

@@ -1,6 +1,7 @@
 # satcfdi_tests: pruebas unitarias Qt Test de dominio, puertos y aplicacion
 # (servicios demo y persistidos con fakes, contrato T003, dispatcher,
-# RegexLogSanitizer). Sin presentacion, SQL, red ni archivos.
+# RegexLogSanitizer, contrato OSIntegration y servicio de configuracion con
+# fakes). Sin presentacion, SQL, red ni archivos.
 qt_add_executable(satcfdi_tests
     main.cpp
     TestDominio.h
@@ -20,7 +21,17 @@ qt_add_executable(satcfdi_tests
     TestServiciosPersistidos.cpp
     TestRegexLogSanitizer.h
     TestRegexLogSanitizer.cpp
+    TestOSIntegration.h
+    TestOSIntegration.cpp
+    TestConfiguracionAppService.h
+    TestConfiguracionAppService.cpp
+    # Fakes compartidos header-only (T004); listados aqui para AUTOMOC.
+    ../fakes/FakeOSIntegration.h
+    ../fakes/FakeConfiguracionAppService.h
 )
+
+# Permite #include "fakes/FakeOSIntegration.h".
+target_include_directories(satcfdi_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
 target_link_libraries(satcfdi_tests PRIVATE
     satcfdi_domain

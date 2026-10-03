@@ -86,6 +86,11 @@ public:
     explicit SqliteConfiguracionAppRepository(SqliteConnectionProvider& proveedor);
 
     Resultado<ConfiguracionApp, ErrorPersistencia> obtener() override;
+    Resultado<ConfiguracionApp, ErrorPersistencia> actualizarInicioAutomatico(bool habilitado,
+                                                                              const QDateTime& en) override;
+    Resultado<ConfiguracionApp, ErrorPersistencia> actualizarMonitoreoPausado(bool pausado,
+                                                                              const QDateTime& en) override;
+    Resultado<ConfiguracionApp, ErrorPersistencia> registrarUltimoCierre(const QDateTime& en) override;
 
 private:
     SqliteConnectionProvider& m_proveedor;

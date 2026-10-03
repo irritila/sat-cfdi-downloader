@@ -9,6 +9,7 @@
 // el Almacen despues de que el future correspondiente termino.
 
 #include "domain/solicitudes/Duplicados.h"
+#include "ports/repositories/ConfiguracionAppRepository.h"
 #include "ports/repositories/LogSolicitudRepository.h"
 #include "ports/repositories/PaqueteSolicitudRepository.h"
 #include "ports/repositories/PerfilSatRepository.h"
@@ -34,6 +35,8 @@ struct Almacen {
     QList<SolicitudPersistida> solicitudes;
     QList<PaquetePersistido> paquetes;
     QList<LogPersistido> logs;
+    // Fila unica configuracion_app (T004); valores por defecto de la migracion.
+    std::optional<ConfiguracionApp> configuracion = ConfiguracionApp{};
 
     // Traza de operaciones ("begin", "commit", "rollback", "insertarCreada", ...).
     QStringList eventos;
@@ -61,6 +64,7 @@ struct Almacen {
         QList<SolicitudPersistida> solicitudes;
         QList<PaquetePersistido> paquetes;
         QList<LogPersistido> logs;
+        std::optional<ConfiguracionApp> configuracion;
     };
     std::optional<Estado> snapshot;
 
@@ -92,7 +96,8 @@ public:
         if (m_a.snapshot) {
             return Resultado<Exito, ErrorPersistencia>::fallo(error(ErrorPersistencia::Tipo::Transaccion));
         }
-        m_a.snapshot = Almacen::Estado{m_a.perfiles, m_a.solicitudes, m_a.paquetes, m_a.logs};
+        m_a.snapshot =
+            Almacen::Estado{m_a.perfiles, m_a.solicitudes, m_a.paquetes, m_a.logs, m_a.configuracion};
         return Resultado<Exito, ErrorPersistencia>::exito({});
     }
 
@@ -116,6 +121,7 @@ public:
             m_a.solicitudes = m_a.snapshot->solicitudes;
             m_a.paquetes = m_a.snapshot->paquetes;
             m_a.logs = m_a.snapshot->logs;
+            m_a.configuracion = m_a.snapshot->configuracion;
             m_a.snapshot.reset();
         }
         return Resultado<Exito, ErrorPersistencia>::exito({});
@@ -424,6 +430,64 @@ public:
     }
 
 private:
+    Almacen& m_a;
+};
+
+// configuracion_app en memoria (T004). Las escrituras exigen transaccion
+// activa (snapshot), como SqliteConfiguracionAppRepository.
+class FakeConfiguracion final : public ConfiguracionAppRepository {
+public:
+    explicit FakeConfiguracion(Almacen& a) : m_a(a) {}
+
+    Resultado<ConfiguracionApp, ErrorPersistencia> obtener() override
+    {
+        using R = Resultado<ConfiguracionApp, ErrorPersistencia>;
+        if (auto e = m_a.registrar(QStringLiteral("obtenerConfiguracion"))) {
+            return R::fallo(*e);
+        }
+        if (!m_a.configuracion) {
+            return R::fallo(error(ErrorPersistencia::Tipo::NoEncontrado));
+        }
+        return R::exito(*m_a.configuracion);
+    }
+
+    Resultado<ConfiguracionApp, ErrorPersistencia> actualizarInicioAutomatico(bool v, const QDateTime& en) override
+    {
+        return escribir(QStringLiteral("actualizarInicioAutomatico"), en,
+                        [v](ConfiguracionApp& c) { c.inicioAutomaticoHabilitado = v; });
+    }
+
+    Resultado<ConfiguracionApp, ErrorPersistencia> actualizarMonitoreoPausado(bool v, const QDateTime& en) override
+    {
+        return escribir(QStringLiteral("actualizarMonitoreoPausado"), en,
+                        [v](ConfiguracionApp& c) { c.monitoreoPausado = v; });
+    }
+
+    Resultado<ConfiguracionApp, ErrorPersistencia> registrarUltimoCierre(const QDateTime& en) override
+    {
+        return escribir(QStringLiteral("registrarUltimoCierre"), en,
+                        [en](ConfiguracionApp& c) { c.ultimoCierreEn = en; });
+    }
+
+private:
+    template <typename F>
+    Resultado<ConfiguracionApp, ErrorPersistencia> escribir(const QString& op, const QDateTime& en, F aplicar)
+    {
+        using R = Resultado<ConfiguracionApp, ErrorPersistencia>;
+        if (auto e = m_a.registrar(op)) {
+            return R::fallo(*e);
+        }
+        if (!m_a.snapshot) {
+            return R::fallo(error(ErrorPersistencia::Tipo::Transaccion));
+        }
+        if (!m_a.configuracion) {
+            return R::fallo(error(ErrorPersistencia::Tipo::NoEncontrado));
+        }
+        aplicar(*m_a.configuracion);
+        m_a.configuracion->actualizadaEn = en;
+        return R::exito(*m_a.configuracion);
+    }
+
     Almacen& m_a;
 };
 

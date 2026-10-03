@@ -26,8 +26,9 @@ namespace {
 //
 // Que NO prueba: la forma de los metodos. Desde T003 los repositorios,
 // UnitOfWork y LogSanitizer tienen metodos virtuales puros (no cambian
-// sizeof); SatGateway, SecretStore, OSIntegration y PackageStorage siguen sin
-// metodos, lo que se verifica por revision de src/ports/.
+// sizeof); SatGateway, SecretStore y PackageStorage siguen sin metodos, lo que
+// se verifica por revision de src/ports/. Desde T004 OSIntegration es un
+// QObject abstracto y su contrato se prueba en TestOSIntegration.
 struct SoloVptr {
     virtual ~SoloVptr() = default;
 };
@@ -41,7 +42,7 @@ constexpr bool esPuertoVacio()
 
 static_assert(esPuertoVacio<SatGateway>());
 static_assert(esPuertoVacio<SecretStore>());
-static_assert(esPuertoVacio<OSIntegration>());
+static_assert(std::is_abstract_v<OSIntegration> && std::is_base_of_v<QObject, OSIntegration>);
 static_assert(esPuertoVacio<PackageStorage>());
 static_assert(esPuertoVacio<LogSanitizer>());
 static_assert(esPuertoVacio<PerfilSatRepository>());

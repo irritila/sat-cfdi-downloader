@@ -1,5 +1,8 @@
 #include "AppCompositionRoot.h"
 
+#include "AppLifecycleController.h"
+#include "SingleInstanceCoordinator.h"
+#include "application/configuration/ConfiguracionAppServicePersistido.h"
 #include "application/logging/RegexLogSanitizer.h"
 #include "application/persistence/PersistenceDispatcher.h"
 #include "application/persistence/PuertosPersistencia.h"
@@ -9,6 +12,7 @@
 #include "presentation/viewmodels/PresentacionViewModels.h"
 
 #include <QQmlApplicationEngine>
+#include <QWindow>
 
 #include <functional>
 
@@ -21,11 +25,14 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase)
 {
     SqlitePersistencia& p = *m_persistencia;
     const PuertosPersistencia puertos{p.perfiles(), p.solicitudes(), p.paquetes(),
-                                      p.logs(),     p.unidadDeTrabajo(), *m_sanitizer};
+                                      p.logs(),     p.unidadDeTrabajo(), *m_sanitizer,
+                                      &p.configuracion()};
 
     m_perfilesService = std::make_unique<PerfilesSatServicePersistido>(
         *m_dispatcher, p.perfiles(), p.unidadDeTrabajo());
     m_solicitudesService = std::make_unique<SolicitudesServicePersistido>(*m_dispatcher, puertos);
+    m_configuracionService = std::make_unique<ConfiguracionAppServicePersistido>(
+        *m_dispatcher, p.configuracion(), p.unidadDeTrabajo());
     m_viewModels = std::make_unique<PresentacionViewModels>(m_solicitudesService.get(),
                                                             m_perfilesService.get());
 }
@@ -34,7 +41,9 @@ AppCompositionRoot::~AppCompositionRoot()
 {
     // 1. Consumidores, del mas externo al mas interno.
     m_engine.reset();
+    m_controlador.reset();
     m_viewModels.reset();
+    m_configuracionService.reset();
     m_solicitudesService.reset();
     m_perfilesService.reset();
 
@@ -57,6 +66,35 @@ bool AppCompositionRoot::cargar()
     m_engine->setInitialProperties(m_viewModels->initialProperties());
     m_engine->loadFromModule("SatCfdiDownloader", "Main");
     return !m_engine->rootObjects().isEmpty();
+}
+
+AppLifecycleController& AppCompositionRoot::iniciarCicloDeVida(OSIntegration& os,
+                                                              SingleInstanceCoordinator* instancia,
+                                                              std::function<void()> salida)
+{
+    Q_ASSERT(!m_controlador);
+    QWindow* ventana = nullptr;
+    if (m_engine && !m_engine->rootObjects().isEmpty()) {
+        ventana = qobject_cast<QWindow*>(m_engine->rootObjects().constFirst());
+    }
+    m_controlador = std::make_unique<AppLifecycleController>(
+        os, *m_configuracionService, *m_viewModels->app(), ventana);
+    if (salida) {
+        m_controlador->setSalida(std::move(salida));
+    }
+    m_controlador->iniciar();
+    if (instancia) {
+        // Segunda apertura -> mostrar/enfocar; entrega lo encolado antes.
+        QObject::connect(instancia, &SingleInstanceCoordinator::activacionSolicitada,
+                         m_controlador.get(), &AppLifecycleController::mostrarVentana);
+        instancia->habilitarEntrega();
+    }
+    return *m_controlador;
+}
+
+ConfiguracionAppService& AppCompositionRoot::configuracion() const
+{
+    return *m_configuracionService;
 }
 
 SolicitudesService& AppCompositionRoot::solicitudes() const

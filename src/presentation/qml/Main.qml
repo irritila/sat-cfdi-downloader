@@ -6,6 +6,10 @@ import QtQuick.Controls
 // Ventana principal del shell. Los view models se inyectan desde C++
 // (composition root o pruebas) con setInitialProperties; no hay context
 // properties ni singletons. QML solo hace layout, navegacion y estado visual.
+//
+// La ventana arranca oculta (T004 DA2): AppLifecycleController decide si se
+// muestra (arranque manual) o no (Login Item), sin destello. QML no llama APIs
+// del sistema operativo.
 ApplicationWindow {
     id: ventana
     objectName: "ventanaPrincipal"
@@ -19,7 +23,7 @@ ApplicationWindow {
     height: 640
     minimumWidth: 560
     minimumHeight: 420
-    visible: true
+    visible: false
     title: qsTr("SAT CFDI Downloader")
 
     // La pagina se cambia de forma diferida (Qt.callLater) para no destruir la

@@ -15,7 +15,8 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(warnings)
 
 # Componentes Qt. Sql (T003) solo lo enlaza satcfdi_infrastructure (y sus
-# pruebas). Network sigue prohibido hasta las tareas SAT.
+# pruebas). Network (T004) solo lo enlaza satcfdi_app_core para la instancia
+# unica (QLocalServer/QLocalSocket); el cliente HTTP SAT llega con su tarea.
 find_package(Qt6 6.8 REQUIRED COMPONENTS
     Core
     Gui
@@ -24,6 +25,7 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS
     Quick
     QuickControls2
     Sql
+    Network
     Test
     QuickTest
 )
@@ -32,8 +34,17 @@ qt_standard_project_setup(REQUIRES 6.8)
 
 # Metadatos del bundle macOS consumidos por src/app (MACOSX_BUNDLE_INFO_PLIST).
 set(SATCFDI_BUNDLE_NAME "SAT CFDI Downloader")
-set(SATCFDI_BUNDLE_IDENTIFIER "mx.adenium.satcfdi" CACHE STRING
+set(SATCFDI_BUNDLE_IDENTIFIER "mx.adenium.satcfdi-downloader" CACHE STRING
     "CFBundleIdentifier de satcfdi_app")
+# Migracion T004: un build dir configurado antes conserva en cache el id
+# anterior (un default de CACHE no lo reemplaza). Solo se migra ese valor
+# exacto; un id personalizado distinto se respeta.
+if(SATCFDI_BUNDLE_IDENTIFIER STREQUAL "mx.adenium.satcfdi")
+    message(STATUS "SATCFDI_BUNDLE_IDENTIFIER: migrando el valor en cache "
+                   "'mx.adenium.satcfdi' a 'mx.adenium.satcfdi-downloader' (T004)")
+    set(SATCFDI_BUNDLE_IDENTIFIER "mx.adenium.satcfdi-downloader" CACHE STRING
+        "CFBundleIdentifier de satcfdi_app" FORCE)
+endif()
 set(SATCFDI_MACOS_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/resources/macos/Info.plist.in")
 
 # LSMinimumSystemVersion. Sin CMAKE_OSX_DEPLOYMENT_TARGET explicito, clang toma

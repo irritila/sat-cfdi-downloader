@@ -18,9 +18,11 @@ Instalacion con Homebrew:
 brew install qt cmake ninja
 ```
 
-Modulos Qt usados: Core, Gui, Widgets, Qml, Quick, QuickControls2, Sql, Test y
-QuickTest. Sql (T003) solo lo enlazan `satcfdi_infrastructure` y sus pruebas.
-Qt Network entra con las tareas SAT.
+Modulos Qt usados: Core, Gui, Widgets, Qml, Quick, QuickControls2, Sql, Network,
+Test y QuickTest. Sql (T003) solo lo enlazan `satcfdi_infrastructure` y sus
+pruebas. Network (T004) solo lo enlaza `satcfdi_app_core` para la instancia
+unica con `QLocalServer`/`QLocalSocket` (IPC local, sin red); el cliente HTTP
+del SAT llega con su tarea.
 
 ## Encontrar Qt (`CMAKE_PREFIX_PATH`)
 
@@ -63,7 +65,10 @@ Opciones de CMake del proyecto:
 - `-DSATCFDI_WARNINGS_AS_ERRORS=ON`: trata advertencias como errores en los
   targets del proyecto (desactivado por defecto).
 - `-DSATCFDI_BUNDLE_IDENTIFIER=<id>`: cambia el `CFBundleIdentifier` del bundle
-  (por defecto `mx.adenium.satcfdi`).
+  (por defecto `mx.adenium.satcfdi-downloader`, desde T004). Es una variable de
+  cache: si un directorio de build existente tiene exactamente el id anterior
+  `mx.adenium.satcfdi`, la configuracion lo migra al nuevo y lo informa con un
+  mensaje `STATUS`; un id personalizado distinto se respeta.
 
 ## Abrir la app
 
@@ -79,7 +84,39 @@ Para ver la salida de consola, ejecutar el binario dentro del bundle:
 ./build/src/app/satcfdi_app.app/Contents/MacOS/satcfdi_app
 ```
 
-Al cerrar la ventana el proceso termina; todavia no hay icono en menu bar (T004).
+## Ciclo de vida (T004)
+
+- Instancia unica: al arrancar, la app abre el canal local
+  `mx.adenium.satcfdi-downloader.<uid>.instance-v1` (socket Unix en el
+  directorio temporal del usuario) ANTES de tocar SQLite. Si ya hay una
+  instancia, la nueva le envia `ActivateWindow` (la primaria muestra y enfoca
+  su ventana) y termina con codigo 0, sin crear base ni grafo. Si el socket
+  quedo de un proceso terminado (canal obsoleto), se retira y la nueva
+  instancia asume el rol primario. La adquisicion y la retirada del canal
+  obsoleto se serializan entre procesos con un `QLockFile` junto al socket
+  (`<canal>.lock`), de modo que arranques simultaneos dejan una sola primaria.
+- Cerrar la ventana la oculta: el proceso y el menu bar siguen activos
+  (`setQuitOnLastWindowClosed(false)`). La ventana se vuelve a mostrar desde el
+  menu bar o abriendo la app otra vez. Solo Salir (menu bar, Cmd-Q) termina:
+  registra `ultimo_cierre_en`, retira el menu bar y sale.
+- Arranque manual: muestra y enfoca la ventana. Arranque por Login Item: crea el
+  menu bar sin mostrar la ventana.
+- Probar la instancia unica:
+
+```bash
+B=./build/src/app/satcfdi_app.app/Contents/MacOS/satcfdi_app
+$B --data-dir /tmp/satcfdi-prueba &   # primaria
+$B; echo $?                            # secundaria: activa la primaria y sale con 0
+```
+
+- Probar el Login Item (requiere el adaptador `MacOSIntegration`): abrir el
+  bundle con `open build/src/app/satcfdi_app.app`, activar "Iniciar con la
+  sesion" en el menu bar y revisar Ajustes del Sistema > General > Elementos de
+  inicio. `SMAppService` puede reportar `RequiresApproval` hasta que se apruebe
+  ahi. Para probar el arranque sin ventana, cerrar sesion y volver a entrar. Sin
+  identidad de firma valida el registro puede fallar o quedar `Unavailable`; la
+  verificacion completa requiere un bundle firmado. Desactivar la opcion al
+  terminar.
 
 ## Datos locales y `--data-dir`
 
@@ -113,12 +150,10 @@ bundle autocontenido (`macdeployqt`, firma, notarizacion) queda fuera del alcanc
   `LSMinimumSystemVersion` toman la version mayor del SDK. Con el Qt de Homebrew
   (compilado para macOS 26) el bundle local requiere macOS 26 o superior; fijar
   un minimo menor produce advertencias de `ld` y no garantiza ejecucion.
-- QtNetwork: el proyecto no lo declara en `find_package` ni en
-  `target_link_libraries` (prohibido hasta las tareas SAT). Aun asi `otool -L satcfdi_app`
-  lo lista, porque el target `Qt6::Qml` de Homebrew declara `Qt6::Network` en
-  su `INTERFACE_LINK_LIBRARIES` (QtQml depende de QtNetwork) y CMake lo propaga
-  a la linea de enlace. Es una dependencia transitiva de Qt y no implica que la
-  app use la red.
+- QtNetwork: desde T004 `satcfdi_app_core` lo enlaza solo para
+  `QLocalServer`/`QLocalSocket` (socket Unix local, sin trafico de red). Ademas
+  QtQml de Homebrew ya dependia de QtNetwork, por lo que `otool -L` lo listaba
+  desde T002.
 - QtSql y driver SQLite: `otool -L satcfdi_app` lista QtSql porque
   `satcfdi_infrastructure` es una biblioteca estatica y su codigo SQL queda
   dentro del ejecutable; ninguna otra capa usa la API de QtSql. El driver

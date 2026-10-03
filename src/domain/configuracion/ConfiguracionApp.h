@@ -7,7 +7,7 @@
 namespace satcfdi {
 
 // Fila unica de configuracion_app (id = 1, implicito; la siembra la migracion
-// 001). Solo lectura en T003.
+// 001). Escritura desde T004 via ConfiguracionAppRepository.
 struct ConfiguracionApp {
     bool inicioAutomaticoHabilitado = false;   // inicio_automatico_habilitado
     bool monitoreoPausado = false;             // monitoreo_pausado

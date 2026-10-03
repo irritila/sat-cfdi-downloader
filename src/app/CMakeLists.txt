@@ -1,8 +1,11 @@
-# satcfdi_app: ejecutable MACOSX_BUNDLE con main.cpp. El arranque y el
-# composition root viven en satcfdi_app_core (T003). Sin Network; Qt6::Sql
-# solo llega de forma transitiva desde satcfdi_infrastructure (estatica).
+# satcfdi_app: ejecutable MACOSX_BUNDLE con main.cpp y la fabrica del adaptador
+# de SO. Arranque, composition root, ciclo de vida e instancia unica viven en
+# satcfdi_app_core. Qt6::Sql y Qt6::Network llegan de forma transitiva desde
+# las bibliotecas estaticas (infraestructura y app_core).
 qt_add_executable(satcfdi_app MACOSX_BUNDLE
     main.cpp
+    OSIntegrationFactory.h
+    OSIntegrationFactory.cpp
 )
 
 set_target_properties(satcfdi_app PROPERTIES
@@ -19,5 +22,10 @@ target_link_libraries(satcfdi_app PRIVATE
     Qt6::Widgets
     Qt6::Quick
 )
+
+# Adaptador de SO (MacOSIntegration): solo satcfdi_app lo enlaza.
+if(APPLE)
+    target_link_libraries(satcfdi_app PRIVATE satcfdi_os_macos)
+endif()
 
 satcfdi_enable_warnings(satcfdi_app)

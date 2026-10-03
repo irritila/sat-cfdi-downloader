@@ -12,6 +12,7 @@ class PerfilSatRepository;
 class SolicitudMasivaRepository;
 class PaqueteSolicitudRepository;
 class LogSolicitudRepository;
+class ConfiguracionAppRepository;
 class UnitOfWork;
 class LogSanitizer;
 
@@ -26,6 +27,12 @@ struct PuertosPersistencia {
     LogSolicitudRepository& logs;
     UnitOfWork& unidadDeTrabajo;
     const LogSanitizer& sanitizer;
+    // T004. Puntero (no referencia) solo para mantener compatible la
+    // inicializacion agregada existente de 6 campos mientras app_core lo
+    // asigna; el composition root DEBE pasar &persistencia.configuracion().
+    // Ningun servicio actual lo desreferencia: ConfiguracionAppServicePersistido
+    // recibe el repositorio por referencia explicita.
+    ConfiguracionAppRepository* configuracion = nullptr;
 };
 
 // Reloj inyectable (UTC, milisegundos) para pruebas deterministas.

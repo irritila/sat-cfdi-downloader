@@ -2,7 +2,7 @@
 
 ## Estado
 
-Pendiente
+Completada (criterio de notificacion con permiso concedido bloqueado por firma)
 
 ## Prioridad y tamano
 
@@ -116,40 +116,40 @@ ni escribe SQLite directamente.
 
 ## Criterios de aceptacion
 
-- [ ] Dado un arranque manual, cuando inicia la app, entonces crea el menu bar,
+- [x] Dado un arranque manual, cuando inicia la app, entonces crea el menu bar,
   cambia a foreground y muestra/enfoca la ventana principal.
-- [ ] Dado un arranque por Login Item, cuando inicia la app, entonces crea el
+- [x] Dado un arranque por Login Item, cuando inicia la app, entonces crea el
   menu bar, mantiene el proceso activo y no muestra la ventana.
-- [ ] Dado un proceso primario activo, cuando se abre el mismo bundle otra vez,
+- [x] Dado un proceso primario activo, cuando se abre el mismo bundle otra vez,
   entonces la segunda instancia envia `ActivateWindow` y termina, y la primaria
   muestra/enfoca su ventana sin crear un segundo grafo funcional.
-- [ ] Dado un canal de instancia obsoleto, cuando se confirma que no existe el
+- [x] Dado un canal de instancia obsoleto, cuando se confirma que no existe el
   proceso primario, entonces la nueva instancia puede asumir el rol primario.
-- [ ] Dada una ventana visible, cuando el usuario la cierra, entonces se oculta
+- [x] Dada una ventana visible, cuando el usuario la cierra, entonces se oculta
   y el proceso, menu bar y worker permanecen activos.
-- [ ] Dado el menu bar, cuando se elige Mostrar ventana o Nueva solicitud,
+- [x] Dado el menu bar, cuando se elige Mostrar ventana o Nueva solicitud,
   entonces la ventana se muestra/enfoca y Nueva solicitud navega a la ruta QML
   existente.
-- [ ] Dado el menu bar, cuando se elige Pausar/Reanudar, entonces se emite el
+- [x] Dado el menu bar, cuando se elige Pausar/Reanudar, entonces se emite el
   comando al servicio de aplicacion y el estado persistido se actualiza tras
   confirmar el resultado.
-- [ ] Dado el menu bar, cuando se elige Salir, entonces se detienen worker y
+- [x] Dado el menu bar, cuando se elige Salir, entonces se detienen worker y
   menu bar y termina el proceso; cerrar la ventana por si solo no lo termina.
-- [ ] Dada una instalacion nueva, entonces el Login Item permanece deshabilitado
+- [x] Dada una instalacion nueva, entonces el Login Item permanece deshabilitado
   por defecto y la preferencia local es `false`.
-- [ ] Dado cualquier estado efectivo de Login Item, entonces la UI distingue la
+- [x] Dado cualquier estado efectivo de Login Item, entonces la UI distingue la
   preferencia solicitada de `Disabled`, `Enabled`, `RequiresApproval`,
   `Rejected` o `Unavailable`.
-- [ ] Dado un permiso de notificaciones `NotDetermined`, cuando el usuario
+- [x] Dado un permiso de notificaciones `NotDetermined`, cuando el usuario
   solicita permiso, entonces se consulta a macOS y se expone el estado real.
-- [ ] Dado un permiso `Denied`, cuando se intenta enviar una notificacion,
+- [x] Dado un permiso `Denied`, cuando se intenta enviar una notificacion,
   entonces se muestra que esta deshabilitada y la app sigue operativa.
 - [ ] Dado un permiso `Granted`, cuando se emite la notificacion de prueba,
   entonces macOS recibe el titulo y cuerpo esperados.
-- [ ] Dado `FakeOSIntegration`, entonces las pruebas cubren arranque manual,
+- [x] Dado `FakeOSIntegration`, entonces las pruebas cubren arranque manual,
   Login Item, segunda apertura, cierre de ventana, salida, estados de permiso
   y fallos sin SAT, Keychain ni credenciales reales.
-- [ ] La implementacion no crea daemon, LaunchAgent ni helper independiente.
+- [x] La implementacion no crea daemon, LaunchAgent ni helper independiente.
 
 ## Verificacion
 
@@ -176,7 +176,17 @@ ni escribe SQLite directamente.
 
 ## Resultado
 
-Pendiente.
+Completada el 2026-10-04, con un criterio bloqueado por firma de codigo.
+
+- `OSIntegration` como `QObject` en ports; `MacOSIntegration` (Objective-C++) en el target `satcfdi_os_macos`.
+- Instancia unica con `QLocalServer` y `QLockFile`, resuelta antes del bootstrap SQLite; probada con arranques simultaneos.
+- `AppLifecycleController`: cerrar ventana oculta, menu bar, pausa persistida, salida ordenada con `ultimo_cierre_en`.
+- Login Item con `SMAppService.mainApp`; preferencia y estado efectivo separados en el menu bar.
+- Bundle id `mx.adenium.satcfdi-downloader`, con migracion automatica del valor anterior en cache.
+- `ctest`: os_macos, unit, infrastructure, integration y presentation pasan.
+- Prueba manual: ventana, menu bar, segunda apertura, pausa, salida, Login Item habilitado y arranque por Login Item sin ventana.
+- Bloqueado: entrega de notificacion con permiso concedido; con firma ad-hoc macOS no registra la app en notificaciones. Requiere firma estable (distribucion).
+- Riesgos: logout puede abortarse al interceptar la salida; Login Item ad-hoc ligado al build; la segunda apertura no recibe acuse si la primaria falla en bootstrap.
 
 ## Riesgos y notas
 

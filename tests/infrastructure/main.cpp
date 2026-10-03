@@ -1,5 +1,6 @@
 #include "TestSqliteCentinelas.h"
 #include "TestSqliteConexion.h"
+#include "TestSqliteConfiguracion.h"
 #include "TestSqliteMigraciones.h"
 #include "TestSqliteRepositorios.h"
 
@@ -20,5 +21,6 @@ int main(int argc, char* argv[])
     ejecutar(TestSqliteConexion());
     ejecutar(TestSqliteRepositorios());
     ejecutar(TestSqliteCentinelas());
+    ejecutar(TestSqliteConfiguracion());
     return fallos == 0 ? 0 : 1;
 }
