@@ -46,6 +46,7 @@ El sistema debe permitir a un usuario unico, actuando como contador, gestionar p
 * [Requerimientos](docs/requirements.md)
 * [Arquitectura](docs/architecture.md)
 * [Diseno tecnico](docs/design/README.md)
+* [Desarrollo local](docs/development.md)
 * [ADRs](docs/adrs/README.md)
 
 ## Otras referencias

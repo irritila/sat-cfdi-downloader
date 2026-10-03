@@ -2,7 +2,7 @@
 
 ## Estado
 
-Pendiente
+Completada
 
 ## Prioridad y tamano
 
@@ -98,29 +98,29 @@ Se necesita un resultado visible temprano, pero todavia no deben introducirse SQ
 
 ## Criterios de aceptacion
 
-- [ ] `cmake -S . -B build` configura el proyecto correctamente cuando el entorno puede encontrar Qt 6.8; si hace falta, la tarea documenta `CMAKE_PREFIX_PATH`.
-- [ ] `cmake --build build` genera `satcfdi_app` como bundle macOS.
-- [ ] `ctest --test-dir build` se ejecuta sin fallos.
-- [ ] La app abre una ventana principal QML sin errores de carga.
-- [ ] La ventana muestra una lista de solicitudes simuladas.
-- [ ] Se puede navegar de la lista a nueva solicitud y al detalle.
-- [ ] El detalle muestra metadata simulada de la solicitud seleccionada.
-- [ ] Al enviar una nueva solicitud simulada valida, se abre el detalle por `id` y la solicitud aparece en la lista al regresar.
-- [ ] Con datos demo vacios, la lista muestra un estado vacio.
-- [ ] Con fechas invalidas o sin perfil, el formulario impide enviar y muestra error visible.
-- [ ] El detalle separa estado local, estado SAT y paquetes simulados.
-- [ ] Las filas de lista y badges de estado usan texto accesible y no dependen solo de color.
-- [ ] El flujo lista, nueva solicitud y detalle puede recorrerse con teclado.
-- [ ] Redimensionar la ventana no corta contenido esencial.
-- [ ] QML no accede directamente a SQLite, archivos, secretos ni SAT.
-- [ ] La estructura de targets y carpetas coincide con `qt-project-structure.md`.
-- [ ] Existen contratos compilables en `satcfdi_ports` para SAT, secretos, sistema operativo, paquetes, logs y repositorios.
-- [ ] Los contratos no contienen detalles SOAP inventados ni implementaciones concretas.
-- [ ] `satcfdi_ports` no declara metodos productivos que adelanten T003, T006 o T007.
-- [ ] `satcfdi_presentation_tests` carga el modulo QML y verifica roles/navegacion basica.
-- [ ] T002 no contiene `QSystemTrayIcon`, `setQuitOnLastWindowClosed(false)`, `LSUIElement`, instancia unica, `MacOSIntegration` ni `FakeOSIntegration`.
-- [ ] T002 no agrega dependencias Qt `Sql` ni `Network`.
-- [ ] No se introducen tablas, migraciones ni dependencias de integracion SAT en esta tarea.
+- [x] `cmake -S . -B build` configura el proyecto correctamente cuando el entorno puede encontrar Qt 6.8; si hace falta, la tarea documenta `CMAKE_PREFIX_PATH`.
+- [x] `cmake --build build` genera `satcfdi_app` como bundle macOS.
+- [x] `ctest --test-dir build` se ejecuta sin fallos.
+- [x] La app abre una ventana principal QML sin errores de carga.
+- [x] La ventana muestra una lista de solicitudes simuladas.
+- [x] Se puede navegar de la lista a nueva solicitud y al detalle.
+- [x] El detalle muestra metadata simulada de la solicitud seleccionada.
+- [x] Al enviar una nueva solicitud simulada valida, se abre el detalle por `id` y la solicitud aparece en la lista al regresar.
+- [x] Con datos demo vacios, la lista muestra un estado vacio.
+- [x] Con fechas invalidas o sin perfil, el formulario impide enviar y muestra error visible.
+- [x] El detalle separa estado local, estado SAT y paquetes simulados.
+- [x] Las filas de lista y badges de estado usan texto accesible y no dependen solo de color.
+- [x] El flujo lista, nueva solicitud y detalle puede recorrerse con teclado.
+- [x] Redimensionar la ventana no corta contenido esencial.
+- [x] QML no accede directamente a SQLite, archivos, secretos ni SAT.
+- [x] La estructura de targets y carpetas coincide con `qt-project-structure.md`.
+- [x] Existen contratos compilables en `satcfdi_ports` para SAT, secretos, sistema operativo, paquetes, logs y repositorios.
+- [x] Los contratos no contienen detalles SOAP inventados ni implementaciones concretas.
+- [x] `satcfdi_ports` no declara metodos productivos que adelanten T003, T006 o T007.
+- [x] `satcfdi_presentation_tests` carga el modulo QML y verifica roles/navegacion basica.
+- [x] T002 no contiene `QSystemTrayIcon`, `setQuitOnLastWindowClosed(false)`, `LSUIElement`, instancia unica, `MacOSIntegration` ni `FakeOSIntegration`.
+- [x] T002 no agrega dependencias Qt `Sql` ni `Network`.
+- [x] No se introducen tablas, migraciones ni dependencias de integracion SAT en esta tarea.
 
 ## Verificacion
 
@@ -143,7 +143,15 @@ Se necesita un resultado visible temprano, pero todavia no deben introducirse SQ
 
 ## Resultado
 
-Pendiente.
+Completada el 2026-10-03.
+
+- Shell Qt/QML por capas con 8 targets CMake y bundle `satcfdi_app.app`; prerrequisitos y comandos en `docs/development.md`.
+- `SolicitudesService` y `PerfilesSatService` abstractos con `QFuture<Resultado<...>>`; implementaciones demo instanciadas solo en `AppCompositionRoot`.
+- Puertos de `satcfdi_ports` sin metodos; modulo QML `SatCfdiDownloader` con lista, nueva solicitud y detalle.
+- `ctest`: `satcfdi_tests` (unit) y `satcfdi_presentation_tests` (presentation) pasan; build sin warnings con `SATCFDI_WARNINGS_AS_ERRORS=ON`.
+- Comprobacion manual en macOS real: ventana, teclado y redimensionado correctos.
+- Limitaciones: compilado contra Qt 6.10.2 (APIs <= 6.8); bundle local requiere macOS 26+ con Qt de Homebrew; QtNetwork llega transitivo por `Qt6::Qml`.
+- Para T003: conservar `crear()` como fachada de UI y descartar respuestas asincronas tardias en `NuevaSolicitudViewModel`.
 
 ## Riesgos y notas
 

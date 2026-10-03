@@ -1,1 +1,17 @@
 /.idea
+
+# Directorios de build de CMake (build/, build-core/, build-platform/, ...)
+/build*/
+
+# Qt Creator / CMake
+CMakeLists.txt.user*
+CMakeUserPresets.json
+*.autosave
+.qtc_clangd/
+compile_commands.json
+
+# macOS
+.DS_Store
+
+# Indice de clangd
+.cache/
