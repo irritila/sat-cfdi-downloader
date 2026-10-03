@@ -22,6 +22,38 @@ Las definiciones completas estan en `arx/agents/`. Las integraciones concretas
 de cada herramienta deben ser adaptadores pequenos que apunten a estos archivos,
 sin copiar su contenido.
 
+## Refinamiento de tareas
+
+| Rol | Cuando invocarlo | Responsabilidad principal |
+| --- | --- | --- |
+| [refinement-lead](agents/refinement-lead.md) | Objetivos o alcance poco claros, alternativas por decidir o tareas sin criterios verificables. | Conducir la discusion con el usuario, explicitar decisiones y pendientes, y redactar una tarea lista para implementar. |
+
+El refinamiento usa `docs/tasks/_template.md` y distingue decisiones tomadas,
+supuestos y preguntas abiertas. El rol indica que falta cuando la tarea aun no
+esta lista para implementarse.
+
+## Ciclo de desarrollo por tarea
+
+| Rol | Cuando invocarlo | Responsabilidad principal |
+| --- | --- | --- |
+| [development-cycle-lead](agents/development-cycle-lead.md) | Una tarea refinada requiere plan, implementacion coordinada, integracion y evidencia de cierre. | Coordinar especialistas, cortes verticales, propiedad de archivos, bitacora y validacion sin sustituir sus roles tecnicos. |
+
+El ciclo crea una sesion en `docs/meetings/TNNN-desarrollo/` con un dossier de
+contexto, plan, propiedad, bitacora y evidencia. El coordinador da la palabra a
+los especialistas, limita las lecturas a su encargo y conserva una matriz de
+criterios contra evidencia real.
+
+## Skills
+
+| Skill | Proposito | Invocacion |
+| --- | --- | --- |
+| [task-refinement](skills/task-refinement/SKILL.md) | Coordinar el refinamiento de una tarea con rondas de especialistas, decisiones y criterios verificables. | Codex: `$task-refinement`; Claude Code: `/task-refinement`. |
+| [development-cycle](skills/development-cycle/SKILL.md) | Coordinar la implementacion, integracion y evidencia de una tarea refinada. | Codex: `$development-cycle`; Claude Code: `/development-cycle`. |
+
+Los directorios canonicos incluyen los inicializadores y referencias usados por
+ambos proveedores. `.claude/skills/` contiene adaptadores breves para invocarlos
+como skills de proyecto en Claude Code.
+
 ## Roles Qt por responsabilidad
 
 | Rol | Cuando invocarlo | Responsabilidad principal |
