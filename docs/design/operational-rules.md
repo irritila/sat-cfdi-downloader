@@ -77,7 +77,7 @@ En las tablas siguientes, los estados mostrados como `Aceptada`, `EnProceso`, `T
 | `ErrorSat` | SAT reporto `EstadoSolicitud=4`. | Si | Terminal para worker automatico. | Eliminar local. |
 | `Rechazada` | SAT reporto `EstadoSolicitud=5` en verificacion. | Si | Terminal para worker automatico. | Eliminar local. |
 | `Vencida` | SAT reporto `EstadoSolicitud=6`. | Si | Terminal para verificacion/descarga automatica. | Eliminar local; crear nueva solicitud manualmente. |
-| `EnvioFallido` | Fallo conocido antes de crear solicitud: autenticacion, XML local mal formado o rechazo documentado de la operacion de creacion. | No | Terminal para worker automatico. | Eliminar local; crear nueva solicitud manualmente. |
+| `EnvioFallido` | Rechazo explicito y documentado de la operacion de creacion sin `IdSolicitud` (ADR 0017). Los fallos locales o de autenticacion previos al envio regresan a `Creada`. | No | Terminal para worker automatico. | Eliminar local; crear nueva solicitud manualmente. |
 | `EnvioIncierto` | Timeout/interrupcion despues de iniciar envio, `5000` sin `IdSolicitud`, `5006` o codigo de creacion no documentado; no se sabe si SAT creo solicitud. | No | No reintentar automaticamente. | Eliminar local; crear nueva solicitud manualmente con advertencia. |
 
 Notas:
@@ -274,6 +274,7 @@ Reglas Qt/SQLite:
 4. Transaccion local:
    - Si `CodEstatus=5000` e `IdSolicitud` existe: marcar `Enviada`, guardar `id_solicitud_sat`, `cod_estatus_solicitud` y mensaje.
    - Si SAT rechaza con codigo documentado sin `IdSolicitud`: marcar `EnvioFallido`, guardar codigo y mensaje de creacion.
+   - Si la falla ocurrio en `Preparacion`, `Autenticacion` o antes de enviar `SolicitaDescarga*` (ADR 0017): regresar a `Creada`, limpiar `envio_iniciado_en`, `cod_estatus_solicitud` y `mensaje_solicitud_sat`, guardar `ultimo_error` y registrar log. El reenvio es solo manual.
    - Si hay timeout/interrupcion despues de iniciar HTTP, `5000` sin `IdSolicitud`, `5006` o codigo de creacion no documentado: marcar `EnvioIncierto`.
 
 ### Verificar solicitud

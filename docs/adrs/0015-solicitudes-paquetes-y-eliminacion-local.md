@@ -4,6 +4,8 @@
 
 Accepted
 
+Modificado parcialmente por ADR 0017: los fallos locales o de autenticacion previos al envio regresan a `Creada` en lugar de `EnvioFallido`.
+
 ## Reemplaza
 
 - ADR 0014 en sus reglas de vencimiento de paquetes y solicitud, rechazo inicial

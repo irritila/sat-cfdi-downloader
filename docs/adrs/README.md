@@ -33,3 +33,4 @@ Un ADR aceptado no se edita para cambiar la decision central. Si una decision ca
 | [0014](0014-serial-operation-executor-and-recovery.md) | Superseded | Serializar operaciones y definir recuperacion transaccional; reemplazado parcialmente por ADR 0015 |
 | [0015](0015-solicitudes-paquetes-y-eliminacion-local.md) | Accepted | Separar estados SAT, paquetes y eliminacion local |
 | [0016](0016-sqlite-runtime-migrations-and-threading.md) | Accepted | Fijar runtime SQLite, migraciones y conexiones por hilo |
+| [0017](0017-fallas-previas-al-envio-regresan-a-creada.md) | Accepted | Regresar a `Creada` las solicitudes cuyo envio fallo antes de salir a SAT (modifica ADR 0015) |
