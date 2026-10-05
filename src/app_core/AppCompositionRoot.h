@@ -14,10 +14,12 @@ class QQmlApplicationEngine;
 namespace satcfdi {
 
 class AccionesWorker;
+class ConsultaExistenciaEjecutor;
 class AppLifecycleController;
 class ExtensionWorker;
 class OperacionExecutor;
 class OperacionesSat;
+class PackageStorage;
 class Programador;
 class WorkerLocal;
 class CredencialesSatServicePersistido;
@@ -71,6 +73,12 @@ struct OpcionesMonitoreo {
     RelojUtc reloj;
     Programador* programadorEjecutor = nullptr;
     Programador* programadorWorker = nullptr;
+    // T008: almacenamiento de ZIP. Si `packageStorage` es nulo, el root crea
+    // FilesystemPackageStorage(raizPaquetes); `raizPaquetes` vacia =
+    // <directorio de la base>/paquetes (las pruebas nunca tocan el home). main
+    // pasa resolverRaiz(dataDir, home) (D8).
+    PackageStorage* packageStorage = nullptr;
+    QString raizPaquetes;
 };
 
 class AppCompositionRoot {
@@ -101,6 +109,9 @@ public:
 
     // Para pruebas de integracion.
     OperacionExecutor& ejecutor() const { return *m_ejecutor; }
+    PackageStorage& packageStorage() const { return *m_packageStorage; }
+    // Raiz absoluta efectiva de los paquetes (D8); vacia si se inyecto el storage.
+    const QString& raizPaquetes() const noexcept { return m_raizPaquetes; }
     WorkerLocal& worker() const { return *m_worker; }
     ConfiguracionAppService& configuracion() const;
     CredencialesSatService& credenciales() const;
@@ -127,12 +138,16 @@ private:
     // T007: monitoreo (orden de destruccion inverso: acciones -> worker ->
     // ejecutor -> puerto/programadores, todo antes del dispatcher).
     std::unique_ptr<OperacionesSat> m_operacionesSatPropio;
+    std::unique_ptr<PackageStorage> m_packageStoragePropio;
+    PackageStorage* m_packageStorage = nullptr;
+    QString m_raizPaquetes;
     std::unique_ptr<Programador> m_programadorEjecutorPropio;
     std::unique_ptr<Programador> m_programadorWorkerPropio;
     std::unique_ptr<OperacionExecutor> m_ejecutor;
     std::unique_ptr<WorkerLocal> m_worker;
     std::unique_ptr<ExtensionWorker> m_extensionWorker;
     std::unique_ptr<AccionesWorker> m_accionesWorker;
+    std::unique_ptr<ConsultaExistenciaEjecutor> m_consultaExistencia;
     bool m_monitoreoIniciado = false;
     std::unique_ptr<PresentacionViewModels> m_viewModels;
     std::unique_ptr<AppLifecycleController> m_controlador;

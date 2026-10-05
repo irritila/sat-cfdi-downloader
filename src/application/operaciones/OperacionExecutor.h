@@ -21,6 +21,8 @@ namespace satcfdi {
 
 class SolicitudMasivaRepository;
 class LogSolicitudRepository;
+class PaqueteSolicitudRepository;
+class PackageStorage;
 class OperacionesSolicitudRepository;
 class UnitOfWork;
 class LogSanitizer;
@@ -37,6 +39,15 @@ struct PuertosEjecutor {
     const LogSanitizer& sanitizer;
     OperacionesSat& sat;
     std::function<void()> cerrarConexion; // p. ej. SqlitePersistencia::cerrarConexionDelHiloActual
+    // T008 (aditivos, al final para no romper inicializaciones existentes):
+    // - paquetes: lectura de paquetes por solicitud para asociar finales del
+    //   escaneo (archivo_huerfano, D10);
+    // - almacenamiento: escanearRecuperacion, eliminarTemporal y la consulta de
+    //   existencia (D9-D11), siempre en el hilo del ejecutor.
+    // nullptr = sin almacenamiento: la recuperacion omite el escaneo (con
+    // diagnostico) y consultarExistencia devuelve ErrorComprobacion.
+    PaqueteSolicitudRepository* paquetes = nullptr;
+    PackageStorage* almacenamiento = nullptr;
 };
 
 // Ejecutor serial de operaciones criticas (T007 D5, ADR 0014/0016/0018).
@@ -96,8 +107,21 @@ public:
 
     // Recuperacion al arrancar (D9): Enviando -> EnvioIncierto; Descargando
     // -> Descargado / Disponible / sin cambio segun existeArchivoFinal (D14).
-    // Un log por operacion afectada.
+    // Un log por operacion afectada. T008 D9/D10, con `almacenamiento`:
+    // escanearRecuperacion(); temporal propio (asociado a un paquete
+    // Descargando o no asociable) -> eliminarTemporal tras aplicar la regla de
+    // T007; final de una solicitud visible sin paquete con ese nombre ->
+    // se conserva y log archivo_huerfano (una vez por archivo); final sin
+    // solicitud visible -> se conserva y solo diagnostico de app (D3). Si el
+    // escaneo falla, no se borra nada (diagnostico) y la recuperacion SQLite
+    // continua. Diagnosticos en la categoria "satcfdi.recuperacion.archivos",
+    // con rutas relativas.
     QFuture<ResultadoOperacion> recuperar();
+
+    // T008 D11: existencia de un archivo final (ruta RELATIVA de ruta_local) en
+    // el hilo del ejecutor, prioridad Manual. Solo lectura: sin estado ni log.
+    // Tambien emite existenciaConsultada (encolada al hilo grafico).
+    QFuture<ExistenciaArchivo> consultarExistencia(const QString& rutaRelativa);
 
     // Gate por perfil (D9), en el hilo del ejecutor y en orden de cola. Los
     // perfiles cuya consulta FALLA no aparecen en la lista (cuentan como no
@@ -122,6 +146,8 @@ signals:
     void solicitudActualizada(const satcfdi::SolicitudId& solicitudId);
     // Cambio el estado de credencial observado de un perfil (D9).
     void estadoCredencialCambiado(const satcfdi::PerfilId& perfil, satcfdi::EstadoCredencial estado);
+    // Resultado de consultarExistencia (T008 D11).
+    void existenciaConsultada(const QString& rutaRelativa, satcfdi::ExistenciaArchivo existencia);
     // La cola quedo vacia (sin operacion activa).
     void inactivo();
     void detenido();

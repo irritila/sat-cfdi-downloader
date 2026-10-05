@@ -8,6 +8,7 @@
 #include "FakesPersistencia.h"
 #include "fakes/FakeConfiguracionAppService.h"
 #include "fakes/FakeOperacionesSat.h"
+#include "fakes/FakePackageStorage.h"
 #include "fakes/FakeProgramador.h"
 
 #include "application/logging/RegexLogSanitizer.h"
@@ -47,6 +48,8 @@ struct Entorno {
     fakes::FakeLogs logs{almacen};
     fakes::FakeOperacionesSolicitud operaciones{almacen};
     fakes::FakeUnitOfWork uow{almacen};
+    fakes::FakePaquetes paquetesRepo{almacen};
+    fakes::FakePackageStorage storage;
     RegexLogSanitizer sanitizer;
     fakes::FakeOperacionesSat sat;
     fakes::FakeReloj reloj{kInicio};
@@ -72,7 +75,8 @@ struct Entorno {
                             [this]() {
                                 hiloCierre = QThread::currentThread();
                                 ++cierresConexion;
-                            }},
+                            },
+                            &paquetesRepo, &storage},
             reloj.funcion(), programador);
     }
 
@@ -84,6 +88,8 @@ struct Entorno {
         s.rfcSolicitante = QStringLiteral("EKU9003173C9");
         s.estadoLocal = estado;
         s.creadaEn = kInicio;
+        s.fechaInicialSat = QStringLiteral("2026-09-01T00:00:00");
+        s.fechaFinalSat = QStringLiteral("2026-09-30T23:59:59");
         if (estado != EstadoLocal::Creada) {
             s.envioIniciadoEn = kInicio;
         }
@@ -149,6 +155,15 @@ struct Entorno {
             }
         }
         return n;
+    }
+
+    // Ruta relativa (T008 D5) del archivo final de un paquete sembrado.
+    QString rutaFinal(const PaquetePersistido& p) const
+    {
+        const SolicitudPersistida* s = solicitud(p.solicitudMasivaId);
+        return rutapaquete::derivarRutaRelativa(
+                   UbicacionPaquete{s->rfcSolicitante, s->fechaInicialSat, s->id.texto(), p.idPaqueteSat})
+            .valor();
     }
 
     // Espera a que el ejecutor procese todo lo encolado hasta ahora.

@@ -2,7 +2,7 @@
 
 ## Estado
 
-Pendiente (refinada 2026-10-04; lista para implementar).
+Completada
 
 ## Prioridad y tamano
 
@@ -84,22 +84,22 @@ El MVP guarda los ZIP fuera de SQLite, en una ruta fija (`ADR 0004`). Desde la r
 
 ## Criterios de aceptacion
 
-- [ ] Dada la misma `UbicacionPaquete`, cuando se deriva la ruta dos veces, entonces se obtiene la misma ruta relativa `<RFC>/<yyyy-mm de FechaInicial>/<UUID>/<archivo>.zip` bajo la raiz.
-- [ ] Dado un `id_paquete_sat` valido (`<uuid>_01`), cuando se deriva el archivo, entonces se llama `<id>.zip` sin sufijo hash.
-- [ ] Dados ids con `/`, `..`, espacios, Unicode o un `.` inicial, cuando se deriva la ruta, entonces ningun componente sale de la raiz ni supera 255 bytes. Dos ids distintos que se sanean igual producen nombres distintos gracias al hash.
-- [ ] Dada una entrada invalida, cuando se llama a cualquier operacion, entonces devuelve `EntradaInvalida` y no crea nada.
-- [ ] Dada una fuente de N chunks, cuando `guardarAtomico` termina con exito, entonces el temporal estuvo en la carpeta final, el final contiene exactamente esos bytes con permisos 0600 (directorios nuevos 0700), no queda el temporal y se devuelve la ruta relativa.
-- [ ] Dado un fallo de escritura, `ENOSPC` simulado o una cancelacion en el chunk K, cuando termina `guardarAtomico`, entonces devuelve `Escritura`, `SinEspacio` o `Cancelada` y no existe el archivo final.
-- [ ] Dado un directorio sin permiso de escritura (`chmod 0500` en `QTemporaryDir`), cuando se guarda, entonces devuelve `Permiso` sin archivo final.
-- [ ] Dado un fallo del `fsync` del archivo, cuando se guarda, entonces devuelve `Durabilidad` y no promueve. Dado un fallo de promocion, devuelve `Promocion` sin archivo final.
-- [ ] Dado un fallo del `fsync` del directorio despues de promover, cuando se guarda, entonces devuelve exito con `advertenciaDurabilidad=true` y el final existe.
-- [ ] Dado un final preexistente con bytes centinela, cuando se guarda el mismo paquete, entonces devuelve `ColisionDestino` y el archivo no cambia.
-- [ ] Dada una raiz con temporales propios, temporales ajenos, finales con UUID valido y archivos fuera de la estructura, cuando se escanea, entonces solo se reportan los propios con sus campos de D9, y los ajenos no se reportan ni se borran.
-- [ ] Dado un hallazgo temporal propio, cuando se llama a `eliminarTemporal`, entonces se borra solo ese temporal. Dado un hallazgo final, la llamada se rechaza y el archivo permanece.
-- [ ] Dado un final sin solicitud asociable, cuando T007 procesa el escaneo, entonces el archivo permanece y se emite un diagnostico saneado en el log de la app, sin escribir en `log_solicitud`.
-- [ ] Dada una ruta relativa existente o ausente, cuando el detalle consulta la existencia, entonces recibe `Presente` o `NoEncontrado` en el hilo grafico y el estado persistido del paquete no cambia. Un error de lectura produce `ErrorComprobacion`.
-- [ ] Con `--data-dir <dir>`, la raiz efectiva es `<dir>/paquetes`; ninguna prueba crea nada bajo `~/SAT-CFDI-Downloader`.
-- [ ] El puerto no expone ninguna operacion para borrar archivos finales, y ningun log ni diagnostico contiene bytes del ZIP.
+- [x] Dada la misma `UbicacionPaquete`, cuando se deriva la ruta dos veces, entonces se obtiene la misma ruta relativa `<RFC>/<yyyy-mm de FechaInicial>/<UUID>/<archivo>.zip` bajo la raiz.
+- [x] Dado un `id_paquete_sat` valido (`<uuid>_01`), cuando se deriva el archivo, entonces se llama `<id>.zip` sin sufijo hash.
+- [x] Dados ids con `/`, `..`, espacios, Unicode o un `.` inicial, cuando se deriva la ruta, entonces ningun componente sale de la raiz ni supera 255 bytes. Dos ids distintos que se sanean igual producen nombres distintos gracias al hash.
+- [x] Dada una entrada invalida, cuando se llama a cualquier operacion, entonces devuelve `EntradaInvalida` y no crea nada.
+- [x] Dada una fuente de N chunks, cuando `guardarAtomico` termina con exito, entonces el temporal estuvo en la carpeta final, el final contiene exactamente esos bytes con permisos 0600 (directorios nuevos 0700), no queda el temporal y se devuelve la ruta relativa.
+- [x] Dado un fallo de escritura, `ENOSPC` simulado o una cancelacion en el chunk K, cuando termina `guardarAtomico`, entonces devuelve `Escritura`, `SinEspacio` o `Cancelada` y no existe el archivo final.
+- [x] Dado un directorio sin permiso de escritura (`chmod 0500` en `QTemporaryDir`), cuando se guarda, entonces devuelve `Permiso` sin archivo final.
+- [x] Dado un fallo del `fsync` del archivo, cuando se guarda, entonces devuelve `Durabilidad` y no promueve. Dado un fallo de promocion, devuelve `Promocion` sin archivo final.
+- [x] Dado un fallo del `fsync` del directorio despues de promover, cuando se guarda, entonces devuelve exito con `advertenciaDurabilidad=true` y el final existe.
+- [x] Dado un final preexistente con bytes centinela, cuando se guarda el mismo paquete, entonces devuelve `ColisionDestino` y el archivo no cambia.
+- [x] Dada una raiz con temporales propios, temporales ajenos, finales con UUID valido y archivos fuera de la estructura, cuando se escanea, entonces solo se reportan los propios con sus campos de D9, y los ajenos no se reportan ni se borran.
+- [x] Dado un hallazgo temporal propio, cuando se llama a `eliminarTemporal`, entonces se borra solo ese temporal. Dado un hallazgo final, la llamada se rechaza y el archivo permanece.
+- [x] Dado un final sin solicitud asociable, cuando T007 procesa el escaneo, entonces el archivo permanece y se emite un diagnostico saneado en el log de la app, sin escribir en `log_solicitud`.
+- [x] Dada una ruta relativa existente o ausente, cuando el detalle consulta la existencia, entonces recibe `Presente` o `NoEncontrado` en el hilo grafico y el estado persistido del paquete no cambia. Un error de lectura produce `ErrorComprobacion`.
+- [x] Con `--data-dir <dir>`, la raiz efectiva es `<dir>/paquetes`; ninguna prueba crea nada bajo `~/SAT-CFDI-Downloader`.
+- [x] El puerto no expone ninguna operacion para borrar archivos finales, y ningun log ni diagnostico contiene bytes del ZIP.
 
 ## Verificacion
 
@@ -118,7 +118,13 @@ El MVP guarda los ZIP fuera de SQLite, en una ruta fija (`ADR 0004`). Desde la r
 
 ## Resultado
 
-Pendiente.
+Completada el 2026-10-05.
+
+- Puerto `PackageStorage` y `FilesystemPackageStorage` (biblioteca `satcfdi_storage`) sobre la costura `FileOps`: derivacion `<RFC>/<yyyy-mm>/<UUID>/<archivo>.zip` con saneamiento, guardado atomico por chunks sin reemplazo y con durabilidad, existencia, escaneo estricto y eliminacion solo de temporales; `FakePackageStorage`.
+- `OperacionExecutor`: recuperacion con escaneo del filesystem (D9, D10) y `consultarExistencia` (D11).
+- Raiz `<data-dir>/paquetes` o `~/SAT-CFDI-Downloader/paquetes`, creada con 0700 en el hilo de E/S del bootstrap; detalle con existencia por paquete descargado.
+- ADR 0004 (nota T008) y `operational-rules.md` actualizados.
+- `ctest`: 12 suites; prueba manual con `--data-dir` correcta.
 
 ## Riesgos y notas
 

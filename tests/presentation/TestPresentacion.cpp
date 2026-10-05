@@ -18,6 +18,7 @@
 
 #include "application/profiles/DemoPerfilesSatService.h"
 #include "AccionesSolicitud.h"
+#include "ConsultaExistenciaPaquetes.h"
 #include "AppViewModel.h"
 #include "NuevaSolicitudViewModel.h"
 #include "PresentacionViewModels.h"
@@ -35,6 +36,7 @@
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QRegularExpression>
+#include <QPromise>
 #include <QSet>
 #include <QSignalSpy>
 #include <QTest>
@@ -318,6 +320,25 @@ struct AccionesEspia final : AccionesSolicitud {
     }
 };
 
+// T008: consulta de existencia con promesas que resuelve la prueba.
+struct ExistenciaEspia final : ConsultaExistenciaPaquetes {
+    QStringList consultados;
+    QList<std::shared_ptr<QPromise<ExistenciaPaquete>>> promesas;
+    QFuture<ExistenciaPaquete> consultar(const SolicitudId&, const QString& idPaqueteSat) override
+    {
+        consultados.append(idPaqueteSat);
+        auto p = std::make_shared<QPromise<ExistenciaPaquete>>();
+        p->start();
+        promesas.append(p);
+        return p->future();
+    }
+    void resolver(int i, ExistenciaPaquete e)
+    {
+        promesas.at(i)->addResult(e);
+        promesas.at(i)->finish();
+    }
+};
+
 } // namespace
 
 class TestPresentacion : public QObject {
@@ -363,6 +384,9 @@ private slots:
     void envioTrasCrearSeEncola();
     void detalleAccionesManualesYEstadosAccesibles();
     void detalleSinAccionesNoMuestraBotones();
+
+    // T008 D11
+    void detalleMuestraExistenciaSinCambiarEstado();
 };
 
 void TestPresentacion::init()
@@ -1537,6 +1561,67 @@ void TestPresentacion::detalleSinAccionesNoMuestraBotones()
     QVERIFY(!e.item(QStringLiteral("botonVerificarAhora"))->isVisible());
     d->verificarAhora(); // sin acciones: no hace nada
     QVERIFY(d->accionSolicitada().isEmpty());
+}
+
+void TestPresentacion::detalleMuestraExistenciaSinCambiarEstado()
+{
+    EscenarioAsincrono e;
+    ExistenciaEspia existencia;
+    e.vms.setConsultaExistencia(&existencia);
+    QVERIFY(e.cargar());
+    e.solicitudes.lista.resolver(0, ResultadoListaSol::exito({}));
+    SolicitudDetailViewModel* d = e.vms.detalle();
+    const SolicitudId id = SolicitudId::generar();
+    QVERIFY(e.vms.app()->abrirDetalle(id.texto()));
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaDetalleSolicitud"));
+
+    // Tres paquetes Descargado y uno Disponible (este no se consulta).
+    SolicitudDetalle detalle = detalleDePrueba(id);
+    const QStringList ids{QStringLiteral("PAQ_01"), QStringLiteral("PAQ_02"), QStringLiteral("PAQ_03")};
+    detalle.paquetes.clear();
+    for (const QString& p : ids) {
+        PaqueteResumen r;
+        r.idPaqueteSat = p;
+        r.estadoDescarga = EstadoDescarga::Descargado;
+        r.disponibleEn = detalle.resumen.creadaEn;
+        r.descargadoEn = detalle.resumen.creadaEn;
+        detalle.paquetes.append(r);
+    }
+    PaqueteResumen disponible;
+    disponible.idPaqueteSat = QStringLiteral("PAQ_04");
+    disponible.disponibleEn = detalle.resumen.creadaEn;
+    detalle.paquetes.append(disponible);
+    detalle.resumen.totalPaquetes = int(detalle.paquetes.size());
+    e.solicitudes.detalle.resolver(0, SolicitudesService::ResultadoDetalle::exito(detalle));
+    QTRY_VERIFY(d->cargada());
+    QCOMPARE(existencia.consultados, ids);
+
+    auto existenciaDe = [&](int i) { return d->paquetes().at(i).toMap().value(QStringLiteral("existencia")).toString(); };
+    QCOMPARE(existenciaDe(0), QStringLiteral("Comprobando"));
+    existencia.resolver(0, ExistenciaPaquete::Presente);
+    existencia.resolver(1, ExistenciaPaquete::NoEncontrado);
+    existencia.resolver(2, ExistenciaPaquete::ErrorComprobacion);
+    QTRY_COMPARE(existenciaDe(2), QStringLiteral("ErrorComprobacion"));
+    QCOMPARE(existenciaDe(0), QStringLiteral("Presente"));
+    QCOMPARE(existenciaDe(1), QStringLiteral("NoEncontrado"));
+    QCOMPARE(existenciaDe(3), QString()); // Disponible: no aplica
+
+    // Textos accesibles por paquete; el estado persistido no cambia.
+    QTRY_COMPARE(e.item(QStringLiteral("existenciaPaquete_PAQ_01"))->property("text").toString(),
+                 QStringLiteral("Archivo local presente"));
+    QCOMPARE(e.item(QStringLiteral("existenciaPaquete_PAQ_02"))->property("text").toString(),
+             QStringLiteral("Archivo local no encontrado"));
+    QCOMPARE(e.item(QStringLiteral("existenciaPaquete_PAQ_03"))->property("text").toString(),
+             QStringLiteral("No se pudo comprobar el archivo local"));
+    QCOMPARE(nombreAccesible(e.item(QStringLiteral("existenciaPaquete_PAQ_02"))),
+             QStringLiteral("Archivo local no encontrado"));
+    QVERIFY(!e.item(QStringLiteral("existenciaPaquete_PAQ_04"))->isVisible());
+    for (int i = 0; i < 3; ++i) {
+        QCOMPARE(d->paquetes().at(i).toMap().value(QStringLiteral("estadoDescarga")).toString(),
+                 QStringLiteral("Descargado"));
+    }
+    QCOMPARE(e.solicitudes.detalle.size(), 1); // sin recargas ni escrituras
+    e.vms.setConsultaExistencia(nullptr);
 }
 
 #include "TestPresentacion.moc"

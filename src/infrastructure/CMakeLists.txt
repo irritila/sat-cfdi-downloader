@@ -108,6 +108,29 @@ if(APPLE)
     satcfdi_enable_warnings(satcfdi_os_macos_tests)
 endif()
 
+# --- T008 corte A (core-infra): almacenamiento local de paquetes ZIP --------
+# satcfdi_storage: FilesystemPackageStorage (puerto PackageStorage) sobre la
+# costura FileOps (PosixFileOps: mkdir/open exclusivo, fsync + F_FULLFSYNC,
+# renamex_np RENAME_EXCL, fsync del directorio). Solo Qt Core; sin SQL ni red.
+# Lo enlaza el composition root (raiz resuelta con resolverRaiz, D8) y las
+# pruebas de infraestructura.
+qt_add_library(satcfdi_storage STATIC
+    storage/FileOps.h
+    storage/PosixFileOps.cpp
+    storage/FilesystemPackageStorage.h
+    storage/FilesystemPackageStorage.cpp
+)
+target_include_directories(satcfdi_storage PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+target_link_libraries(satcfdi_storage
+    PUBLIC
+        satcfdi_domain
+        satcfdi_ports
+        Qt6::Core
+)
+satcfdi_enable_warnings(satcfdi_storage)
+
 # --- T005 corte B (especialista-macos) ---------------------------------------
 # OpenSSL 3 como dependencia DIRECTA (DU1): no se confia en la carga
 # transitiva de QtNetwork. En macOS se usa la de Homebrew si no se indico

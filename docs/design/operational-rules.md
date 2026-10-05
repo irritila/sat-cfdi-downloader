@@ -327,8 +327,13 @@ La app no debe dejar `SolicitudMasiva=Terminada` sin registrar los paquetes reci
 
 1. Transaccion local breve: reclamar el paquete y marcarlo `Descargando`.
 2. Invocar la operacion externa sin una transaccion abierta; su adaptador hace
-   preparacion, autenticacion, descarga del ZIP, escritura temporal y rename
-   atomico a la ruta final.
+   preparacion, autenticacion, descarga del ZIP, escritura por chunks a un
+   temporal en la carpeta final y promocion atomica sin reemplazo. El temporal
+   se llama `.<archivo>.<16 hex aleatorios>.part`, se crea en exclusiva con
+   permisos `0600` y los directorios nuevos usan `0700`. Antes de promover se
+   sincroniza el archivo con `fsync` y `F_FULLFSYNC`; la promocion no reemplaza
+   un destino existente (`renamex_np` con `RENAME_EXCL`) y despues se
+   sincroniza el directorio.
 3. Transaccion local `BEGIN IMMEDIATE`: si el paquete no fue eliminado, con
    archivo final confirmado marcar `Descargado` y guardar ruta y codigo SAT.
 
@@ -336,6 +341,19 @@ Una falla de `Preparacion`, `Autenticacion` o `Almacenamiento` deja el paquete
 en `Error`; `5007` lo deja `Vencido` y `5008` lo deja `Error`. Una interrupcion
 se recupera al arrancar. La solicitud solo pasa a `Vencida` si una respuesta de
 verificacion SAT reporta `EstadoSolicitud=6`.
+
+Si falla la sincronizacion del archivo antes de la promocion, el resultado es
+`Durabilidad`, no existe archivo final y el paquete queda en `Error`. Si la
+promocion ya ocurrio y falla la sincronizacion del directorio, la operacion es
+exitosa con `advertenciaDurabilidad=true`: el final existe, el ejecutor marca
+`Descargado` y registra una advertencia saneada. No se convierte en error ni
+se reintenta como descarga, porque el reintento encontraria una colision de
+destino. Ningun flujo sobrescribe o borra un archivo final.
+
+La comprobacion de existencia usada por el detalle se encola en
+`OperacionExecutor` como una lectura de filesystem. Su resultado vuelve por
+senal encolada como `Presente`, `NoEncontrado` o `ErrorComprobacion`; no cambia
+el estado persistido del paquete ni registra un log de solicitud.
 
 ### Eliminar solicitud local
 
@@ -353,14 +371,25 @@ Al iniciar la app:
 
 - `Creada` sin intento de envio: se mantiene visible y puede enviarse.
 - `Enviando` con intento iniciado: pasa a `EnvioIncierto` y registra log. No se reenvia desde el MVP.
+- Antes de aplicar estados, `PackageStorage` escanea solo hechos propios: rutas
+  bajo `<RFC>/<yyyy-mm>/<UUID canonico>/` y temporales con el patron estricto
+  `.<archivo>.<16 hex aleatorios>.part`. Reporta `Temporal` o `Final`, ruta
+  relativa, UUID de solicitud y nombre de archivo final asociado; no consulta
+  SQLite. Todo lo demas se ignora y nunca se borra.
+- Para un temporal asociado a un paquete `Descargando`, T007 aplica su regla
+  de recuperacion y ordena `eliminarTemporal`. Un temporal propio no asociable
+  se elimina con un diagnostico saneado de aplicacion. La eliminacion solo
+  acepta temporales propios.
 - `Descargando` sin archivo final confirmado: pasa a `Disponible` y registra
-  log de descarga interrumpida.
-- Si existe el archivo final para un paquete en `Descargando`, se reconcilia
-  como `Descargado` y se registra el evento.
-- Si falla la comprobacion de archivo final, conserva `Descargando` y registra
+  log de descarga interrumpida. Si existe el archivo final para un paquete en
+  `Descargando`, se reconcilia como `Descargado` y se registra el evento.
+  Si falla la comprobacion de archivo final, conserva `Descargando` y registra
   una falla de reconciliacion; no infiere que el archivo no existe.
-- Archivos temporales `.part` o `.tmp` sin archivo final se eliminan o ignoran.
-- Un archivo final sin paquete persistido se conserva como archivo huerfano y se registra en `LogSolicitud`; no se elimina automaticamente.
+- Un final con solicitud asociable pero sin paquete persistido se conserva y
+  T007 registra `archivo_huerfano` en `LogSolicitud`. Un final sin solicitud
+  asociable se conserva y solo produce un diagnostico saneado en el log de la
+  aplicacion; no escribe `LogSolicitud`.
+- Ninguna rama de recuperacion sobrescribe o borra archivos finales.
 - Solicitudes `Terminada` con paquetes `Disponible` o `Error` quedan disponibles para descarga o reintento manual.
 - Solicitudes eliminadas localmente se ignoran por worker y UI principal.
 

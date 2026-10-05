@@ -333,9 +333,11 @@ void TestComposicionPersistida::grafoPersistidoSinDemosNiCarpetaZip()
         QCOMPARE(modelo->rowCount(), 0);
     }
 
-    // Solo la base (y sus -wal/-shm); ningun directorio (p. ej. paquetes ZIP).
+    // Solo la base (y sus -wal/-shm) y, desde T008 (D8), la raiz de paquetes
+    // vacia; ninguna otra carpeta ni archivo.
     const QDir dir(tmp.path());
-    QVERIFY(dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot).isEmpty());
+    QCOMPARE(dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot), QStringList{QStringLiteral("paquetes")});
+    QVERIFY(QDir(dir.filePath(QStringLiteral("paquetes"))).isEmpty());
     const QStringList archivos = dir.entryList(QDir::Files | QDir::Hidden);
     QVERIFY(archivos.contains(QStringLiteral("satcfdi.sqlite3")));
     for (const QString& archivo : archivos) {

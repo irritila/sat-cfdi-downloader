@@ -28,6 +28,29 @@ La ruta queda fija para el MVP. No se guarda como preferencia configurable en `C
 
 La eliminacion local es virtual en base de datos. No borra automaticamente ZIPs descargados.
 
+## Nota de detalle (T008)
+
+Sin cambiar esta decision ni su estado, la estructura concreta de cada ZIP es:
+
+```text
+<raiz>/<RFC>/<yyyy-mm de FechaInicial>/<UUID local>/<archivo>.zip
+```
+
+`yyyy-mm` usa el mes de `FechaInicial`, incluso si el rango de la solicitud
+cruza meses. El directorio de solicitud usa el UUID local canonico de la app,
+no el identificador SAT.
+
+El nombre parte de `id_paquete_sat`. Si cumple `[A-Za-z0-9._-]{1,100}` y no
+empieza por `.`, se usa `<id>.zip`. En otro caso, cada caracter no permitido se
+sustituye por `_`, el prefijo se trunca a 100 y se agrega
+`--<16 hex de SHA-256 del id original en UTF-8>`. Cada componente mide como
+maximo 255 bytes. La ruta persistida es relativa a la raiz y no admite
+componentes absolutos ni `..`.
+
+La raiz de produccion es `~/SAT-CFDI-Downloader/paquetes`. Con `--data-dir`,
+la raiz es `<data-dir>/paquetes`; las pruebas inyectan una raiz temporal. La
+ruta no se configura como preferencia del usuario.
+
 ## Consecuencias
 
 - La base local no crece por contenido binario de paquetes.

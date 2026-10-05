@@ -4,8 +4,10 @@
 #include "app_core/ArranqueProceso.h"
 #include "app_core/AppCompositionRoot.h"
 #include "app_core/SingleInstanceCoordinator.h"
+#include "infrastructure/storage/FilesystemPackageStorage.h"
 
 #include <QApplication>
+#include <QDir>
 #include <QMessageBox>
 
 namespace {
@@ -37,7 +39,15 @@ int main(int argc, char* argv[])
 
     // Vive todo el proceso: mientras exista, esta es la instancia primaria.
     satcfdi::SingleInstanceCoordinator instancia;
-    const satcfdi::AppBootstrapper bootstrapper(std::move(opciones).valor());
+    // T008 D8: con --data-dir los ZIP van a <dir>/paquetes; sin el, a
+    // ~/SAT-CFDI-Downloader/paquetes (no a AppDataLocation). La crea el
+    // bootstrapper en su hilo de E/S.
+    satcfdi::AppBootstrapper::Opciones arranque = std::move(opciones).valor();
+    arranque.raizPaquetes = satcfdi::FilesystemPackageStorage::resolverRaiz(
+        arranque.directorioDatos.isEmpty() ? std::nullopt
+                                           : std::optional<QString>(QDir(arranque.directorioDatos).absolutePath()),
+        QDir::homePath());
+    const satcfdi::AppBootstrapper bootstrapper(std::move(arranque));
     const auto preparacion = satcfdi::prepararProceso(instancia, bootstrapper);
     switch (preparacion.tipo) {
     case satcfdi::PreparacionProceso::Tipo::Lista:
@@ -63,7 +73,9 @@ int main(int argc, char* argv[])
         return errorFatal(QStringLiteral("El almacen de credenciales no esta disponible en esta "
                                          "plataforma."));
     }
-    satcfdi::AppCompositionRoot root(preparacion.arranque.rutaBase, *secretStore);
+    satcfdi::OpcionesMonitoreo monitoreo;
+    monitoreo.raizPaquetes = preparacion.arranque.raizPaquetes;
+    satcfdi::AppCompositionRoot root(preparacion.arranque.rutaBase, *secretStore, monitoreo);
     if (!root.cargar()) {
         return 1;
     }

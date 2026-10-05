@@ -4,12 +4,15 @@
 #include "domain/common/UuidCanonico.h"
 #include "domain/operaciones/PoliticasOperacion.h"
 #include "ports/LogSanitizer.h"
+#include "ports/PackageStorage.h"
+#include "ports/repositories/PaqueteSolicitudRepository.h"
 #include "ports/repositories/LogSolicitudRepository.h"
 #include "ports/repositories/OperacionesSolicitudRepository.h"
 #include "ports/repositories/SolicitudMasivaRepository.h"
 #include "ports/repositories/UnitOfWork.h"
 
 #include <QHash>
+#include <QLoggingCategory>
 #include <QMetaObject>
 #include <QMutex>
 #include <QMutexLocker>
@@ -21,6 +24,8 @@
 #include <deque>
 #include <exception>
 #include <utility>
+
+Q_LOGGING_CATEGORY(lcRecuperacionArchivos, "satcfdi.recuperacion.archivos")
 
 namespace satcfdi {
 
@@ -807,6 +812,119 @@ struct OperacionExecutor::Impl {
                          && paq.valor()->paquete.estadoDescarga == EstadoDescarga::Descargando);
     }
 
+    // --- Archivos (T008 D3, D9, D10, D11) ------------------------------------
+
+    std::optional<QList<HallazgoFilesystem>> escanearArchivos()
+    {
+        if (!p.almacenamiento) {
+            qCInfo(lcRecuperacionArchivos, "sin almacenamiento de paquetes: se omite el escaneo de archivos");
+            return std::nullopt;
+        }
+        auto r = p.almacenamiento->escanearRecuperacion();
+        if (!r) {
+            qCWarning(lcRecuperacionArchivos, "escaneo de recuperacion fallido (%s): no se borra nada",
+                      qPrintable(claveEstable(r.error())));
+            return std::nullopt;
+        }
+        return std::move(r).valor();
+    }
+
+    void procesarHallazgos(const QList<HallazgoFilesystem>& hallazgos, const QList<PaqueteDescargable>& descargando,
+                           bool& error)
+    {
+        for (const HallazgoFilesystem& h : hallazgos) {
+            if (h.tipo == TipoHallazgo::Temporal) {
+                const bool asociado = std::any_of(descargando.cbegin(), descargando.cend(), [&](const PaqueteDescargable& pd) {
+                    return pd.paquete.solicitudMasivaId == h.solicitudId
+                           && rutapaquete::nombreArchivoFinal(pd.paquete.idPaqueteSat) == h.archivoFinal;
+                });
+                auto borrado = p.almacenamiento->eliminarTemporal(h);
+                if (!borrado) {
+                    qCWarning(lcRecuperacionArchivos, "no se pudo eliminar el temporal %s (%s)",
+                              qPrintable(h.rutaRelativa), qPrintable(claveEstable(borrado.error())));
+                } else if (!asociado) {
+                    qCInfo(lcRecuperacionArchivos, "temporal no asociable eliminado: %s", qPrintable(h.rutaRelativa));
+                }
+                continue;
+            }
+            procesarFinal(h, error);
+        }
+    }
+
+    void procesarFinal(const HallazgoFilesystem& h, bool& error)
+    {
+        auto solicitud = p.solicitudes.obtenerVisible(h.solicitudId);
+        if (!solicitud) {
+            qCWarning(lcRecuperacionArchivos, "no se pudo leer la solicitud del archivo %s", qPrintable(h.rutaRelativa));
+            error = true;
+            return;
+        }
+        if (!solicitud.valor()) {
+            // D3: sin solicitud asociable; se conserva y solo hay diagnostico.
+            qCWarning(lcRecuperacionArchivos, "archivo final sin solicitud asociable (se conserva): %s",
+                      qPrintable(h.rutaRelativa));
+            return;
+        }
+        if (!p.paquetes) {
+            return; // sin repositorio de paquetes no se puede asociar
+        }
+        auto paquetes = p.paquetes->listarVisiblesPorSolicitud(h.solicitudId);
+        if (!paquetes) {
+            error = true;
+            return;
+        }
+        for (const PaquetePersistido& paq : paquetes.valor()) {
+            if (rutapaquete::nombreArchivoFinal(paq.idPaqueteSat) == h.archivoFinal) {
+                return; // archivo de un paquete registrado
+            }
+        }
+        // Huerfano: se conserva y se registra una sola vez (D10), revalidando
+        // la visibilidad en la misma transaccion (D5).
+        const QString marca = QStringLiteral("Archivo final sin paquete registrado: ") + h.archivoFinal;
+        RB r = enTransaccion([&]() -> RB {
+            auto visible = p.solicitudes.obtenerVisible(h.solicitudId);
+            if (!visible) {
+                return RB::fallo(std::move(visible).error());
+            }
+            if (!visible.valor()) {
+                return RB::exito(false);
+            }
+            auto previos = p.logs.listarVisiblesPorSolicitud(h.solicitudId);
+            if (!previos) {
+                return RB::fallo(std::move(previos).error());
+            }
+            for (const LogPersistido& l : previos.valor()) {
+                if (l.tipoEvento == TipoEventoLog::ArchivoHuerfano && l.payloadResumenJson
+                    && l.payloadResumenJson->contains(h.archivoFinal)) {
+                    return RB::exito(false);
+                }
+            }
+            if (auto e = log(h.solicitudId, {TipoEventoLog::ArchivoHuerfano, OrigenLog::Recuperacion, std::nullopt,
+                                             std::nullopt, std::nullopt, marca,
+                                             QStringLiteral("Ruta relativa: ") + h.rutaRelativa, std::nullopt})) {
+                return RB::fallo(*e);
+            }
+            return RB::exito(true);
+        });
+        error = error || !r;
+        if (r && r.valor()) {
+            emit q->solicitudActualizada(h.solicitudId);
+        }
+    }
+
+    ExistenciaArchivo ejecutarExistencia(const QString& rutaRelativa)
+    {
+        ExistenciaArchivo e = ExistenciaArchivo::ErrorComprobacion;
+        if (p.almacenamiento) {
+            auto r = p.almacenamiento->existeArchivoFinal(rutaRelativa);
+            if (r) {
+                e = r.valor() ? ExistenciaArchivo::Presente : ExistenciaArchivo::NoEncontrado;
+            }
+        }
+        emit q->existenciaConsultada(rutaRelativa, e);
+        return e;
+    }
+
     R ejecutarRecuperacion(const SenalCancelacion& cancelacion)
     {
         constexpr auto tipo = TipoOperacion::Recuperacion;
@@ -815,6 +933,9 @@ struct OperacionExecutor::Impl {
         if (!interrumpido) {
             return errorLocal(tipo, origen, std::nullopt, std::nullopt);
         }
+        // T008 D9: el escaneo se hace antes de aplicar nada; si falla no se
+        // borra nada y la recuperacion SQLite continua.
+        const std::optional<QList<HallazgoFilesystem>> hallazgos = escanearArchivos();
         bool error = false;
         for (const SolicitudId& id : interrumpido.valor().solicitudesEnviando) {
             AplicacionEnvio a;
@@ -889,6 +1010,10 @@ struct OperacionExecutor::Impl {
                 emit q->solicitudActualizada(paq.solicitudMasivaId);
             }
         }
+        if (hallazgos) {
+            // Despues de aplicar la regla de T007 a los paquetes Descargando.
+            procesarHallazgos(*hallazgos, interrumpido.valor().paquetesDescargando, error);
+        }
         return resultado(tipo, origen, error ? Desenlace::ErrorLocal : Desenlace::Aplicada);
     }
 
@@ -927,6 +1052,7 @@ OperacionExecutor::OperacionExecutor(PuertosEjecutor puertos, RelojUtc reloj, Pr
     qRegisterMetaType<PerfilId>();
     qRegisterMetaType<EstadoCredencial>();
     qRegisterMetaType<InstantaneaWorker>();
+    qRegisterMetaType<ExistenciaArchivo>();
 
     m_impl->hilo.setObjectName(QStringLiteral("satcfdi-ejecutor"));
     m_impl->contexto = new QObject;
@@ -1049,6 +1175,17 @@ QFuture<ResultadoOperacion> OperacionExecutor::recuperar()
 {
     return m_impl->encolarOperacion(TipoOperacion::Recuperacion, OrigenLog::Recuperacion, std::nullopt, std::nullopt,
                                     [this](const SenalCancelacion& c) { return m_impl->ejecutarRecuperacion(c); });
+}
+
+QFuture<ExistenciaArchivo> OperacionExecutor::consultarExistencia(const QString& rutaRelativa)
+{
+    return m_impl->encolar<ExistenciaArchivo>(
+        PrioridadOperacion::Manual, std::nullopt,
+        [this, rutaRelativa](const SenalCancelacion&) { return m_impl->ejecutarExistencia(rutaRelativa); },
+        [this, rutaRelativa]() {
+            emit existenciaConsultada(rutaRelativa, ExistenciaArchivo::ErrorComprobacion);
+            return ExistenciaArchivo::ErrorComprobacion;
+        });
 }
 
 QFuture<QList<std::pair<PerfilId, EstadoCredencial>>>

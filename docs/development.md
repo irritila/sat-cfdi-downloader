@@ -161,7 +161,7 @@ el hilo grafico no ejecuta SQL:
 ```
 
 Junto a la base pueden aparecer `satcfdi.sqlite3-wal` y `satcfdi.sqlite3-shm`
-(modo WAL). T003 no crea carpeta de paquetes ZIP.
+(modo WAL) y, desde T008, la carpeta `paquetes/` (ver "Paquetes ZIP locales").
 
 Credenciales e.firma (T005): los contenedores cifrados viven en
 `<directorio de datos>/credentials/` y la contrasena y la clave de envoltura en
@@ -296,6 +296,25 @@ dialogo, no debe aceptarse a ciegas: la prueba no deberia pedir nada. Nota:
 `security find-generic-password` solo consulta los llaveros de archivo; no ve
 los items del data protection keychain. La ausencia de residuos la comprueba la
 propia prueba (lista vacia tras borrar).
+
+## Paquetes ZIP locales (T008)
+
+- Raiz de paquetes (D8): con `--data-dir <dir>`, `<dir>/paquetes`; sin
+  `--data-dir`, `~/SAT-CFDI-Downloader/paquetes` (no `Application Support`).
+  `ruta_local` se guarda relativa a esa raiz.
+- La app crea la raiz al ARRANCAR, en el hilo de E/S del bootstrap (no en el
+  hilo grafico), con permisos 0700 (los componentes que falten;
+  no cambia permisos de carpetas que ya existian). El adaptador
+  (`FilesystemPackageStorage`) tambien la crearia en el primer guardado; se crea
+  antes para que sea visible y quede privada desde el inicio.
+- Dentro: `<RFC>/<AAAA-MM>/<id local de la solicitud>/<IdPaquete>.zip`. Al
+  arrancar, la recuperacion escanea la raiz: un temporal propio se elimina, un
+  final sin solicitud asociable se conserva y solo deja un diagnostico en el log
+  de la app (categoria `satcfdi.recuperacion.archivos`).
+- El detalle muestra, por cada paquete `Descargado`, si el archivo local esta
+  presente, no se encontro o no se pudo comprobar; nunca cambia el estado.
+- Prueba manual: `satcfdi_app --data-dir /tmp/satcfdi-prueba` y comprobar que
+  existe `/tmp/satcfdi-prueba/paquetes` (0700).
 
 ## Monitoreo local: worker y ejecutor serial (T007)
 

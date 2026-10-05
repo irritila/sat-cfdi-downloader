@@ -1,7 +1,10 @@
 #include "IntegracionWorker.h"
 
 #include "application/operaciones/OperacionExecutor.h"
+#include "domain/paquetes/PaquetePersistido.h"
 #include "application/operaciones/WorkerLocal.h"
+#include "application/persistence/PersistenceDispatcher.h"
+#include "ports/repositories/PaqueteSolicitudRepository.h"
 
 #include <chrono>
 
@@ -70,6 +73,55 @@ QFuture<void> ExtensionWorker::detener()
 {
     m_worker.detener();
     return m_ejecutor.detener(std::chrono::seconds(10));
+}
+
+ConsultaExistenciaEjecutor::ConsultaExistenciaEjecutor(PersistenceDispatcher& dispatcher,
+                                                       PaqueteSolicitudRepository& paquetes,
+                                                       OperacionExecutor& ejecutor)
+    : m_dispatcher(dispatcher)
+    , m_paquetes(paquetes)
+    , m_ejecutor(ejecutor)
+{
+}
+
+QFuture<ExistenciaPaquete> ConsultaExistenciaEjecutor::consultar(const SolicitudId& solicitud,
+                                                                 const QString& idPaqueteSat)
+{
+    PaqueteSolicitudRepository* paquetes = &m_paquetes;
+    OperacionExecutor* ejecutor = &m_ejecutor;
+    QFuture<std::optional<QString>> ruta = m_dispatcher.despachar<std::optional<QString>>(
+        [paquetes, solicitud, idPaqueteSat]() -> std::optional<QString> {
+            auto lista = paquetes->listarVisiblesPorSolicitud(solicitud);
+            if (!lista) {
+                return std::nullopt;
+            }
+            for (const PaquetePersistido& p : lista.valor()) {
+                if (p.idPaqueteSat == idPaqueteSat && p.rutaLocal && !p.rutaLocal->isEmpty()) {
+                    return p.rutaLocal;
+                }
+            }
+            return std::nullopt;
+        });
+    // La consulta al ejecutor se encola desde el hilo grafico (contexto).
+    return ruta
+        .then(ejecutor,
+              [ejecutor](const std::optional<QString>& r) -> QFuture<ExistenciaPaquete> {
+                  if (!r) {
+                      return QtFuture::makeReadyValueFuture(ExistenciaPaquete::ErrorComprobacion);
+                  }
+                  return ejecutor->consultarExistencia(*r).then([](ExistenciaArchivo e) {
+                      switch (e) {
+                      case ExistenciaArchivo::Presente:
+                          return ExistenciaPaquete::Presente;
+                      case ExistenciaArchivo::NoEncontrado:
+                          return ExistenciaPaquete::NoEncontrado;
+                      case ExistenciaArchivo::ErrorComprobacion:
+                          break;
+                      }
+                      return ExistenciaPaquete::ErrorComprobacion;
+                  });
+              })
+        .unwrap();
 }
 
 AccionesWorker::AccionesWorker(WorkerLocal& worker)

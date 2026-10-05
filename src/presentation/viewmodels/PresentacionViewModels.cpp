@@ -33,6 +33,11 @@ void PresentacionViewModels::setAccionesSolicitud(AccionesSolicitud* acciones)
     m_detalle->setAccionesSolicitud(acciones);
 }
 
+void PresentacionViewModels::setConsultaExistencia(ConsultaExistenciaPaquetes* consulta)
+{
+    m_detalle->setConsultaExistencia(consulta);
+}
+
 QVariantMap PresentacionViewModels::initialProperties() const
 {
     return {

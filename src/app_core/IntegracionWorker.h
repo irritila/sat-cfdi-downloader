@@ -2,11 +2,14 @@
 
 #include "ExtensionCicloDeVida.h"
 #include "presentation/viewmodels/AccionesSolicitud.h"
+#include "presentation/viewmodels/ConsultaExistenciaPaquetes.h"
 #include "ports/OSIntegration.h"
 
 namespace satcfdi {
 
 class OperacionExecutor;
+class PaqueteSolicitudRepository;
+class PersistenceDispatcher;
 class WorkerLocal;
 struct InstantaneaWorker;
 
@@ -45,6 +48,25 @@ public:
 
 private:
     WorkerLocal& m_worker;
+};
+
+// ConsultaExistenciaPaquetes (presentacion, T008 D11): lee ruta_local del
+// paquete con PersistenceDispatcher (SQL fuera del hilo grafico) y consulta la
+// existencia con OperacionExecutor::consultarExistencia (filesystem en el hilo
+// del ejecutor). Solo lectura: no cambia estado ni escribe logs. Sin
+// ruta_local, error de lectura, future cancelado o ejecutor detenido ->
+// ErrorComprobacion.
+class ConsultaExistenciaEjecutor final : public ConsultaExistenciaPaquetes {
+public:
+    ConsultaExistenciaEjecutor(PersistenceDispatcher& dispatcher, PaqueteSolicitudRepository& paquetes,
+                               OperacionExecutor& ejecutor);
+
+    QFuture<ExistenciaPaquete> consultar(const SolicitudId& solicitud, const QString& idPaqueteSat) override;
+
+private:
+    PersistenceDispatcher& m_dispatcher;
+    PaqueteSolicitudRepository& m_paquetes;
+    OperacionExecutor& m_ejecutor;
 };
 
 } // namespace satcfdi

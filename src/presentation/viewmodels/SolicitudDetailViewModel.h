@@ -3,6 +3,7 @@
 #include "application/requests/SolicitudDtos.h"
 
 #include <QDateTime>
+#include <QHash>
 #include <QObject>
 #include <QPointer>
 #include <QString>
@@ -16,6 +17,7 @@
 namespace satcfdi {
 
 class AccionesSolicitud;
+class ConsultaExistenciaPaquetes;
 
 class SolicitudesService;
 
@@ -148,6 +150,10 @@ public:
     Q_INVOKABLE void eliminar();
 
     void setAccionesSolicitud(AccionesSolicitud* acciones);
+    // T008 D11: existencia del ZIP de cada paquete Descargado. No propietario.
+    // paquetes()[i]["existencia"]: "" (no aplica), "Comprobando", "Presente",
+    // "NoEncontrado" o "ErrorComprobacion". Nunca cambia el estado persistido.
+    void setConsultaExistencia(ConsultaExistenciaPaquetes* consulta);
     bool puedeVerificar() const;
     bool puedeReintentarDescarga() const;
     QString accionSolicitada() const { return m_accionSolicitada; }
@@ -179,6 +185,10 @@ private:
     quint64 m_genCarga = 0;
     quint64 m_genEliminar = 0;
     AccionesSolicitud* m_acciones = nullptr;
+    ConsultaExistenciaPaquetes* m_existencia = nullptr;
+    QHash<QString, QString> m_existencias; // idPaqueteSat -> clave
+    quint64 m_genExistencia = 0;
+    void consultarExistencias();
     QString m_accionSolicitada;
 };
 

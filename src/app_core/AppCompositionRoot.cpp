@@ -15,8 +15,11 @@
 #include "application/profiles/PerfilesSatServicePersistido.h"
 #include "application/requests/SolicitudesServicePersistido.h"
 #include "infrastructure/persistence/sqlite/SqlitePersistencia.h"
+#include "infrastructure/storage/FilesystemPackageStorage.h"
 #include "presentation/viewmodels/PresentacionViewModels.h"
 
+#include <QDir>
+#include <QFileInfo>
 #include <QLoggingCategory>
 #include <QQmlApplicationEngine>
 #include <QWindow>
@@ -27,6 +30,7 @@ namespace satcfdi {
 
 namespace {
 Q_LOGGING_CATEGORY(lcMonitoreo, "satcfdi.monitoreo")
+
 } // namespace
 
 AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& secretStore,
@@ -67,13 +71,27 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
         m_programadorWorkerPropio = std::make_unique<ProgramadorQt>(reloj);
         programadorWorker = m_programadorWorkerPropio.get();
     }
+    // T008 D8: almacenamiento de ZIP. La raiz la crea AppBootstrapper al
+    // arrancar, en su hilo de E/S (nunca en el hilo grafico); el adaptador
+    // tambien la crea al primer guardado.
+    m_packageStorage = monitoreo.packageStorage;
+    if (!m_packageStorage) {
+        m_raizPaquetes = monitoreo.raizPaquetes.isEmpty()
+                             ? QDir(QFileInfo(rutaBase).absolutePath()).filePath(QStringLiteral("paquetes"))
+                             : monitoreo.raizPaquetes;
+        m_packageStoragePropio = std::make_unique<FilesystemPackageStorage>(m_raizPaquetes);
+        m_packageStorage = m_packageStoragePropio.get();
+    }
+
     SqlitePersistencia* persistencia = m_persistencia.get();
     PuertosEjecutor puertosEjecutor{p.solicitudes(), p.logs(), p.operaciones(), p.unidadDeTrabajo(), *m_sanitizer,
-                                    *sat, [persistencia] { persistencia->cerrarConexionDelHiloActual(); }};
+                                    *sat, [persistencia] { persistencia->cerrarConexionDelHiloActual(); },
+                                    &p.paquetes(), m_packageStorage};
     m_ejecutor = std::make_unique<OperacionExecutor>(std::move(puertosEjecutor), reloj, *programadorEjecutor);
     m_worker = std::make_unique<WorkerLocal>(*m_ejecutor, *m_configuracionService, *programadorWorker, reloj);
     m_extensionWorker = std::make_unique<ExtensionWorker>(*m_worker, *m_ejecutor);
     m_accionesWorker = std::make_unique<AccionesWorker>(*m_worker);
+    m_consultaExistencia = std::make_unique<ConsultaExistenciaEjecutor>(*m_dispatcher, p.paquetes(), *m_ejecutor);
 
     // Los cambios aplicados por el ejecutor refrescan la UI por las senales
     // del servicio de solicitudes (lista y detalle).
@@ -100,6 +118,7 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
     m_viewModels = std::make_unique<PresentacionViewModels>(
         m_solicitudesService.get(), m_perfilesService.get(), m_credencialesService.get());
     m_viewModels->setAccionesSolicitud(m_accionesWorker.get());
+    m_viewModels->setConsultaExistencia(m_consultaExistencia.get());
 
     // Primera tarea del dispatcher serial: limpia generaciones huerfanas del
     // SecretStore (residuos de fallos previos). No se espera aqui; las
@@ -117,6 +136,7 @@ AppCompositionRoot::~AppCompositionRoot()
     // T007: el ejecutor termina antes que el dispatcher (y su hilo cierra su
     // propia conexion). Si la salida explicita ya lo detuvo, es inmediato.
     m_accionesWorker.reset();
+    m_consultaExistencia.reset();
     m_extensionWorker.reset();
     if (m_worker) {
         m_worker->detener();
@@ -126,6 +146,7 @@ AppCompositionRoot::~AppCompositionRoot()
     m_programadorWorkerPropio.reset();
     m_programadorEjecutorPropio.reset();
     m_operacionesSatPropio.reset();
+    m_packageStoragePropio.reset();
 
     m_credencialesService.reset();
     m_configuracionService.reset();

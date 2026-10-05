@@ -32,7 +32,13 @@ struct ArranquePreparado {
     QString directorioDatos;
     QString rutaBase; // <directorioDatos>/satcfdi.sqlite3
     InformeInicializacionSqlite informe;
+    QString raizPaquetes; // T008 D8: raiz efectiva de los ZIP (absoluta)
 };
+
+// T008 D8: crea `raiz` y sus componentes FALTANTES con 0700 (no cambia
+// permisos de carpetas existentes). Un fallo solo deja un warning. E/S: se
+// llama desde el hilo temporal de AppBootstrapper, nunca desde el grafico.
+void crearRaizPaquetesPrivada(const QString& raiz);
 
 // Fija organizationName ("Adenium") y applicationName ("SAT CFDI Downloader").
 // main.cpp la llama justo despues de crear QApplication y antes de resolver la
@@ -65,6 +71,11 @@ public:
         // Vacio: inicializarBaseSqlite con `migraciones`. Inyectable en pruebas
         // (p. ej. para registrar el hilo y delegar en la real).
         Inicializador inicializador;
+        // T008 D8: raiz de paquetes; vacia = <directorioDatos>/paquetes.
+        QString raizPaquetes;
+        // Crea la raiz en el hilo temporal; vacia = crearRaizPaquetesPrivada.
+        // Costura para pruebas (p. ej. registrar el hilo y delegar).
+        std::function<void(const QString&)> crearRaizPaquetes;
     };
 
     // Acepta `--data-dir <dir>` y `--data-dir=<dir>`; ignora otros argumentos

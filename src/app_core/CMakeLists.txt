@@ -40,6 +40,8 @@ target_link_libraries(satcfdi_app_core
         satcfdi_presentationplugin
         satcfdi_application
         satcfdi_infrastructure
+        # T008: FilesystemPackageStorage (raiz de paquetes, D8).
+        satcfdi_storage
         satcfdi_domain
         satcfdi_ports
         Qt6::Core

@@ -31,6 +31,16 @@ enum class PrioridadOperacion {
     Automatica = 2,
 };
 
+// Resultado de consultarExistencia (T008 D11). Solo lectura del filesystem:
+// nunca cambia el estado persistido del paquete.
+enum class ExistenciaArchivo {
+    Presente,
+    NoEncontrado,
+    ErrorComprobacion, // ruta invalida, raiz ilegible, sin almacenamiento o ejecutor detenido
+};
+
+QString claveEstable(ExistenciaArchivo existencia);
+
 // Desenlace publicado de una operacion (senal encolada al hilo grafico).
 struct ResultadoOperacion {
     enum class Desenlace {
@@ -52,3 +62,4 @@ struct ResultadoOperacion {
 
 Q_DECLARE_METATYPE(satcfdi::TipoOperacion)
 Q_DECLARE_METATYPE(satcfdi::ResultadoOperacion)
+Q_DECLARE_METATYPE(satcfdi::ExistenciaArchivo)

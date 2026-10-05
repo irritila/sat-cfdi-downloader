@@ -23,6 +23,9 @@ qt_add_executable(satcfdi_infrastructure_tests
     TestSqlitePerfiles.cpp
     TestSqliteOperaciones.h
     TestSqliteOperaciones.cpp
+    TestPackageStorageFs.h
+    TestPackageStorageFs.cpp
+    ../fakes/FakePackageStorage.h
 )
 
 target_compile_definitions(satcfdi_infrastructure_tests PRIVATE
@@ -36,6 +39,8 @@ target_include_directories(satcfdi_infrastructure_tests PRIVATE ${CMAKE_CURRENT_
 
 target_link_libraries(satcfdi_infrastructure_tests PRIVATE
     satcfdi_infrastructure
+    # T008: FilesystemPackageStorage.
+    satcfdi_storage
     # RegexLogSanitizer real para la prueba de centinelas de secretos.
     satcfdi_application
     satcfdi_domain

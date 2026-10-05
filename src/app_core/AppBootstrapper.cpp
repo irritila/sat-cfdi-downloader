@@ -4,6 +4,7 @@
 
 #include <QCoreApplication>
 #include <QDir>
+#include <QFileInfo>
 #include <QStandardPaths>
 #include <QThread>
 
@@ -52,6 +53,22 @@ void configurarIdentidadAplicacion()
 {
     QCoreApplication::setOrganizationName(QStringLiteral("Adenium"));
     QCoreApplication::setApplicationName(QStringLiteral("SAT CFDI Downloader"));
+}
+
+void crearRaizPaquetesPrivada(const QString& raiz)
+{
+    QStringList faltantes;
+    QFileInfo info(raiz);
+    while (!info.exists() && !info.isRoot() && !info.absoluteFilePath().isEmpty()) {
+        faltantes.prepend(info.absoluteFilePath());
+        info = QFileInfo(info.absolutePath());
+    }
+    for (const QString& dir : faltantes) {
+        if (!QDir().mkdir(dir, QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner)) {
+            qWarning("no se pudo crear la raiz de paquetes al arrancar");
+            return;
+        }
+    }
 }
 
 Resultado<AppBootstrapper::Opciones, ErrorArranque>
@@ -126,9 +143,20 @@ Resultado<ArranquePreparado, ErrorArranque> AppBootstrapper::preparar() const
     }
 
     // SQL de bootstrap fuera del hilo grafico: hilo temporal unido aqui.
+    // T008 D8: la raiz de paquetes se crea en el MISMO hilo de E/S, despues
+    // de inicializar la base (solo si la base quedo lista).
+    const QString raizPaquetes = m_opciones.raizPaquetes.isEmpty()
+                                     ? QDir(directorio).filePath(QStringLiteral("paquetes"))
+                                     : QDir::cleanPath(m_opciones.raizPaquetes);
+    std::function<void(const QString&)> crearRaiz =
+        m_opciones.crearRaizPaquetes ? m_opciones.crearRaizPaquetes : &crearRaizPaquetesPrivada;
     std::optional<Resultado<InformeInicializacionSqlite, ErrorPersistencia>> salida;
-    const std::unique_ptr<QThread> hilo(
-        QThread::create([&salida, &inicializador, &rutaBase] { salida = inicializador(rutaBase); }));
+    const std::unique_ptr<QThread> hilo(QThread::create([&salida, &inicializador, &rutaBase, &crearRaiz, &raizPaquetes] {
+        salida = inicializador(rutaBase);
+        if (salida->esExito()) {
+            crearRaiz(raizPaquetes);
+        }
+    }));
     hilo->setObjectName(QStringLiteral("satcfdi-bootstrap"));
     hilo->start();
     hilo->wait();
@@ -147,6 +175,7 @@ Resultado<ArranquePreparado, ErrorArranque> AppBootstrapper::preparar() const
     ArranquePreparado preparado;
     preparado.directorioDatos = directorio;
     preparado.rutaBase = rutaBase;
+    preparado.raizPaquetes = raizPaquetes;
     preparado.informe = std::move(inicializacion).valor();
     return R::exito(std::move(preparado));
 }

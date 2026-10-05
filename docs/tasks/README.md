@@ -24,7 +24,7 @@ Ejemplo: `T001-modelo-fisico-sqlite.md`.
 | [T005.1](T005.1-ui-perfiles-sat.md) | Completada | UI de perfiles SAT y e.firma |
 | [T006](T006-spike-sat.md) | Completada | Spike de integracion SAT |
 | [T007](T007-worker-ejecutor-serial.md) | Completada | Worker y ejecutor serial |
-| [T008](T008-almacenamiento-zip.md) | Pendiente | Almacenamiento local de paquetes ZIP |
+| [T008](T008-almacenamiento-zip.md) | Completada | Almacenamiento local de paquetes ZIP |
 | [T009](T009-flujo-sat-integrado.md) | Pendiente | Flujo SAT integrado |
 | [T011](T011-empaquetado-firma-local.md) | Pendiente | Empaquetado y firma local (previa a T010) |
 | [T010](T010-pruebas-aceptacion-mvp.md) | Pendiente | Pruebas de aceptacion del MVP |

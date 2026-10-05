@@ -3,6 +3,7 @@
 #include "TestContratoT007.h"
 #include "TestOperacionExecutor.h"
 #include "TestWorkerLocal.h"
+#include "TestRecuperacionArchivos.h"
 #include "TestCredencialesSat.h"
 #include "TestPreparacionPerfiles.h"
 #include "TestDemoPerfilesSatService.h"
@@ -10,6 +11,7 @@
 #include "TestDominio.h"
 #include "TestOSIntegration.h"
 #include "TestPuertos.h"
+#include "TestAlmacenamientoPaquetes.h"
 #include "TestRegexLogSanitizer.h"
 #include "TestResultado.h"
 #include "TestServiciosPersistidos.h"
@@ -38,5 +40,7 @@ int main(int argc, char* argv[])
     ejecutar(TestContratoT007());
     ejecutar(TestOperacionExecutor());
     ejecutar(TestWorkerLocal());
+    ejecutar(TestRecuperacionArchivos());
+    ejecutar(TestAlmacenamientoPaquetes()); // T008
     return fallos == 0 ? 0 : 1;
 }

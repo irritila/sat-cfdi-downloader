@@ -360,7 +360,10 @@ Page {
                             Layout.fillWidth: true
                             spacing: 8
                             Accessible.role: Accessible.ListItem
-                            Accessible.name: qsTr("Paquete %1, %2").arg(modelData.idPaqueteSat).arg(textoEstado)
+                            readonly property string textoExistencia: Etiquetas.existenciaPaquete(modelData.existencia)
+                            Accessible.name: textoExistencia === ""
+                                             ? qsTr("Paquete %1, %2").arg(modelData.idPaqueteSat).arg(textoEstado)
+                                             : qsTr("Paquete %1, %2, %3").arg(modelData.idPaqueteSat).arg(textoEstado).arg(textoExistencia)
 
                             ColumnLayout {
                                 Layout.fillWidth: true
@@ -388,6 +391,17 @@ Page {
                                     wrapMode: Text.WordWrap
                                     Layout.fillWidth: true
                                     Accessible.ignored: true
+                                }
+                                // T008 D11: existencia del ZIP local (solo Descargado).
+                                Label {
+                                    objectName: "existenciaPaquete_" + paquete.modelData.idPaqueteSat
+                                    visible: paquete.textoExistencia !== ""
+                                    text: paquete.textoExistencia
+                                    color: paquete.modelData.existencia === "Presente" ? palette.text : "#b00020"
+                                    wrapMode: Text.WordWrap
+                                    Layout.fillWidth: true
+                                    Accessible.role: Accessible.StaticText
+                                    Accessible.name: text
                                 }
                             }
                             EstadoBadge {

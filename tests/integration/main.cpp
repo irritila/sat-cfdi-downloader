@@ -9,6 +9,7 @@ int ejecutarTestCicloDeVida(int argc, char* argv[]);
 int ejecutarTestCredencialesArranque(int argc, char* argv[]);
 int ejecutarTestPreparacionPerfiles(int argc, char* argv[]);
 int ejecutarTestMonitoreo(int argc, char* argv[]);
+int ejecutarTestPaquetes(int argc, char* argv[]);
 
 // satcfdi_integration_tests (T003 + T004). Offscreen (ver CMakeLists).
 int main(int argc, char* argv[])
@@ -25,5 +26,6 @@ int main(int argc, char* argv[])
     fallos += ejecutarTestCredencialesArranque(argc, argv);
     fallos += ejecutarTestPreparacionPerfiles(argc, argv);
     fallos += ejecutarTestMonitoreo(argc, argv);
+    fallos += ejecutarTestPaquetes(argc, argv);
     return fallos == 0 ? 0 : 1;
 }

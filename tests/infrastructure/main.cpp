@@ -5,6 +5,7 @@
 #include "TestSqlitePerfiles.h"
 #include "TestSqliteMigraciones.h"
 #include "TestSqliteOperaciones.h"
+#include "TestPackageStorageFs.h"
 #include "TestSqliteRepositorios.h"
 
 #include <QCoreApplication>
@@ -28,5 +29,6 @@ int main(int argc, char* argv[])
     ejecutar(TestSqliteCredenciales());
     ejecutar(TestSqlitePerfiles());
     ejecutar(TestSqliteOperaciones()); // T007
+    ejecutar(TestPackageStorageFs());  // T008
     return fallos == 0 ? 0 : 1;
 }

@@ -37,6 +37,10 @@ qt_add_executable(satcfdi_tests
     TestOperacionExecutor.cpp
     TestWorkerLocal.h
     TestWorkerLocal.cpp
+    TestRecuperacionArchivos.h
+    TestRecuperacionArchivos.cpp
+    TestAlmacenamientoPaquetes.h
+    TestAlmacenamientoPaquetes.cpp
     # Fakes compartidos header-only (T004); listados aqui para AUTOMOC.
     ../fakes/FakeOSIntegration.h
     ../fakes/FakeConfiguracionAppService.h
@@ -46,6 +50,7 @@ qt_add_executable(satcfdi_tests
     ../fakes/FakeCredencialesSatService.h
     ../fakes/FakeOperacionesSat.h
     ../fakes/FakeProgramador.h
+    ../fakes/FakePackageStorage.h
 )
 
 # Permite #include "fakes/FakeOSIntegration.h".

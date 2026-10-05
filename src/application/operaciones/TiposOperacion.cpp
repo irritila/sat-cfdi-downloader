@@ -16,6 +16,16 @@ QString claveEstable(TipoOperacion tipo)
     return {};
 }
 
+QString claveEstable(ExistenciaArchivo existencia)
+{
+    switch (existencia) {
+    case ExistenciaArchivo::Presente: return QStringLiteral("Presente");
+    case ExistenciaArchivo::NoEncontrado: return QStringLiteral("NoEncontrado");
+    case ExistenciaArchivo::ErrorComprobacion: return QStringLiteral("ErrorComprobacion");
+    }
+    return {};
+}
+
 QString claveEstable(EstadoWorker estado)
 {
     switch (estado) {

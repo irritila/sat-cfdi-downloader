@@ -6,6 +6,7 @@
 namespace satcfdi {
 
 class AccionesSolicitud;
+class ConsultaExistenciaPaquetes;
 class AppViewModel;
 class CredencialesSatService;
 class EFirmaFormViewModel;
@@ -49,6 +50,8 @@ public:
     // Reintentar descarga). No propietario; debe vivir mas que este objeto.
     // nullptr = sin acciones (las pruebas de presentacion y el shell sin worker).
     void setAccionesSolicitud(AccionesSolicitud* acciones);
+    // T008 D11: existencia de ZIP en el detalle. No propietario; nullptr = no consulta.
+    void setConsultaExistencia(ConsultaExistenciaPaquetes* consulta);
 
 private:
     SolicitudesListModel* m_solicitudes;

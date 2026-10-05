@@ -1,6 +1,7 @@
 #include "SolicitudDetailViewModel.h"
 
 #include "AccionesSolicitud.h"
+#include "ConsultaExistenciaPaquetes.h"
 #include "application/requests/SolicitudesService.h"
 #include "domain/solicitudes/EstadoResumen.h"
 #include "domain/solicitudes/SolicitudId.h"
@@ -11,6 +12,20 @@
 #include <utility>
 
 namespace satcfdi {
+
+QString claveEstable(ExistenciaPaquete existencia)
+{
+    switch (existencia) {
+    case ExistenciaPaquete::Presente:
+        return QStringLiteral("Presente");
+    case ExistenciaPaquete::NoEncontrado:
+        return QStringLiteral("NoEncontrado");
+    case ExistenciaPaquete::ErrorComprobacion:
+        break;
+    }
+    return QStringLiteral("ErrorComprobacion");
+}
+
 
 namespace {
 
@@ -191,6 +206,7 @@ QVariantList SolicitudDetailViewModel::paquetes() const
         mapa.insert(QStringLiteral("descargadoEn"), fechaONulo(p.descargadoEn));
         mapa.insert(QStringLiteral("vencidoEn"), fechaONulo(p.vencidoEn));
         mapa.insert(QStringLiteral("codigoDescargaSat"), texto(p.codigoDescargaSat));
+        mapa.insert(QStringLiteral("existencia"), m_existencias.value(p.idPaqueteSat));
         lista.append(mapa);
     }
     return lista;
@@ -321,6 +337,42 @@ void SolicitudDetailViewModel::setAccionesSolicitud(AccionesSolicitud* acciones)
     emit datosChanged();
 }
 
+void SolicitudDetailViewModel::setConsultaExistencia(ConsultaExistenciaPaquetes* consulta)
+{
+    m_existencia = consulta;
+    consultarExistencias();
+    emit datosChanged();
+}
+
+void SolicitudDetailViewModel::consultarExistencias()
+{
+    // Cada carga invalida las respuestas anteriores (token de generacion).
+    const quint64 generacion = ++m_genExistencia;
+    m_existencias.clear();
+    if (!m_existencia || !m_detalle) {
+        return;
+    }
+    const SolicitudId solicitud = m_detalle->resumen.id;
+    for (const PaqueteResumen& p : m_detalle->paquetes) {
+        if (p.estadoDescarga != EstadoDescarga::Descargado) {
+            continue;
+        }
+        const QString id = p.idPaqueteSat;
+        m_existencias.insert(id, QStringLiteral("Comprobando"));
+        auto aplicar = [this, generacion, id](ExistenciaPaquete e) {
+            if (generacion != m_genExistencia) {
+                return;
+            }
+            m_existencias.insert(id, claveEstable(e));
+            emit datosChanged();
+        };
+        m_existencia->consultar(solicitud, id)
+            .then(this, aplicar)
+            .onCanceled(this, [aplicar] { aplicar(ExistenciaPaquete::ErrorComprobacion); })
+            .onFailed(this, [aplicar] { aplicar(ExistenciaPaquete::ErrorComprobacion); });
+    }
+}
+
 bool SolicitudDetailViewModel::puedeVerificar() const
 {
     if (!m_acciones || !m_detalle || m_detalle->resumen.estadoLocal != EstadoLocal::Enviada) {
@@ -369,6 +421,7 @@ void SolicitudDetailViewModel::setDetalle(std::optional<SolicitudDetalle> detall
         return;
     }
     m_detalle = std::move(detalle);
+    consultarExistencias();
     emit datosChanged();
 }
 

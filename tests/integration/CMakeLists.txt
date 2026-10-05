@@ -14,6 +14,7 @@ qt_add_executable(satcfdi_integration_tests
     TestCredencialesArranque.cpp
     TestPreparacionPerfiles.cpp
     TestMonitoreo.cpp
+    TestPaquetes.cpp
     ../fakes/FakeOperacionesSat.h
     ../fakes/FakeProgramador.h
 )

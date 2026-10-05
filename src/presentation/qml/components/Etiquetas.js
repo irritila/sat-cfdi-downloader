@@ -98,6 +98,14 @@ function estadoDescarga(clave) { return texto(estadosDescarga, clave, "Sin estad
 function tipoDescarga(clave) { return texto(tiposDescarga, clave, "") }
 function tipoComprobante(clave) { return texto(tiposComprobante, clave, "Todos") }
 function eventoLog(clave) { return texto(eventosLog, clave, "Evento") }
+// T008 D11: existencia del ZIP local de un paquete Descargado ("" = no aplica).
+const existenciasPaquete = {
+    "Comprobando": "Comprobando archivo local...",
+    "Presente": "Archivo local presente",
+    "NoEncontrado": "Archivo local no encontrado",
+    "ErrorComprobacion": "No se pudo comprobar el archivo local"
+}
+function existenciaPaquete(clave) { return texto(existenciasPaquete, clave, "") }
 function origenLog(clave) { return texto(origenesLog, clave, "") }
 
 // Categoria visual (solo refuerza el texto; nunca lo sustituye).
