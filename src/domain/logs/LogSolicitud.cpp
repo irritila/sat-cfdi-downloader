@@ -24,6 +24,8 @@ QString claveEstable(TipoEventoLog tipo)
     case T::ArchivoHuerfano: return QStringLiteral("archivo_huerfano");
     case T::AccionPendienteRegistrada: return QStringLiteral("accion_pendiente_registrada");
     case T::AccionPendienteDescartada: return QStringLiteral("accion_pendiente_descartada");
+    case T::EnvioNoIniciado: return QStringLiteral("envio_no_iniciado");
+    case T::VerificacionSuspendida: return QStringLiteral("verificacion_suspendida");
     }
     Q_UNREACHABLE_RETURN(QString());
 }

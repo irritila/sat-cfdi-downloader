@@ -236,7 +236,7 @@ void TestContratoT003::matrizDuplicados()
 
 void TestContratoT003::catalogosIgualesAlEsquema()
 {
-    // Literales copiados de 001_initial_schema.sql (CHECK de log_solicitud y
+    // Literales copiados de 001_initial_schema.sql y 003_worker_ejecutor.sql (CHECK de log_solicitud y
     // paquete_solicitud). Un cambio en cualquiera de los lados rompe la prueba.
     const QStringList tipos = {
         u"solicitud_creada"_s, u"duplicado_confirmado"_s, u"envio_iniciado"_s,
@@ -246,6 +246,8 @@ void TestContratoT003::catalogosIgualesAlEsquema()
         u"descarga_interrumpida"_s, u"paquete_reconciliado"_s, u"paquete_vencido"_s,
         u"archivo_huerfano"_s, u"accion_pendiente_registrada"_s,
         u"accion_pendiente_descartada"_s,
+        // Migracion 003 (T007).
+        u"envio_no_iniciado"_s, u"verificacion_suspendida"_s,
     };
     QCOMPARE(qsizetype(kTiposEventoLog.size()), tipos.size());
     for (qsizetype i = 0; i < tipos.size(); ++i) {

@@ -1,4 +1,5 @@
 #include "infrastructure/persistence/sqlite/SqliteConnectionProvider.h"
+#include "infrastructure/persistence/sqlite/SqliteFilas.h"
 #include "infrastructure/persistence/sqlite/SqliteRepositorios.h"
 #include "infrastructure/persistence/sqlite/SqliteSoporte.h"
 
@@ -11,119 +12,6 @@ namespace satcfdi {
 namespace {
 
 constexpr QStringView kTabla = u"solicitud_masiva";
-
-const QString kColumnas = QStringLiteral(
-    "id, perfil_sat_id, id_solicitud_sat, tipo_cfdi, operacion_sat, rfc_solicitante, "
-    "rfc_emisor, rfc_receptor, rfc_receptores_json, tipo_solicitud_sat, "
-    "estado_comprobante_sat, fecha_inicial_sat, fecha_final_sat, tipo_comprobante, "
-    "complemento, dedup_key, estado_local, cod_estatus_solicitud, mensaje_solicitud_sat, "
-    "estado_solicitud_sat, codigo_estado_solicitud, mensaje_verificacion_sat, numero_cfdi, "
-    "creada_en, envio_iniciado_en, enviada_en, ultima_verificacion_en, "
-    "siguiente_verificacion_en, verificaciones_sin_cambio, ultimo_error, "
-    "verificacion_pendiente, descarga_pendiente, accion_pendiente_en, eliminado_en");
-
-QVariant valor(const QSqlQuery& q, const char* columna)
-{
-    return q.value(QString::fromLatin1(columna));
-}
-
-Resultado<SolicitudPersistida, ErrorPersistencia> leerSolicitud(const QSqlQuery& q)
-{
-    using R = Resultado<SolicitudPersistida, ErrorPersistencia>;
-    auto ilegible = [](const char* columna) {
-        return R::fallo(sqlite::filaIlegible(kTabla, QString::fromLatin1(columna)));
-    };
-
-    SolicitudPersistida s;
-    const auto id = SolicitudId::desdeTexto(valor(q, "id").toString());
-    if (!id) {
-        return ilegible("id");
-    }
-    s.id = *id;
-    const auto perfil = PerfilId::desdeTexto(valor(q, "perfil_sat_id").toString());
-    if (!perfil) {
-        return ilegible("perfil_sat_id");
-    }
-    s.perfilSatId = *perfil;
-    s.idSolicitudSat = sqlite::leerTextoOpcional(valor(q, "id_solicitud_sat"));
-    const auto tipo = tipoDescargaDesdeTipoCfdi(valor(q, "tipo_cfdi").toString());
-    if (!tipo) {
-        return ilegible("tipo_cfdi");
-    }
-    s.tipoCfdi = *tipo;
-    const auto operacion = operacionSatDesdeClave(valor(q, "operacion_sat").toString());
-    if (!operacion) {
-        return ilegible("operacion_sat");
-    }
-    s.operacionSat = *operacion;
-    s.rfcSolicitante = valor(q, "rfc_solicitante").toString();
-    s.rfcEmisor = sqlite::leerTextoOpcional(valor(q, "rfc_emisor"));
-    s.rfcReceptor = sqlite::leerTextoOpcional(valor(q, "rfc_receptor"));
-    if (const auto json = sqlite::leerTextoOpcional(valor(q, "rfc_receptores_json"))) {
-        const auto receptores = parsearRfcReceptoresJson(*json);
-        if (!receptores) {
-            return ilegible("rfc_receptores_json");
-        }
-        s.rfcReceptores = *receptores;
-    }
-    s.tipoSolicitudSat = valor(q, "tipo_solicitud_sat").toString();
-    s.estadoComprobanteSat = valor(q, "estado_comprobante_sat").toString();
-    s.fechaInicialSat = valor(q, "fecha_inicial_sat").toString();
-    s.fechaFinalSat = valor(q, "fecha_final_sat").toString();
-    s.tipoComprobante = sqlite::leerTextoOpcional(valor(q, "tipo_comprobante"));
-    s.complemento = sqlite::leerTextoOpcional(valor(q, "complemento"));
-    const auto clave = DedupKey::desdeTexto(valor(q, "dedup_key").toString());
-    if (!clave) {
-        return ilegible("dedup_key");
-    }
-    s.dedupKey = *clave;
-    const auto estadoLocal = estadoLocalDesdeClave(valor(q, "estado_local").toString());
-    if (!estadoLocal) {
-        return ilegible("estado_local");
-    }
-    s.estadoLocal = *estadoLocal;
-    s.codEstatusSolicitud = sqlite::leerTextoOpcional(valor(q, "cod_estatus_solicitud"));
-    s.mensajeSolicitudSat = sqlite::leerTextoOpcional(valor(q, "mensaje_solicitud_sat"));
-    if (const auto estadoSat = sqlite::leerTextoOpcional(valor(q, "estado_solicitud_sat"))) {
-        const auto e = estadoSolicitudSatDesdeClave(*estadoSat);
-        if (!e) {
-            return ilegible("estado_solicitud_sat");
-        }
-        s.estadoSolicitudSat = *e;
-    }
-    s.codigoEstadoSolicitud = sqlite::leerTextoOpcional(valor(q, "codigo_estado_solicitud"));
-    s.mensajeVerificacionSat = sqlite::leerTextoOpcional(valor(q, "mensaje_verificacion_sat"));
-    if (const QVariant numero = valor(q, "numero_cfdi"); !numero.isNull()) {
-        s.numeroCfdi = numero.toLongLong();
-    }
-    if (!sqlite::leerInstante(valor(q, "creada_en"), s.creadaEn)) {
-        return ilegible("creada_en");
-    }
-    if (!sqlite::leerInstanteOpcional(valor(q, "envio_iniciado_en"), s.envioIniciadoEn)) {
-        return ilegible("envio_iniciado_en");
-    }
-    if (!sqlite::leerInstanteOpcional(valor(q, "enviada_en"), s.enviadaEn)) {
-        return ilegible("enviada_en");
-    }
-    if (!sqlite::leerInstanteOpcional(valor(q, "ultima_verificacion_en"), s.ultimaVerificacionEn)) {
-        return ilegible("ultima_verificacion_en");
-    }
-    if (!sqlite::leerInstanteOpcional(valor(q, "siguiente_verificacion_en"),
-                                      s.siguienteVerificacionEn)) {
-        return ilegible("siguiente_verificacion_en");
-    }
-    s.verificacionesSinCambio = valor(q, "verificaciones_sin_cambio").toInt();
-    s.ultimoError = sqlite::leerTextoOpcional(valor(q, "ultimo_error"));
-    s.verificacionPendiente = valor(q, "verificacion_pendiente").toInt() != 0;
-    s.descargaPendiente = valor(q, "descarga_pendiente").toInt() != 0;
-    if (!sqlite::leerInstanteOpcional(valor(q, "accion_pendiente_en"), s.accionPendienteEn)) {
-        return ilegible("accion_pendiente_en");
-    }
-    if (!sqlite::leerInstanteOpcional(valor(q, "eliminado_en"), s.eliminadoEn)) {
-        return ilegible("eliminado_en");
-    }
-    return R::exito(std::move(s));
-}
 
 } // namespace
 
@@ -145,7 +33,7 @@ Resultado<QList<SolicitudPersistida>, ErrorPersistencia> SqliteSolicitudMasivaRe
     q.setForwardOnly(true);
     if (auto r = sqlite::ejecutarDirecto(
             q,
-            QStringLiteral("SELECT ") + kColumnas
+            QStringLiteral("SELECT ") + sqlite::columnasSolicitud()
                 + QStringLiteral(" FROM solicitud_masiva WHERE eliminado_en IS NULL "
                                  "ORDER BY creada_en DESC, id DESC"),
             kContexto);
@@ -154,7 +42,7 @@ Resultado<QList<SolicitudPersistida>, ErrorPersistencia> SqliteSolicitudMasivaRe
     }
     QList<SolicitudPersistida> lista;
     while (q.next()) {
-        auto fila = leerSolicitud(q);
+        auto fila = sqlite::leerSolicitud(q);
         if (!fila) {
             return R::fallo(std::move(fila).error());
         }
@@ -176,7 +64,7 @@ SqliteSolicitudMasivaRepository::obtenerVisible(const SolicitudId& id)
     QSqlQuery q(db);
     q.setForwardOnly(true);
     if (auto r = sqlite::preparar(q,
-                                  QStringLiteral("SELECT ") + kColumnas
+                                  QStringLiteral("SELECT ") + sqlite::columnasSolicitud()
                                       + QStringLiteral(" FROM solicitud_masiva WHERE id = :id "
                                                        "AND eliminado_en IS NULL"),
                                   kContexto);
@@ -190,7 +78,7 @@ SqliteSolicitudMasivaRepository::obtenerVisible(const SolicitudId& id)
     if (!q.next()) {
         return R::exito(std::nullopt);
     }
-    auto fila = leerSolicitud(q);
+    auto fila = sqlite::leerSolicitud(q);
     if (!fila) {
         return R::fallo(std::move(fila).error());
     }

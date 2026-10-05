@@ -35,6 +35,12 @@ qt_add_library(satcfdi_domain STATIC
     paquetes/EstadoDescarga.cpp
     paquetes/PaquetePersistido.h
     paquetes/PaquetePersistido.cpp
+    operaciones/FallaOperacion.h
+    operaciones/FallaOperacion.cpp
+    operaciones/ResultadosOperacion.h
+    operaciones/RegistrosOperacion.h
+    operaciones/PoliticasOperacion.h
+    operaciones/PoliticasOperacion.cpp
 )
 
 # Convencion de includes: rutas relativas a src/, por ejemplo

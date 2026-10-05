@@ -24,7 +24,7 @@ Este diseno asume `ADR 0011`: Qt 6, QML / Qt Quick Controls, C++ y CMake.
 | --- | --- | --- | --- |
 | `satcfdi_domain` | static lib | Entidades, estados, filtros normalizados, reglas de transicion y retencion local. | `Qt6::Core` |
 | `satcfdi_ports` | interface lib | Contratos C++: SAT, secretos, repositorios, paquetes, SO y sanitizacion. | `satcfdi_domain` |
-| `satcfdi_application` | static lib | Casos de uso, servicios de aplicacion, dispatcher de persistencia, sanitizacion de logs, ejecutor serial futuro, worker y acciones manuales. | `satcfdi_domain`, `satcfdi_ports`, `Qt6::Core` |
+| `satcfdi_application` | static lib | Casos de uso, servicios de aplicacion, `PersistenceDispatcher`, `OperacionesSat`, ejecutor serial, worker, acciones manuales y sanitizacion de logs. | `satcfdi_domain`, `satcfdi_ports`, `Qt6::Core` |
 | `satcfdi_infrastructure` | static lib | Adaptadores SQLite, SAT, archivos, macOS, Keychain y notificaciones. En T003 agrega migrador, proveedor SQLite y repositorios. | `satcfdi_domain`, `satcfdi_ports`, `Qt6::Core`; `Qt6::Sql` solo cuando implementa persistencia; los adaptadores posteriores agregan `Qt6::Network` o `Qt6::Widgets` cuando corresponda |
 | `satcfdi_presentation` | static lib / qml module | View models C++ y QML expuesto por la app. | `satcfdi_application`, `satcfdi_domain`, `Qt6::Core`, `Qt6::Qml`, `Qt6::Quick`, `Qt6::QuickControls2` |
 | `satcfdi_app_core` | static lib | `AppBootstrapper`, `AppCompositionRoot`, resolucion de rutas y armado del grafo para app y pruebas de integracion. | `satcfdi_presentation`, `satcfdi_application`, `satcfdi_infrastructure`, `Qt6::Core` |
@@ -126,8 +126,8 @@ o ausentes hasta sus tareas correspondientes.
 │   │   ├── profiles/
 │   │   ├── requests/
 │   │   ├── actions/
-│   │   ├── execution/
-│   │   ├── worker/
+│   │   ├── operaciones/               # T007: OperacionesSat, OperacionExecutor,
+│   │   │                              # WorkerLocal, Programador, OperacionesSatNulo
 │   │   └── logging/
 │   ├── infrastructure/
 │   │   ├── persistence/
@@ -214,18 +214,30 @@ La UI QML corre en el hilo grafico. Ninguna llamada SAT, escritura SQLite, acces
 Reglas:
 
 - `PersistenceDispatcher` es el mecanismo tecnico de T003 para ejecutar
-  persistencia local fuera del hilo grafico. Vive sobre un `QThread` dedicado y
-  devuelve resultados mediante `QPromise`/`QFuture` o senales encoladas.
-- `PersistenceDispatcher` no es `OperacionExecutor`. T007 introducira el
-  ejecutor serial para operaciones SAT, worker, recuperacion y acciones
-  manuales criticas.
-- `OperacionExecutor` vive en un hilo de trabajo o usa una cola serial fuera del hilo grafico.
-- Worker y acciones manuales encolan operaciones en `OperacionExecutor`; no ejecutan directamente SAT, transacciones ni escrituras de ZIP.
-- Cada hilo que use SQLite debe tener su propia conexion `QSqlDatabase`.
-- Los repositorios no deben compartir una conexion abierta entre hilo grafico y ejecutor.
+  persistencia local fuera del hilo grafico. Vive sobre un `QThread` dedicado,
+  con su conexion SQLite propia, y devuelve resultados mediante
+  `QPromise`/`QFuture` o senales encoladas.
+- `OperacionExecutor` no es `PersistenceDispatcher`. Vive en otro `QThread`,
+  tiene una cola serial y crea, usa, cierra y retira su propia conexion SQLite
+  en ese hilo. Nunca reutiliza ni comparte la conexion del dispatcher.
+- `OperacionesSat` vive en `application/operations/` y solo la consume
+  `OperacionExecutor`; sus adaptadores concretos se conectan desde el
+  composition root. `WorkerLocal` vive en `application/worker/` y las acciones
+  manuales solo encolan operaciones en el ejecutor.
+- `OperacionExecutor` ejecuta las llamadas SAT, la recuperacion y las
+  transacciones criticas en tres pasos: reclamar en transaccion breve, operar
+  fuera de transaccion y aplicar en `BEGIN IMMEDIATE` si no hay eliminacion
+  local. Ni worker ni acciones manuales escriben esos resultados directamente.
+- Cada hilo que use SQLite debe tener su propia conexion `QSqlDatabase`; los
+  repositorios no comparten una conexion abierta entre hilo grafico, dispatcher
+  y ejecutor.
 - Las transacciones SQLite de escritura usan `BEGIN IMMEDIATE` mediante `UnitOfWork` para evitar carreras lectura-escritura con WAL.
 - Los modelos visuales basados en `QAbstractListModel` se actualizan en el hilo grafico.
-- Los resultados del ejecutor o dispatcher regresan a view models mediante signals/slots con conexion encolada, `QFuture::then(viewModel, ...)` o un mecanismo equivalente seguro para Qt.
+- Los resultados del ejecutor, los cambios de `WorkerLocal` y los del
+  dispatcher regresan a view models y `OSIntegration` mediante senales/slots
+  con conexion encolada, `QFuture::then(viewModel, ...)` o un mecanismo
+  equivalente seguro para Qt. Los receptores de UI se ejecutan en el hilo
+  grafico.
 - La eliminacion local debe verificarse antes de aplicar cualquier resultado asincrono a una solicitud o paquete.
 
 ## Modulo QML

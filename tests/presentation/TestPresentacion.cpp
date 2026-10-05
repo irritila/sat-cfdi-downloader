@@ -17,6 +17,7 @@
 #include "fakes/FakePerfilesSatService.h"
 
 #include "application/profiles/DemoPerfilesSatService.h"
+#include "AccionesSolicitud.h"
 #include "AppViewModel.h"
 #include "NuevaSolicitudViewModel.h"
 #include "PresentacionViewModels.h"
@@ -303,6 +304,20 @@ bool prepararFormulario(EscenarioAsincrono& e)
     return f->canSubmit();
 }
 
+// T007: registra las acciones que la presentacion pide (sin worker real).
+struct AccionesEspia final : AccionesSolicitud {
+    QStringList llamadas;
+    void enviar(const SolicitudId& id) override { llamadas.append(QStringLiteral("enviar:") + id.texto()); }
+    void verificarAhora(const SolicitudId& id) override
+    {
+        llamadas.append(QStringLiteral("verificar:") + id.texto());
+    }
+    void reintentarDescarga(const SolicitudId& id) override
+    {
+        llamadas.append(QStringLiteral("descargar:") + id.texto());
+    }
+};
+
 } // namespace
 
 class TestPresentacion : public QObject {
@@ -343,6 +358,11 @@ private slots:
     void detalleReaccionaASolicitudEliminada();
     void detalleDescartaRespuestaTardia();
     void eliminarConConfirmacion();
+
+    // T007: acciones manuales, envio tras crear y textos de eventos nuevos
+    void envioTrasCrearSeEncola();
+    void detalleAccionesManualesYEstadosAccesibles();
+    void detalleSinAccionesNoMuestraBotones();
 };
 
 void TestPresentacion::init()
@@ -1411,5 +1431,112 @@ void TestPresentacion::eliminarConConfirmacion()
 }
 
 QTEST_MAIN(TestPresentacion)
+
+void TestPresentacion::envioTrasCrearSeEncola()
+{
+    Escenario e(DemoSolicitudesService::Datos::Representativos);
+    AccionesEspia acciones;
+    e.vms.setAccionesSolicitud(&acciones);
+    QVERIFY(e.cargar());
+    e.vms.app()->mostrarNueva();
+    NuevaSolicitudViewModel* f = e.vms.nuevaSolicitud();
+    QTRY_COMPARE(f->perfilesDisponibles()->count(), 2);
+    QSignalSpy enviado(f, &NuevaSolicitudViewModel::submitted);
+    f->setPerfilId(f->perfilesDisponibles()->index(0).data(PerfilesDisponiblesModel::IdRole).toString());
+    f->setFechaInicial(QStringLiteral("2026-07-01"));
+    f->setFechaFinal(QStringLiteral("2026-07-31"));
+    QVERIFY(f->canSubmit());
+    f->submit();
+    QTRY_COMPARE(enviado.count(), 1);
+    // D4: el envio se pide una vez, para la solicitud creada, al crearla.
+    QCOMPARE(acciones.llamadas, QStringList{QStringLiteral("enviar:") + enviado.at(0).at(0).toString()});
+    e.vms.setAccionesSolicitud(nullptr);
+}
+
+void TestPresentacion::detalleAccionesManualesYEstadosAccesibles()
+{
+    EscenarioAsincrono e;
+    AccionesEspia acciones;
+    e.vms.setAccionesSolicitud(&acciones);
+    QVERIFY(e.cargar());
+    QVERIFY(QTest::qWaitForWindowExposed(e.ventana));
+    e.solicitudes.lista.resolver(0, ResultadoListaSol::exito({}));
+    SolicitudDetailViewModel* d = e.vms.detalle();
+
+    const SolicitudId id = SolicitudId::generar();
+    QVERIFY(e.vms.app()->abrirDetalle(id.texto()));
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaDetalleSolicitud"));
+
+    // Enviada, en proceso, con un paquete Disponible y los eventos nuevos.
+    SolicitudDetalle detalle = detalleDePrueba(id);
+    detalle.resumen.estadoSat = EstadoSolicitudSat::EnProceso;
+    LogResumen noIniciado;
+    noIniciado.tipoEvento = TipoEventoLog::EnvioNoIniciado;
+    noIniciado.origen = OrigenLog::Usuario;
+    noIniciado.creadoEn = detalle.resumen.creadaEn;
+    LogResumen suspendida = noIniciado;
+    suspendida.tipoEvento = TipoEventoLog::VerificacionSuspendida;
+    suspendida.origen = OrigenLog::Worker;
+    detalle.logs.append(noIniciado);
+    detalle.logs.append(suspendida);
+    e.solicitudes.detalle.resolver(0, SolicitudesService::ResultadoDetalle::exito(detalle));
+    QTRY_VERIFY(d->cargada());
+
+    QVERIFY(d->puedeVerificar());
+    QVERIFY(d->puedeReintentarDescarga());
+    QQuickItem* verificar = e.item(QStringLiteral("botonVerificarAhora"));
+    QQuickItem* reintentar = e.item(QStringLiteral("botonReintentarDescarga"));
+    QTRY_VERIFY(verificar->isVisible());
+    QVERIFY(reintentar->isVisible());
+    QCOMPARE(nombreAccesible(verificar), QStringLiteral("Verificar ahora"));
+    QCOMPARE(nombreAccesible(reintentar), QStringLiteral("Reintentar descarga"));
+
+    QMetaObject::invokeMethod(verificar, "click");
+    QMetaObject::invokeMethod(reintentar, "click");
+    QCOMPARE(acciones.llamadas, (QStringList{QStringLiteral("verificar:") + id.texto(),
+                                             QStringLiteral("descargar:") + id.texto()}));
+    QTRY_VERIFY(e.item(QStringLiteral("accionSolicitada"))->isVisible());
+    QVERIFY(!d->accionSolicitada().isEmpty());
+
+    // Textos de los eventos nuevos de T007 (Etiquetas.js).
+    QTRY_VERIFY(e.item(QStringLiteral("eventoLog_2")));
+    QVERIFY(e.item(QStringLiteral("eventoLog_1"))->property("text").toString().contains(
+        QStringLiteral("Envio no iniciado; puede reenviarse manualmente")));
+    QVERIFY(e.item(QStringLiteral("eventoLog_2"))->property("text").toString().contains(
+        QStringLiteral("Verificacion automatica suspendida; use Verificar ahora")));
+
+    // Terminada y descargada: ninguna accion aplica.
+    QVERIFY(e.vms.app()->abrirDetalle(SolicitudId::generar().texto()));
+    SolicitudDetalle cerrada = detalleDePrueba(SolicitudId::desdeTexto(d->solicitudId()).value());
+    cerrada.paquetes.first().estadoDescarga = EstadoDescarga::Descargado;
+    e.solicitudes.detalle.resolver(1, SolicitudesService::ResultadoDetalle::exito(cerrada));
+    QTRY_VERIFY(d->cargada());
+    QVERIFY(!d->puedeVerificar());
+    QVERIFY(!d->puedeReintentarDescarga());
+    QTRY_VERIFY(!verificar->isVisible());
+    QVERIFY(!reintentar->isVisible());
+    QVERIFY(d->accionSolicitada().isEmpty());
+    e.vms.setAccionesSolicitud(nullptr);
+}
+
+void TestPresentacion::detalleSinAccionesNoMuestraBotones()
+{
+    EscenarioAsincrono e;
+    QVERIFY(e.cargar());
+    e.solicitudes.lista.resolver(0, ResultadoListaSol::exito({}));
+    SolicitudDetailViewModel* d = e.vms.detalle();
+    const SolicitudId id = SolicitudId::generar();
+    QVERIFY(e.vms.app()->abrirDetalle(id.texto()));
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaDetalleSolicitud"));
+    SolicitudDetalle detalle = detalleDePrueba(id);
+    detalle.resumen.estadoSat = EstadoSolicitudSat::Aceptada;
+    e.solicitudes.detalle.resolver(0, SolicitudesService::ResultadoDetalle::exito(detalle));
+    QTRY_VERIFY(d->cargada());
+    QVERIFY(!d->puedeVerificar());
+    QVERIFY(!d->puedeReintentarDescarga());
+    QVERIFY(!e.item(QStringLiteral("botonVerificarAhora"))->isVisible());
+    d->verificarAhora(); // sin acciones: no hace nada
+    QVERIFY(d->accionSolicitada().isEmpty());
+}
 
 #include "TestPresentacion.moc"

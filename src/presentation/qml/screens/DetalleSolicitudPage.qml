@@ -56,6 +56,23 @@ Page {
         mostrarRegresar: true
         onRegresarSolicitado: pagina.regresar()
 
+        // T007: acciones manuales; solo visibles si aplican al estado actual.
+        BotonAccion {
+            objectName: "botonVerificarAhora"
+            visible: pagina.conDatos && pagina.detalle.puedeVerificar
+            text: qsTr("Verificar ahora")
+            descripcion: qsTr("Consultar ahora el estado de la solicitud en el SAT; si el monitoreo esta pausado, queda pendiente")
+            onClicked: pagina.detalle.verificarAhora()
+        }
+
+        BotonAccion {
+            objectName: "botonReintentarDescarga"
+            visible: pagina.conDatos && pagina.detalle.puedeReintentarDescarga
+            text: qsTr("Reintentar descarga")
+            descripcion: qsTr("Descargar de nuevo los paquetes disponibles o con error; si el monitoreo esta pausado, queda pendiente")
+            onClicked: pagina.detalle.reintentarDescarga()
+        }
+
         BotonAccion {
             id: botonEliminar
             objectName: "botonEliminarSolicitud"
@@ -167,6 +184,18 @@ Page {
             spacing: 12
 
             Item { implicitHeight: 4 }
+
+            Label {
+                objectName: "accionSolicitada"
+                visible: text.length > 0
+                text: pagina.detalle.accionSolicitada
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+                Layout.leftMargin: 16
+                Layout.rightMargin: 16
+                Accessible.role: Accessible.StaticText
+                Accessible.name: text
+            }
 
             Label {
                 objectName: "errorEliminacion"

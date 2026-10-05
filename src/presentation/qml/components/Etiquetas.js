@@ -73,7 +73,9 @@ const eventosLog = {
     "paquete_vencido": "Paquete vencido",
     "archivo_huerfano": "Archivo huerfano",
     "accion_pendiente_registrada": "Accion pendiente registrada",
-    "accion_pendiente_descartada": "Accion pendiente descartada"
+    "accion_pendiente_descartada": "Accion pendiente descartada",
+    "envio_no_iniciado": "Envio no iniciado; puede reenviarse manualmente",
+    "verificacion_suspendida": "Verificacion automatica suspendida; use Verificar ahora"
 }
 
 const origenesLog = {

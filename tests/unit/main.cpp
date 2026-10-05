@@ -1,5 +1,8 @@
 #include "TestConfiguracionAppService.h"
 #include "TestContratoT003.h"
+#include "TestContratoT007.h"
+#include "TestOperacionExecutor.h"
+#include "TestWorkerLocal.h"
 #include "TestCredencialesSat.h"
 #include "TestPreparacionPerfiles.h"
 #include "TestDemoPerfilesSatService.h"
@@ -32,5 +35,8 @@ int main(int argc, char* argv[])
     ejecutar(TestConfiguracionAppService());
     ejecutar(TestCredencialesSat());
     ejecutar(TestPreparacionPerfiles());
+    ejecutar(TestContratoT007());
+    ejecutar(TestOperacionExecutor());
+    ejecutar(TestWorkerLocal());
     return fallos == 0 ? 0 : 1;
 }

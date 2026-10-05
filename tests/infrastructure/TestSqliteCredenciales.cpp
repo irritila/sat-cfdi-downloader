@@ -103,7 +103,8 @@ void TestSqliteCredenciales::migracion002SobreBase001YRepetida()
     QVERIFY(dir.isValid());
     auto embebidas = migracionesSqliteEmbebidas();
     QVERIFY(embebidas);
-    QCOMPARE(embebidas.valor().size(), 2);
+    QVERIFY(embebidas.valor().size() >= 2);
+    const int ultima = embebidas.valor().last().version;
 
     // Base en version 1 con una fila de credencial previa a 002.
     QVERIFY(inicializarBaseSqlite(rutaBase(dir), {embebidas.valor().first()}));
@@ -125,13 +126,17 @@ void TestSqliteCredenciales::migracion002SobreBase001YRepetida()
     auto migrada = inicializarBaseSqlite(rutaBase(dir));
     QVERIFY2(migrada, migrada ? "" : qPrintable(migrada.error().mensaje));
     QCOMPARE(migrada.valor().migracion.versionInicial, 1);
-    QCOMPARE(migrada.valor().migracion.versionFinal, 2);
-    QCOMPARE(migrada.valor().migracion.aplicadas, QList<int>{2});
+    QCOMPARE(migrada.valor().migracion.versionFinal, ultima);
+    QList<int> pendientes;
+    for (const MigracionSql& m : embebidas.valor().mid(1)) {
+        pendientes.append(m.version);
+    }
+    QCOMPARE(migrada.valor().migracion.aplicadas, pendientes);
 
     auto repetida = inicializarBaseSqlite(rutaBase(dir));
     QVERIFY(repetida);
     QVERIFY(repetida.valor().migracion.aplicadas.isEmpty());
-    QCOMPARE(repetida.valor().migracion.versionFinal, 2);
+    QCOMPARE(repetida.valor().migracion.versionFinal, ultima);
 
     SqlitePersistencia p(rutaBase(dir));
     QStringList columnas = columna(p.proveedor(), QStringLiteral("SELECT name FROM pragma_table_info('credencial_sat')"));

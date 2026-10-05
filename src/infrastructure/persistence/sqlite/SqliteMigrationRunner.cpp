@@ -23,6 +23,7 @@ using ResultadoMig = Resultado<ResultadoMigracion, ErrorPersistencia>;
 const std::pair<int, QString> kMigracionesEmbebidas[] = {
     {1, QStringLiteral("001_initial_schema")},
     {2, QStringLiteral("002_credencial_metadata")}, // T005
+    {3, QStringLiteral("003_worker_ejecutor")},     // T007
 };
 
 ErrorPersistencia errorMigracion(const QString& mensaje)

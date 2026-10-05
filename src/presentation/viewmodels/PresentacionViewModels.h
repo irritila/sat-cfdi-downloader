@@ -5,6 +5,7 @@
 
 namespace satcfdi {
 
+class AccionesSolicitud;
 class AppViewModel;
 class CredencialesSatService;
 class EFirmaFormViewModel;
@@ -43,6 +44,11 @@ public:
     //  "detalleViewModel", "perfilesViewModel", "eFirmaViewModel"} para
     //  QQmlApplicationEngine::setInitialProperties.
     QVariantMap initialProperties() const;
+
+    // T007: acciones de operacion (envio tras crear, Verificar ahora,
+    // Reintentar descarga). No propietario; debe vivir mas que este objeto.
+    // nullptr = sin acciones (las pruebas de presentacion y el shell sin worker).
+    void setAccionesSolicitud(AccionesSolicitud* acciones);
 
 private:
     SolicitudesListModel* m_solicitudes;

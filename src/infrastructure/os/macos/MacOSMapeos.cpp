@@ -122,4 +122,39 @@ QString textoAccionMonitoreo(bool pausado)
     return pausado ? QStringLiteral("Reanudar monitoreo") : QStringLiteral("Pausar monitoreo");
 }
 
+QString textoEstadoMonitoreo(const OSIntegration::EstadoMonitoreo& estado)
+{
+    using Fase = OSIntegration::EstadoMonitoreo::Fase;
+    using Actividad = OSIntegration::EstadoMonitoreo::Actividad;
+    switch (estado.fase) {
+    case Fase::Pausado:
+        return QStringLiteral("Monitoreo pausado");
+    case Fase::ActivoEnEspera:
+        return QStringLiteral("Monitoreo activo");
+    case Fase::Ejecutando:
+        switch (estado.actividad) {
+        case Actividad::Enviando:
+            return QStringLiteral("Trabajando: enviando...");
+        case Actividad::Verificando:
+            return QStringLiteral("Trabajando: verificando...");
+        case Actividad::Descargando:
+            return QStringLiteral("Trabajando: descargando...");
+        case Actividad::Ninguna:
+        case Actividad::Otra:
+            break;
+        }
+        return QStringLiteral("Trabajando...");
+    case Fase::Deteniendo:
+        return QStringLiteral("Deteniendo monitoreo...");
+    case Fase::Detenido:
+        break;
+    }
+    return QStringLiteral("Monitoreo detenido");
+}
+
+QString textoPendientes(int pendientes)
+{
+    return pendientes > 0 ? QStringLiteral("Pendientes: %1").arg(pendientes) : QString();
+}
+
 } // namespace satcfdi::macos

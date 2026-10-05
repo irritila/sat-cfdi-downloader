@@ -76,5 +76,8 @@ OSIntegration::LaunchContext launchContextDesdeEventoApertura(bool hayEvento,
 QString textoEstadoLoginItem(OSIntegration::LoginItemStatus estado);
 QString textoEstadoNotificaciones(OSIntegration::NotificationStatus estado);
 QString textoAccionMonitoreo(bool pausado);
+// T007 D2: linea de estado del worker y de pendientes (vacia si 0).
+QString textoEstadoMonitoreo(const OSIntegration::EstadoMonitoreo& estado);
+QString textoPendientes(int pendientes);
 
 } // namespace satcfdi::macos

@@ -1,5 +1,6 @@
 #include "SolicitudDetailViewModel.h"
 
+#include "AccionesSolicitud.h"
 #include "application/requests/SolicitudesService.h"
 #include "domain/solicitudes/EstadoResumen.h"
 #include "domain/solicitudes/SolicitudId.h"
@@ -228,6 +229,10 @@ void SolicitudDetailViewModel::cargar(const QString& id)
         emit solicitudIdChanged();
         setDetalle(std::nullopt);
         ++m_genEliminar; // una eliminacion de otra solicitud ya no aplica aqui
+        if (!m_accionSolicitada.isEmpty()) {
+            m_accionSolicitada.clear();
+            emit accionSolicitadaChanged();
+        }
         setEliminacion(false, QString());
     }
     const quint64 generacion = ++m_genCarga;
@@ -308,6 +313,54 @@ void SolicitudDetailViewModel::setEstado(Estado estado, const QString& mensaje)
     m_estado = estado;
     m_errorMessage = mensaje;
     emit estadoChanged();
+}
+
+void SolicitudDetailViewModel::setAccionesSolicitud(AccionesSolicitud* acciones)
+{
+    m_acciones = acciones;
+    emit datosChanged();
+}
+
+bool SolicitudDetailViewModel::puedeVerificar() const
+{
+    if (!m_acciones || !m_detalle || m_detalle->resumen.estadoLocal != EstadoLocal::Enviada) {
+        return false;
+    }
+    const auto& sat = m_detalle->resumen.estadoSat;
+    return !sat || *sat == EstadoSolicitudSat::Aceptada || *sat == EstadoSolicitudSat::EnProceso;
+}
+
+bool SolicitudDetailViewModel::puedeReintentarDescarga() const
+{
+    if (!m_acciones || !m_detalle) {
+        return false;
+    }
+    for (const PaqueteResumen& p : m_detalle->paquetes) {
+        if (p.estadoDescarga == EstadoDescarga::Disponible || p.estadoDescarga == EstadoDescarga::Error) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void SolicitudDetailViewModel::verificarAhora()
+{
+    if (!puedeVerificar()) {
+        return;
+    }
+    m_acciones->verificarAhora(m_detalle->resumen.id);
+    m_accionSolicitada = tr("Verificacion solicitada. Si el monitoreo esta pausado, queda pendiente.");
+    emit accionSolicitadaChanged();
+}
+
+void SolicitudDetailViewModel::reintentarDescarga()
+{
+    if (!puedeReintentarDescarga()) {
+        return;
+    }
+    m_acciones->reintentarDescarga(m_detalle->resumen.id);
+    m_accionSolicitada = tr("Descarga solicitada. Si el monitoreo esta pausado, queda pendiente.");
+    emit accionSolicitadaChanged();
 }
 
 void SolicitudDetailViewModel::setDetalle(std::optional<SolicitudDetalle> detalle)

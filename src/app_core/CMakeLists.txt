@@ -14,6 +14,10 @@ qt_add_library(satcfdi_app_core STATIC
     ArranqueProceso.cpp
     AppLifecycleController.cpp
     ExtensionCicloDeVida.h
+    IntegracionWorker.h
+    IntegracionWorker.cpp
+    ProgramadorQt.h
+    ProgramadorQt.cpp
     SingleInstanceCoordinator.h
     SingleInstanceCoordinator.cpp
 )

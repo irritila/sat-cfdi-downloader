@@ -2,7 +2,7 @@
 
 ## Estado
 
-Pendiente (refinada 2026-10-04; lista para implementar).
+Completada
 
 ## Prioridad y tamano
 
@@ -99,42 +99,42 @@ El worker revisa solicitudes y paquetes mientras la app esta abierta, incluso co
 
 ### Programacion y pausa
 
-- [ ] Dada una solicitud verificable con `siguiente_verificacion_en` vencida, cuando el reloj logico avanza al instante debido, entonces se encola una sola verificacion.
-- [ ] Dadas tres verificaciones consecutivas sin cambio (D8), cuando termina la tercera, entonces `siguiente_verificacion_en` queda a 30 min. Dado ese backoff, cuando una verificacion cambia alguno de los cuatro campos, entonces el contador vuelve a 0 y la siguiente queda a 10 min.
-- [ ] Dadas verificaciones sin cambio acumuladas, cuando una verificacion falla, entonces el contador no se incrementa y la siguiente queda a 30 min.
-- [ ] Dadas tres fallas consecutivas iguales `300`, `302`, `303` o `5004`, cuando ocurre la tercera, entonces la verificacion automatica se suspende hasta `Verificar ahora`, aun tras reiniciar la app. Las fallas repetidas con la misma clave no crean logs nuevos.
-- [ ] Dado un perfil con credencial no `Lista`, cuando corre un ciclo con varias solicitudes de ese perfil, entonces se consulta una sola vez y ninguna operacion de ese perfil llega al puerto.
-- [ ] Dado el monitoreo pausado, cuando vence la agenda automatica, entonces el puerto no recibe llamadas.
-- [ ] Dado el monitoreo pausado, cuando el usuario pide `Verificar ahora` y `Reintentar descarga`, entonces ambas banderas persisten a la vez con `accion_pendiente_en`. Cuando se reanuda, se consumen en el orden verificar y luego descargar, y cada una se limpia solo despues de su operacion, o con un log de descarte si ya no aplica.
-- [ ] Dada una intencion registrada mientras se procesa otra de la misma solicitud, cuando termina la primera, entonces la nueva intencion no se pierde.
+- [x] Dada una solicitud verificable con `siguiente_verificacion_en` vencida, cuando el reloj logico avanza al instante debido, entonces se encola una sola verificacion.
+- [x] Dadas tres verificaciones consecutivas sin cambio (D8), cuando termina la tercera, entonces `siguiente_verificacion_en` queda a 30 min. Dado ese backoff, cuando una verificacion cambia alguno de los cuatro campos, entonces el contador vuelve a 0 y la siguiente queda a 10 min.
+- [x] Dadas verificaciones sin cambio acumuladas, cuando una verificacion falla, entonces el contador no se incrementa y la siguiente queda a 30 min.
+- [x] Dadas tres fallas consecutivas iguales `300`, `302`, `303` o `5004`, cuando ocurre la tercera, entonces la verificacion automatica se suspende hasta `Verificar ahora`, aun tras reiniciar la app. Las fallas repetidas con la misma clave no crean logs nuevos.
+- [x] Dado un perfil con credencial no `Lista`, cuando corre un ciclo con varias solicitudes de ese perfil, entonces se consulta una sola vez y ninguna operacion de ese perfil llega al puerto.
+- [x] Dado el monitoreo pausado, cuando vence la agenda automatica, entonces el puerto no recibe llamadas.
+- [x] Dado el monitoreo pausado, cuando el usuario pide `Verificar ahora` y `Reintentar descarga`, entonces ambas banderas persisten a la vez con `accion_pendiente_en`. Cuando se reanuda, se consumen en el orden verificar y luego descargar, y cada una se limpia solo despues de su operacion, o con un log de descarte si ya no aplica.
+- [x] Dada una intencion registrada mientras se procesa otra de la misma solicitud, cuando termina la primera, entonces la nueva intencion no se pierde.
 
 ### Operaciones y transiciones
 
-- [ ] Dada una solicitud `Creada` enviada por el usuario, cuando el fake responde con cada caso de D7, entonces el estado final es `Enviada`, `Creada` (con `envio_iniciado_en` nulo y CHECKs vigentes), `EnvioFallido` o `EnvioIncierto` segun corresponda, con su log, y nunca se reenvia automaticamente.
-- [ ] Dado el ciclo del worker, cuando existen solicitudes `Creada`, entonces el worker no las selecciona.
-- [ ] Dada una verificacion `Terminada`, cuando se aplica, entonces la solicitud y todos sus paquetes nuevos (con `vencimiento_estimado_en` segun D10) se registran en la misma transaccion. Dada una verificacion `Vencida`, entonces los paquetes no descargados pasan a `Vencido` con origen `SAT`.
-- [ ] Dado un paquete descargable, cuando se descarga, entonces: con el archivo final confirmado pasa a `Descargado`; con una falla en `Preparacion`, `Autenticacion` u otra fase pasa a `Error`; con `5007` pasa a `Vencido` (origen SAT, motivo `paquete_expirado`); con `5008` pasa a `Error`; con una falla `Almacenamiento` (incluida `ColisionDestino`) pasa a `Error` con un log `descarga_fallida` saneado; con exito y `advertenciaDurabilidad` pasa a `Descargado` y su log registra la advertencia. La solicitud no cambia su estado SAT.
-- [ ] Dado un paquete `Disponible`, `Error` o `Descargando` con `vencimiento_estimado_en` vencido, cuando corre el ciclo, entonces queda `Vencido` con origen `estimacion_local` y un log.
+- [x] Dada una solicitud `Creada` enviada por el usuario, cuando el fake responde con cada caso de D7, entonces el estado final es `Enviada`, `Creada` (con `envio_iniciado_en` nulo y CHECKs vigentes), `EnvioFallido` o `EnvioIncierto` segun corresponda, con su log, y nunca se reenvia automaticamente.
+- [x] Dado el ciclo del worker, cuando existen solicitudes `Creada`, entonces el worker no las selecciona.
+- [x] Dada una verificacion `Terminada`, cuando se aplica, entonces la solicitud y todos sus paquetes nuevos (con `vencimiento_estimado_en` segun D10) se registran en la misma transaccion. Dada una verificacion `Vencida`, entonces los paquetes no descargados pasan a `Vencido` con origen `SAT`.
+- [x] Dado un paquete descargable, cuando se descarga, entonces: con el archivo final confirmado pasa a `Descargado`; con una falla en `Preparacion`, `Autenticacion` u otra fase pasa a `Error`; con `5007` pasa a `Vencido` (origen SAT, motivo `paquete_expirado`); con `5008` pasa a `Error`; con una falla `Almacenamiento` (incluida `ColisionDestino`) pasa a `Error` con un log `descarga_fallida` saneado; con exito y `advertenciaDurabilidad` pasa a `Descargado` y su log registra la advertencia. La solicitud no cambia su estado SAT.
+- [x] Dado un paquete `Disponible`, `Error` o `Descargando` con `vencimiento_estimado_en` vencido, cuando corre el ciclo, entonces queda `Vencido` con origen `estimacion_local` y un log.
 
 ### Recuperacion y eliminacion
 
-- [ ] Dada una solicitud en `Enviando` al arrancar, cuando corre la recuperacion, entonces queda `EnvioIncierto` con un solo log.
-- [ ] Dado un paquete en `Descargando` al arrancar: si no hay archivo final, vuelve a `Disponible` con un log `descarga_interrumpida`; si `existeArchivoFinal` confirma el archivo, queda `Descargado` con un log `paquete_reconciliado`; si `existeArchivoFinal` falla, conserva `Descargando` y registra la falla.
-- [ ] Dada una solicitud eliminada mientras su operacion esta bloqueada en el fake, cuando el fake responde, entonces ni la solicitud ni sus paquetes cambian y no se registra un resultado posterior.
+- [x] Dada una solicitud en `Enviando` al arrancar, cuando corre la recuperacion, entonces queda `EnvioIncierto` con un solo log.
+- [x] Dado un paquete en `Descargando` al arrancar: si no hay archivo final, vuelve a `Disponible` con un log `descarga_interrumpida`; si `existeArchivoFinal` confirma el archivo, queda `Descargado` con un log `paquete_reconciliado`; si `existeArchivoFinal` falla, conserva `Descargando` y registra la falla.
+- [x] Dada una solicitud eliminada mientras su operacion esta bloqueada en el fake, cuando el fake responde, entonces ni la solicitud ni sus paquetes cambian y no se registra un resultado posterior.
 
 ### Concurrencia, hilos y ciclo de vida
 
-- [ ] Dadas una accion manual y un ciclo del worker encolados a la vez, cuando se procesan, entonces el fake nunca observa mas de una operacion activa y la manual se ejecuta primero.
-- [ ] Dadas escrituras simultaneas de `OperacionExecutor` y `PersistenceDispatcher` sobre SQLite real, cuando coinciden, entonces cada una usa su propia conexion y la base queda consistente (sin `database is locked` no manejado).
-- [ ] Dado el puerto bloqueado, cuando se encola un evento en el hilo grafico, entonces se procesa antes de liberar el puerto.
-- [ ] Dada una salida con una operacion activa, cuando el reloj logico llega a 9.999 s, entonces el sistema sigue esperando y rechaza operaciones nuevas. A los 10 s, pide la cancelacion cooperativa, aplica la falla resultante segun D12 y termina el ejecutor antes que el dispatcher y el menu bar.
-- [ ] Dada una interrupcion por salida, aunque la senal de cierre se repita, entonces se registra exactamente un log por operacion interrumpida. Un cierre sin operaciones no genera logs por solicitud.
-- [ ] Dados los cambios de estado del worker (`Pausado`, `ActivoEnEspera`, `Ejecutando(tipo)`, `Deteniendo`, `Detenido`) y de pendientes, cuando ocurren, entonces `OSIntegration` recibe el estado y el conteo correspondientes, y el menu bar muestra los textos de D2.
-- [ ] Sin `T009`, cuando la app real intenta una operacion, entonces el adaptador nulo produce una falla `Preparacion` visible y nunca un exito simulado.
+- [x] Dadas una accion manual y un ciclo del worker encolados a la vez, cuando se procesan, entonces el fake nunca observa mas de una operacion activa y la manual se ejecuta primero.
+- [x] Dadas escrituras simultaneas de `OperacionExecutor` y `PersistenceDispatcher` sobre SQLite real, cuando coinciden, entonces cada una usa su propia conexion y la base queda consistente (sin `database is locked` no manejado).
+- [x] Dado el puerto bloqueado, cuando se encola un evento en el hilo grafico, entonces se procesa antes de liberar el puerto.
+- [x] Dada una salida con una operacion activa, cuando el reloj logico llega a 9.999 s, entonces el sistema sigue esperando y rechaza operaciones nuevas. A los 10 s, pide la cancelacion cooperativa, aplica la falla resultante segun D12 y termina el ejecutor antes que el dispatcher y el menu bar.
+- [x] Dada una interrupcion por salida, aunque la senal de cierre se repita, entonces se registra exactamente un log por operacion interrumpida. Un cierre sin operaciones no genera logs por solicitud.
+- [x] Dados los cambios de estado del worker (`Pausado`, `ActivoEnEspera`, `Ejecutando(tipo)`, `Deteniendo`, `Detenido`) y de pendientes, cuando ocurren, entonces `OSIntegration` recibe el estado y el conteo correspondientes, y el menu bar muestra los textos de D2.
+- [x] Sin `T009`, cuando la app real intenta una operacion, entonces el adaptador nulo produce una falla `Preparacion` visible y nunca un exito simulado.
 
 ### Documentacion
 
-- [ ] El ADR nuevo existe y `operational-rules.md` y `qt-project-structure.md` reflejan D6, D10 y el hilo del ejecutor, sin contradicciones con ADR 0014 y 0015.
+- [x] El ADR nuevo existe y `operational-rules.md` y `qt-project-structure.md` reflejan D6, D10 y el hilo del ejecutor, sin contradicciones con ADR 0014 y 0015.
 
 ## Verificacion
 
@@ -155,7 +155,14 @@ El worker revisa solicitudes y paquetes mientras la app esta abierta, incluso co
 
 ## Resultado
 
-Pendiente.
+Completada el 2026-10-05.
+
+- `OperacionExecutor` (hilo, cola con prioridad y conexion SQLite propios; transacciones en tres pasos; cancelacion y salida con plazo de 10 s) y `WorkerLocal` (recuperacion, ciclo D9, agenda 10/30 y suspension, pausa e intenciones, gate por perfil) en `src/application/operaciones/`.
+- Puerto `OperacionesSat` con `OperacionesSatNulo` en el root hasta T009; `SqliteOperacionesSolicitudRepository`; migracion 003.
+- Menu bar con estado del monitoreo y pendientes; acciones "Verificar ahora" y "Reintentar descarga" en el detalle; envio tras crear (tambien con pausa, D17 de la sesion).
+- ADR 0018 y ajustes en `operational-rules.md` y `qt-project-structure.md`.
+- `ctest`: 12 suites, repetidas en paralelo. Prueba manual con adaptador nulo correcta.
+- Decision de la sesion D17: con monitoreo pausado, el envio manual de una solicitud `Creada` se ejecuta; la pausa solo afecta verificar y descargar.
 
 ## Riesgos y notas
 

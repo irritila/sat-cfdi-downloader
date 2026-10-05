@@ -14,8 +14,10 @@
 
 namespace satcfdi {
 
-// Catalogo cerrado log_solicitud.tipo_evento (DC8 de T001). claveEstable()
-// devuelve el literal snake_case del CHECK. Ampliarlo exige migracion.
+// Catalogo cerrado log_solicitud.tipo_evento (DC8 de T001; ampliado por la
+// migracion 003 de T007 con envio_no_iniciado y verificacion_suspendida).
+// claveEstable() devuelve el literal snake_case del CHECK. Ampliarlo exige
+// migracion.
 enum class TipoEventoLog {
     SolicitudCreada,
     DuplicadoConfirmado,
@@ -35,9 +37,11 @@ enum class TipoEventoLog {
     ArchivoHuerfano,
     AccionPendienteRegistrada,
     AccionPendienteDescartada,
+    EnvioNoIniciado,         // T007 D7 / ADR 0017: Enviando -> Creada
+    VerificacionSuspendida,  // T007 D8: tres fallas iguales suspendibles
 };
 
-inline constexpr std::array<TipoEventoLog, 18> kTiposEventoLog = {
+inline constexpr std::array<TipoEventoLog, 20> kTiposEventoLog = {
     TipoEventoLog::SolicitudCreada,       TipoEventoLog::DuplicadoConfirmado,
     TipoEventoLog::EnvioIniciado,         TipoEventoLog::SolicitudEnviada,
     TipoEventoLog::EnvioFallido,          TipoEventoLog::EnvioIncierto,
@@ -47,6 +51,7 @@ inline constexpr std::array<TipoEventoLog, 18> kTiposEventoLog = {
     TipoEventoLog::DescargaInterrumpida,  TipoEventoLog::PaqueteReconciliado,
     TipoEventoLog::PaqueteVencido,        TipoEventoLog::ArchivoHuerfano,
     TipoEventoLog::AccionPendienteRegistrada, TipoEventoLog::AccionPendienteDescartada,
+    TipoEventoLog::EnvioNoIniciado,       TipoEventoLog::VerificacionSuspendida,
 };
 
 // log_solicitud.origen: 'worker', 'usuario', 'recuperacion'.

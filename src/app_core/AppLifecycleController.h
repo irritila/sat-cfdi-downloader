@@ -26,8 +26,9 @@ class ExtensionCicloDeVida;
 //   menu bar y el worker siguen). Requiere setQuitOnLastWindowClosed(false).
 // - QEvent::Quit de la aplicacion (Cmd-Q, Salir del Dock) se redirige al
 //   mismo flujo de salida explicita.
-// - Salir: extension.detener() -> registrarUltimoCierre() confirmado (o
-//   fallido, registrado en log) -> os.prepararSalida() -> salida().
+// - Salir: extension.detener() (worker y ejecutor, hasta 10 s, D1) ->
+//   registrarUltimoCierre() confirmado (o fallido, registrado en log) ->
+//   os.prepararSalida() -> salida().
 //
 // Ownership/hilo: hilo grafico. No posee nada; os, configuracion y
 // appViewModel deben vivir mas que el controlador. La ventana es no
@@ -88,6 +89,7 @@ private:
     void cambiarMonitoreo(bool pausar);
     void cambiarInicioAutomatico(bool habilitar);
     void reflejar(const ConfiguracionApp& configuracion);
+    void registrarCierreYTerminar();
     void terminarSalida();
 
     OSIntegration& m_os;

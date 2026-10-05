@@ -1,5 +1,7 @@
 #include "NuevaSolicitudViewModel.h"
 
+#include "AccionesSolicitud.h"
+
 #include "application/profiles/ConsultaPreparacionPerfiles.h"
 #include "application/profiles/CredencialesSatService.h"
 #include "application/profiles/PerfilesSatService.h"
@@ -344,6 +346,11 @@ void NuevaSolicitudViewModel::crearConfirmacion(const NuevaSolicitudRequest& req
         }
         actualizar([&] { m_ocupado = false; });
         if (r.esExito()) {
+            // D4: el envio lo dispara el usuario al crear; se encola en el
+            // ejecutor (no bloquea). D17: tambien con el monitoreo pausado.
+            if (m_acciones) {
+                m_acciones->enviar(r.valor());
+            }
             emit submitted(r.valor().texto());
             return;
         }

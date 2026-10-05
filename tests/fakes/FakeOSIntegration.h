@@ -86,6 +86,8 @@ public:
     bool salidaPreparada = false;
     std::optional<bool> preferenciaReflejada;
     std::optional<bool> monitoreoPausadoReflejado;
+    // T007: historial de estados del worker reflejados (en orden).
+    QList<EstadoMonitoreo> estadosMonitoreo;
 
     int pendientesLoginItem() const { return int(m_pendientesLoginItem.size()); }
     int pendientesPermiso() const { return m_pendientesPermiso; }
@@ -164,6 +166,12 @@ public:
     {
         comandos.append(QStringLiteral("reflejarMonitoreoPausado(%1)").arg(texto(pausado)));
         monitoreoPausadoReflejado = pausado;
+    }
+
+    void reflejarEstadoMonitoreo(const EstadoMonitoreo& estado) override
+    {
+        comandos.append(QStringLiteral("reflejarEstadoMonitoreo"));
+        estadosMonitoreo.append(estado);
     }
 
     void prepararSalida() override

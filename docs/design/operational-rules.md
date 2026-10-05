@@ -92,7 +92,7 @@ Notas:
 | Estado | Significado | Worker automatico | Acciones manuales validas |
 | --- | --- | --- | --- |
 | `Disponible` | SAT devolvio `IdPaquete`; ZIP no descargado. | Descargar si monitoreo activo. | Descargar paquete, eliminar local via solicitud. |
-| `Descargando` | Token valido obtenido y descarga iniciada. | No iniciar otra descarga concurrente. | Eliminar local, con advertencia. |
+| `Descargando` | Descarga reclamada o en curso, incluida su preparacion y autenticacion; no implica que ya exista token valido. | No iniciar otra descarga concurrente. | Eliminar local, con advertencia. |
 | `Descargado` | Archivo final existe porque el temporal fue renombrado correctamente. | Ignorar. | Eliminar local via solicitud. |
 | `Error` | Error SAT, red, autenticacion, archivo o interrupcion. | No reintentar automaticamente. | Reintentar descarga, eliminar local via solicitud. |
 | `Vencido` | El paquete ya no es descargable. La causa se conserva en `motivo_vencimiento` y `origen_vencimiento`. | Ignorar. | Eliminar local via solicitud. |
@@ -100,7 +100,8 @@ Transiciones adicionales:
 
 - `Disponible -> Error`: fallo de autenticacion o preparacion antes de descargar.
 - `Descargando -> Vencido`: SAT devuelve paquete inexistente/expirado.
-- `Descargando -> Disponible`: recuperacion de arranque tras cierre inesperado sin archivo final.
+- `Descargando -> Disponible`: recuperacion de arranque tras cierre inesperado
+  cuando se confirma que no existe archivo final.
 - `eliminado_en` es la unica fuente de eliminacion logica del paquete; no se persiste como estado de descarga.
 
 ## Deteccion de vencimiento
@@ -112,6 +113,12 @@ La app detecta vencimiento de solicitudes o paquetes por tres caminos:
 - El scheduler detecta `vencimiento_estimado_en` vencido para paquetes `Disponible`, `Error` o `Descargando`: esos paquetes pasan a `Vencido` con origen `estimacion_local`, motivo `vencimiento_estimado` y se registra `LogSolicitud`. Esto tampoco cambia el estado SAT de la solicitud.
 
 La deteccion por fecha estimada no borra archivos ni recrea solicitudes. Solo evita seguir presentando paquetes como descargables cuando la ventana de SAT probablemente expiro.
+
+`vencimiento_estimado_en` se fija una sola vez al insertar por primera vez cada
+`IdPaquete` recibido en una verificacion `Terminada`: `ahoraUtc() + 72 h`. No
+se desplaza si una verificacion posterior vuelve a reportar el paquete. Es una
+estimacion local basada en la primera observacion, no la hora exacta de
+generacion ni el vencimiento confirmado por SAT.
 
 ## Duplicados locales
 
@@ -240,6 +247,34 @@ Al reanudar monitoreo:
 
 No existe tabla de cola en el MVP.
 
+## Agenda y orden del ciclo del worker
+
+La agenda es por solicitud mediante `siguiente_verificacion_en`. Se considera
+una verificacion sin cambio cuando repite `estado_solicitud_sat`,
+`codigo_estado_solicitud`, `numero_cfdi` y el conjunto de `idsPaquetes`. Un
+cambio pone el contador en 0 y programa 10 min; la tercera verificacion sin
+cambio consecutiva programa 30 min. Una falla no cuenta como sin cambio y
+programa 30 min.
+
+La racha de fallas se persiste por clave `(fase, codigo)`. Tres fallas iguales
+con codigo `300`, `302`, `303` o `5004` suspenden la verificacion automatica
+(`siguiente_verificacion_en = NULL`) hasta `Verificar ahora`; red, `404`, Fault
+y `5011` no suspenden. Solo un cambio de clave crea un nuevo `LogSolicitud`;
+una repeticion actualiza `ultimo_error`.
+
+La recuperacion corre al arrancar, antes de cualquier ciclo. Con monitoreo
+activo, cada ciclo toma una seleccion acotada y procesa, en orden:
+
+1. Vencimientos estimados.
+2. Intenciones pendientes.
+3. Verificaciones debidas.
+4. Descargas automaticas.
+
+Lo manual tiene prioridad sobre lo automatico y la verificacion sobre la
+descarga. Antes de seleccionar trabajo de un perfil, se consulta una vez su
+estado de credencial; si no esta `Lista`, se omite el perfil sin llamar a SAT y
+se publica el cambio como evento de aplicacion para la UI.
+
 ## Ejecutor serial
 
 Responsabilidades:
@@ -274,7 +309,7 @@ Reglas Qt/SQLite:
 4. Transaccion local:
    - Si `CodEstatus=5000` e `IdSolicitud` existe: marcar `Enviada`, guardar `id_solicitud_sat`, `cod_estatus_solicitud` y mensaje.
    - Si SAT rechaza con codigo documentado sin `IdSolicitud`: marcar `EnvioFallido`, guardar codigo y mensaje de creacion.
-   - Si la falla ocurrio en `Preparacion`, `Autenticacion` o antes de enviar `SolicitaDescarga*` (ADR 0017): regresar a `Creada`, limpiar `envio_iniciado_en`, `cod_estatus_solicitud` y `mensaje_solicitud_sat`, guardar `ultimo_error` y registrar log. El reenvio es solo manual.
+   - Si la falla ocurrio en `Preparacion`, `Autenticacion` o `AntesDeEnvio` de `SolicitaDescarga*` (ADR 0017): regresar atomicamente a `Creada`, limpiar `envio_iniciado_en`, `cod_estatus_solicitud` y `mensaje_solicitud_sat`, guardar `ultimo_error` saneado y registrar `envio_no_iniciado`. El reenvio es solo manual.
    - Si hay timeout/interrupcion despues de iniciar HTTP, `5000` sin `IdSolicitud`, `5006` o codigo de creacion no documentado: marcar `EnvioIncierto`.
 
 ### Verificar solicitud
@@ -290,14 +325,17 @@ La app no debe dejar `SolicitudMasiva=Terminada` sin registrar los paquetes reci
 
 ### Descargar paquete
 
-1. Obtener token valido.
-2. Transaccion local: marcar paquete `Descargando`.
-3. Descargar bytes del ZIP.
-4. Escribir a archivo temporal.
-5. Renombrar archivo temporal a ruta final.
-6. Transaccion local: marcar `Descargado`, guardar ruta y codigo SAT.
+1. Transaccion local breve: reclamar el paquete y marcarlo `Descargando`.
+2. Invocar la operacion externa sin una transaccion abierta; su adaptador hace
+   preparacion, autenticacion, descarga del ZIP, escritura temporal y rename
+   atomico a la ruta final.
+3. Transaccion local `BEGIN IMMEDIATE`: si el paquete no fue eliminado, con
+   archivo final confirmado marcar `Descargado` y guardar ruta y codigo SAT.
 
-Si falla antes de renombrar, el paquete queda en `Error`, `Disponible` o `Vencido` segun causa. La solicitud solo pasa a `Vencida` si una respuesta de verificacion SAT reporta `EstadoSolicitud=6`.
+Una falla de `Preparacion`, `Autenticacion` o `Almacenamiento` deja el paquete
+en `Error`; `5007` lo deja `Vencido` y `5008` lo deja `Error`. Una interrupcion
+se recupera al arrancar. La solicitud solo pasa a `Vencida` si una respuesta de
+verificacion SAT reporta `EstadoSolicitud=6`.
 
 ### Eliminar solicitud local
 
@@ -315,8 +353,12 @@ Al iniciar la app:
 
 - `Creada` sin intento de envio: se mantiene visible y puede enviarse.
 - `Enviando` con intento iniciado: pasa a `EnvioIncierto` y registra log. No se reenvia desde el MVP.
-- `Descargando` sin archivo final: pasa a `Disponible` y registra log de descarga interrumpida.
-- Si existe el archivo final para un paquete en `Descargando`, se reconcilia como `Descargado` y se registra el evento.
+- `Descargando` sin archivo final confirmado: pasa a `Disponible` y registra
+  log de descarga interrumpida.
+- Si existe el archivo final para un paquete en `Descargando`, se reconcilia
+  como `Descargado` y se registra el evento.
+- Si falla la comprobacion de archivo final, conserva `Descargando` y registra
+  una falla de reconciliacion; no infiere que el archivo no existe.
 - Archivos temporales `.part` o `.tmp` sin archivo final se eliminan o ignoran.
 - Un archivo final sin paquete persistido se conserva como archivo huerfano y se registra en `LogSolicitud`; no se elimina automaticamente.
 - Solicitudes `Terminada` con paquetes `Disponible` o `Error` quedan disponibles para descarga o reintento manual.

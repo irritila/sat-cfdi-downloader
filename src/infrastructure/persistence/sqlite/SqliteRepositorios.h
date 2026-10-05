@@ -3,6 +3,7 @@
 #include "ports/repositories/ConfiguracionAppRepository.h"
 #include "ports/repositories/CredencialSatRepository.h"
 #include "ports/repositories/LogSolicitudRepository.h"
+#include "ports/repositories/OperacionesSolicitudRepository.h"
 #include "ports/repositories/PaqueteSolicitudRepository.h"
 #include "ports/repositories/PerfilSatRepository.h"
 #include "ports/repositories/SolicitudMasivaRepository.h"
@@ -114,6 +115,51 @@ public:
     obtenerPorPerfil(const PerfilId& perfilId) override;
     Resultado<bool, ErrorPersistencia> eliminarPorPerfil(const PerfilId& perfilId) override;
     Resultado<QList<CredencialRef>, ErrorPersistencia> listarReferenciasVigentes() override;
+
+private:
+    SqliteConnectionProvider& m_proveedor;
+};
+
+// Operaciones del ejecutor serial y del worker (T007). Hilo: el del
+// OperacionExecutor, con su propia conexion por hilo del proveedor (distinta de
+// la del PersistenceDispatcher). Las escrituras exigen SqliteUnitOfWork activo
+// (BEGIN IMMEDIATE) y revalidan en su WHERE eliminado_en IS NULL y el estado de
+// origen; si no aplica devuelven exito con false sin modificar nada.
+class SqliteOperacionesSolicitudRepository final : public OperacionesSolicitudRepository {
+public:
+    explicit SqliteOperacionesSolicitudRepository(SqliteConnectionProvider& proveedor);
+
+    Resultado<QList<PerfilId>, ErrorPersistencia> listarPerfilesConTrabajo(const QDateTime& ahoraUtc) override;
+    Resultado<QList<PaqueteDescargable>, ErrorPersistencia>
+    listarVencimientosEstimados(const QDateTime& ahoraUtc, int limite) override;
+    Resultado<QList<IntencionPendiente>, ErrorPersistencia>
+    listarIntencionesPendientes(const QList<PerfilId>& perfiles, int limite) override;
+    Resultado<QList<SolicitudPersistida>, ErrorPersistencia>
+    listarVerificacionesDebidas(const QList<PerfilId>& perfiles, const QDateTime& ahoraUtc, int limite) override;
+    Resultado<QList<PaqueteDescargable>, ErrorPersistencia>
+    listarDescargasAutomaticas(const QList<PerfilId>& perfiles, int limite) override;
+    Resultado<std::optional<PaqueteDescargable>, ErrorPersistencia> obtenerPaquete(const QString& paqueteId) override;
+    Resultado<QList<PaqueteDescargable>, ErrorPersistencia>
+    listarPaquetesReintentables(const SolicitudId& solicitudId) override;
+    Resultado<TrabajoInterrumpido, ErrorPersistencia> listarInterrumpidos() override;
+    Resultado<std::optional<RachaVerificacion>, ErrorPersistencia>
+    leerRachaVerificacion(const SolicitudId& solicitudId) override;
+
+    Resultado<bool, ErrorPersistencia> marcarEnviando(const SolicitudId& solicitudId,
+                                                      const QDateTime& ahoraUtc) override;
+    Resultado<bool, ErrorPersistencia> aplicarEnvio(const AplicacionEnvio& aplicacion) override;
+    Resultado<ResultadoAplicacionVerificacion, ErrorPersistencia>
+    aplicarVerificacion(const AplicacionVerificacion& aplicacion) override;
+    Resultado<bool, ErrorPersistencia> aplicarFallaVerificacion(const AplicacionFallaVerificacion& aplicacion) override;
+    Resultado<bool, ErrorPersistencia> marcarDescargando(const QString& paqueteId, const QDateTime& ahoraUtc,
+                                                         bool permitirError) override;
+    Resultado<bool, ErrorPersistencia> aplicarDescarga(const AplicacionDescarga& aplicacion) override;
+    Resultado<bool, ErrorPersistencia> vencerPaqueteEstimado(const QString& paqueteId,
+                                                             const QDateTime& ahoraUtc) override;
+    Resultado<bool, ErrorPersistencia> registrarIntencion(const SolicitudId& solicitudId, TipoIntencion tipo,
+                                                          const QDateTime& ahoraUtc) override;
+    Resultado<bool, ErrorPersistencia> consumirIntencion(const SolicitudId& solicitudId, TipoIntencion tipo,
+                                                         const QDateTime& capturadaEn) override;
 
 private:
     SqliteConnectionProvider& m_proveedor;

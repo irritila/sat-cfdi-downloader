@@ -50,6 +50,7 @@ qt_add_qml_module(satcfdi_presentation
         viewmodels/NuevaSolicitudViewModel.cpp
         viewmodels/SolicitudDetailViewModel.h
         viewmodels/SolicitudDetailViewModel.cpp
+        viewmodels/AccionesSolicitud.h
         viewmodels/PresentacionViewModels.h
         viewmodels/PresentacionViewModels.cpp
 )

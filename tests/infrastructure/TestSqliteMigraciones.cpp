@@ -27,6 +27,31 @@ QList<MigracionSql> embebidas()
     return m ? m.valor() : QList<MigracionSql>{};
 }
 
+// Version mas reciente embebida (T007: deriva de la lista, no un literal).
+int ultimaVersion()
+{
+    const QList<MigracionSql> m = embebidas();
+    return m.isEmpty() ? 0 : m.last().version;
+}
+
+QList<int> versionesEmbebidas()
+{
+    QList<int> v;
+    for (const MigracionSql& m : embebidas()) {
+        v.append(m.version);
+    }
+    return v;
+}
+
+QStringList versionesTexto()
+{
+    QStringList v;
+    for (int n : versionesEmbebidas()) {
+        v.append(QString::number(n));
+    }
+    return v;
+}
+
 const QString kObjetosUsuario = QStringLiteral(
     "SELECT type || ':' || name FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY 1");
 
@@ -64,12 +89,21 @@ void TestSqliteMigraciones::recursoEmbebidoIgualAlFuente()
 
     auto lista = migracionesSqliteEmbebidas();
     QVERIFY(lista);
-    QCOMPARE(lista.valor().size(), 2);
+    QCOMPARE(lista.valor().size(), 3);
+    for (int i = 0; i < lista.valor().size(); ++i) {
+        QCOMPARE(lista.valor().at(i).version, i + 1); // consecutivas desde 1
+    }
     QCOMPARE(lista.valor().first().version, 1);
     QCOMPARE(lista.valor().first().sql.toUtf8(), fuente);
     QCOMPARE(lista.valor().at(1).version, 2);
     QCOMPARE(lista.valor().at(1).nombre, QStringLiteral("002_credencial_metadata"));
     QCOMPARE(lista.valor().at(1).sql.toUtf8(), fuente002);
+
+    // T007: 003 embebida igual al fuente.
+    const QByteArray fuente003 = leerArchivo(QStringLiteral(SATCFDI_MIGRACION_003_FUENTE));
+    QVERIFY(!fuente003.isEmpty());
+    QCOMPARE(lista.valor().at(2).nombre, QStringLiteral("003_worker_ejecutor"));
+    QCOMPARE(lista.valor().at(2).sql.toUtf8(), fuente003);
 }
 
 void TestSqliteMigraciones::dividirSentenciasDm2()
@@ -126,8 +160,8 @@ void TestSqliteMigraciones::migraBaseVacia()
     auto informe = inicializarBaseSqlite(rutaBase(dir));
     QVERIFY2(informe, informe ? "" : qPrintable(informe.error().mensaje));
     QCOMPARE(informe.valor().migracion.versionInicial, 0);
-    QCOMPARE(informe.valor().migracion.versionFinal, 2);
-    QCOMPARE(informe.valor().migracion.aplicadas, (QList<int>{1, 2}));
+    QCOMPARE(informe.valor().migracion.versionFinal, ultimaVersion());
+    QCOMPARE(informe.valor().migracion.aplicadas, versionesEmbebidas());
     QCOMPARE(informe.valor().journalMode, QStringLiteral("wal"));
     QVERIFY(!informe.valor().versionSqlite.isEmpty());
 
@@ -140,10 +174,10 @@ void TestSqliteMigraciones::migraBaseVacia()
                                   QStringLiteral("perfil_sat"), QStringLiteral("schema_migrations"),
                                   QStringLiteral("solicitud_masiva")}));
     QCOMPARE(columna(proveedor, QStringLiteral("SELECT version FROM schema_migrations ORDER BY version")),
-             (QStringList{QStringLiteral("1"), QStringLiteral("2")}));
+             versionesTexto());
     const QString aplicada =
         escalar(proveedor, QStringLiteral("SELECT aplicada_en FROM schema_migrations "
-                                          "WHERE version = 2")).toString();
+                                          "WHERE version = %1").arg(ultimaVersion())).toString();
     QVERIFY(timestamp::desdeTexto(aplicada).has_value());
     QCOMPARE(escalar(proveedor, QStringLiteral("SELECT count(*) FROM configuracion_app")).toInt(), 1);
     proveedor.cerrarConexionDelHiloActual();
@@ -161,13 +195,14 @@ void TestSqliteMigraciones::segundaAperturaNoDuplica()
     }
     auto segunda = inicializarBaseSqlite(rutaBase(dir));
     QVERIFY(segunda);
-    QCOMPARE(segunda.valor().migracion.versionInicial, 2);
-    QCOMPARE(segunda.valor().migracion.versionFinal, 2);
+    QCOMPARE(segunda.valor().migracion.versionInicial, ultimaVersion());
+    QCOMPARE(segunda.valor().migracion.versionFinal, ultimaVersion());
     QVERIFY(segunda.valor().migracion.aplicadas.isEmpty());
 
     SqliteConnectionProvider proveedor(rutaBase(dir));
     QCOMPARE(columna(proveedor, kObjetosUsuario), antes);
-    QCOMPARE(escalar(proveedor, QStringLiteral("SELECT count(*) FROM schema_migrations")).toInt(), 2);
+    QCOMPARE(escalar(proveedor, QStringLiteral("SELECT count(*) FROM schema_migrations")).toInt(),
+             versionesEmbebidas().size());
     QCOMPARE(escalar(proveedor, QStringLiteral("SELECT count(*) FROM configuracion_app")).toInt(), 1);
     proveedor.cerrarConexionDelHiloActual();
 }
@@ -212,13 +247,14 @@ void TestSqliteMigraciones::migracionRotaHaceRollbackCompleto()
     QVERIFY(inicializarBaseSqlite(rutaBase(dir)));
 
     QList<MigracionSql> lista = embebidas();
-    lista.append(MigracionSql{3, QStringLiteral("003_rota"),
+    const int rota = ultimaVersion() + 1;
+    lista.append(MigracionSql{rota, QStringLiteral("rota"),
                               QStringLiteral("CREATE TABLE tabla_parcial (id INTEGER)\n;\n"
                                              "INSERT INTO tabla_inexistente VALUES (1)\n;\n")});
     auto r = inicializarBaseSqlite(rutaBase(dir), lista);
     QVERIFY(!r);
     QCOMPARE(r.error().tipo, ErrorPersistencia::Tipo::Migracion);
-    QVERIFY(r.error().mensaje.contains(QStringLiteral("migracion 3")));
+    QVERIFY(r.error().mensaje.contains(QStringLiteral("migracion %1").arg(rota)));
 
     SqliteConnectionProvider proveedor(rutaBase(dir));
     QCOMPARE(escalar(proveedor, QStringLiteral("SELECT count(*) FROM sqlite_master "
@@ -226,7 +262,7 @@ void TestSqliteMigraciones::migracionRotaHaceRollbackCompleto()
                  .toInt(),
              0);
     QCOMPARE(escalar(proveedor, QStringLiteral("SELECT max(version) FROM schema_migrations")).toInt(),
-             2);
+             ultimaVersion());
     QVERIFY(!proveedor.transaccionActiva());
     proveedor.cerrarConexionDelHiloActual();
 }

@@ -27,6 +27,12 @@ PresentacionViewModels::PresentacionViewModels(SolicitudesService* solicitudes,
             [this](const QString& perfilId, bool) { m_perfiles->reintentarEstado(perfilId); });
 }
 
+void PresentacionViewModels::setAccionesSolicitud(AccionesSolicitud* acciones)
+{
+    m_nuevaSolicitud->setAccionesSolicitud(acciones);
+    m_detalle->setAccionesSolicitud(acciones);
+}
+
 QVariantMap PresentacionViewModels::initialProperties() const
 {
     return {

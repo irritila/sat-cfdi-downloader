@@ -15,6 +15,8 @@
 
 namespace satcfdi {
 
+class AccionesSolicitud;
+
 class SolicitudesService;
 
 // Detalle de una solicitud cargada por id (UUID texto), nunca por indice.
@@ -82,6 +84,14 @@ class SolicitudDetailViewModel : public QObject {
     // mensajeSat, creadoEn}; claves estables, creado_en ascendente.
     Q_PROPERTY(QVariantList logs READ logs NOTIFY datosChanged)
 
+    // T007: acciones manuales (solo si el root conecto AccionesSolicitud).
+    // puedeVerificar: Enviada sin estado SAT final. puedeReintentarDescarga:
+    // algun paquete Disponible o Error. accionSolicitada: texto breve tras
+    // pedir una accion (la UI se refresca por las senales del servicio).
+    Q_PROPERTY(bool puedeVerificar READ puedeVerificar NOTIFY datosChanged)
+    Q_PROPERTY(bool puedeReintentarDescarga READ puedeReintentarDescarga NOTIFY datosChanged)
+    Q_PROPERTY(QString accionSolicitada READ accionSolicitada NOTIFY accionSolicitadaChanged)
+
 public:
     enum class Estado {
         Ninguno,
@@ -137,11 +147,19 @@ public:
     // Eliminacion logica local de la solicitud actual (confirmada en QML).
     Q_INVOKABLE void eliminar();
 
+    void setAccionesSolicitud(AccionesSolicitud* acciones);
+    bool puedeVerificar() const;
+    bool puedeReintentarDescarga() const;
+    QString accionSolicitada() const { return m_accionSolicitada; }
+    Q_INVOKABLE void verificarAhora();
+    Q_INVOKABLE void reintentarDescarga();
+
 signals:
     void solicitudIdChanged();
     void estadoChanged();
     void datosChanged();
     void eliminacionChanged();
+    void accionSolicitadaChanged();
     // La eliminacion pedida desde este view model termino con exito
     // (incluye cambio=false: ya no existia).
     void eliminada(const QString& id);
@@ -160,6 +178,8 @@ private:
     QString m_errorEliminacion;
     quint64 m_genCarga = 0;
     quint64 m_genEliminar = 0;
+    AccionesSolicitud* m_acciones = nullptr;
+    QString m_accionSolicitada;
 };
 
 } // namespace satcfdi

@@ -29,6 +29,7 @@ public:
     }
     void reflejarPreferenciaLoginItem(bool) override {}
     void reflejarMonitoreoPausado(bool) override {}
+    void reflejarEstadoMonitoreo(const EstadoMonitoreo&) override {}
     void prepararSalida() override {}
 };
 

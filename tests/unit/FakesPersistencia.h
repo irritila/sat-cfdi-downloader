@@ -8,10 +8,12 @@
 // Hilo: se invocan desde el hilo de PersistenceDispatcher; la prueba solo lee
 // el Almacen despues de que el future correspondiente termino.
 
+#include "domain/operaciones/PoliticasOperacion.h"
 #include "domain/solicitudes/Duplicados.h"
 #include "ports/repositories/ConfiguracionAppRepository.h"
 #include "ports/repositories/CredencialSatRepository.h"
 #include "ports/repositories/LogSolicitudRepository.h"
+#include "ports/repositories/OperacionesSolicitudRepository.h"
 #include "ports/repositories/PaqueteSolicitudRepository.h"
 #include "ports/repositories/PerfilSatRepository.h"
 #include "ports/repositories/SolicitudMasivaRepository.h"
@@ -41,6 +43,8 @@ struct Almacen {
     std::optional<ConfiguracionApp> configuracion = ConfiguracionApp{};
     // credencial_sat (T005).
     QList<CredencialSat> credenciales;
+    // Racha de fallas de verificacion (T007, migracion 003): clave y contador.
+    QHash<SolicitudId, std::pair<QString, int>> rachas;
 
     // Traza de operaciones ("begin", "commit", "rollback", "insertarCreada", ...).
     QStringList eventos;
@@ -87,6 +91,7 @@ struct Almacen {
         QList<LogPersistido> logs;
         std::optional<ConfiguracionApp> configuracion;
         QList<CredencialSat> credenciales;
+        QHash<SolicitudId, std::pair<QString, int>> rachas;
     };
     std::optional<Estado> snapshot;
 
@@ -130,7 +135,7 @@ public:
         }
         m_a.snapshot =
             Almacen::Estado{m_a.perfiles, m_a.solicitudes, m_a.paquetes, m_a.logs, m_a.configuracion,
-                           m_a.credenciales};
+                           m_a.credenciales, m_a.rachas};
         return Resultado<Exito, ErrorPersistencia>::exito({});
     }
 
@@ -156,6 +161,7 @@ public:
             m_a.logs = m_a.snapshot->logs;
             m_a.configuracion = m_a.snapshot->configuracion;
             m_a.credenciales = m_a.snapshot->credenciales;
+            m_a.rachas = m_a.snapshot->rachas;
             m_a.snapshot.reset();
         }
         return Resultado<Exito, ErrorPersistencia>::exito({});
@@ -669,6 +675,453 @@ private:
             return error(ErrorPersistencia::Tipo::Integridad, "credencial_sat.metadata");
         }
         return std::nullopt;
+    }
+
+    Almacen& m_a;
+};
+
+// Repositorio de operaciones del ejecutor/worker en memoria (T007). Emula el
+// contrato de OperacionesSolicitudRepository: escrituras con transaccion,
+// revalidacion de eliminado_en y del estado de origen (false sin cambios si
+// no aplica), limpieza condicional de intenciones (D13), paquetes nuevos sin
+// duplicar ni desplazar su vencimiento (D10) y racha de fallas (migracion 003).
+// Operaciones registradas con el nombre del metodo (fallos inyectables).
+class FakeOperacionesSolicitud final : public OperacionesSolicitudRepository {
+public:
+    explicit FakeOperacionesSolicitud(Almacen& a) : m_a(a) {}
+
+    Resultado<QList<PerfilId>, ErrorPersistencia> listarPerfilesConTrabajo(const QDateTime& ahora) override
+    {
+        using R = Resultado<QList<PerfilId>, ErrorPersistencia>;
+        if (auto e = m_a.registrar(QStringLiteral("listarPerfilesConTrabajo"))) {
+            return R::fallo(*e);
+        }
+        QList<PerfilId> r;
+        auto agregar = [&](const PerfilId& p) {
+            if (!r.contains(p)) {
+                r.append(p);
+            }
+        };
+        for (const SolicitudPersistida& s : m_a.solicitudes) {
+            if (s.eliminadoEn) {
+                continue;
+            }
+            if (verificacionDebida(s, ahora) || s.verificacionPendiente || s.descargaPendiente) {
+                agregar(s.perfilSatId);
+            }
+        }
+        for (const PaquetePersistido& p : m_a.paquetes) {
+            const SolicitudPersistida* s = solicitud(p.solicitudMasivaId);
+            if (s && !p.eliminadoEn && p.estadoDescarga == EstadoDescarga::Disponible
+                && s->estadoSolicitudSat == EstadoSolicitudSat::Terminada) {
+                agregar(s->perfilSatId);
+            }
+        }
+        return R::exito(r);
+    }
+
+    Resultado<QList<PaqueteDescargable>, ErrorPersistencia> listarVencimientosEstimados(const QDateTime& ahora,
+                                                                                        int limite) override
+    {
+        using R = Resultado<QList<PaqueteDescargable>, ErrorPersistencia>;
+        if (auto e = m_a.registrar(QStringLiteral("listarVencimientosEstimados"))) {
+            return R::fallo(*e);
+        }
+        QList<PaqueteDescargable> r;
+        for (const PaquetePersistido& p : m_a.paquetes) {
+            if (politicas::vencimientoEstimadoAlcanzado(p, ahora) && solicitud(p.solicitudMasivaId)) {
+                r.append(descargable(p));
+            }
+        }
+        std::sort(r.begin(), r.end(), [](const PaqueteDescargable& x, const PaqueteDescargable& y) {
+            return *x.paquete.vencimientoEstimadoEn < *y.paquete.vencimientoEstimadoEn;
+        });
+        return R::exito(r.mid(0, limite));
+    }
+
+    Resultado<QList<IntencionPendiente>, ErrorPersistencia> listarIntencionesPendientes(const QList<PerfilId>& perfiles,
+                                                                                       int limite) override
+    {
+        using R = Resultado<QList<IntencionPendiente>, ErrorPersistencia>;
+        if (auto e = m_a.registrar(QStringLiteral("listarIntencionesPendientes"))) {
+            return R::fallo(*e);
+        }
+        QList<IntencionPendiente> r;
+        for (const SolicitudPersistida& s : m_a.solicitudes) {
+            if (!s.eliminadoEn && s.accionPendienteEn && perfiles.contains(s.perfilSatId)) {
+                r.append(IntencionPendiente{s.id, s.perfilSatId, s.verificacionPendiente, s.descargaPendiente,
+                                            *s.accionPendienteEn});
+            }
+        }
+        std::sort(r.begin(), r.end(), [](const IntencionPendiente& x, const IntencionPendiente& y) {
+            return x.accionPendienteEn < y.accionPendienteEn;
+        });
+        return R::exito(r.mid(0, limite));
+    }
+
+    Resultado<QList<SolicitudPersistida>, ErrorPersistencia>
+    listarVerificacionesDebidas(const QList<PerfilId>& perfiles, const QDateTime& ahora, int limite) override
+    {
+        using R = Resultado<QList<SolicitudPersistida>, ErrorPersistencia>;
+        if (auto e = m_a.registrar(QStringLiteral("listarVerificacionesDebidas"))) {
+            return R::fallo(*e);
+        }
+        QList<SolicitudPersistida> r;
+        for (const SolicitudPersistida& s : m_a.solicitudes) {
+            if (!s.eliminadoEn && perfiles.contains(s.perfilSatId) && verificacionDebida(s, ahora)) {
+                r.append(s);
+            }
+        }
+        std::sort(r.begin(), r.end(), [](const SolicitudPersistida& x, const SolicitudPersistida& y) {
+            return *x.siguienteVerificacionEn < *y.siguienteVerificacionEn;
+        });
+        return R::exito(r.mid(0, limite));
+    }
+
+    Resultado<QList<PaqueteDescargable>, ErrorPersistencia> listarDescargasAutomaticas(const QList<PerfilId>& perfiles,
+                                                                                       int limite) override
+    {
+        using R = Resultado<QList<PaqueteDescargable>, ErrorPersistencia>;
+        if (auto e = m_a.registrar(QStringLiteral("listarDescargasAutomaticas"))) {
+            return R::fallo(*e);
+        }
+        QList<PaqueteDescargable> r;
+        for (const PaquetePersistido& p : m_a.paquetes) {
+            const SolicitudPersistida* s = solicitud(p.solicitudMasivaId);
+            if (s && !p.eliminadoEn && p.estadoDescarga == EstadoDescarga::Disponible
+                && s->estadoSolicitudSat == EstadoSolicitudSat::Terminada && perfiles.contains(s->perfilSatId)) {
+                r.append(descargable(p));
+            }
+        }
+        std::sort(r.begin(), r.end(), [](const PaqueteDescargable& x, const PaqueteDescargable& y) {
+            return x.paquete.disponibleEn < y.paquete.disponibleEn;
+        });
+        return R::exito(r.mid(0, limite));
+    }
+
+    Resultado<std::optional<PaqueteDescargable>, ErrorPersistencia> obtenerPaquete(const QString& paqueteId) override
+    {
+        using R = Resultado<std::optional<PaqueteDescargable>, ErrorPersistencia>;
+        if (auto e = m_a.registrar(QStringLiteral("obtenerPaquete"))) {
+            return R::fallo(*e);
+        }
+        const PaquetePersistido* p = paquete(paqueteId);
+        if (!p || !solicitud(p->solicitudMasivaId)) {
+            return R::exito(std::nullopt);
+        }
+        return R::exito(descargable(*p));
+    }
+
+    Resultado<QList<PaqueteDescargable>, ErrorPersistencia> listarPaquetesReintentables(const SolicitudId& id) override
+    {
+        using R = Resultado<QList<PaqueteDescargable>, ErrorPersistencia>;
+        if (auto e = m_a.registrar(QStringLiteral("listarPaquetesReintentables"))) {
+            return R::fallo(*e);
+        }
+        QList<PaqueteDescargable> r;
+        if (solicitud(id)) {
+            for (const PaquetePersistido& p : m_a.paquetes) {
+                if (p.solicitudMasivaId == id && !p.eliminadoEn
+                    && (p.estadoDescarga == EstadoDescarga::Disponible || p.estadoDescarga == EstadoDescarga::Error)) {
+                    r.append(descargable(p));
+                }
+            }
+        }
+        return R::exito(r);
+    }
+
+    Resultado<TrabajoInterrumpido, ErrorPersistencia> listarInterrumpidos() override
+    {
+        using R = Resultado<TrabajoInterrumpido, ErrorPersistencia>;
+        if (auto e = m_a.registrar(QStringLiteral("listarInterrumpidos"))) {
+            return R::fallo(*e);
+        }
+        TrabajoInterrumpido t;
+        for (const SolicitudPersistida& s : m_a.solicitudes) {
+            if (!s.eliminadoEn && s.estadoLocal == EstadoLocal::Enviando) {
+                t.solicitudesEnviando.append(s.id);
+            }
+        }
+        for (const PaquetePersistido& p : m_a.paquetes) {
+            if (!p.eliminadoEn && p.estadoDescarga == EstadoDescarga::Descargando && solicitud(p.solicitudMasivaId)) {
+                t.paquetesDescargando.append(descargable(p));
+            }
+        }
+        return R::exito(t);
+    }
+
+    Resultado<std::optional<RachaVerificacion>, ErrorPersistencia> leerRachaVerificacion(const SolicitudId& id) override
+    {
+        using R = Resultado<std::optional<RachaVerificacion>, ErrorPersistencia>;
+        if (auto e = m_a.registrar(QStringLiteral("leerRachaVerificacion"))) {
+            return R::fallo(*e);
+        }
+        const SolicitudPersistida* s = solicitud(id);
+        if (!s) {
+            return R::exito(std::nullopt);
+        }
+        RachaVerificacion r;
+        r.verificacionesSinCambio = s->verificacionesSinCambio;
+        if (m_a.rachas.contains(id)) {
+            r.ultimaClaveFalla = m_a.rachas.value(id).first;
+            r.fallasIguales = m_a.rachas.value(id).second;
+        }
+        return R::exito(r);
+    }
+
+    Resultado<bool, ErrorPersistencia> marcarEnviando(const SolicitudId& id, const QDateTime& ahora) override
+    {
+        return escribir(QStringLiteral("marcarEnviando"), [&]() {
+            SolicitudPersistida* s = solicitudMutable(id);
+            if (!s || s->estadoLocal != EstadoLocal::Creada) {
+                return false;
+            }
+            s->estadoLocal = EstadoLocal::Enviando;
+            s->envioIniciadoEn = ahora;
+            return true;
+        });
+    }
+
+    Resultado<bool, ErrorPersistencia> aplicarEnvio(const AplicacionEnvio& a) override
+    {
+        return escribir(QStringLiteral("aplicarEnvio"), [&]() {
+            SolicitudPersistida* s = solicitudMutable(a.solicitudId);
+            if (!s || s->estadoLocal != EstadoLocal::Enviando) {
+                return false;
+            }
+            s->estadoLocal = a.destino;
+            s->ultimoError = a.ultimoError;
+            if (a.destino == EstadoLocal::Creada) {
+                s->envioIniciadoEn.reset();
+                s->codEstatusSolicitud.reset();
+                s->mensajeSolicitudSat.reset();
+            } else {
+                s->codEstatusSolicitud = a.codEstatus;
+                s->mensajeSolicitudSat = a.mensaje;
+            }
+            if (a.destino == EstadoLocal::Enviada) {
+                s->idSolicitudSat = a.idSolicitudSat;
+                s->enviadaEn = a.enviadaEn;
+                s->siguienteVerificacionEn = a.siguienteVerificacionEn;
+            }
+            return true;
+        });
+    }
+
+    Resultado<ResultadoAplicacionVerificacion, ErrorPersistencia> aplicarVerificacion(const AplicacionVerificacion& a) override
+    {
+        using R = Resultado<ResultadoAplicacionVerificacion, ErrorPersistencia>;
+        if (auto e = m_a.registrar(QStringLiteral("aplicarVerificacion"))) {
+            return R::fallo(*e);
+        }
+        if (!m_a.snapshot) {
+            return R::fallo(error(ErrorPersistencia::Tipo::Transaccion));
+        }
+        ResultadoAplicacionVerificacion r;
+        SolicitudPersistida* s = solicitudMutable(a.solicitudId);
+        if (!s || s->estadoLocal != EstadoLocal::Enviada) {
+            return R::exito(r);
+        }
+        r.aplicada = true;
+        s->estadoSolicitudSat = a.estadoSolicitudSat;
+        s->codigoEstadoSolicitud = a.codigoEstadoSolicitud;
+        s->mensajeVerificacionSat = a.mensajeVerificacion;
+        s->numeroCfdi = a.numeroCfdi;
+        s->ultimaVerificacionEn = a.verificadaEn;
+        s->siguienteVerificacionEn = a.siguienteVerificacionEn;
+        s->verificacionesSinCambio = a.verificacionesSinCambio;
+        s->ultimoError.reset();
+        m_a.rachas.remove(a.solicitudId);
+        for (const PaqueteNuevo& n : a.paquetesNuevos) {
+            const bool existe = std::any_of(m_a.paquetes.cbegin(), m_a.paquetes.cend(), [&](const PaquetePersistido& p) {
+                return p.solicitudMasivaId == a.solicitudId && p.idPaqueteSat == n.idPaqueteSat;
+            });
+            if (existe) {
+                continue;
+            }
+            PaquetePersistido p;
+            p.id = n.id;
+            p.solicitudMasivaId = a.solicitudId;
+            p.idPaqueteSat = n.idPaqueteSat;
+            p.disponibleEn = n.disponibleEn;
+            p.vencimientoEstimadoEn = n.vencimientoEstimadoEn;
+            m_a.paquetes.append(p);
+            r.paquetesInsertados.append(n.id);
+        }
+        if (a.vencerNoDescargados) {
+            for (PaquetePersistido& p : m_a.paquetes) {
+                if (p.solicitudMasivaId == a.solicitudId && !p.eliminadoEn
+                    && p.estadoDescarga != EstadoDescarga::Descargado && p.estadoDescarga != EstadoDescarga::Vencido) {
+                    p.estadoDescarga = EstadoDescarga::Vencido;
+                    p.vencidoEn = a.verificadaEn;
+                    p.motivoVencimiento = MotivoVencimiento::SolicitudExpirada;
+                    p.origenVencimiento = OrigenVencimiento::Sat;
+                    r.paquetesVencidos.append(p.id);
+                }
+            }
+        }
+        return R::exito(r);
+    }
+
+    Resultado<bool, ErrorPersistencia> aplicarFallaVerificacion(const AplicacionFallaVerificacion& a) override
+    {
+        return escribir(QStringLiteral("aplicarFallaVerificacion"), [&]() {
+            SolicitudPersistida* s = solicitudMutable(a.solicitudId);
+            if (!s || s->estadoLocal != EstadoLocal::Enviada) {
+                return false;
+            }
+            s->ultimoError = a.ultimoError;
+            s->siguienteVerificacionEn = a.siguienteVerificacionEn;
+            m_a.rachas.insert(a.solicitudId, {a.claveFalla, a.fallasIguales});
+            return true;
+        });
+    }
+
+    Resultado<bool, ErrorPersistencia> marcarDescargando(const QString& paqueteId, const QDateTime& ahora,
+                                                         bool permitirError) override
+    {
+        return escribir(QStringLiteral("marcarDescargando"), [&]() {
+            PaquetePersistido* p = paqueteMutable(paqueteId);
+            if (!p || !solicitud(p->solicitudMasivaId)) {
+                return false;
+            }
+            const bool desde = p->estadoDescarga == EstadoDescarga::Disponible
+                               || (permitirError && p->estadoDescarga == EstadoDescarga::Error);
+            if (!desde) {
+                return false;
+            }
+            p->estadoDescarga = EstadoDescarga::Descargando;
+            p->descargaIniciadaEn = ahora;
+            return true;
+        });
+    }
+
+    Resultado<bool, ErrorPersistencia> aplicarDescarga(const AplicacionDescarga& a) override
+    {
+        return escribir(QStringLiteral("aplicarDescarga"), [&]() {
+            PaquetePersistido* p = paqueteMutable(a.paqueteId);
+            if (!p || !solicitud(p->solicitudMasivaId) || p->estadoDescarga != EstadoDescarga::Descargando) {
+                return false;
+            }
+            p->estadoDescarga = a.destino;
+            p->codigoDescargaSat = a.codigoDescargaSat;
+            p->mensajeDescargaSat = a.mensajeDescargaSat;
+            p->ultimoError = a.ultimoError;
+            if (a.destino == EstadoDescarga::Descargado) {
+                p->rutaLocal = a.rutaFinal;
+                p->descargadoEn = a.aplicadaEn;
+            }
+            if (a.destino == EstadoDescarga::Vencido) {
+                p->vencidoEn = a.aplicadaEn;
+                p->motivoVencimiento = a.motivoVencimiento;
+                p->origenVencimiento = a.origenVencimiento;
+            }
+            if (a.destino == EstadoDescarga::Disponible) {
+                p->descargaIniciadaEn.reset();
+            }
+            if (a.reconciliado) {
+                p->reconciliadoEn = a.aplicadaEn;
+            }
+            return true;
+        });
+    }
+
+    Resultado<bool, ErrorPersistencia> vencerPaqueteEstimado(const QString& paqueteId, const QDateTime& ahora) override
+    {
+        return escribir(QStringLiteral("vencerPaqueteEstimado"), [&]() {
+            PaquetePersistido* p = paqueteMutable(paqueteId);
+            if (!p || !solicitud(p->solicitudMasivaId) || !politicas::vencimientoEstimadoAlcanzado(*p, ahora)) {
+                return false;
+            }
+            p->estadoDescarga = EstadoDescarga::Vencido;
+            p->vencidoEn = ahora;
+            p->motivoVencimiento = MotivoVencimiento::VencimientoEstimado;
+            p->origenVencimiento = OrigenVencimiento::EstimacionLocal;
+            return true;
+        });
+    }
+
+    Resultado<bool, ErrorPersistencia> registrarIntencion(const SolicitudId& id, TipoIntencion tipo,
+                                                          const QDateTime& ahora) override
+    {
+        return escribir(QStringLiteral("registrarIntencion"), [&]() {
+            SolicitudPersistida* s = solicitudMutable(id);
+            if (!s) {
+                return false;
+            }
+            (tipo == TipoIntencion::Verificacion ? s->verificacionPendiente : s->descargaPendiente) = true;
+            s->accionPendienteEn = ahora;
+            return true;
+        });
+    }
+
+    Resultado<bool, ErrorPersistencia> consumirIntencion(const SolicitudId& id, TipoIntencion tipo,
+                                                         const QDateTime& capturadaEn) override
+    {
+        return escribir(QStringLiteral("consumirIntencion"), [&]() {
+            SolicitudPersistida* s = solicitudMutable(id);
+            if (!s || s->accionPendienteEn != std::optional<QDateTime>(capturadaEn)) {
+                return false;
+            }
+            (tipo == TipoIntencion::Verificacion ? s->verificacionPendiente : s->descargaPendiente) = false;
+            if (!s->verificacionPendiente && !s->descargaPendiente) {
+                s->accionPendienteEn.reset();
+            }
+            return true;
+        });
+    }
+
+private:
+    static bool verificacionDebida(const SolicitudPersistida& s, const QDateTime& ahora)
+    {
+        const bool verificable = !s.estadoSolicitudSat || *s.estadoSolicitudSat == EstadoSolicitudSat::Aceptada
+                                 || *s.estadoSolicitudSat == EstadoSolicitudSat::EnProceso;
+        return s.estadoLocal == EstadoLocal::Enviada && verificable && s.siguienteVerificacionEn
+               && *s.siguienteVerificacionEn <= ahora;
+    }
+
+    const SolicitudPersistida* solicitud(const SolicitudId& id) const
+    {
+        for (const SolicitudPersistida& s : m_a.solicitudes) {
+            if (s.id == id && !s.eliminadoEn) {
+                return &s;
+            }
+        }
+        return nullptr;
+    }
+    SolicitudPersistida* solicitudMutable(const SolicitudId& id)
+    {
+        return const_cast<SolicitudPersistida*>(solicitud(id));
+    }
+    const PaquetePersistido* paquete(const QString& id) const
+    {
+        for (const PaquetePersistido& p : m_a.paquetes) {
+            if (p.id == id && !p.eliminadoEn) {
+                return &p;
+            }
+        }
+        return nullptr;
+    }
+    PaquetePersistido* paqueteMutable(const QString& id) { return const_cast<PaquetePersistido*>(paquete(id)); }
+
+    PaqueteDescargable descargable(const PaquetePersistido& p) const
+    {
+        const SolicitudPersistida* s = solicitud(p.solicitudMasivaId);
+        return PaqueteDescargable{p, s ? s->perfilSatId : PerfilId(), s ? s->rfcSolicitante : QString(),
+                                  s && s->idSolicitudSat ? *s->idSolicitudSat : QString()};
+    }
+
+    template <typename F>
+    Resultado<bool, ErrorPersistencia> escribir(const QString& op, F aplicar)
+    {
+        using R = Resultado<bool, ErrorPersistencia>;
+        if (auto e = m_a.registrar(op)) {
+            return R::fallo(*e);
+        }
+        if (!m_a.snapshot) {
+            return R::fallo(error(ErrorPersistencia::Tipo::Transaccion));
+        }
+        return R::exito(aplicar());
     }
 
     Almacen& m_a;

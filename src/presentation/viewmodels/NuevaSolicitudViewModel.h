@@ -14,6 +14,8 @@
 
 namespace satcfdi {
 
+class AccionesSolicitud;
+
 class ConsultaPreparacionPerfiles;
 class CredencialesSatService;
 class PerfilesSatService;
@@ -105,6 +107,9 @@ public:
     void setTipoComprobante(const QString& valor);
     void setComplemento(const QString& valor);
 
+    // T007: tras crear la solicitud, pide su envio (D4). No propietario.
+    void setAccionesSolicitud(AccionesSolicitud* acciones) { m_acciones = acciones; }
+
     Q_INVOKABLE void submit();
     Q_INVOKABLE void confirmarDuplicado();
     Q_INVOKABLE void cancelarDuplicado();
@@ -158,6 +163,7 @@ private:
     void aplicarErrorCrear(const ErrorCrear& error, const NuevaSolicitudRequest& request);
 
     QPointer<SolicitudesService> m_solicitudes;
+    AccionesSolicitud* m_acciones = nullptr;
     ConsultaPreparacionPerfiles* m_consulta;
     PerfilesDisponiblesModel* m_perfilesDisponibles;
 

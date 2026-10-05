@@ -104,6 +104,28 @@ private slots:
 
         QVERIFY(textoAccionMonitoreo(false) != textoAccionMonitoreo(true));
     }
+
+    // T007 D2: textos de la linea de estado del worker.
+    void textosEstadoMonitoreo()
+    {
+        using E = satcfdi::OSIntegration::EstadoMonitoreo;
+        auto texto = [](E::Fase f, E::Actividad a = E::Actividad::Ninguna) {
+            E e;
+            e.fase = f;
+            e.actividad = a;
+            return textoEstadoMonitoreo(e);
+        };
+        QCOMPARE(texto(E::Fase::ActivoEnEspera), QStringLiteral("Monitoreo activo"));
+        QCOMPARE(texto(E::Fase::Pausado), QStringLiteral("Monitoreo pausado"));
+        QCOMPARE(texto(E::Fase::Ejecutando, E::Actividad::Enviando), QStringLiteral("Trabajando: enviando..."));
+        QCOMPARE(texto(E::Fase::Ejecutando, E::Actividad::Verificando), QStringLiteral("Trabajando: verificando..."));
+        QCOMPARE(texto(E::Fase::Ejecutando, E::Actividad::Descargando), QStringLiteral("Trabajando: descargando..."));
+        QCOMPARE(texto(E::Fase::Ejecutando, E::Actividad::Otra), QStringLiteral("Trabajando..."));
+        QVERIFY(!texto(E::Fase::Deteniendo).isEmpty());
+        QVERIFY(!texto(E::Fase::Detenido).isEmpty());
+        QCOMPARE(textoPendientes(0), QString());
+        QCOMPARE(textoPendientes(3), QStringLiteral("Pendientes: 3"));
+    }
 };
 
 QTEST_GUILESS_MAIN(TestMacOSMapeos)

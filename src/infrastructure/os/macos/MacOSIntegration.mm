@@ -324,6 +324,9 @@ struct MacOSIntegration::Impl {
     std::unique_ptr<QMenu> menu;
     QSystemTrayIcon* bandeja = nullptr; // hijo del adaptador
     QAction* accionMonitoreo = nullptr;
+    QAction* estadoMonitoreo = nullptr;    // T007: linea no seleccionable
+    QAction* pendientesMonitoreo = nullptr; // "Pendientes: N" (oculta si 0)
+    OSIntegration::EstadoMonitoreo monitoreo;
     QAction* accionInicioAutomatico = nullptr;
     QAction* estadoLoginItem = nullptr;
     QAction* abrirAjustesLoginItem = nullptr;
@@ -418,6 +421,10 @@ void MacOSIntegration::inicializar()
             intencion(&OSIntegration::nuevaSolicitudSolicitada));
     menu->addSeparator();
 
+    d->estadoMonitoreo = menu->addAction(QString());
+    d->estadoMonitoreo->setEnabled(false);
+    d->pendientesMonitoreo = menu->addAction(QString());
+    d->pendientesMonitoreo->setEnabled(false);
     d->accionMonitoreo = menu->addAction(mapeos::textoAccionMonitoreo(d->monitoreoPausado));
     connect(d->accionMonitoreo, &QAction::triggered, this, [this] {
         if (!d->saliendo) {
@@ -517,6 +524,9 @@ void MacOSIntegration::actualizarMenu()
         return;
     }
     d->accionMonitoreo->setText(mapeos::textoAccionMonitoreo(d->monitoreoPausado));
+    d->estadoMonitoreo->setText(mapeos::textoEstadoMonitoreo(d->monitoreo));
+    d->pendientesMonitoreo->setText(mapeos::textoPendientes(d->monitoreo.pendientes));
+    d->pendientesMonitoreo->setVisible(d->monitoreo.pendientes > 0);
     d->accionInicioAutomatico->setChecked(d->preferenciaLoginItem);
     d->accionInicioAutomatico->setEnabled(d->loginItem != LoginItemStatus::Unavailable || d->preferenciaLoginItem);
     d->estadoLoginItem->setText(mapeos::textoEstadoLoginItem(d->loginItem));
@@ -539,6 +549,15 @@ void MacOSIntegration::reflejarPreferenciaLoginItem(bool habilitado)
 void MacOSIntegration::reflejarMonitoreoPausado(bool pausado)
 {
     d->monitoreoPausado = pausado;
+    actualizarMenu();
+}
+
+void MacOSIntegration::reflejarEstadoMonitoreo(const EstadoMonitoreo& estado)
+{
+    if (d->monitoreo == estado) {
+        return;
+    }
+    d->monitoreo = estado;
     actualizarMenu();
 }
 

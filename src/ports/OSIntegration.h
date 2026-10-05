@@ -51,6 +51,19 @@ public:
     enum class NotificationSendResult { Sent, PermissionDenied, PermissionNotDetermined, Unavailable, Failed };
     Q_ENUM(NotificationSendResult)
 
+    // Estado del monitoreo local para el menu bar (T007 D2/D11). Vocabulario
+    // propio del puerto (no depende de application): app_core traduce
+    // InstantaneaWorker a esta forma.
+    struct EstadoMonitoreo {
+        enum class Fase { Pausado, ActivoEnEspera, Ejecutando, Deteniendo, Detenido };
+        enum class Actividad { Ninguna, Enviando, Verificando, Descargando, Otra };
+        Fase fase = Fase::Detenido;
+        Actividad actividad = Actividad::Ninguna; // solo en Ejecutando
+        int pendientes = 0;                       // solicitudes con intencion pendiente
+
+        friend bool operator==(const EstadoMonitoreo&, const EstadoMonitoreo&) = default;
+    };
+
     using QObject::QObject;
     ~OSIntegration() override;
 
@@ -91,6 +104,12 @@ public:
     // intenciones ni llama al SO para cambiar el Login Item.
     virtual void reflejarPreferenciaLoginItem(bool habilitado) = 0;
     virtual void reflejarMonitoreoPausado(bool pausado) = 0;
+
+    // T007 (D2, D11): refleja el estado del worker en una linea NO
+    // seleccionable del menu bar ("Monitoreo activo", "Monitoreo pausado",
+    // "Trabajando: enviando/verificando/descargando...") y "Pendientes: N"
+    // cuando N > 0. Sin errores detallados. No emite intenciones.
+    virtual void reflejarEstadoMonitoreo(const EstadoMonitoreo& estado) = 0;
 
     // Retira el menu bar y deja de emitir intenciones antes de terminar el
     // proceso. Idempotente. Despues solo se permite destruir el adaptador.

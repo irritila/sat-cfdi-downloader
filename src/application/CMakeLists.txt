@@ -1,6 +1,8 @@
 # satcfdi_application: contratos funcionales consumidos por presentacion,
 # DTOs, servicios (demo y persistidos), PersistenceDispatcher y
-# RegexLogSanitizer. Sin SQL, red, archivos ni timers. Unico hilo permitido:
+# RegexLogSanitizer y, desde T007, OperacionExecutor/WorkerLocal (hilo propio
+# del ejecutor). Sin SQL, red, archivos ni timers (el Programador de
+# produccion vive en app_core/ProgramadorQt). Unico hilo permitido:
 # el QThread de PersistenceDispatcher (DA4). Los servicios Demo* y *Persistido
 # solo se instancian en el composition root (o en pruebas).
 qt_add_library(satcfdi_application STATIC
@@ -10,6 +12,17 @@ qt_add_library(satcfdi_application STATIC
     configuration/ConfiguracionAppServicePersistido.cpp
     logging/RegexLogSanitizer.h
     logging/RegexLogSanitizer.cpp
+    operaciones/OperacionesSat.h
+    operaciones/OperacionesSatNulo.h
+    operaciones/SenalCancelacion.h
+    operaciones/SenalCancelacion.cpp
+    operaciones/Programador.h
+    operaciones/TiposOperacion.h
+    operaciones/TiposOperacion.cpp
+    operaciones/OperacionExecutor.h
+    operaciones/OperacionExecutor.cpp
+    operaciones/WorkerLocal.h
+    operaciones/WorkerLocal.cpp
     persistence/PersistenceDispatcher.h
     persistence/PersistenceDispatcher.cpp
     persistence/PuertosPersistencia.h

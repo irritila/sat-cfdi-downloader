@@ -21,11 +21,14 @@ qt_add_executable(satcfdi_infrastructure_tests
     TestSqliteCredenciales.cpp
     TestSqlitePerfiles.h
     TestSqlitePerfiles.cpp
+    TestSqliteOperaciones.h
+    TestSqliteOperaciones.cpp
 )
 
 target_compile_definitions(satcfdi_infrastructure_tests PRIVATE
     SATCFDI_MIGRACION_001_FUENTE="${CMAKE_CURRENT_SOURCE_DIR}/../../src/infrastructure/persistence/migrations/001_initial_schema.sql"
     SATCFDI_MIGRACION_002_FUENTE="${CMAKE_CURRENT_SOURCE_DIR}/../../src/infrastructure/persistence/migrations/002_credencial_metadata.sql"
+    SATCFDI_MIGRACION_003_FUENTE="${CMAKE_CURRENT_SOURCE_DIR}/../../src/infrastructure/persistence/migrations/003_worker_ejecutor.sql"
 )
 
 # Permite #include "fakes/FakeSecretStore.h" (T005).

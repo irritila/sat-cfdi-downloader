@@ -209,9 +209,14 @@ void AppLifecycleController::solicitarSalida()
     }
     m_saliendo = true;
     emit salidaIniciada();
-    if (m_extension) {
-        m_extension->detener();
-    }
+    // D1: primero el worker/ejecutor (hasta su plazo), luego el ultimo cierre
+    // (dispatcher) y al final el menu bar. Nada bloquea el hilo grafico.
+    QFuture<void> trabajo = m_extension ? m_extension->detener() : QtFuture::makeReadyVoidFuture();
+    trabajo.then(this, [this] { registrarCierreYTerminar(); });
+}
+
+void AppLifecycleController::registrarCierreYTerminar()
+{
     m_configuracion.registrarUltimoCierre().then(
         this, [this](const ConfiguracionAppService::ResultadoConfiguracion& r) {
             if (!r) {

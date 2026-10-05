@@ -18,6 +18,7 @@ class PaqueteSolicitudRepository;
 class LogSolicitudRepository;
 class ConfiguracionAppRepository;
 class CredencialSatRepository;
+class OperacionesSolicitudRepository;
 class UnitOfWork;
 
 // API PUBLICA de persistencia SQLite para bootstrap y composition root
@@ -37,12 +38,13 @@ Resultado<InformeInicializacionSqlite, ErrorPersistencia>
 inicializarBaseSqlite(const QString& rutaBase, const QList<MigracionSql>& migraciones,
                       OpcionesConexionSqlite opciones = {});
 
-// Igual, con las migraciones embebidas (`:/migrations/001_initial_schema.sql`
-// y `:/migrations/002_credencial_metadata.sql`).
+// Igual, con las migraciones embebidas (`:/migrations/001_initial_schema.sql`,
+// `:/migrations/002_credencial_metadata.sql` y
+// `:/migrations/003_worker_ejecutor.sql`).
 Resultado<InformeInicializacionSqlite, ErrorPersistencia>
 inicializarBaseSqlite(const QString& rutaBase);
 
-// Migraciones embebidas como recurso Qt, en orden (001 y 002).
+// Migraciones embebidas como recurso Qt, en orden (001, 002 y 003).
 Resultado<QList<MigracionSql>, ErrorPersistencia> migracionesSqliteEmbebidas();
 
 // Grafo de persistencia SQLite de trabajo: proveedor de conexiones por hilo +
@@ -70,6 +72,12 @@ public:
     LogSolicitudRepository& logs() noexcept;
     ConfiguracionAppRepository& configuracion() noexcept;
     CredencialSatRepository& credenciales() noexcept; // T005
+    // T007: operaciones del OperacionExecutor. Mismo proveedor (conexion por
+    // hilo): usado desde el hilo del ejecutor obtiene SU propia conexion,
+    // distinta de la del PersistenceDispatcher. Sus escrituras usan
+    // unidadDeTrabajo() en ese mismo hilo. Antes de terminar el hilo del
+    // ejecutor, llamar cerrarConexionDelHiloActual() desde ese hilo.
+    OperacionesSolicitudRepository& operaciones() noexcept;
     UnitOfWork& unidadDeTrabajo() noexcept;
 
     // Cierra y retira la conexion del hilo actual (revierte una transaccion

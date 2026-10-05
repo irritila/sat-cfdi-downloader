@@ -297,6 +297,29 @@ dialogo, no debe aceptarse a ciegas: la prueba no deberia pedir nada. Nota:
 los items del data protection keychain. La ausencia de residuos la comprueba la
 propia prueba (lista vacia tras borrar).
 
+## Monitoreo local: worker y ejecutor serial (T007)
+
+- `AppCompositionRoot` crea `OperacionExecutor` (hilo y conexion SQLite
+  propios, distintos de `PersistenceDispatcher`), `WorkerLocal` y el puerto
+  `OperacionesSat`. Hasta T009 el puerto es `OperacionesSatNulo`: toda operacion
+  falla en `Preparacion` ("Integracion SAT no disponible en esta version") y la
+  solicitud vuelve a `Creada` con su error visible; nunca hay exito simulado.
+- Al arrancar, el worker encola la recuperacion y arranca pausado o activo segun
+  la configuracion persistida. El menu bar muestra una linea no seleccionable:
+  `Monitoreo activo`, `Monitoreo pausado` o `Trabajando: enviando/verificando/
+  descargando...`, y `Pendientes: N` si hay intenciones guardadas por la pausa.
+- Crear una solicitud encola su envio (tambien con el monitoreo pausado). El
+  detalle ofrece `Verificar ahora` (solicitud enviada sin estado SAT final) y
+  `Reintentar descarga` (paquetes disponibles o con error); con pausa quedan
+  pendientes.
+- Salir (menu bar o Cmd-Q): el worker deja de programar, el ejecutor rechaza
+  operaciones nuevas y espera la actual hasta 10 s; despues pide la cancelacion
+  cooperativa. Luego se registra el ultimo cierre y se retira el menu bar.
+- Prueba manual (tarea T007): abrir la app con `--data-dir` temporal, crear una
+  solicitud (falla `Preparacion` con el adaptador nulo y queda `Creada`),
+  pausar y reanudar desde el menu bar observando la linea de estado, y
+  comprobar que la ventana sigue respondiendo.
+
 ## Spike SAT (T006): CLI manual `satcfdi_sat_spike`
 
 La biblioteca `satcfdi_sat` (sobres SOAP/WS-Security, C14N con libxml2 del

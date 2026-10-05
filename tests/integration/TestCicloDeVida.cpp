@@ -40,7 +40,11 @@ struct ExtensionEspia final : ExtensionCicloDeVida {
     {
         eventos.append(pausado ? QStringLiteral("pausado(true)") : QStringLiteral("pausado(false)"));
     }
-    void detener() override { eventos.append(QStringLiteral("detener")); }
+    QFuture<void> detener() override
+    {
+        eventos.append(QStringLiteral("detener"));
+        return QtFuture::makeReadyVoidFuture();
+    }
 };
 
 // Grafo minimo del controlador: fakes de SO y configuracion, QWindow simple

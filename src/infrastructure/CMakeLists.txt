@@ -20,6 +20,10 @@ qt_add_library(satcfdi_infrastructure STATIC
     persistence/sqlite/SqliteLogSolicitudRepository.cpp
     persistence/sqlite/SqliteConfiguracionAppRepository.cpp
     persistence/sqlite/SqliteCredencialSatRepository.cpp
+    persistence/sqlite/SqliteFilas.h
+    persistence/sqlite/SqliteFilas.cpp
+    persistence/sqlite/SqliteOperacionesConsultas.h
+    persistence/sqlite/SqliteOperacionesSolicitudRepository.cpp
     persistence/sqlite/SqlitePersistencia.h
     persistence/sqlite/SqlitePersistencia.cpp
 )
@@ -31,6 +35,7 @@ qt_add_resources(satcfdi_infrastructure "satcfdi_migrations"
     FILES
         persistence/migrations/001_initial_schema.sql
         persistence/migrations/002_credencial_metadata.sql
+        persistence/migrations/003_worker_ejecutor.sql
 )
 
 target_include_directories(satcfdi_infrastructure PUBLIC

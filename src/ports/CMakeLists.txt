@@ -16,6 +16,7 @@ qt_add_library(satcfdi_ports STATIC
     persistence/Exito.h
     repositories/PerfilSatRepository.h
     repositories/CredencialSatRepository.h
+    repositories/OperacionesSolicitudRepository.h
     repositories/SolicitudMasivaRepository.h
     repositories/PaqueteSolicitudRepository.h
     repositories/LogSolicitudRepository.h

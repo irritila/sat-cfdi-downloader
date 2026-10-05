@@ -80,6 +80,7 @@ struct SqlitePersistencia::Impl {
         , logs(proveedor)
         , configuracion(proveedor)
         , credenciales(proveedor)
+        , operaciones(proveedor)
         , unidadDeTrabajo(proveedor)
     {
     }
@@ -93,6 +94,7 @@ struct SqlitePersistencia::Impl {
     SqliteLogSolicitudRepository logs;
     SqliteConfiguracionAppRepository configuracion;
     SqliteCredencialSatRepository credenciales;
+    SqliteOperacionesSolicitudRepository operaciones;
     SqliteUnitOfWork unidadDeTrabajo;
 };
 
@@ -109,6 +111,7 @@ PaqueteSolicitudRepository& SqlitePersistencia::paquetes() noexcept { return m_i
 LogSolicitudRepository& SqlitePersistencia::logs() noexcept { return m_impl->logs; }
 ConfiguracionAppRepository& SqlitePersistencia::configuracion() noexcept { return m_impl->configuracion; }
 CredencialSatRepository& SqlitePersistencia::credenciales() noexcept { return m_impl->credenciales; }
+OperacionesSolicitudRepository& SqlitePersistencia::operaciones() noexcept { return m_impl->operaciones; }
 UnitOfWork& SqlitePersistencia::unidadDeTrabajo() noexcept { return m_impl->unidadDeTrabajo; }
 
 void SqlitePersistencia::cerrarConexionDelHiloActual()
