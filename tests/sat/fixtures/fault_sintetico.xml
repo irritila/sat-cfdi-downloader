@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- sintetico (T006, D7): SOAP 1.1 Fault NO observado en SAT; forma estandar de WCF. -->
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><s:Fault><faultcode xmlns:a="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">a:InvalidSecurity</faultcode><faultstring xml:lang="en-US">An error occurred when verifying security for the message.</faultstring><detail><ExceptionDetail><Message>Detalle sintetico</Message></ExceptionDetail></detail></s:Fault></s:Body></s:Envelope>

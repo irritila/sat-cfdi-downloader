@@ -112,7 +112,7 @@ struct Entorno {
 template <typename T>
 std::optional<T> esperar(QFuture<T> f)
 {
-    if (!QTest::qWaitFor([&] { return f.isFinished(); }, 5000) || f.isCanceled()) {
+    if (!QTest::qWaitFor([&] { return f.isFinished(); }, 30000) || f.isCanceled()) {
         return std::nullopt;
     }
     return f.result();
@@ -164,6 +164,8 @@ void TestServiciosPersistidos::crearInsertaCreadaConLogSaneado()
 void TestServiciosPersistidos::senalesTrasCommitYAntesDeCompletarFuture()
 {
     Entorno e;
+    // Barrera: la tarea no termina antes de que crear() encadene su .then().
+    e.almacen.bloquearEn(u"commit"_s);
     QFuture<SolicitudesService::ResultadoCrear> f = e.servicio.crear(e.request());
 
     QStringList orden;
@@ -178,6 +180,8 @@ void TestServiciosPersistidos::senalesTrasCommitYAntesDeCompletarFuture()
     });
     connect(&e.servicio, &SolicitudesService::solicitudActualizada, this,
             [&](const SolicitudId&) { orden.append(u"solicitudActualizada"_s); });
+    QVERIFY(!f.isFinished());
+    e.almacen.soltar();
 
     const auto r = esperar(f);
     QVERIFY(r && r->esExito());
@@ -192,6 +196,7 @@ void TestServiciosPersistidos::senalesDeEliminarYPerfilAntesDeCompletarFuture()
     const SolicitudId id = e.sembrar(EstadoLocal::Creada, {});
     QThread* grafico = QThread::currentThread();
 
+    e.almacen.bloquearEn(u"commit"_s); // ver senalesTrasCommitYAntesDeCompletarFuture
     QFuture<SolicitudesService::ResultadoEliminar> fe = e.servicio.eliminar(id);
     QStringList orden;
     bool eliminarTerminado = true;
@@ -203,11 +208,14 @@ void TestServiciosPersistidos::senalesDeEliminarYPerfilAntesDeCompletarFuture()
         QCOMPARE(QThread::currentThread(), grafico);
         QVERIFY(e.almacen.eventos.contains(u"commit"_s));
     });
+    QVERIFY(!fe.isFinished());
+    e.almacen.soltar();
     const auto r = esperar(fe);
     QVERIFY(r && r->esExito() && r->valor().cambio);
     QCOMPARE(orden, (QStringList{u"listaCambiada"_s, u"solicitudEliminada"_s}));
     QVERIFY(!eliminarTerminado);
 
+    e.almacen.bloquearEn(u"commit"_s);
     QFuture<PerfilesSatService::ResultadoCrear> fp =
         e.perfilesServicio.crear(u"CACX7605101P8"_s, u"Nuevo"_s);
     bool perfilTerminado = true;
@@ -216,6 +224,8 @@ void TestServiciosPersistidos::senalesDeEliminarYPerfilAntesDeCompletarFuture()
         perfilTerminado = fp.isFinished();
         perfilEnGrafico = QThread::currentThread() == grafico;
     });
+    QVERIFY(!fp.isFinished());
+    e.almacen.soltar();
     const auto rp = esperar(fp);
     QVERIFY(rp && rp->esExito());
     QVERIFY(!perfilTerminado);

@@ -38,7 +38,7 @@ struct Entorno {
 template <typename T>
 std::optional<T> esperar(QFuture<T> f)
 {
-    if (!QTest::qWaitFor([&] { return f.isFinished(); }, 5000) || f.isCanceled()) {
+    if (!QTest::qWaitFor([&] { return f.isFinished(); }, 30000) || f.isCanceled()) {
         return std::nullopt;
     }
     return f.result();

@@ -2,7 +2,7 @@
 
 ## Estado
 
-Pendiente (refinada 2026-10-04; lista para implementar).
+Completada
 
 ## Prioridad y tamano
 
@@ -102,28 +102,28 @@ El SAT requiere WS-Security, firma XML, token de autenticacion y operaciones SOA
 
 ### Automaticos (sin red ni e.firma real)
 
-- [ ] Dado un vector XML conocido, cuando se canonicaliza en modo exclusivo y en modo inclusivo, entonces los bytes y el digest SHA-1 coinciden exactamente con los esperados.
-- [ ] Dada una llave RSA temporal generada en la prueba, cuando se firman el `Timestamp` y cada nodo de peticion, entonces OpenSSL verifica la firma, la referencia apunta al nodo esperado y el serial X509 va en decimal.
-- [ ] Dado cada sobre construido (autenticacion, emitidos, recibidos, verificacion, descarga), cuando se sanea, entonces coincide con su golden sanitizado, no contiene atributos vacios y no contiene firma, certificado ni token recuperables.
-- [ ] Dados los fixtures de respuesta exitosa de cada operacion, de verificacion con `IdsPaquetes` y de SOAP Fault (`sintetico` si no hubo uno real), cuando se parsean, entonces producen un resultado o error tipado sin confundir `CodEstatus`, `EstadoSolicitud` y `CodigoEstadoSolicitud`.
-- [ ] Dado un servidor HTTP local, cuando la conexion falla o vence el deadline antes de `requestSent`, entonces se clasifica como `AntesDeEnvio`; cuando se corta o vence el deadline despues de `requestSent`, entonces se clasifica como `DespuesDeEnvio`. Dado un HTTP completo con resultado o Fault, entonces se clasifica como `RespuestaExplicita`.
-- [ ] Dada evidencia con `AutenticaResult`, `BinarySecurityToken`, `SignatureValue`, `X509Certificate`, `Paquete`, header `WRAP`, RFC o Ids, cuando se enmascara, entonces no queda ningun valor recuperable y enmascarar dos veces da el mismo resultado.
-- [ ] Dada una contrasena incorrecta, un `.cer`/`.key` que no forman pareja o un certificado que no es e.firma, cuando la CLI carga el material, entonces termina con el error de `validarEFirma()` correspondiente, sin red y sin escribir material en disco.
-- [ ] Con `SATCFDI_BUILD_SAT_SPIKE=OFF` (por defecto), la app y la suite compilan sin la CLI, y `satcfdi_app` no enlaza la biblioteca SAT.
+- [x] Dado un vector XML conocido, cuando se canonicaliza en modo exclusivo y en modo inclusivo, entonces los bytes y el digest SHA-1 coinciden exactamente con los esperados.
+- [x] Dada una llave RSA temporal generada en la prueba, cuando se firman el `Timestamp` y cada nodo de peticion, entonces OpenSSL verifica la firma, la referencia apunta al nodo esperado y el serial X509 va en decimal.
+- [x] Dado cada sobre construido (autenticacion, emitidos, recibidos, verificacion, descarga), cuando se sanea, entonces coincide con su golden sanitizado, no contiene atributos vacios y no contiene firma, certificado ni token recuperables.
+- [x] Dados los fixtures de respuesta exitosa de cada operacion, de verificacion con `IdsPaquetes` y de SOAP Fault (`sintetico` si no hubo uno real), cuando se parsean, entonces producen un resultado o error tipado sin confundir `CodEstatus`, `EstadoSolicitud` y `CodigoEstadoSolicitud`.
+- [x] Dado un servidor HTTP local, cuando la conexion falla o vence el deadline antes de `requestSent`, entonces se clasifica como `AntesDeEnvio`; cuando se corta o vence el deadline despues de `requestSent`, entonces se clasifica como `DespuesDeEnvio`. Dado un HTTP completo con resultado o Fault, entonces se clasifica como `RespuestaExplicita`.
+- [x] Dada evidencia con `AutenticaResult`, `BinarySecurityToken`, `SignatureValue`, `X509Certificate`, `Paquete`, header `WRAP`, RFC o Ids, cuando se enmascara, entonces no queda ningun valor recuperable y enmascarar dos veces da el mismo resultado.
+- [x] Dada una contrasena incorrecta, un `.cer`/`.key` que no forman pareja o un certificado que no es e.firma, cuando la CLI carga el material, entonces termina con el error de `validarEFirma()` correspondiente, sin red y sin escribir material en disco.
+- [x] Con `SATCFDI_BUILD_SAT_SPIKE=OFF` (por defecto), la app y la suite compilan sin la CLI, y `satcfdi_app` no enlaza la biblioteca SAT.
 
 ### Corrida real y evidencia
 
-- [ ] `docs/design/sat-spike-results.md` registra la URL, fecha y hash de cada WSDL inspeccionado y confirma la operacion, SOAPAction y namespace de autenticacion, emitidos, recibidos, verificacion y descarga, aunque solo una de emitidos o recibidos se ejecute.
-- [ ] Dada la e.firma vigente del usuario, cuando ejecuta `Autentica`, entonces se obtiene un token (registrado solo por su formato y TTL) o queda documentado el rechazo exacto (HTTP, Fault, codigo).
-- [ ] Dado un dia que cumple la precondicion, cuando el usuario confirma una solicitud, entonces la evidencia registra la fase, `CodEstatus`, `Mensaje` y un `IdSolicitud` enmascarado, o el codigo y contexto del rechazo.
-- [ ] Cuando se verifica la solicitud, entonces la evidencia registra la secuencia de `EstadoSolicitud`, `CodigoEstadoSolicitud`, `CodEstatus` y `NumeroCFDIs` observada, con sus timestamps.
-- [ ] Si hay un paquete, `Descargar` registra `CodEstatus`, `Mensaje` y el tamano en bytes de `Paquete`, sin su contenido. Si no hay paquete, la descarga queda como `No probada` con su motivo, no como `Viable`.
-- [ ] La evidencia registra el numero total de solicitudes reales (3 como maximo) y declara que ningun timeout `DespuesDeEnvio` se reenvio.
-- [ ] Cada operacion queda clasificada como `Viable`, `Requiere ajuste`, `Bloqueada` o `No probada`, y se senala cual fue real y cual solo `dry-run` o fixture.
-- [ ] Los puntos de firma de la seccion anterior quedan resueltos o marcados como pendientes con su evidencia. Las discrepancias con `docs/web-service.md` quedan corregidas en ese documento.
-- [ ] El resultado incluye una recomendacion concreta de contrato para `SatGateway` que confirma o ajusta D8.
-- [ ] Un escaneo antes del commit (`git grep` de patrones de secretos, del RFC y los Ids reales, de base64 de 200 caracteres o mas, y de archivos `.cer`, `.key` o `.zip`) sobre el arbol y el staging da resultado vacio.
-- [ ] Si una operacion critica queda `Bloqueada` o `No probada`, `docs/tasks/T009-flujo-sat-integrado.md` lo refleja como precondicion pendiente de esa parte del flujo.
+- [x] `docs/design/sat-spike-results.md` registra la URL, fecha y hash de cada WSDL inspeccionado y confirma la operacion, SOAPAction y namespace de autenticacion, emitidos, recibidos, verificacion y descarga, aunque solo una de emitidos o recibidos se ejecute.
+- [x] Dada la e.firma vigente del usuario, cuando ejecuta `Autentica`, entonces se obtiene un token (registrado solo por su formato y TTL) o queda documentado el rechazo exacto (HTTP, Fault, codigo).
+- [x] Dado un dia que cumple la precondicion, cuando el usuario confirma una solicitud, entonces la evidencia registra la fase, `CodEstatus`, `Mensaje` y un `IdSolicitud` enmascarado, o el codigo y contexto del rechazo.
+- [x] Cuando se verifica la solicitud, entonces la evidencia registra la secuencia de `EstadoSolicitud`, `CodigoEstadoSolicitud`, `CodEstatus` y `NumeroCFDIs` observada, con sus timestamps.
+- [x] Si hay un paquete, `Descargar` registra `CodEstatus`, `Mensaje` y el tamano en bytes de `Paquete`, sin su contenido. Si no hay paquete, la descarga queda como `No probada` con su motivo, no como `Viable`.
+- [x] La evidencia registra el numero total de solicitudes reales (3 como maximo) y declara que ningun timeout `DespuesDeEnvio` se reenvio.
+- [x] Cada operacion queda clasificada como `Viable`, `Requiere ajuste`, `Bloqueada` o `No probada`, y se senala cual fue real y cual solo `dry-run` o fixture.
+- [x] Los puntos de firma de la seccion anterior quedan resueltos o marcados como pendientes con su evidencia. Las discrepancias con `docs/web-service.md` quedan corregidas en ese documento.
+- [x] El resultado incluye una recomendacion concreta de contrato para `SatGateway` que confirma o ajusta D8.
+- [x] Un escaneo antes del commit (`git grep` de patrones de secretos, del RFC y los Ids reales, de base64 de 200 caracteres o mas, y de archivos `.cer`, `.key` o `.zip`) sobre el arbol y el staging da resultado vacio.
+- [x] Si una operacion critica queda `Bloqueada` o `No probada`, `docs/tasks/T009-flujo-sat-integrado.md` lo refleja como precondicion pendiente de esa parte del flujo.
 
 ## Verificacion
 
@@ -142,7 +142,13 @@ El SAT requiere WS-Security, firma XML, token de autenticacion y operaciones SOA
 
 ## Resultado
 
-Pendiente.
+Completada el 2026-10-05. Evidencia en `docs/design/sat-spike-results.md`.
+
+- Biblioteca `satcfdi_sat` (C14N con libxml2, firma con OpenSSL, sobres, parser, cliente HTTP con fases, enmascarado) con pruebas sin red; CLI `tools/sat_spike/` tras `SATCFDI_BUILD_SAT_SPIKE`.
+- Corrida real del usuario contra produccion: `Autentica`, `SolicitaDescargaEmitidos`, `VerificaSolicitudDescarga` y `Descargar` `Viable` (1 solicitud de 3, sin timeouts ni reenvios). `SolicitaDescargaRecibidos` `No probada`.
+- Firma confirmada: exclusiva en autenticacion, inclusiva en las demas, `X509IssuerSerial`, RSA-SHA1, sin WS-Addressing; token `WRAP` con TTL de 300 s.
+- WSDL de descarga no publicado en produccion; forma confirmada por la corrida. Discrepancias corregidas en `docs/web-service.md`.
+- Recomendacion de contrato para `SatGateway` (confirma D8 con ajustes) y precondiciones para T009.
 
 ## Riesgos y notas
 

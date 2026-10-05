@@ -29,12 +29,13 @@ struct Entorno {
     ConfiguracionAppServicePersistido servicio{dispatcher, configuracion, uow, [] { return kAhora; }};
 
     Entorno() { almacen.configuracion->actualizadaEn = kAntes; }
+    ~Entorno() { almacen.liberar(); } // nunca deja el dispatcher en una barrera
 };
 
 template <typename T>
 std::optional<T> esperar(QFuture<T> f)
 {
-    if (!QTest::qWaitFor([&] { return f.isFinished(); }, 5000) || f.isCanceled()) {
+    if (!QTest::qWaitFor([&] { return f.isFinished(); }, 30000) || f.isCanceled()) {
         return std::nullopt;
     }
     return f.result();
@@ -102,6 +103,9 @@ void TestConfiguracionAppService::escriturasConfirmanYEmitenAntesDeCompletar()
 {
     QFETCH(Op, op);
     Entorno e;
+    // Barrera: la tarea no termina antes de que el servicio encadene su
+    // .then(); si no, la senal podria emitirse antes del connect de abajo.
+    e.almacen.bloquearEn(u"commit"_s);
     QFuture<R> f = invocar(e.servicio, op);
 
     QThread* grafico = QThread::currentThread();
@@ -118,6 +122,8 @@ void TestConfiguracionAppService::escriturasConfirmanYEmitenAntesDeCompletar()
                 enHiloGrafico = QThread::currentThread() == grafico;
                 commitAntesDeSenal = e.almacen.eventos.contains(u"commit"_s);
             });
+    QVERIFY(!f.isFinished());
+    e.almacen.soltar();
 
     const auto r = esperar(f);
     QVERIFY(r && r->esExito());

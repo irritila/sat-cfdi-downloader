@@ -99,6 +99,7 @@ Las filas de Fault, HTTP no 200 y token rechazado se confirman o ajustan con `sa
 - Para cada operacion del MVP (autenticacion, creacion de emitidos y de recibidos, verificacion y descarga), `docs/design/sat-spike-results.md` la clasifica `Viable`, o `Requiere ajuste` con el ajuste identificado, implementado y probado. Una operacion `Bloqueada` o `No probada` bloquea solo su parte de T009, y la tarea debe declarar explicitamente que parte queda fuera.
 - T006 aporta fixtures sanitizados de cada respuesta observada, el TTL del token y la forma real de Fault y de token rechazado. Lo que T006 no observe queda como fixture `sintetico` y se marca en las pruebas.
 - Existe al menos un `PerfilSat` con e.firma `Lista`.
+- Resultado de T006 (2026-10-05): autenticacion, emitidos, verificacion y descarga `Viable`. `SolicitaDescargaRecibidos` quedo `No probada` (forma confirmada por WSDL, misma firma que emitidos): la creacion de recibidos queda pendiente de una corrida real antes de habilitarse en T009. SOAP Fault real y token rechazado no observados: sus pruebas usan fixtures `sintetico`.
 
 ## Reglas de integracion
 

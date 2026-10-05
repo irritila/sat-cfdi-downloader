@@ -137,7 +137,7 @@ http://DescargaMasivaTerceros.gob.mx/IAutenticacion/Autentica
               <Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" />
             </Transforms>
             <DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1" />
-            <DigestValue>Ij+Epaya2U5D/sSncl6BHkkTRWo=</DigestValue>
+            <DigestValue>Ij+Epaya2U5D/sSncI6BHkkTRWo=</DigestValue>
           </Reference>
         </SignedInfo>
         <SignatureValue><!-- Valor de firma --></SignatureValue>
@@ -166,6 +166,11 @@ http://DescargaMasivaTerceros.gob.mx/IAutenticacion/Autentica
 ```
 
 > **Importante:** Si existe algún error durante la autenticación y no se obtiene el token, no se podrán utilizar los demás servicios. Al consumir los servicios se validará el token; si no es válido se mandará una excepción de autenticación.
+
+> **Spike T006 (2026-10-05):** el SAT acepto `Autentica` sin los headers `To`/`Action` del ejemplo .NET, con C14N exclusiva,
+> `SecurityTokenReference` y RSA-SHA1. El token observado vive 300 s (`Created`/`Expires`) y se envia en las demas operaciones
+> como `Authorization: WRAP access_token="<token>"`. Las demas operaciones se firmaron con C14N inclusiva,
+> `Reference URI=""` + `enveloped-signature` y `X509IssuerSerial`. Ver `docs/design/sat-spike-results.md`.
 
 > **Nota:** El servicio de autenticación descrito en esta sección es el mismo a utilizar para los servicios de Solicitud de Descarga Masiva, Verificación Descarga Masiva y Descarga Masiva.
 
@@ -492,6 +497,11 @@ WSDL:
 https://cfdidescargamasiva.clouda.sat.gob.mx/DescargaMasivaService.svc?singleWsdl
 ```
 
+> **Spike T006 (2026-10-04):** este WSDL no se publica en el host productivo (HTTP 400 con `?singleWsdl`, `?wsdl` o sin
+> query). La forma de la peticion (`PeticionDescargaMasivaTercerosEntrada/peticionDescarga` con `IdPaquete` y
+> `RfcSolicitante`) y de la respuesta (`Paquete`) se tomo de phpcfdi y quedo confirmada contra produccion. Ver
+> `docs/design/sat-spike-results.md`.
+
 SOAPAction:
 
 ```text
@@ -534,7 +544,7 @@ La aplicacion debe guardar el paquete como archivo ZIP en la carpeta local defin
 | 303 | Sello no corresponde con RfcSolicitante | |
 | 304 | Certificado Revocado o Caduco | El certificado fue revocado o expiró. |
 | 305 | Certificado Inválido | Puede deberse al tipo, codificación u otra condición. |
-| 5000 | Solicitud de descarga recibida con éxito | Descarga aceptada por SAT. |
+| 5000 | Solicitud de descarga recibida con éxito | Descarga aceptada por SAT. En produccion (T006) el `Mensaje` observado fue `Solicitud Aceptada`. |
 | 5004 | No se encontró la información | No se encontró la información del paquete solicitado. |
 | 5007 | No existe el paquete solicitado | Los paquetes solo tienen periodo de vida limitado. |
 | 5008 | Máximo de descargas permitidas | El paquete ya alcanzó el máximo de descargas. |
@@ -559,3 +569,4 @@ La aplicacion debe guardar el paquete como archivo ZIP en la carpeta local defin
 | 1 | Introducción: se precisa que la documentación contiene recomendaciones que pueden aplicarse siempre y cuando se utilice un equipo propio que no comprometa la información. | 14/08/2018 |
 | 2 | Autenticación para Servicios. Servicio de autenticación: Se precisa que la e.firma no debe almacenarse en el repositorio de llaves criptográficas si no se está utilizando un equipo propio, a fin de no comprometer la información. | 14/08/2018 |
 | 3 | Se incorpora la descripción referente a los códigos de evento 5003 y 5011 del Servicio de Verificación de Descarga Masiva. | 29/11/2023 |
+| 4 | Spike T006: WSDL de descarga no publicado, forma de `Descargar` confirmada, autenticacion sin WS-Addressing, TTL del token, `DigestValue` del ejemplo §4.2 corregido. | 05/10/2026 |

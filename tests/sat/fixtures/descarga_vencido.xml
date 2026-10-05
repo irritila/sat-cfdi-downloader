@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fixture sintetico (T006): paquete inexistente (5007), sin Paquete. -->
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Header><h:respuesta CodEstatus="5007" Mensaje="No existe el paquete solicitado" xmlns:h="http://DescargaMasivaTerceros.sat.gob.mx"/></s:Header><s:Body><RespuestaDescargaMasivaTercerosSalida xmlns="http://DescargaMasivaTerceros.sat.gob.mx"/></s:Body></s:Envelope>

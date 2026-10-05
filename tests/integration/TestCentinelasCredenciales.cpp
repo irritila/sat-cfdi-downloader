@@ -141,9 +141,27 @@ void TestCentinelasCredenciales::initTestCase()
         m_centinelas.append({c.nombre + QStringLiteral(".hex"), c.bytes.toHex()});
         m_centinelas.append({c.nombre + QStringLiteral(".HEX"), c.bytes.toHex().toUpper()});
     }
+    // Ventanas de 32 bytes del DER, salvo las que comparte con cualquier otro
+    // certificado sintetico del mismo script (cabecera X.509, algoritmo,
+    // issuer, subject, vigencia): esas no identifican a ESTE certificado y darian falsos
+    // positivos con fixtures de otras suites que corren en paralelo.
+    // Un segundo juego independiente aporta el efirma.cer "gemelo" (mismo
+    // subject, serie y vigencia; otra llave y firma): solo quedan las ventanas
+    // de la llave publica y la firma, unicas de esta ejecucion.
+    const fixtures::FixturesEFirma gemelo;
+    QVERIFY2(gemelo.valido(), qPrintable(gemelo.error()));
+    const QByteArray otros = m_fx->leer(QStringLiteral("otro_rfc.cer")) + m_fx->leer(QStringLiteral("csd.cer"))
+                             + gemelo.leer(QStringLiteral("efirma.cer"));
+    QVERIFY(!otros.isEmpty());
+    int ventanas = 0;
     for (qsizetype i = 0; i + 32 <= cer.size(); i += 32) {
-        m_centinelas.append({QStringLiteral("cer[%1..+32]").arg(i), cer.mid(i, 32)});
+        const QByteArray v = cer.mid(i, 32);
+        if (!otros.contains(v)) {
+            m_centinelas.append({QStringLiteral("cer[%1..+32]").arg(i), v});
+            ++ventanas;
+        }
     }
+    QVERIFY2(ventanas >= 10, "muy pocas ventanas distintivas del certificado");
 
     m_keychain = std::make_shared<fakes::FakeKeychainApi>();
     m_store = std::make_unique<MacOSSecretStore>(m_raiz->filePath(QStringLiteral("credentials")), kBundle,

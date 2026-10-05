@@ -22,7 +22,7 @@ Ejemplo: `T001-modelo-fisico-sqlite.md`.
 | [T004](T004-ciclo-vida-macos.md) | Completada | Ciclo de vida macOS y menu bar |
 | [T005](T005-secret-store-keychain.md) | Completada | SecretStore con Keychain |
 | [T005.1](T005.1-ui-perfiles-sat.md) | Completada | UI de perfiles SAT y e.firma |
-| [T006](T006-spike-sat.md) | Pendiente | Spike de integracion SAT |
+| [T006](T006-spike-sat.md) | Completada | Spike de integracion SAT |
 | [T007](T007-worker-ejecutor-serial.md) | Pendiente | Worker y ejecutor serial |
 | [T008](T008-almacenamiento-zip.md) | Pendiente | Almacenamiento local de paquetes ZIP |
 | [T009](T009-flujo-sat-integrado.md) | Pendiente | Flujo SAT integrado |

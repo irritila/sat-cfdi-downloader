@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fixture sintetico (T006): CodEstatus, EstadoSolicitud y CodigoEstadoSolicitud con valores distintos. -->
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><VerificaSolicitudDescargaResponse xmlns="http://DescargaMasivaTerceros.sat.gob.mx"><VerificaSolicitudDescargaResult CodEstatus="5000" EstadoSolicitud="5" CodigoEstadoSolicitud="5002" NumeroCFDIs="0" Mensaje="Solicitud Aceptada"/></VerificaSolicitudDescargaResponse></s:Body></s:Envelope>

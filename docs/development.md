@@ -297,6 +297,87 @@ dialogo, no debe aceptarse a ciegas: la prueba no deberia pedir nada. Nota:
 los items del data protection keychain. La ausencia de residuos la comprueba la
 propia prueba (lista vacia tras borrar).
 
+## Spike SAT (T006): CLI manual `satcfdi_sat_spike`
+
+La biblioteca `satcfdi_sat` (sobres SOAP/WS-Security, C14N con libxml2 del
+SDK, firma RSA-SHA1 con OpenSSL 3, parser y cliente HTTP) y sus pruebas sin red
+(`ctest -L sat-spike`) se compilan siempre. La CLI manual es opcional, queda
+fuera del bundle y `satcfdi_app` no enlaza `satcfdi_sat` (la configuracion
+falla si alguna vez lo hiciera).
+
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt -DSATCFDI_BUILD_SAT_SPIKE=ON
+cmake --build build --target satcfdi_sat_spike
+ctest --test-dir build -L sat-spike --output-on-failure   # tests/sat (siempre) y satcfdi_sat_spike_cli_tests
+```
+
+Reglas de la CLI:
+
+- `--cer` y `--key` deben estar FUERA del repositorio (se rechazan rutas
+  dentro de el). `.cer`, `.key`, `.pfx`, `.zip` y `sat-spike/` estan en
+  `.gitignore` como red de seguridad.
+- La contrasena solo se pide por prompt sin eco en una terminal interactiva
+  (termios verificado; si no se puede apagar el eco, no se pide). Nunca por
+  argumento ni variable de entorno; un argumento no reconocido se rechaza sin
+  reproducirlo. La terminal se restaura ante SIGINT, SIGTERM, SIGHUP, SIGQUIT y
+  SIGTSTP. Si no se puede fijar `RLIMIT_CORE=0`, la CLI aborta. (El target
+  `satcfdi_sat_spike_prueba` lee stdin sin TTY solo para las pruebas.)
+- Si la e.firma no valida (contrasena, pareja, no es e.firma, vigencia), termina
+  con codigo 3 sin red ni archivos.
+- Cada operacion real muestra la operacion, el RFC enmascarado y el rango o Id,
+  y exige escribir `yes`. `solicita`, `verifica` y `descarga` autentican antes
+  dentro del mismo proceso (el token vive solo en memoria), con su propia
+  confirmacion.
+- Directorio de salida (`--salida`, por defecto
+  `~/Library/Application Support/Adenium/SAT CFDI Downloader/sat-spike/`, 0700):
+  `ledger.jsonl` (0600, verificado con `stat`; enlaces simbolicos o permisos
+  que no se confirman fallan cerrado) registra cada operacion ANTES de enviarla (operacion,
+  rango, hash del criterio y del sobre) y su resultado; puede contener RFC e
+  Ids reales, nunca contrasenas, tokens, sobres ni paquetes. La CLI rechaza un
+  criterio ya registrado y mas de 3 solicitudes (una que termino `AntesDeEnvio`
+  no llego al SAT y no cuenta). Una solicitud `DespuesDeEnvio` queda marcada
+  como incierta y no se reenvia. Maximo 10 verificaciones por `IdSolicitud`,
+  separadas al menos 15 minutos (la CLI indica cuanto falta), y una sola
+  descarga por `IdPaquete`. Toda la operacion real (leer, validar, registrar,
+  enviar, anotar) ocurre bajo `flock` exclusivo de `ledger.lock`; si otro
+  proceso lo tiene, la CLI falla de inmediato. Un ledger corrupto falla
+  cerrado. Los ZIP van a `paquetes/paquete-<hash>.zip` (0600); el `IdPaquete`
+  real solo queda en el ledger. El directorio de salida no puede estar dentro
+  del repo (se comprueba antes de pedir la contrasena).
+- Ids sin copiarlos: `verifica --ultima` usa el IdSolicitud de la ultima
+  solicitud aceptada (`CodEstatus=5000`) del ledger y `descarga --paquete N` el
+  N-esimo IdPaquete de la ultima verificacion con paquetes; solo se muestran
+  enmascarados. `--id` (UUID) e `--id-paquete` (`UUID_NN`) siguen disponibles,
+  pero un valor con otro formato se rechaza antes de pedir la contrasena y sin
+  red (sin reproducirlo).
+- Solicitud: solo `TipoSolicitud=CFDI` y `EstadoComprobante=Vigente`, un dia
+  completo cerrado (`--desde AAAA-MM-DD`, 00:00:00 a 23:59:59).
+- La consola solo muestra texto enmascarado (`EnmascaradorEvidencia`).
+- Firma configurable para la corrida: `--c14n exclusiva|inclusiva`,
+  `--issuer docsat|rfc4514` (defaults de `OpcionesFirma::porDefecto` por
+  operacion) y `--ws-addressing` (agrega `To`/`Action` al Header de
+  `Autentica`). `--c14n-declarada exclusiva|inclusiva` es EXPERIMENTAL: declara
+  una C14N distinta de la calculada (no conforme a XMLDSig); la consola lo
+  advierte y la evidencia debe registrarlo aparte.
+
+Secuencia de la corrida real (la ejecuta solo el usuario, en su Mac; ver
+`docs/tasks/T006-spike-sat.md`, "Reglas de seguridad y operacion"):
+
+```bash
+B=./build/tools/sat_spike/satcfdi_sat_spike
+E="--cer <ruta fuera del repo>.cer --key <ruta fuera del repo>.key"
+$B --dry-run $E --desde <dia>                         # 1. sin red: revisar sobres enmascarados
+$B autentica $E                                       # 2. token: formato y TTL
+$B solicita --tipo emitidos --desde <dia> $E          # 3. una solicitud (o --tipo recibidos)
+$B verifica --ultima $E                               # 4. cada 15-30 min, maximo 10 veces
+$B descarga --paquete 1 $E                            # 5. una vez por paquete (1, 2, ...)
+```
+
+`<dia>`: un dia cerrado de hace mas de 7 dias, con entre 1 y 50 CFDI conocidos y
+no solicitado antes por otro medio. Un rechazo 301-305 obliga a usar otro dia.
+Solo la salida de consola (ya enmascarada) se comparte para la evidencia; el
+ledger y los ZIP quedan locales.
+
 ## Directorios de build
 
 Todos los directorios `build*/` estan ignorados por git. Durante ciclos de

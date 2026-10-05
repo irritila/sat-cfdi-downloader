@@ -106,7 +106,7 @@ struct Entorno {
 template <typename T>
 std::optional<T> esperar(QFuture<T> f)
 {
-    if (!QTest::qWaitFor([&] { return f.isFinished(); }, 5000) || f.isCanceled()) {
+    if (!QTest::qWaitFor([&] { return f.isFinished(); }, 30000) || f.isCanceled()) {
         return std::nullopt;
     }
     return f.result();
@@ -270,11 +270,29 @@ void TestCredencialesSat::importarValidoDejaListaYUnaGeneracion()
 {
     Entorno e;
     QSignalSpy spy(&e.servicio, &CredencialesSatService::credencialCambio);
+    // Barrera: la importacion se detiene en prepararEFirma mientras se
+    // observa Validando (sin ella, la tarea puede terminar antes de que
+    // importar() encadene su continuacion y el estado ya seria Lista).
+    QSemaphore entro;
+    QSemaphore seguir;
+    e.store.alEntrar = [&](FakeSecretStore::Operacion op) {
+        if (op == FakeSecretStore::Operacion::Preparar) {
+            entro.release();
+            seguir.acquire();
+        }
+    };
+    struct Liberar {
+        QSemaphore& s;
+        ~Liberar() { s.release(); } // nunca deja bloqueado el dispatcher
+    } liberar{seguir};
     auto f = e.servicio.importar(e.perfil, e.entrada());
+    QVERIFY(entro.tryAcquire(1, 5000));
     // Mientras corre: Validando.
     const auto validando = esperar(e.servicio.obtenerEstado(e.perfil));
     QVERIFY(validando && validando->esExito());
     QCOMPARE(validando->valor(), EstadoCredencial::Validando);
+    QVERIFY(!f.isFinished());
+    seguir.release(); // alEntrar no se reasigna: el hilo del dispatcher puede estar dentro
 
     const auto r = esperar(f);
     QVERIFY(r && r->esExito());

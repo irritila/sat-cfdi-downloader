@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fixture sintetico (T006): Result con namespace equivocado; el parser debe ignorarlo. -->
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><VerificaSolicitudDescargaResponse xmlns="http://otro.ejemplo/ns"><VerificaSolicitudDescargaResult CodEstatus="5000" EstadoSolicitud="3" CodigoEstadoSolicitud="5000" NumeroCFDIs="1" Mensaje="x"><IdsPaquetes>p-1</IdsPaquetes></VerificaSolicitudDescargaResult></VerificaSolicitudDescargaResponse></s:Body></s:Envelope>

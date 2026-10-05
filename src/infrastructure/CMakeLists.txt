@@ -168,3 +168,48 @@ if(APPLE)
     )
     satcfdi_enable_warnings(satcfdi_secrets_macos)
 endif()
+
+# --- T006 corte A (core): biblioteca SAT del spike -------------------------
+# satcfdi_sat: C14N (libxml2 del SDK), digest/firma RSA-SHA1 (OpenSSL 3),
+# sobres SOAP/WS-Security, parser de respuestas y Faults (QXmlStreamReader),
+# cliente HTTP con fases (QNetworkAccessManager) y enmascarado de evidencia
+# (D2, D3, D5, D6). Reutilizable por T009; NO lo enlaza satcfdi_app (solo la
+# CLI del spike, tools/sat_spike, y sus pruebas). Headers sin tipos de libxml2
+# ni OpenSSL.
+find_package(LibXml2 REQUIRED)
+
+qt_add_library(satcfdi_sat STATIC
+    sat/SatOperaciones.h
+    sat/SatOperaciones.cpp
+    sat/XmlC14n.h
+    sat/XmlC14n.cpp
+    sat/FirmaXml.h
+    sat/FirmaXml.cpp
+    sat/SobresSat.h
+    sat/SobresSat.cpp
+    sat/TokenSat.h
+    sat/RespuestasSat.h
+    sat/RespuestasSat.cpp
+    sat/ClienteHttpSat.h
+    sat/ClienteHttpSat.cpp
+    sat/EnmascaradorEvidencia.h
+    sat/EnmascaradorEvidencia.cpp
+)
+set_target_properties(satcfdi_sat PROPERTIES AUTOMOC ON)
+target_include_directories(satcfdi_sat PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+target_link_libraries(satcfdi_sat
+    PUBLIC
+        satcfdi_domain
+        satcfdi_ports
+        satcfdi_crypto
+        Qt6::Core
+        Qt6::Network
+    PRIVATE
+        LibXml2::LibXml2
+        OpenSSL::Crypto
+)
+satcfdi_enable_warnings(satcfdi_sat)
+
+# Las pruebas sin red del spike (tests/sat) las registra el CMake raiz.

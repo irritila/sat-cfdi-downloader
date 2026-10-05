@@ -19,6 +19,7 @@
 
 #include <QHash>
 #include <QMutex>
+#include <QSemaphore>
 #include <QSet>
 #include <QStringList>
 #include <QThread>
@@ -56,10 +57,27 @@ struct Almacen {
 
     void liberar()
     {
-        QMutexLocker l(&mutex);
-        liberado = true;
-        condicion.wakeAll();
+        {
+            QMutexLocker l(&mutex);
+            liberado = true;
+            condicion.wakeAll();
+        }
+        soltar(); // nunca deja una barrera de operacion pendiente
     }
+
+    // Barrera por operacion: la siguiente llamada a registrar(op) se detiene
+    // en el hilo del dispatcher hasta soltar(). Sirve para garantizar que la
+    // tarea NO ha terminado cuando el servicio encadena su .then(this, ...):
+    // si la tarea termina antes, Qt ejecuta la continuacion en el acto (dentro
+    // de la llamada al servicio) y una prueba que conecta despues no ve la
+    // senal. Se arma antes de invocar el servicio y se suelta despues; el
+    // orden soltar()/llegada es indiferente (semaforo). Un solo uso por armado.
+    void bloquearEn(const QString& op)
+    {
+        bloqueoOperacion = op;
+    }
+    void soltar() { barreraOperacion.release(); }
+    bool detenidoEnBarrera() const { return enBarrera.load(); }
 
     // Snapshot de transaccion.
     struct Estado {
@@ -72,8 +90,18 @@ struct Almacen {
     };
     std::optional<Estado> snapshot;
 
+    QString bloqueoOperacion; // lo escribe la prueba antes de despachar; lo limpia el dispatcher
+    QSemaphore barreraOperacion;
+    std::atomic<bool> enBarrera{false};
+
     std::optional<ErrorPersistencia> registrar(const QString& op)
     {
+        if (!bloqueoOperacion.isEmpty() && op == bloqueoOperacion) {
+            bloqueoOperacion.clear();
+            enBarrera = true;
+            barreraOperacion.acquire();
+            enBarrera = false;
+        }
         eventos.append(op);
         hilos.insert(QThread::currentThread());
         if (fallos.contains(op)) {

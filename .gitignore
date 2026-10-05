@@ -15,3 +15,14 @@ compile_commands.json
 
 # Indice de clangd
 .cache/
+
+# T006: material e.firma, paquetes y salida local del spike SAT (nunca en el repo)
+*.cer
+*.key
+*.pfx
+*.zip
+sat-spike/
+
+# Residuos de configurar CMake sin -B en la raiz
+/CMakeFiles/
+/CMakeCache.txt
