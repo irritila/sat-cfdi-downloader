@@ -27,6 +27,10 @@ public:
     {
         emit notificacionPruebaTerminada(NotificationSendResult::Unavailable);
     }
+    void notificar(const NotificacionLocal& n) override
+    {
+        emit notificacionTerminada(n.id, NotificationSendResult::Unavailable);
+    }
     void reflejarPreferenciaLoginItem(bool) override {}
     void reflejarMonitoreoPausado(bool) override {}
     void reflejarEstadoMonitoreo(const EstadoMonitoreo&) override {}

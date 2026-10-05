@@ -2,8 +2,10 @@
 
 #include "application/persistence/PuertosPersistencia.h"
 #include "application/profiles/CredencialesSatService.h"
+#include "domain/perfiles/PerfilId.h"
 
 #include <QFuture>
+#include <QObject>
 #include <QString>
 
 #include <functional>
@@ -14,12 +16,15 @@ class QQmlApplicationEngine;
 namespace satcfdi {
 
 class AccionesWorker;
+class NotificadorOS;
+class ServicioNotificaciones;
 class ConsultaExistenciaEjecutor;
 class AppLifecycleController;
 class ExtensionWorker;
 class OperacionExecutor;
 class OperacionesSat;
 class PackageStorage;
+class SatGateway;
 class Programador;
 class WorkerLocal;
 class CredencialesSatServicePersistido;
@@ -65,7 +70,7 @@ class SqlitePersistencia;
 // tarea de cierre de la conexion en el hilo del dispatcher ->
 // dispatcher.cerrar() -> persistencia.
 // T007: dependencias inyectables del monitoreo. Vacias = produccion:
-// OperacionesSatNulo (hasta T009; toda operacion falla en Preparacion), reloj
+// OperacionesSatProductivo (T009) sobre el SatGateway, reloj
 // del sistema y ProgramadorQt propios (uno del ejecutor y otro del worker).
 // Lo inyectado no es propiedad del root y debe vivir mas que el.
 struct OpcionesMonitoreo {
@@ -79,6 +84,9 @@ struct OpcionesMonitoreo {
     // pasa resolverRaiz(dataDir, home) (D8).
     PackageStorage* packageStorage = nullptr;
     QString raizPaquetes;
+    // T009: SatGateway. Nulo = SatGatewayProductivo propio del root (endpoints
+    // productivos). Las pruebas inyectan FakeSatGateway.
+    SatGateway* satGateway = nullptr;
 };
 
 class AppCompositionRoot {
@@ -107,9 +115,11 @@ public:
     // iniciarCicloDeVida() lo llama; las pruebas pueden llamarlo sin QML.
     void iniciarMonitoreo();
 
+
     // Para pruebas de integracion.
     OperacionExecutor& ejecutor() const { return *m_ejecutor; }
     PackageStorage& packageStorage() const { return *m_packageStorage; }
+    SatGateway& satGateway() const { return *m_satGateway; }
     // Raiz absoluta efectiva de los paquetes (D8); vacia si se inyecto el storage.
     const QString& raizPaquetes() const noexcept { return m_raizPaquetes; }
     WorkerLocal& worker() const { return *m_worker; }
@@ -127,6 +137,7 @@ public:
     QQmlApplicationEngine* engine() const { return m_engine.get(); }
 
 private:
+
     std::unique_ptr<SqlitePersistencia> m_persistencia;
     std::unique_ptr<PersistenceDispatcher> m_dispatcher;
     std::unique_ptr<LogSanitizer> m_sanitizer;
@@ -139,6 +150,12 @@ private:
     // ejecutor -> puerto/programadores, todo antes del dispatcher).
     std::unique_ptr<OperacionesSat> m_operacionesSatPropio;
     std::unique_ptr<PackageStorage> m_packageStoragePropio;
+    std::unique_ptr<SatGateway> m_satGatewayPropio;
+    SatGateway* m_satGateway = nullptr;
+    OSIntegration* m_os = nullptr; // T009: notificaciones (lo posee main)
+    std::unique_ptr<NotificadorOS> m_notificador;
+    QMetaObject::Connection m_conexionInvalidarSesion;
+    std::unique_ptr<ServicioNotificaciones> m_servicioNotificaciones;
     PackageStorage* m_packageStorage = nullptr;
     QString m_raizPaquetes;
     std::unique_ptr<Programador> m_programadorEjecutorPropio;

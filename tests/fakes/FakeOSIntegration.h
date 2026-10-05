@@ -82,6 +82,9 @@ public:
     // --- Registro observable. ---
     QStringList comandos;
     QList<QPair<QString, QString>> notificacionesEnviadas; // (titulo, cuerpo) con resultado Sent
+    // T009: todas las pedidas a notificar() y las entregadas (Sent).
+    QList<NotificacionLocal> notificacionesPedidas;
+    QList<NotificacionLocal> notificacionesEntregadas;
     bool inicializado = false;
     bool salidaPreparada = false;
     std::optional<bool> preferenciaReflejada;
@@ -156,6 +159,25 @@ public:
         }
     }
 
+    // T009: registra cada notificacion pedida y responde como
+    // enviarNotificacionPrueba (segun permiso o `resultadoEnvio`).
+    void notificar(const NotificacionLocal& notificacion) override
+    {
+        comandos.append(QStringLiteral("notificar"));
+        notificacionesPedidas.append(notificacion);
+        if (responderInmediato) {
+            resolverNotificacion(notificacion);
+        } else {
+            m_pendientesNotificar.append(notificacion);
+        }
+    }
+    void completarNotificacion()
+    {
+        if (!m_pendientesNotificar.isEmpty()) {
+            resolverNotificacion(m_pendientesNotificar.takeFirst());
+        }
+    }
+
     void reflejarPreferenciaLoginItem(bool habilitado) override
     {
         comandos.append(QStringLiteral("reflejarPreferenciaLoginItem(%1)").arg(texto(habilitado)));
@@ -206,6 +228,33 @@ private:
         emit permisoNotificacionesResuelto(m_notificationStatus);
     }
 
+    void resolverNotificacion(const NotificacionLocal& n)
+    {
+        const NotificationSendResult r = resultadoSegunPermiso();
+        if (r == NotificationSendResult::Sent) {
+            notificacionesEntregadas.append(n);
+        }
+        emit notificacionTerminada(n.id, r);
+    }
+
+    NotificationSendResult resultadoSegunPermiso() const
+    {
+        if (resultadoEnvio) {
+            return *resultadoEnvio;
+        }
+        switch (m_notificationStatus) {
+        case NotificationStatus::Granted:
+            return NotificationSendResult::Sent;
+        case NotificationStatus::Denied:
+            return NotificationSendResult::PermissionDenied;
+        case NotificationStatus::NotDetermined:
+            return NotificationSendResult::PermissionNotDetermined;
+        case NotificationStatus::Unavailable:
+            break;
+        }
+        return NotificationSendResult::Unavailable;
+    }
+
     void resolverEnvio(const QString& titulo, const QString& cuerpo)
     {
         NotificationSendResult r = NotificationSendResult::Sent;
@@ -239,6 +288,7 @@ private:
     QList<bool> m_pendientesLoginItem;
     int m_pendientesPermiso = 0;
     QList<QPair<QString, QString>> m_pendientesEnvio;
+    QList<NotificacionLocal> m_pendientesNotificar;
 };
 
 } // namespace fakes

@@ -31,6 +31,7 @@ private slots:
     void obtenerEstadoSinCredencialListaYVencida();
     void eliminarBorraFilaYGeneracion();
     void obtenerMaterialFirmaEnHiloDeTrabajo();
+    void estadoEnHiloDeTrabajoSincrono();
     void reconciliarConListaIlegibleNoBorra();
     void fakeSoloAceptaCategoriasDelContrato();
     void obtenerMaterialFirmaDesdeHiloGraficoFalla();

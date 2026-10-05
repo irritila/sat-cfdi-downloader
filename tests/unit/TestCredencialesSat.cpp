@@ -615,6 +615,38 @@ void TestCredencialesSat::obtenerMaterialFirmaEnHiloDeTrabajo()
     QCOMPARE(*bloqueado, static_cast<int>(Cat::AlmacenBloqueado));
 }
 
+void TestCredencialesSat::estadoEnHiloDeTrabajoSincrono()
+{
+    // T009 D5: AccesoCredencialSat para el hilo del ejecutor.
+    Entorno e;
+    AccesoCredencialSat* acceso = &e.servicio;
+    const PerfilId perfil = e.perfil;
+    auto estadoEnTarea = [&]() {
+        return esperar(e.dispatcher.despachar<int>([acceso, perfil]() {
+            auto r = acceso->estadoEnHiloDeTrabajo(perfil);
+            return r.esExito() ? static_cast<int>(r.valor()) : -1 - static_cast<int>(*r.error().categoria);
+        }));
+    };
+    QCOMPARE(*estadoEnTarea(), static_cast<int>(EstadoCredencial::SinCredencial));
+    QVERIFY(esperar(e.servicio.importar(e.perfil, e.entrada()))->esExito());
+    QCOMPARE(*estadoEnTarea(), static_cast<int>(EstadoCredencial::Lista));
+    e.store.fallos.insert(FakeSecretStore::Operacion::Estado, Cat::AlmacenBloqueado);
+    QCOMPARE(*estadoEnTarea(), -1 - static_cast<int>(Cat::AlmacenBloqueado));
+    e.store.fallos.clear();
+
+    // Material por la misma interfaz, en el hilo de trabajo.
+    const auto material = esperar(e.dispatcher.despachar<bool>(
+        [acceso, perfil]() { return acceso->materialEnHiloDeTrabajo(perfil).esExito(); }));
+    QVERIFY(material && *material);
+
+    // Hilo grafico: HiloNoPermitido sin tocar repositorios.
+    const qsizetype eventosAntes = e.almacen.eventos.size();
+    const auto r = acceso->estadoEnHiloDeTrabajo(perfil);
+    QVERIFY(!r.esExito());
+    QCOMPARE(r.error().tipo, ErrorCredencialSat::Tipo::HiloNoPermitido);
+    QCOMPARE(e.almacen.eventos.size(), eventosAntes);
+}
+
 void TestCredencialesSat::reconciliarConListaIlegibleNoBorra()
 {
     Entorno e;

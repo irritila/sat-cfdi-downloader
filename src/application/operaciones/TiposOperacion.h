@@ -2,7 +2,9 @@
 
 #include "domain/logs/LogSolicitud.h"
 #include "domain/operaciones/FallaOperacion.h"
+#include "domain/operaciones/TransicionNotificable.h"
 #include "domain/solicitudes/SolicitudId.h"
+#include "ports/secrets/SecretStoreTypes.h"
 
 #include <QMetaType>
 #include <QString>
@@ -63,3 +65,6 @@ struct ResultadoOperacion {
 Q_DECLARE_METATYPE(satcfdi::TipoOperacion)
 Q_DECLARE_METATYPE(satcfdi::ResultadoOperacion)
 Q_DECLARE_METATYPE(satcfdi::ExistenciaArchivo)
+// Senales de OperacionExecutor (T007 D9, T009 D9).
+Q_DECLARE_METATYPE(satcfdi::EstadoCredencial)
+Q_DECLARE_METATYPE(satcfdi::TransicionNotificable)

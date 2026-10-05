@@ -15,6 +15,8 @@
 #include "TestRegexLogSanitizer.h"
 #include "TestResultado.h"
 #include "TestServiciosPersistidos.h"
+#include "TestOperacionesSatProductivo.h"
+#include "TestNotificaciones.h"
 
 #include <QCoreApplication>
 #include <QTest>
@@ -42,5 +44,7 @@ int main(int argc, char* argv[])
     ejecutar(TestWorkerLocal());
     ejecutar(TestRecuperacionArchivos());
     ejecutar(TestAlmacenamientoPaquetes()); // T008
+    ejecutar(TestOperacionesSatProductivo()); // T009
+    ejecutar(TestNotificaciones());           // T009
     return fallos == 0 ? 0 : 1;
 }

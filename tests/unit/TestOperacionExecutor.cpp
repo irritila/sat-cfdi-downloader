@@ -1,6 +1,7 @@
 #include "TestOperacionExecutor.h"
 
 #include "EntornoOperaciones.h"
+#include "fakes/FakeOperacionesSatConEventLoop.h"
 
 #include "domain/operaciones/PoliticasOperacion.h"
 
@@ -589,4 +590,90 @@ void TestOperacionExecutor::recuperacionNoEscribeSiSeEliminaDuranteElPuerto()
         QCOMPARE(e.paquete(pid)->estadoDescarga, EstadoDescarga::Descargando);
         QVERIFY(!e.paquete(pid)->reconciliadoEn);
     }
+}
+
+namespace {
+
+std::unique_ptr<OperacionExecutor> ejecutorCon(Entorno& e, OperacionesSat& sat)
+{
+    return std::make_unique<OperacionExecutor>(
+        PuertosEjecutor{e.solicitudes, e.logs, e.operaciones, e.uow, e.sanitizer, sat, [] {}, &e.paquetesRepo,
+                        &e.storage},
+        e.reloj.funcion(), e.programador);
+}
+
+} // namespace
+
+// T009: un puerto que gira un QEventLoop local (como SatGatewayProductivo) no
+// debe provocar que el ejecutor tome otro trabajo durante la operacion.
+void TestOperacionExecutor::puertoConEventLoopNoReentra()
+{
+    Entorno e;
+    fakes::FakeOperacionesSatConEventLoop sat;
+    auto ejecutor = ejecutorCon(e, sat);
+    const SolicitudId s1 = e.sembrar(EstadoLocal::Enviada, EstadoSolicitudSat::EnProceso).id;
+    const SolicitudId s2 = e.sembrar(EstadoLocal::Enviada, EstadoSolicitudSat::EnProceso).id;
+    const SolicitudId s3 = e.sembrar(EstadoLocal::Enviada, EstadoSolicitudSat::EnProceso).id;
+
+    sat.bloquearSiguiente();
+    auto f1 = ejecutor->verificar(s1, OrigenLog::Worker);
+    QVERIFY(QTest::qWaitFor([&] { return sat.girando(); }, 30000));
+    // Encolados mientras el loop local gira: sus procesar() se despachan en
+    // ese loop y deben regresar sin ejecutar nada.
+    auto f2 = ejecutor->verificar(s2, OrigenLog::Worker);
+    std::atomic<bool> leido{false};
+    auto fl = ejecutor->leer([&leido](OperacionesSolicitudRepository&) { leido = true; });
+    auto f3 = ejecutor->verificar(s3, OrigenLog::Usuario); // Manual: antes que s2
+    sat.marcarDespacho();
+    QVERIFY(QTest::qWaitFor([&] { return sat.despachado(); }, 30000));
+    QCOMPARE(sat.llamadas().size(), 1);
+    QVERIFY(!leido.load());
+    QVERIFY(!f2.isFinished() && !f3.isFinished() && !fl.isFinished());
+
+    sat.liberar();
+    QVERIFY(esperar(f1));
+    QVERIFY(esperar(f2));
+    QVERIFY(esperar(f3));
+    QVERIFY(esperarVoid(fl));
+    QVERIFY(leido.load());
+    QCOMPARE(sat.maximoActivas(), 1);
+    QCOMPARE(sat.llamadas(), (QStringList{u"verificar:"_s + s1.texto(), u"verificar:"_s + s3.texto(),
+                                          u"verificar:"_s + s2.texto()}));
+    QCOMPARE(esperar(f2)->desenlace, D::Aplicada);
+}
+
+void TestOperacionExecutor::cierreCancelaOperacionConEventLoop()
+{
+    Entorno e;
+    fakes::FakeOperacionesSatConEventLoop sat;
+    auto ejecutor = ejecutorCon(e, sat);
+    const SolicitudId s1 = e.sembrar(EstadoLocal::Enviada, EstadoSolicitudSat::EnProceso).id;
+    const SolicitudId s2 = e.sembrar(EstadoLocal::Enviada, EstadoSolicitudSat::EnProceso).id;
+    QSignalSpy detenido(ejecutor.get(), &OperacionExecutor::detenido);
+    // El callback de cancelacion reentra al ejecutor (toma su mutex): la
+    // cancelacion se solicita fuera del mutex, sin deadlock.
+    std::optional<bool> aceptabaAlCancelar;
+    sat.alCancelar = [&] { aceptabaAlCancelar = ejecutor->aceptaOperaciones(); };
+
+    sat.bloquearSiguiente();
+    auto f1 = ejecutor->verificar(s1, OrigenLog::Usuario);
+    QVERIFY(QTest::qWaitFor([&] { return sat.girando(); }, 30000));
+    auto f2 = ejecutor->verificar(s2, OrigenLog::Usuario);
+    sat.marcarDespacho();
+    QVERIFY(QTest::qWaitFor([&] { return sat.despachado(); }, 30000));
+
+    auto fd = ejecutor->detener(); // plazo 10 s con el programador falso
+    QCOMPARE(esperar(f2)->desenlace, D::Rechazada);
+    e.programador.avanzar(std::chrono::milliseconds(9999));
+    QVERIFY(sat.girando());
+    QVERIFY(!fd.isFinished());
+    // Al vencer el plazo, la cancelacion alcanza a la operacion ACTIVA.
+    e.programador.avanzar(std::chrono::milliseconds(1));
+    QVERIFY(esperarVoid(fd));
+    const auto r = esperar(f1);
+    QVERIFY(r && r->falla && r->falla->cancelada);
+    QCOMPARE(aceptabaAlCancelar, std::optional<bool>(false));
+    QVERIFY(QTest::qWaitFor([&] { return detenido.count() == 1; }, 30000));
+    QCOMPARE(sat.maximoActivas(), 1);
+    QCOMPARE(sat.llamadas(), QStringList{u"verificar:"_s + s1.texto()});
 }

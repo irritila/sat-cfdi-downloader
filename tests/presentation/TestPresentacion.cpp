@@ -387,6 +387,11 @@ private slots:
 
     // T008 D11
     void detalleMuestraExistenciaSinCambiarEstado();
+
+    // T009
+    void enviarSoloConCredencialLista();
+    void mensajesDelCatalogoYSin5008();
+    void avisoNotificacionesDeshabilitadas();
 };
 
 void TestPresentacion::init()
@@ -1622,6 +1627,139 @@ void TestPresentacion::detalleMuestraExistenciaSinCambiarEstado()
     }
     QCOMPARE(e.solicitudes.detalle.size(), 1); // sin recargas ni escrituras
     e.vms.setConsultaExistencia(nullptr);
+}
+
+void TestPresentacion::enviarSoloConCredencialLista()
+{
+    EscenarioAsincrono e;
+    AccionesEspia acciones;
+    e.vms.setAccionesSolicitud(&acciones);
+    QVERIFY(e.cargar());
+    e.solicitudes.lista.resolver(0, ResultadoListaSol::exito({}));
+    SolicitudDetailViewModel* d = e.vms.detalle();
+    const SolicitudId id = SolicitudId::generar();
+    QVERIFY(e.vms.app()->abrirDetalle(id.texto()));
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaDetalleSolicitud"));
+
+    SolicitudDetalle creada;
+    creada.resumen = resumenDePrueba(id); // Creada, perfil EKU9003173C9
+    const int listasAntes = e.perfiles.listas.size();
+    e.solicitudes.detalle.resolver(0, SolicitudesService::ResultadoDetalle::exito(creada));
+    QTRY_VERIFY(d->cargada());
+    QVERIFY(d->envioVisible());
+    QVERIFY(!d->puedeEnviar()); // aun verificando
+    QTRY_COMPARE(e.perfiles.listas.size(), listasAntes + 1);
+
+    // Credencial vencida: Enviar visible pero deshabilitado, con el motivo D10.
+    QVERIFY(resolverPerfiles(e, listasAntes, {perfilDePrueba()}, EstadoCredencial::Vencida));
+    QTRY_COMPARE(d->motivoEnvio(),
+                 QStringLiteral("La e.firma de este perfil esta vencida. Reemplazala para continuar."));
+    QVERIFY(!d->puedeEnviar());
+    QQuickItem* enviar = e.item(QStringLiteral("botonEnviarSolicitud"));
+    QTRY_VERIFY(enviar->isVisible());
+    QVERIFY(!enviar->isEnabled());
+    QTRY_VERIFY(e.item(QStringLiteral("motivoEnvio"))->isVisible());
+    d->enviar();
+    QVERIFY(acciones.llamadas.isEmpty()); // sin trafico
+
+    // La credencial cambia a Lista: se reconsulta y Enviar se habilita.
+    emit e.credenciales.credencialCambio(perfilDePrueba().id.texto());
+    QTRY_COMPARE(e.perfiles.listas.size(), listasAntes + 2);
+    QVERIFY(resolverPerfiles(e, listasAntes + 1, {perfilDePrueba()}, EstadoCredencial::Lista));
+    QTRY_VERIFY(d->puedeEnviar());
+    QTRY_VERIFY(enviar->isEnabled());
+    QVERIFY(d->motivoEnvio().isEmpty());
+    QMetaObject::invokeMethod(enviar, "click");
+    QCOMPARE(acciones.llamadas, QStringList{QStringLiteral("enviar:") + id.texto()});
+    e.vms.setAccionesSolicitud(nullptr);
+}
+
+void TestPresentacion::mensajesDelCatalogoYSin5008()
+{
+    EscenarioAsincrono e;
+    AccionesEspia acciones;
+    e.vms.setAccionesSolicitud(&acciones);
+    QVERIFY(e.cargar());
+    e.solicitudes.lista.resolver(0, ResultadoListaSol::exito({}));
+    SolicitudDetailViewModel* d = e.vms.detalle();
+
+    auto abrir = [&](int indice, SolicitudDetalle detalle) {
+        QVERIFY(e.vms.app()->abrirDetalle(detalle.resumen.id.texto()));
+        QTRY_COMPARE(int(e.solicitudes.detalle.size()), indice + 1);
+        e.solicitudes.detalle.resolver(indice, SolicitudesService::ResultadoDetalle::exito(detalle));
+        QTRY_VERIFY(d->cargada() && d->solicitudId() == detalle.resumen.id.texto());
+    };
+
+    // Rechazo 5002 en la creacion.
+    SolicitudDetalle fallida;
+    fallida.resumen = resumenDePrueba(SolicitudId::generar());
+    fallida.resumen.estadoLocal = EstadoLocal::EnvioFallido;
+    fallida.codEstatusSolicitud = QStringLiteral("5002");
+    abrir(0, fallida);
+    QCOMPARE(d->mensajeEstado(), QStringLiteral("El SAT ya no acepta solicitudes con este mismo criterio."));
+    QTRY_VERIFY(e.item(QStringLiteral("mensajeEstado")) && e.item(QStringLiteral("mensajeEstado"))->isVisible());
+
+    // Creada tras una falla de autenticacion: texto D10 ya desglosado.
+    SolicitudDetalle creadaConError;
+    creadaConError.resumen = resumenDePrueba(SolicitudId::generar());
+    creadaConError.ultimoError = QStringLiteral("x");
+    UltimoErrorDesglosado ue;
+    ue.fase = FaseOperacion::Autenticacion;
+    ue.mensaje = QStringLiteral("El SAT no acepto la autenticacion con esta e.firma.");
+    creadaConError.ultimoErrorDesglosado = ue;
+    abrir(1, creadaConError);
+    QCOMPARE(d->mensajeEstado(), QStringLiteral("El SAT no acepto la autenticacion con esta e.firma."));
+
+    // Envio incierto.
+    SolicitudDetalle incierta;
+    incierta.resumen = resumenDePrueba(SolicitudId::generar());
+    incierta.resumen.estadoLocal = EstadoLocal::EnvioIncierto;
+    abrir(2, incierta);
+    QVERIFY(d->mensajeEstado().startsWith(QStringLiteral("No se sabe si el SAT registro la solicitud.")));
+    QVERIFY(!d->envioVisible()); // nunca se reenvia el mismo registro
+
+    // Paquetes: 5008 sin Reintentar; vencido; error reintentable.
+    SolicitudDetalle conPaquetes = detalleDePrueba(SolicitudId::generar());
+    conPaquetes.paquetes.first().estadoDescarga = EstadoDescarga::Error;
+    conPaquetes.paquetes.first().codigoDescargaSat = QStringLiteral("5008");
+    PaqueteResumen vencido = conPaquetes.paquetes.first();
+    vencido.idPaqueteSat = QStringLiteral("PAQ_02");
+    vencido.estadoDescarga = EstadoDescarga::Vencido;
+    vencido.codigoDescargaSat = QStringLiteral("5007");
+    conPaquetes.paquetes.append(vencido);
+    abrir(3, conPaquetes);
+    QVERIFY(!d->puedeReintentarDescarga()); // solo 5008 y Vencido: nada reintentable
+    QTRY_COMPARE(e.item(QStringLiteral("mensajePaquete_PAQ_01"))->property("text").toString(),
+                 QStringLiteral("El paquete alcanzo el maximo de descargas permitidas."));
+    QCOMPARE(e.item(QStringLiteral("mensajePaquete_PAQ_02"))->property("text").toString(),
+             QStringLiteral("El paquete ya no existe en el SAT (vencido)."));
+    QVERIFY(!e.item(QStringLiteral("botonReintentarDescarga"))->isVisible());
+
+    SolicitudDetalle reintentable = detalleDePrueba(SolicitudId::generar());
+    reintentable.paquetes.first().estadoDescarga = EstadoDescarga::Error;
+    reintentable.paquetes.first().codigoDescargaSat = QStringLiteral("5000");
+    abrir(4, reintentable);
+    QVERIFY(d->puedeReintentarDescarga());
+    QCOMPARE(d->paquetes().constFirst().toMap().value(QStringLiteral("mensaje")).toString(),
+             QStringLiteral("No se pudo descargar el paquete. Puedes reintentar."));
+    // Sin RFC ni Ids en los mensajes visibles.
+    QVERIFY(!d->mensajeEstado().contains(QStringLiteral("EKU9003173C9")));
+    e.vms.setAccionesSolicitud(nullptr);
+}
+
+void TestPresentacion::avisoNotificacionesDeshabilitadas()
+{
+    EscenarioAsincrono e;
+    QVERIFY(e.cargar());
+    e.solicitudes.lista.resolver(0, ResultadoListaSol::exito({}));
+    QQuickItem* aviso = nullptr;
+    QTRY_VERIFY((aviso = e.item(QStringLiteral("avisoNotificaciones"))) != nullptr);
+    QVERIFY(!aviso->isVisible());
+    e.vms.app()->setNotificacionesDeshabilitadas(true);
+    QTRY_VERIFY(aviso->isVisible());
+    QVERIFY(nombreAccesible(aviso).startsWith(QStringLiteral("Las notificaciones estan deshabilitadas")));
+    e.vms.app()->setNotificacionesDeshabilitadas(false);
+    QTRY_VERIFY(!aviso->isVisible());
 }
 
 #include "TestPresentacion.moc"

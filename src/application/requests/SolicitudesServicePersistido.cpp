@@ -96,6 +96,9 @@ SolicitudDetalle aDetalle(const SolicitudPersistida& s, const QList<PaquetePersi
     d.enviadaEn = s.enviadaEn;
     d.ultimaVerificacionEn = s.ultimaVerificacionEn;
     d.ultimoError = s.ultimoError;
+    if (s.ultimoError) {
+        d.ultimoErrorDesglosado = desglosarUltimoError(*s.ultimoError);
+    }
     for (const PaquetePersistido& p : paquetes) {
         d.paquetes.append(aPaquete(p));
     }

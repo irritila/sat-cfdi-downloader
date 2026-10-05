@@ -8,8 +8,11 @@
 #include "app_core/AppBootstrapper.h"
 #include "app_core/AppCompositionRoot.h"
 #include "app_core/AppLifecycleController.h"
+#include "presentation/viewmodels/AppViewModel.h"
+#include "presentation/viewmodels/PresentacionViewModels.h"
 
 #include "application/operaciones/OperacionExecutor.h"
+#include "application/operaciones/OperacionesSatNulo.h"
 #include "application/operaciones/WorkerLocal.h"
 #include "application/profiles/PerfilesSatService.h"
 #include "application/requests/SolicitudesService.h"
@@ -63,7 +66,8 @@ struct Grafo {
     void abrir(bool adaptadorNulo = false)
     {
         OpcionesMonitoreo m;
-        m.operacionesSat = adaptadorNulo ? nullptr : &sat;
+        // Nunca el adaptador productivo (red real): fake o el nulo explicito.
+        m.operacionesSat = adaptadorNulo ? static_cast<OperacionesSat*>(&nulo) : &sat;
         m.reloj = reloj.funcion();
         m.programadorEjecutor = &programadorEjecutor;
         m.programadorWorker = &programadorWorker;
@@ -122,6 +126,7 @@ struct Grafo {
     QString rutaBase;
     fakes::FakeSecretStore secretos;
     fakes::FakeOperacionesSat sat;
+    OperacionesSatNulo nulo;
     fakes::FakeReloj reloj{QDateTime(QDate(2026, 10, 5), QTime(12, 0), QTimeZone::UTC)};
     fakes::FakeProgramador programadorEjecutor{reloj};
     fakes::FakeProgramador programadorWorker{reloj};
@@ -144,6 +149,7 @@ private slots:
     void adaptadorNuloFallaEnPreparacionVisible();
     void hiloGraficoRespondeConElPuertoBloqueado();
     void cambioDeCredencialDiagnosticaYRefrescaUi();
+    void credencialNoListaNotificaSinEfectosConPermisoDenegado();
 };
 
 void TestMonitoreo::init()
@@ -242,7 +248,7 @@ void TestMonitoreo::cierreLimpioNoGeneraLogs()
 
 void TestMonitoreo::adaptadorNuloFallaEnPreparacionVisible()
 {
-    Grafo g(true); // OperacionesSatNulo propio del root (produccion sin T009)
+    Grafo g(true); // OperacionesSatNulo inyectado (sin adaptador SAT)
     QVERIFY(g.ok);
     const auto id = g.crearSolicitud();
     QVERIFY(id);
@@ -312,6 +318,54 @@ void TestMonitoreo::cambioDeCredencialDiagnosticaYRefrescaUi()
     g.root->worker().ejecutarCiclo();
     QTRY_COMPARE(cambios.size(), 2);
     QTRY_COMPARE(g.sat.activas(), 0);
+}
+
+void TestMonitoreo::credencialNoListaNotificaSinEfectosConPermisoDenegado()
+{
+    Grafo g;
+    QVERIFY(g.ok);
+    g.os.setNotificationStatus(OSIntegration::NotificationStatus::Denied);
+    const auto id = g.crearSolicitud();
+    QVERIFY(id);
+    const auto perfiles = esperar(g.root->perfiles().listarNoEliminados());
+    QVERIFY(perfiles && perfiles->esExito());
+    const PerfilId perfil = perfiles->valor().constFirst().id;
+    QVERIFY(g.iniciarApp());
+    // La UI indica que las notificaciones estan deshabilitadas.
+    QVERIFY(g.root->viewModels().app()->notificacionesDeshabilitadas());
+
+    g.root->worker().enviar(*id);
+    QTRY_VERIFY(g.sat.llamadas().contains(QStringLiteral("enviar:") + id->texto()));
+    QTRY_COMPARE(g.sat.activas(), 0);
+    const auto antes = esperar(g.root->solicitudes().obtener(*id));
+    QVERIFY(antes && antes->esExito());
+
+    QSignalSpy resultados(&g.os, &OSIntegration::notificacionTerminada);
+    g.sat.fijarCredencial(perfil, EstadoCredencial::Vencida);
+    QTest::ignoreMessage(QtInfoMsg, QRegularExpression(QStringLiteral("cambio a ")));
+    g.reloj.fijar(g.reloj.ahora().addSecs(60 * 60));
+    g.root->worker().ejecutarCiclo();
+    QTRY_COMPARE(g.os.notificacionesPedidas.size(), 1);
+    const OSIntegration::NotificacionLocal n = g.os.notificacionesPedidas.constFirst();
+    QCOMPARE(n.id, QStringLiteral("credencial:%1:%2").arg(perfil.texto(), claveEstable(EstadoCredencial::Vencida)));
+    QCOMPARE(n.tipo, QStringLiteral("credencial"));
+    QVERIFY(!n.titulo.isEmpty() && !n.cuerpo.isEmpty()); // textos del servicio (catalogo D10)
+    QVERIFY(!n.titulo.contains(QStringLiteral("EKU9003173C9")) && !n.cuerpo.contains(QStringLiteral("EKU9003173C9")));
+    QCOMPARE(resultados.size(), 1);
+    QCOMPARE(resultados.at(0).at(1).value<OSIntegration::NotificationSendResult>(),
+             OSIntegration::NotificationSendResult::PermissionDenied);
+    QVERIFY(g.os.notificacionesEntregadas.isEmpty());
+
+    // Sin cambio de estado: ninguna notificacion nueva (dedupe).
+    g.root->worker().ejecutarCiclo();
+    QTRY_COMPARE(g.sat.activas(), 0);
+    QCOMPARE(g.os.notificacionesPedidas.size(), 1);
+
+    // El permiso denegado no cambia estados ni logs.
+    const auto despues = esperar(g.root->solicitudes().obtener(*id));
+    QVERIFY(despues && despues->esExito());
+    QCOMPARE(despues->valor().resumen.estadoLocal, antes->valor().resumen.estadoLocal);
+    QCOMPARE(despues->valor().logs.size(), antes->valor().logs.size());
 }
 
 #include "TestMonitoreo.moc"

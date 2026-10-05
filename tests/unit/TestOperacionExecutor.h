@@ -30,4 +30,6 @@ private slots:
     void destruirCierraConexionEnSuHiloSinAdvertencias();
     void gateDeCredencialUnaVezPorPerfil();
     void intencionSeConsumeSoloSiNoCambio();
+    void puertoConEventLoopNoReentra();
+    void cierreCancelaOperacionConEventLoop();
 };

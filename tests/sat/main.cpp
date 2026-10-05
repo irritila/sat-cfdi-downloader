@@ -1,5 +1,7 @@
 #include "TestC14nFirma.h"
 #include "TestClienteHttpSat.h"
+#include "TestFakeSatGateway.h"
+#include "TestSatGatewayProductivo.h"
 #include "TestSobresRespuestas.h"
 
 #include <QCoreApplication>
@@ -29,9 +31,11 @@ int main(int argc, char* argv[])
     if (suite.isEmpty() || suite == QStringLiteral("unit")) {
         ejecutar(TestC14nFirma());
         ejecutar(TestSobresRespuestas());
+        ejecutar(TestFakeSatGateway()); // T009
     }
     if (suite.isEmpty() || suite == QStringLiteral("infrastructure")) {
         ejecutar(TestClienteHttpSat());
+        ejecutar(TestSatGatewayProductivo()); // T009
     }
     return fallos == 0 ? 0 : 1;
 }

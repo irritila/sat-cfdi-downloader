@@ -10,6 +10,7 @@
 #include "infrastructure/os/macos/MacOSMapeos.h"
 
 #include <QAction>
+#include <QUuid>
 #include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QEvent>
@@ -689,25 +690,42 @@ void MacOSIntegration::solicitarPermisoNotificaciones()
 
 void MacOSIntegration::enviarNotificacionPrueba(const QString& titulo, const QString& cuerpo)
 {
+    entregarNotificacion(QStringLiteral("mx.adenium.satcfdi.prueba.") + QUuid::createUuid().toString(QUuid::WithoutBraces),
+                         QStringLiteral("prueba"), titulo, cuerpo,
+                         [](MacOSIntegration* a, NotificationSendResult r) { emit a->notificacionPruebaTerminada(r); });
+}
+
+void MacOSIntegration::notificar(const NotificacionLocal& n)
+{
+    const QString id = n.id;
+    // Mismo identificador -> el SO reemplaza (dedupe adicional al del servicio).
+    entregarNotificacion(QStringLiteral("mx.adenium.satcfdi.") + n.id, n.tipo, n.titulo, n.cuerpo,
+                         [id](MacOSIntegration* a, NotificationSendResult r) { emit a->notificacionTerminada(id, r); });
+}
+
+void MacOSIntegration::entregarNotificacion(const QString& identificadorQt, const QString& hilo, const QString& titulo,
+                                            const QString& cuerpo,
+                                            std::function<void(MacOSIntegration*, NotificationSendResult)> alTerminar)
+{
     const QPointer<MacOSIntegration> guardia(this);
     UNUserNotificationCenter* centro = centroNotificaciones(d->hayBundle);
     if (centro == nil) {
-        enHiloGrafico(guardia, [](MacOSIntegration* a) {
-            emit a->notificacionPruebaTerminada(NotificationSendResult::Unavailable);
-        });
+        enHiloGrafico(guardia, [alTerminar](MacOSIntegration* a) { alTerminar(a, NotificationSendResult::Unavailable); });
         return;
     }
 
     NSString* tituloNativo = titulo.toNSString();
     NSString* cuerpoNativo = cuerpo.toNSString();
+    NSString* identificador = identificadorQt.toNSString();
+    NSString* hiloNativo = hilo.toNSString();
     // Nunca solicita permiso: decide con el estado vigente del SO.
     [centro getNotificationSettingsWithCompletionHandler:^(UNNotificationSettings* ajustes) {
         const long leido = static_cast<long>(ajustes.authorizationStatus);
         const NotificationStatus estado = mapeos::mapearAutorizacionNotificaciones(leido);
         if (estado != NotificationStatus::Granted) {
-            enHiloGrafico(guardia, [estado](MacOSIntegration* a) {
+            enHiloGrafico(guardia, [estado, alTerminar](MacOSIntegration* a) {
                 a->actualizarNotificationStatus(estado);
-                emit a->notificacionPruebaTerminada(mapeos::resultadoEnvioSegunEstado(estado));
+                alTerminar(a, mapeos::resultadoEnvioSegunEstado(estado));
             });
             return;
         }
@@ -715,9 +733,8 @@ void MacOSIntegration::enviarNotificacionPrueba(const QString& titulo, const QSt
         UNMutableNotificationContent* contenido = [[UNMutableNotificationContent alloc] init];
         contenido.title = tituloNativo;
         contenido.body = cuerpoNativo;
+        contenido.threadIdentifier = hiloNativo;
         contenido.sound = [UNNotificationSound defaultSound];
-        NSString* identificador =
-            [@"mx.adenium.satcfdi.prueba." stringByAppendingString:[NSUUID UUID].UUIDString];
         UNNotificationRequest* peticion = [UNNotificationRequest requestWithIdentifier:identificador
                                                                               content:contenido
                                                                               trigger:nil];
@@ -730,11 +747,11 @@ void MacOSIntegration::enviarNotificacionPrueba(const QString& titulo, const QSt
                          qCWarning(lcMacOS) << "addNotificationRequest fallo: codigo" << static_cast<long>(error.code);
                          resultado = NotificationSendResult::Failed;
                      }
-                     enHiloGrafico(guardia, [resultado](MacOSIntegration* a) {
+                     enHiloGrafico(guardia, [resultado, alTerminar](MacOSIntegration* a) {
                          a->actualizarNotificationStatus(resultado == NotificationSendResult::PermissionDenied
                                                              ? NotificationStatus::Denied
                                                              : NotificationStatus::Granted);
-                         emit a->notificacionPruebaTerminada(resultado);
+                         alTerminar(a, resultado);
                      });
                  }];
     }];

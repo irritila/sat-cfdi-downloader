@@ -3,7 +3,10 @@
 #include "ExtensionCicloDeVida.h"
 #include "presentation/viewmodels/AccionesSolicitud.h"
 #include "presentation/viewmodels/ConsultaExistenciaPaquetes.h"
+#include "application/notificaciones/Notificador.h"
 #include "ports/OSIntegration.h"
+
+#include <QPointer>
 
 namespace satcfdi {
 
@@ -67,6 +70,23 @@ private:
     PersistenceDispatcher& m_dispatcher;
     PaqueteSolicitudRepository& m_paquetes;
     OperacionExecutor& m_ejecutor;
+};
+
+// Notificador (application, T009 D9) sobre OSIntegration::notificar. Sin
+// OSIntegration (antes de iniciarCicloDeVida o en pruebas sin menu bar) no
+// entrega nada. El resultado no vuelve a la aplicacion.
+class NotificadorOS final : public Notificador {
+public:
+    void setOS(OSIntegration* os) { m_os = os; }
+    void notificar(const Notificacion& n) override
+    {
+        if (m_os) {
+            m_os->notificar(OSIntegration::NotificacionLocal{n.id, n.tipo, n.titulo, n.cuerpo});
+        }
+    }
+
+private:
+    QPointer<OSIntegration> m_os;
 };
 
 } // namespace satcfdi

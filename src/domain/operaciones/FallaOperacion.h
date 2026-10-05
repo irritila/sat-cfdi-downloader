@@ -69,4 +69,26 @@ struct FallaOperacion {
 // "RespuestaExplicita:300". Se persiste en ultima_clave_falla_verificacion.
 QString claveFalla(const FallaOperacion& falla);
 
+// Texto de ultimo_error para una falla (T007; formato estable desde T009):
+//   "<claveFalla>[/<causa>][ (cancelada)][: <diagnosticoSanitizado>]"
+// p. ej. "Autenticacion (cancelada): No se pudo conectar ... [AntesDeEnvio]".
+// Con el adaptador de T009, diagnosticoSanitizado = "<mensaje D10>[ [<detalle tecnico>]]".
+QString textoUltimoError(const FallaOperacion& falla);
+
+// Desglose de un ultimo_error escrito con textoUltimoError (sin migracion: la
+// fase ya se persiste como prefijo). nullopt si el texto no empieza con una
+// fase conocida (p. ej. "CodEstatus 301" de un rechazo explicito o el texto
+// de envio interrumpido por cierre).
+struct UltimoErrorDesglosado {
+    FaseOperacion fase = FaseOperacion::Preparacion;
+    std::optional<QString> codigo;
+    std::optional<CausaAlmacenamiento> causaAlmacenamiento;
+    bool cancelada = false;
+    QString mensaje;        // mensaje visible (D10), sin el detalle tecnico
+    QString detalleTecnico; // desde el primer " [" hasta el "]" final, si lo hay
+
+    friend bool operator==(const UltimoErrorDesglosado&, const UltimoErrorDesglosado&) = default;
+};
+std::optional<UltimoErrorDesglosado> desglosarUltimoError(QStringView texto);
+
 } // namespace satcfdi

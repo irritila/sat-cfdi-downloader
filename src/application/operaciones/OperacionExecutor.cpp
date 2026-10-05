@@ -1,5 +1,6 @@
 #include "application/operaciones/OperacionExecutor.h"
 
+#include "application/operaciones/SaneamientoOperacion.h"
 #include "application/operaciones/WorkerLocal.h"
 #include "domain/common/UuidCanonico.h"
 #include "domain/operaciones/PoliticasOperacion.h"
@@ -58,19 +59,25 @@ R resultado(TipoOperacion tipo, OrigenLog origen, Desenlace d, std::optional<Sol
     return r;
 }
 
+// T009: todo lo que devuelve el puerto se sanea antes de aplicarlo o
+// persistirlo (codigo con formato seguro; textos por el saneador de logs, sin
+// RFC ni corridas opacas, con limite). Defensa en profundidad para cualquier
+// adaptador.
+template <typename T, typename F = T (*)(T)>
+Resultado<T, FallaOperacion> seguro(Resultado<T, FallaOperacion> r, F exito = nullptr)
+{
+    if (!r.esExito()) {
+        return Resultado<T, FallaOperacion>::fallo(saneamiento::fallaSegura(std::move(r).error()));
+    }
+    if (exito) {
+        return Resultado<T, FallaOperacion>::exito(exito(std::move(r).valor()));
+    }
+    return r;
+}
+
 QString diagnostico(const FallaOperacion& f)
 {
-    QString d = claveFalla(f);
-    if (f.causaAlmacenamiento) {
-        d += QLatin1Char('/') + claveEstable(*f.causaAlmacenamiento);
-    }
-    if (f.cancelada) {
-        d += QStringLiteral(" (cancelada)");
-    }
-    if (!f.diagnosticoSanitizado.isEmpty()) {
-        d += QStringLiteral(": ") + f.diagnosticoSanitizado;
-    }
-    return d;
+    return textoUltimoError(f);
 }
 
 bool verificable(const SolicitudPersistida& s)
@@ -185,12 +192,24 @@ struct OperacionExecutor::Impl {
 
     // Hilo del ejecutor: una invocacion por trabajo encolado; toma el de mayor
     // prioridad disponible.
+    //
+    // Guardia de reentrada (T009): un puerto puede girar un QEventLoop local en
+    // este hilo (SatGatewayProductivo espera la red asi) y ese loop despacha
+    // los procesar()/finalizarEnHilo() encolados. Con una operacion activa,
+    // procesar() NO toma otro trabajo (queda en su cola) y finalizarEnHilo()
+    // se pospone; al terminar, la operacion reprograma procesar() si quedan
+    // trabajos y finaliza si se esta deteniendo. Asi nunca hay dos
+    // operaciones (SAT ni SQLite) solapadas y cancelacionActual siempre es la
+    // de la operacion activa.
     void procesar()
     {
         Trabajo t;
         SenalCancelacion cancelacion;
         {
             QMutexLocker l(&mutex);
+            if (activo) {
+                return; // reentrada desde un event loop anidado: se reprograma al terminar
+            }
             auto it = std::find_if(colas.begin(), colas.end(), [](const auto& c) { return !c.empty(); });
             if (it == colas.end()) {
                 return;
@@ -218,6 +237,11 @@ struct OperacionExecutor::Impl {
         }
         if (terminar) {
             finalizarEnHilo();
+        } else if (!vacia) {
+            // Trabajos cuyo procesar() se despacho durante la operacion (y
+            // regreso por la guardia): uno nuevo por cada pendiente basta, los
+            // sobrantes regresan con la cola vacia.
+            QMetaObject::invokeMethod(contexto, [this]() { procesar(); }, Qt::QueuedConnection);
         }
     }
 
@@ -225,8 +249,8 @@ struct OperacionExecutor::Impl {
     {
         {
             QMutexLocker l(&mutex);
-            if (finalizado) {
-                return;
+            if (finalizado || activo) {
+                return; // con operacion activa, procesar() finaliza al terminarla
             }
             finalizado = true;
         }
@@ -353,7 +377,7 @@ struct OperacionExecutor::Impl {
         }
         // 2. Puerto, sin transaccion.
         ContextoEnvio ctx{*solicitud, cancelacion};
-        auto r = p.sat.enviar(ctx);
+        auto r = seguro(p.sat.enviar(ctx), &saneamiento::envioSeguro);
         // 3. Aplicar.
         return aplicarEnvio(id, origen, r.esExito() ? std::optional(r.valor()) : std::nullopt,
                             r.esExito() ? std::nullopt : std::optional(r.error()));
@@ -456,7 +480,7 @@ struct OperacionExecutor::Impl {
             return resultado(tipo, origen, Desenlace::Descartada, id);
         }
         ContextoVerificacion ctx{id, anterior.perfilSatId, anterior.rfcSolicitante, *anterior.idSolicitudSat, cancelacion};
-        auto r = p.sat.verificar(ctx);
+        auto r = seguro(p.sat.verificar(ctx), &saneamiento::verificacionSegura);
         const QDateTime ahora = reloj();
         std::optional<FallaOperacion> falla = r.esExito() ? std::nullopt : std::optional(r.error());
 
@@ -493,7 +517,94 @@ struct OperacionExecutor::Impl {
             return resultado(tipo, origen, Desenlace::Descartada, id, std::nullopt, falla);
         }
         emit q->solicitudActualizada(id);
+        if (r.esExito()) {
+            notificarTransicionSat(anterior, r.valor());
+        }
         return resultado(tipo, origen, Desenlace::Aplicada, id, std::nullopt, falla);
+    }
+
+    // T009 D1/D9: tras el COMMIT, una transicion CONFIRMADA (el estado SAT
+    // persistido cambio) a un estado terminal se publica una sola vez.
+    void notificarTransicionSat(const SolicitudPersistida& anterior, const ResultadoVerificacion& v)
+    {
+        if (anterior.estadoSolicitudSat == std::optional(v.estadoSolicitudSat)) {
+            return;
+        }
+        std::optional<TipoTransicionNotificable> tipo;
+        switch (v.estadoSolicitudSat) {
+        case EstadoSolicitudSat::Terminada: tipo = TipoTransicionNotificable::Terminada; break;
+        case EstadoSolicitudSat::Error: tipo = TipoTransicionNotificable::ErrorSat; break;
+        case EstadoSolicitudSat::Rechazada: tipo = TipoTransicionNotificable::Rechazada; break;
+        case EstadoSolicitudSat::Vencida: tipo = TipoTransicionNotificable::Vencida; break;
+        case EstadoSolicitudSat::Aceptada:
+        case EstadoSolicitudSat::EnProceso: break;
+        }
+        if (!tipo) {
+            return;
+        }
+        QSet<QString> ids;
+        for (const QString& idPaquete : v.idsPaquetes) {
+            if (!idPaquete.trimmed().isEmpty()) {
+                ids.insert(idPaquete.trimmed());
+            }
+        }
+        TransicionNotificable t = transicionDe(anterior, *tipo);
+        t.paquetes = int(ids.size());
+        emit q->transicionConfirmada(t);
+    }
+
+    // T009 D1: "Descarga completa" cuando, tras el commit de un Descargado, no
+    // queda ningun paquete visible por descargar (Disponible, Descargando o
+    // Error). Los Vencido no cuentan como pendientes.
+    void notificarDescargaCompleta(const SolicitudId& id)
+    {
+        if (!p.paquetes) {
+            return;
+        }
+        auto paquetes = p.paquetes->listarVisiblesPorSolicitud(id);
+        const std::optional<SolicitudPersistida> solicitud = leerVisible(id);
+        if (!paquetes || !solicitud) {
+            return;
+        }
+        int descargados = 0;
+        for (const PaquetePersistido& paq : paquetes.valor()) {
+            switch (paq.estadoDescarga) {
+            case EstadoDescarga::Descargado: ++descargados; break;
+            case EstadoDescarga::Vencido: break;
+            case EstadoDescarga::Disponible:
+            case EstadoDescarga::Descargando:
+            case EstadoDescarga::Error: return;
+            }
+        }
+        if (descargados == 0) {
+            return;
+        }
+        TransicionNotificable t = transicionDe(*solicitud, TipoTransicionNotificable::DescargaCompleta);
+        t.paquetes = int(paquetes.valor().size());
+        t.descargados = descargados;
+        emit q->transicionConfirmada(t);
+    }
+
+    static TransicionNotificable transicionDe(const SolicitudPersistida& s, TipoTransicionNotificable tipo)
+    {
+        TransicionNotificable t;
+        t.solicitudId = s.id;
+        t.tipo = tipo;
+        t.tipoDescarga = s.tipoCfdi;
+        t.rfcSolicitante = s.rfcSolicitante;
+        t.fechaInicialSat = s.fechaInicialSat;
+        t.fechaFinalSat = s.fechaFinalSat;
+        return t;
+    }
+
+    // Lectura fuera de transaccion; nullopt si no es visible o fallo.
+    std::optional<SolicitudPersistida> leerVisible(const SolicitudId& id)
+    {
+        auto s = p.solicitudes.obtenerVisible(id);
+        if (!s || !s.valor()) {
+            return std::nullopt;
+        }
+        return *s.valor();
     }
 
     // Exito con false si la solicitud ya no esta Enviada (resultado descartado).
@@ -665,9 +776,13 @@ struct OperacionExecutor::Impl {
             }
             return resultado(tipo, origen, Desenlace::Descartada, sid, paqueteId);
         }
+        // T009: la fecha inicial forma la ubicacion del ZIP (T008); si no se
+        // puede leer queda vacia y el adaptador falla en Preparacion.
+        const std::optional<SolicitudPersistida> solicitud = leerVisible(*sid);
         ContextoDescarga ctx{paqueteId, paquete->paquete.solicitudMasivaId, paquete->perfilSatId, paquete->rfcSolicitante,
-                             paquete->paquete.idPaqueteSat, cancelacion};
-        auto r = p.sat.descargar(ctx);
+                             paquete->paquete.idPaqueteSat, cancelacion,
+                             solicitud ? solicitud->fechaInicialSat : QString()};
+        auto r = seguro(p.sat.descargar(ctx), &saneamiento::descargaSegura);
         const QDateTime ahora = reloj();
         std::optional<FallaOperacion> falla = r.esExito() ? std::nullopt : std::optional(r.error());
 
@@ -728,6 +843,9 @@ struct OperacionExecutor::Impl {
             return resultado(tipo, origen, Desenlace::Descartada, sid, paqueteId, falla);
         }
         emit q->solicitudActualizada(*sid);
+        if (a.destino == EstadoDescarga::Descargado) {
+            notificarDescargaCompleta(*sid);
+        }
         return resultado(tipo, origen, Desenlace::Aplicada, sid, paqueteId, falla);
     }
 
@@ -960,8 +1078,11 @@ struct OperacionExecutor::Impl {
         }
         for (const PaqueteDescargable& pd : interrumpido.valor().paquetesDescargando) {
             const PaquetePersistido& paq = pd.paquete;
-            ContextoArchivoFinal ctx{paq.id, paq.solicitudMasivaId, pd.perfilSatId, paq.idPaqueteSat, cancelacion};
-            auto existe = p.sat.existeArchivoFinal(ctx);
+            const std::optional<SolicitudPersistida> solicitud = leerVisible(paq.solicitudMasivaId);
+            ContextoArchivoFinal ctx{paq.id,          paq.solicitudMasivaId, pd.perfilSatId,
+                                     paq.idPaqueteSat, cancelacion,         pd.rfcSolicitante,
+                                     solicitud ? solicitud->fechaInicialSat : QString()};
+            auto existe = seguro(p.sat.existeArchivoFinal(ctx));
             const QDateTime ahora = reloj();
             RB r = enTransaccion([&]() -> RB {
                 if (!existe.esExito()) {
@@ -1053,6 +1174,7 @@ OperacionExecutor::OperacionExecutor(PuertosEjecutor puertos, RelojUtc reloj, Pr
     qRegisterMetaType<EstadoCredencial>();
     qRegisterMetaType<InstantaneaWorker>();
     qRegisterMetaType<ExistenciaArchivo>();
+    qRegisterMetaType<TransicionNotificable>();
 
     m_impl->hilo.setObjectName(QStringLiteral("satcfdi-ejecutor"));
     m_impl->contexto = new QObject;
@@ -1241,9 +1363,15 @@ QFuture<void> OperacionExecutor::detener(std::chrono::milliseconds plazo)
     }
     if (activo) {
         auto cancelar = [this]() {
-            QMutexLocker l(&m_impl->mutex);
-            m_impl->plazoId.reset();
-            m_impl->cancelacionActual.solicitar();
+            SenalCancelacion actual;
+            {
+                QMutexLocker l(&m_impl->mutex);
+                m_impl->plazoId.reset();
+                actual = m_impl->cancelacionActual;
+            }
+            // Fuera del mutex: solicitar() ejecuta los callbacks del puerto de
+            // forma sincrona y estos pueden volver a llamar al ejecutor.
+            actual.solicitar();
         };
         if (plazo.count() <= 0) {
             cancelar();

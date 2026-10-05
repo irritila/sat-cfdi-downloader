@@ -7,7 +7,8 @@
 #include "application/configuration/ConfiguracionAppServicePersistido.h"
 #include "application/logging/RegexLogSanitizer.h"
 #include "application/operaciones/OperacionExecutor.h"
-#include "application/operaciones/OperacionesSatNulo.h"
+#include "application/notificaciones/ServicioNotificaciones.h"
+#include "application/operaciones/OperacionesSatProductivo.h"
 #include "application/operaciones/WorkerLocal.h"
 #include "application/profiles/CredencialesSatServicePersistido.h"
 #include "application/persistence/PersistenceDispatcher.h"
@@ -16,6 +17,9 @@
 #include "application/requests/SolicitudesServicePersistido.h"
 #include "infrastructure/persistence/sqlite/SqlitePersistencia.h"
 #include "infrastructure/storage/FilesystemPackageStorage.h"
+#include "infrastructure/sat/SatGatewayProductivo.h"
+#include "presentation/viewmodels/AppViewModel.h"
+#include "presentation/viewmodels/CatalogoMensajes.h"
 #include "presentation/viewmodels/PresentacionViewModels.h"
 
 #include <QDir>
@@ -54,13 +58,8 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
     // T005.1: la presentacion de perfiles y e.firma consume el mismo servicio
     // de credenciales persistido.
     // T007: ejecutor serial con su propio hilo y conexion SQLite (la de su
-    // hilo en SqlitePersistencia), puerto SAT (nulo hasta T009) y worker.
+    // hilo en SqlitePersistencia), puerto SAT (productivo desde T009) y worker.
     const RelojUtc reloj = monitoreo.reloj ? monitoreo.reloj : relojSistema();
-    OperacionesSat* sat = monitoreo.operacionesSat;
-    if (!sat) {
-        m_operacionesSatPropio = std::make_unique<OperacionesSatNulo>();
-        sat = m_operacionesSatPropio.get();
-    }
     Programador* programadorEjecutor = monitoreo.programadorEjecutor;
     if (!programadorEjecutor) {
         m_programadorEjecutorPropio = std::make_unique<ProgramadorQt>(reloj);
@@ -81,6 +80,34 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
                              : monitoreo.raizPaquetes;
         m_packageStoragePropio = std::make_unique<FilesystemPackageStorage>(m_raizPaquetes);
         m_packageStorage = m_packageStoragePropio.get();
+    }
+
+    // T009: SatGateway productivo (o inyectado). Se crea en el hilo grafico
+    // pero SOLO se invoca desde el hilo del ejecutor (adaptador OperacionesSat).
+    m_satGateway = monitoreo.satGateway;
+    if (!m_satGateway) {
+        SatGatewayOptions opciones;
+        opciones.reloj = reloj;
+        m_satGatewayPropio = std::make_unique<SatGatewayProductivo>(std::move(opciones));
+        m_satGateway = m_satGatewayPropio.get();
+    }
+
+    // T009: OperacionesSat productivo (o inyectado). Se crea antes del
+    // ejecutor y se destruye despues (su destructor cierra las sesiones). Un
+    // cambio de credencial invalida la sesion de token de ese perfil.
+    OperacionesSat* sat = monitoreo.operacionesSat;
+    if (!sat) {
+        auto productivo = std::make_unique<OperacionesSatProductivo>(*m_satGateway, *m_credencialesService,
+                                                                     *m_packageStorage, reloj);
+        OperacionesSatProductivo* operaciones = productivo.get();
+        m_conexionInvalidarSesion = QObject::connect(m_credencialesService.get(), &CredencialesSatService::credencialCambio,
+                         m_credencialesService.get(), [operaciones](const QString& id) {
+                             if (const auto perfil = PerfilId::desdeTexto(id)) {
+                                 operaciones->invalidarSesion(*perfil);
+                             }
+                         });
+        m_operacionesSatPropio = std::move(productivo);
+        sat = m_operacionesSatPropio.get();
     }
 
     SqlitePersistencia* persistencia = m_persistencia.get();
@@ -106,7 +133,6 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
     // Diagnostico de app (solo la clave del estado; sin RFC ni perfil) y
     // evento para la UI: credencialCambio hace que PerfilesSatViewModel
     // reverifique ese perfil y que el selector de nueva solicitud se recargue.
-    // La notificacion nativa la agrega T009.
     CredencialesSatService* credenciales = m_credencialesService.get();
     QObject::connect(m_ejecutor.get(), &OperacionExecutor::estadoCredencialCambiado, credenciales,
                      [credenciales](const PerfilId& perfil, EstadoCredencial estado) {
@@ -114,6 +140,16 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
                                 qUtf8Printable(claveEstable(estado)));
                          emit credenciales->credencialCambio(perfil.texto());
                      });
+
+    // T009 D1/D9: notificaciones decididas por la aplicacion (una sola fuente,
+    // tambien las de credencial) solo tras commit, entregadas por OSIntegration
+    // cuando exista (iniciarCicloDeVida). El resultado no vuelve a la app.
+    m_notificador = std::make_unique<NotificadorOS>();
+    m_servicioNotificaciones = std::make_unique<ServicioNotificaciones>(*m_notificador);
+    QObject::connect(m_ejecutor.get(), &OperacionExecutor::transicionConfirmada, m_servicioNotificaciones.get(),
+                     &ServicioNotificaciones::alConfirmarTransicion);
+    QObject::connect(m_ejecutor.get(), &OperacionExecutor::estadoCredencialCambiado,
+                     m_servicioNotificaciones.get(), &ServicioNotificaciones::alCambiarEstadoCredencial);
 
     m_viewModels = std::make_unique<PresentacionViewModels>(
         m_solicitudesService.get(), m_perfilesService.get(), m_credencialesService.get());
@@ -135,6 +171,7 @@ AppCompositionRoot::~AppCompositionRoot()
 
     // T007: el ejecutor termina antes que el dispatcher (y su hilo cierra su
     // propia conexion). Si la salida explicita ya lo detuvo, es inmediato.
+    m_servicioNotificaciones.reset();
     m_accionesWorker.reset();
     m_consultaExistencia.reset();
     m_extensionWorker.reset();
@@ -145,8 +182,11 @@ AppCompositionRoot::~AppCompositionRoot()
     m_ejecutor.reset(); // ~OperacionExecutor: cancela, espera y cierra su conexion en su hilo
     m_programadorWorkerPropio.reset();
     m_programadorEjecutorPropio.reset();
-    m_operacionesSatPropio.reset();
+    QObject::disconnect(m_conexionInvalidarSesion);
+    m_operacionesSatPropio.reset(); // ~OperacionesSatProductivo: cerrarSesiones()
     m_packageStoragePropio.reset();
+    m_satGatewayPropio.reset();
+    m_notificador.reset();
 
     m_credencialesService.reset();
     m_configuracionService.reset();
@@ -197,6 +237,18 @@ AppLifecycleController& AppCompositionRoot::iniciarCicloDeVida(OSIntegration& os
     if (salida) {
         m_controlador->setSalida(std::move(salida));
     }
+    // T009: notificaciones (credencial aqui; las de solicitud las decide el
+    // servicio de aplicacion) y aviso de notificaciones deshabilitadas.
+    m_os = &os;
+    m_notificador->setOS(&os);
+    AppViewModel* app = m_viewModels->app();
+    const auto reflejarPermiso = [app](OSIntegration::NotificationStatus s) {
+        app->setNotificacionesDeshabilitadas(s == OSIntegration::NotificationStatus::Denied
+                                             || s == OSIntegration::NotificationStatus::Unavailable);
+    };
+    reflejarPermiso(os.notificationStatus());
+    QObject::connect(&os, &OSIntegration::notificationStatusChanged, app, reflejarPermiso);
+
     // T007: pausa/reanudacion confirmadas y salida (D1) pasan por el worker.
     m_controlador->setExtension(m_extensionWorker.get());
 

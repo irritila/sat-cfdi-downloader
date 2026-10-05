@@ -201,7 +201,7 @@ endif()
 # satcfdi_sat: C14N (libxml2 del SDK), digest/firma RSA-SHA1 (OpenSSL 3),
 # sobres SOAP/WS-Security, parser de respuestas y Faults (QXmlStreamReader),
 # cliente HTTP con fases (QNetworkAccessManager) y enmascarado de evidencia
-# (D2, D3, D5, D6). Reutilizable por T009; NO lo enlaza satcfdi_app (solo la
+# (D2, D3, D5, D6). T009 agrega SatGatewayProductivo, que enlaza el composition root (antes solo la
 # CLI del spike, tools/sat_spike, y sus pruebas). Headers sin tipos de libxml2
 # ni OpenSSL.
 find_package(LibXml2 REQUIRED)
@@ -222,6 +222,11 @@ qt_add_library(satcfdi_sat STATIC
     sat/ClienteHttpSat.cpp
     sat/EnmascaradorEvidencia.h
     sat/EnmascaradorEvidencia.cpp
+    # T009: SatGateway productivo (lo enlaza el composition root).
+    sat/SatGatewayProductivo.h
+    sat/SatGatewayProductivo.cpp
+    sat/SaneadoRespuestaSat.h
+    sat/SaneadoRespuestaSat.cpp
 )
 set_target_properties(satcfdi_sat PROPERTIES AUTOMOC ON)
 target_include_directories(satcfdi_sat PUBLIC

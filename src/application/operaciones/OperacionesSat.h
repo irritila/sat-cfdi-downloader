@@ -37,6 +37,10 @@ struct ContextoDescarga {
     QString rfcSolicitante;
     QString idPaqueteSat;
     SenalCancelacion cancelacion;
+    // T009: fecha_inicial_sat de la solicitud ("yyyy-MM-ddTHH:mm:ss"); con
+    // rfcSolicitante y solicitudId forma la UbicacionPaquete de T008. Vacia
+    // si no se pudo leer: el adaptador falla en Preparacion sin red.
+    QString fechaInicialSat;
 };
 
 struct ContextoArchivoFinal {
@@ -45,6 +49,9 @@ struct ContextoArchivoFinal {
     PerfilId perfilSatId;
     QString idPaqueteSat;
     SenalCancelacion cancelacion;
+    // T009: datos para derivar la ruta final (UbicacionPaquete de T008).
+    QString rfcSolicitante;
+    QString fechaInicialSat;
 };
 
 // Puerto de aplicacion de las operaciones externas (T007 D3, ADR 0018).

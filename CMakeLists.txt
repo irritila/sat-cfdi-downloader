@@ -119,8 +119,9 @@ if(SATCFDI_BUILD_SAT_SPIKE)
     add_subdirectory(tools/sat_spike)
 endif()
 
-# Criterio 8 de T006: satcfdi_app no enlaza la biblioteca SAT del spike (ni
-# directa ni transitivamente). Se comprueba al configurar.
+# T006 criterio 8 / T009: desde T009 satcfdi_app SI enlaza satcfdi_sat (el
+# SatGateway productivo vive ahi), pero nunca la CLI del spike
+# (satcfdi_sat_spike_core, tools/sat_spike). Se comprueba al configurar.
 function(_satcfdi_dependencias_link target salida)
     set(_pendientes ${target})
     set(_vistos "")
@@ -149,6 +150,6 @@ function(_satcfdi_dependencias_link target salida)
     set(${salida} ${_vistos} PARENT_SCOPE)
 endfunction()
 _satcfdi_dependencias_link(satcfdi_app _satcfdi_deps_app)
-if("satcfdi_sat" IN_LIST _satcfdi_deps_app)
-    message(FATAL_ERROR "satcfdi_app enlaza satcfdi_sat (biblioteca del spike SAT); T006 lo prohibe hasta T009")
+if("satcfdi_sat_spike_core" IN_LIST _satcfdi_deps_app)
+    message(FATAL_ERROR "satcfdi_app enlaza la CLI del spike SAT (satcfdi_sat_spike_core)")
 endif()

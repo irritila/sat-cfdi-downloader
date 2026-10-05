@@ -5,6 +5,7 @@
 #include "application/operaciones/TiposOperacion.h"
 #include "application/persistence/PuertosPersistencia.h"
 #include "domain/operaciones/RegistrosOperacion.h"
+#include "domain/operaciones/TransicionNotificable.h"
 #include "domain/perfiles/PerfilId.h"
 #include "domain/solicitudes/SolicitudId.h"
 #include "ports/secrets/SecretStoreTypes.h"
@@ -146,6 +147,9 @@ signals:
     void solicitudActualizada(const satcfdi::SolicitudId& solicitudId);
     // Cambio el estado de credencial observado de un perfil (D9).
     void estadoCredencialCambiado(const satcfdi::PerfilId& perfil, satcfdi::EstadoCredencial estado);
+    // T009 D1/D9: transicion confirmada (emitida DESPUES del commit, una vez
+    // por transicion persistida) para el servicio de notificaciones.
+    void transicionConfirmada(const satcfdi::TransicionNotificable& transicion);
     // Resultado de consultarExistencia (T008 D11).
     void existenciaConsultada(const QString& rutaRelativa, satcfdi::ExistenciaArchivo existencia);
     // La cola quedo vacia (sin operacion activa).
@@ -158,5 +162,3 @@ private:
 };
 
 } // namespace satcfdi
-
-Q_DECLARE_METATYPE(satcfdi::EstadoCredencial)

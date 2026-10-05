@@ -56,6 +56,18 @@ Page {
         mostrarRegresar: true
         onRegresarSolicitado: pagina.regresar()
 
+        // T009: Enviar una solicitud Creada solo con la credencial Lista.
+        BotonAccion {
+            objectName: "botonEnviarSolicitud"
+            visible: pagina.conDatos && pagina.detalle.envioVisible
+            enabled: pagina.detalle.puedeEnviar
+            text: qsTr("Enviar")
+            descripcion: pagina.detalle.puedeEnviar
+                         ? qsTr("Enviar la solicitud al SAT")
+                         : pagina.detalle.motivoEnvio
+            onClicked: pagina.detalle.enviar()
+        }
+
         // T007: acciones manuales; solo visibles si aplican al estado actual.
         BotonAccion {
             objectName: "botonVerificarAhora"
@@ -184,6 +196,32 @@ Page {
             spacing: 12
 
             Item { implicitHeight: 4 }
+
+            // T009 D10: por que no se puede enviar y mensaje del estado actual.
+            Label {
+                objectName: "motivoEnvio"
+                visible: text.length > 0 && !pagina.detalle.puedeEnviar
+                text: pagina.detalle.motivoEnvio
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+                Layout.leftMargin: 16
+                Layout.rightMargin: 16
+                Accessible.role: Accessible.StaticText
+                Accessible.name: text
+            }
+
+            Label {
+                objectName: "mensajeEstado"
+                visible: text.length > 0
+                text: pagina.detalle.mensajeEstado
+                font.bold: true
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+                Layout.leftMargin: 16
+                Layout.rightMargin: 16
+                Accessible.role: Accessible.StaticText
+                Accessible.name: text
+            }
 
             Label {
                 objectName: "accionSolicitada"
@@ -391,6 +429,16 @@ Page {
                                     wrapMode: Text.WordWrap
                                     Layout.fillWidth: true
                                     Accessible.ignored: true
+                                }
+                                // T009 D10: vencido, maximo de descargas o error.
+                                Label {
+                                    objectName: "mensajePaquete_" + paquete.modelData.idPaqueteSat
+                                    visible: text.length > 0
+                                    text: paquete.modelData.mensaje
+                                    wrapMode: Text.WordWrap
+                                    Layout.fillWidth: true
+                                    Accessible.role: Accessible.StaticText
+                                    Accessible.name: text
                                 }
                                 // T008 D11: existencia del ZIP local (solo Descargado).
                                 Label {

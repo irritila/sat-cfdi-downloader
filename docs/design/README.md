@@ -16,3 +16,4 @@ Los documentos aqui no amplian el alcance del MVP. Deben mantenerse alineados co
 | [Reglas operativas](operational-rules.md) | Define estados, codigos, transacciones, recuperacion y ejecucion serial. |
 | [Modelo fisico SQLite](sqlite-physical-model.md) | Define tablas, restricciones, indices, contrato de migraciones y transacciones de la base local. |
 | [Resultados del spike SAT](sat-spike-results.md) | Evidencia sanitizada de T006 contra produccion SAT, puntos de firma y contrato recomendado para `SatGateway`. |
+| [Humo SAT de T009](sat-smoke-t009.md) | Evidencia sanitizada de la prueba real del flujo integrado (emitidos) y revision de datos posterior. |

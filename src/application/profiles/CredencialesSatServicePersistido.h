@@ -1,6 +1,7 @@
 #pragma once
 
 #include "application/persistence/PuertosPersistencia.h"
+#include "application/profiles/AccesoCredencialSat.h"
 #include "application/profiles/CredencialesSatService.h"
 
 #include <QSet>
@@ -34,7 +35,7 @@ class SecretStore;
 // Exclusion (calidad T005): `m_exclusion` (QMutex compartido por shared_ptr
 // para sobrevivir al servicio si una tarea corre tras su destruccion) se
 // toma durante TODA la tarea de importar/reemplazar/eliminar/reconciliar y
-// durante obtenerMaterialFirma(). Asi la lectura de la fila + el descifrado
+// durante obtenerMaterialFirma() y estadoEnHiloDeTrabajo(). Asi la lectura de la fila + el descifrado
 // de material son atomicos respecto a reemplazo y limpieza, aunque T009 llame
 // desde su propio ejecutor. obtenerEstado() no lo toma (solo lectura en el
 // dispatcher, serial con las demas tareas). No reentrante.
@@ -43,7 +44,7 @@ class SecretStore;
 // `registro(operacion, categoria)` (por defecto qCWarning en la categoria
 // "satcfdi.credenciales"). Solo recibe una etiqueta fija de operacion y la
 // categoria: nunca RFC, rutas, `diagnostico` ni OSStatus.
-class CredencialesSatServicePersistido final : public CredencialesSatService {
+class CredencialesSatServicePersistido final : public CredencialesSatService, public AccesoCredencialSat {
     Q_OBJECT
 
 public:
@@ -66,10 +67,15 @@ public:
     QFuture<ResultadoReconciliacion> reconciliar() override;
     ResultadoMaterial obtenerMaterialFirma(const PerfilId& perfilId) override;
 
+    // AccesoCredencialSat (T009 D5): hilo de trabajo, bajo `m_exclusion`.
+    Resultado<EstadoCredencial, ErrorCredencialSat> estadoEnHiloDeTrabajo(const PerfilId& perfilId) override;
+    Resultado<MaterialFirma, ErrorCredencialSat> materialEnHiloDeTrabajo(const PerfilId& perfilId) override;
+
     // Registro por defecto (qCWarning, solo operacion + categoria).
     static void registroPorDefecto(QStringView operacion, ErrorSecretStore::Categoria categoria);
 
 private:
+    bool enHiloNoPermitido() const;
     QFuture<ResultadoImportacion> registrar(const PerfilId& perfilId, EntradaEFirma&& entrada,
                                             bool esReemplazo);
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "domain/logs/LogSolicitud.h"
+#include "domain/operaciones/FallaOperacion.h"
 #include "domain/paquetes/EstadoDescarga.h"
 #include "domain/perfiles/PerfilId.h"
 #include "domain/solicitudes/Duplicados.h"
@@ -71,6 +72,12 @@ struct SolicitudDetalle {
     std::optional<QDateTime> enviadaEn;
     std::optional<QDateTime> ultimaVerificacionEn;
     std::optional<QString> ultimoError;
+    // T009: desglose de ultimoError cuando lo escribio una FallaOperacion
+    // (domain/operaciones/FallaOperacion.h, desglosarUltimoError). Permite a
+    // la UI elegir el texto D10 por fase/codigo (p. ej. Creada tras una falla
+    // de Preparacion/Autenticacion/AntesDeEnvio). Vacio si ultimoError no
+    // tiene ese formato (rechazo explicito "CodEstatus N", envio interrumpido).
+    std::optional<UltimoErrorDesglosado> ultimoErrorDesglosado;
 
     QList<PaqueteResumen> paquetes; // resumen.totalPaquetes == paquetes.size()
     QList<LogResumen> logs;         // creado_en ASC

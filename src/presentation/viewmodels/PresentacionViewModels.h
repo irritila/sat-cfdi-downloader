@@ -54,6 +54,8 @@ public:
     void setConsultaExistencia(ConsultaExistenciaPaquetes* consulta);
 
 private:
+    void conectarPreparacionDetalle(PerfilesSatService* perfiles, CredencialesSatService* credenciales);
+
     SolicitudesListModel* m_solicitudes;
     NuevaSolicitudViewModel* m_nuevaSolicitud;
     SolicitudDetailViewModel* m_detalle;

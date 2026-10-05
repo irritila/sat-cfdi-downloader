@@ -14,6 +14,15 @@ qt_add_library(satcfdi_application STATIC
     logging/RegexLogSanitizer.cpp
     operaciones/OperacionesSat.h
     operaciones/OperacionesSatNulo.h
+    operaciones/OperacionesSatProductivo.h
+    operaciones/OperacionesSatProductivo.cpp
+    operaciones/MensajesOperacionSat.h
+    operaciones/MensajesOperacionSat.cpp
+    operaciones/SaneamientoOperacion.h
+    operaciones/SaneamientoOperacion.cpp
+    notificaciones/Notificador.h
+    notificaciones/ServicioNotificaciones.h
+    notificaciones/ServicioNotificaciones.cpp
     operaciones/SenalCancelacion.h
     operaciones/SenalCancelacion.cpp
     operaciones/Programador.h
@@ -26,6 +35,7 @@ qt_add_library(satcfdi_application STATIC
     persistence/PersistenceDispatcher.h
     persistence/PersistenceDispatcher.cpp
     persistence/PuertosPersistencia.h
+    profiles/AccesoCredencialSat.h
     profiles/ConsultaPreparacionPerfiles.h
     profiles/ConsultaPreparacionPerfiles.cpp
     profiles/CredencialesSatService.h

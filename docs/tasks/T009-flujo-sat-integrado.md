@@ -2,7 +2,7 @@
 
 ## Estado
 
-Pendiente (refinada 2026-10-04). Lista para implementar por operacion una vez cumplida la precondicion de T006 (ver Precondiciones).
+Completada (2026-10-05). Refinada 2026-10-04; implementada en la rama `t009-flujo-sat-integrado`.
 
 ## Prioridad y tamano
 
@@ -123,35 +123,36 @@ Las filas de Fault, HTTP no 200 y token rechazado se confirman o ajustan con `sa
 ### Precondicion y contrato
 
 - [ ] Dada la clasificacion de T006 por operacion, cuando se habilita el flujo, entonces solo las operaciones `Viable` o con ajuste probado estan conectadas, y las demas quedan declaradas fuera con su motivo.
-- [ ] Dados filtros de emitidos y de recibidos validos, cuando se envian, entonces el adaptador invoca solo la operacion SAT correspondiente con los atributos efectivos de ADR 0013 (verificado con `FakeSatGateway` y el servidor local).
+  Excepcion aceptada por el usuario (2026-10-05): `SolicitaDescargaRecibidos` sigue `No probada` y la UI la mantiene habilitada; se valida en T010.
+- [x] Dados filtros de emitidos y de recibidos validos, cuando se envian, entonces el adaptador invoca solo la operacion SAT correspondiente con los atributos efectivos de ADR 0013 (verificado con `FakeSatGateway` y el servidor local).
 
 ### Mapeo y estados
 
-- [ ] Dada cada fila de la tabla de mapeo, cuando el fake o el servidor local la reproduce, entonces `OperacionesSat` devuelve el resultado o la fase indicados, y el estado final aplicado por T007 coincide con la tabla (prueba parametrizada).
-- [ ] Dado un perfil sin credencial `Lista`, cuando se abre el detalle de una solicitud `Creada` de ese perfil, entonces `Enviar` esta deshabilitado con el mensaje de credencial y no hay trafico SAT.
-- [ ] Dada una falla en `Preparacion`, `Autenticacion` o `AntesDeEnvio` al enviar, cuando termina, entonces la solicitud vuelve a `Creada` con el mensaje correspondiente y `Enviar` manual disponible.
-- [ ] Dado `5008` en una descarga, cuando se aplica, entonces el paquete queda en `Error` y `Reintentar descarga` no se ofrece para ese paquete.
+- [x] Dada cada fila de la tabla de mapeo, cuando el fake o el servidor local la reproduce, entonces `OperacionesSat` devuelve el resultado o la fase indicados, y el estado final aplicado por T007 coincide con la tabla (prueba parametrizada).
+- [x] Dado un perfil sin credencial `Lista`, cuando se abre el detalle de una solicitud `Creada` de ese perfil, entonces `Enviar` esta deshabilitado con el mensaje de credencial y no hay trafico SAT.
+- [x] Dada una falla en `Preparacion`, `Autenticacion` o `AntesDeEnvio` al enviar, cuando termina, entonces la solicitud vuelve a `Creada` con el mensaje correspondiente y `Enviar` manual disponible.
+- [x] Dado `5008` en una descarga, cuando se aplica, entonces el paquete queda en `Error` y `Reintentar descarga` no se ofrece para ese paquete.
 
 ### Sesion, tiempos y seguridad
 
-- [ ] Dado un token vigente, cuando siguen varias operaciones del mismo perfil, entonces se autentica una sola vez. Al expirar el TTL, ante una falla de autenticacion, un token rechazado, un cambio de credencial o el cierre, el token se invalida y la siguiente operacion autentica de nuevo.
-- [ ] Dado un servidor local que no responde, cuando vence el timeout de cada operacion (con reloj y deadline controlables), entonces se aborta la peticion y la fase reportada distingue `AntesDeEnvio` de `DespuesDeEnvio`. Dada una cancelacion durante una descarga, la escritura se aborta sin archivo final.
-- [ ] Dados los logs, mensajes, notificaciones y SQLite tras ejecutar todas las pruebas, cuando se inspeccionan, entonces no contienen token, firma, contrasena, certificado, RFC completo en mensajes o notificaciones, ni bytes o base64 del ZIP.
+- [x] Dado un token vigente, cuando siguen varias operaciones del mismo perfil, entonces se autentica una sola vez. Al expirar el TTL, ante una falla de autenticacion, un token rechazado, un cambio de credencial o el cierre, el token se invalida y la siguiente operacion autentica de nuevo.
+- [x] Dado un servidor local que no responde, cuando vence el timeout de cada operacion (con reloj y deadline controlables), entonces se aborta la peticion y la fase reportada distingue `AntesDeEnvio` de `DespuesDeEnvio`. Dada una cancelacion durante una descarga, la escritura se aborta sin archivo final.
+- [x] Dados los logs, mensajes, notificaciones y SQLite tras ejecutar todas las pruebas, cuando se inspeccionan, entonces no contienen token, firma, contrasena, certificado, RFC completo en mensajes o notificaciones, ni bytes o base64 del ZIP.
 
 ### Notificaciones
 
-- [ ] Dada una transicion confirmada a `Terminada`, `ErrorSat`, `Rechazada` o `Vencida`, cuando se hace el commit, entonces se emite una sola notificacion por solicitud y transicion, aunque la verificacion se repita.
-- [ ] Dada la descarga del ultimo paquete pendiente, cuando se hace el commit, entonces se emite una sola `Descarga completa: N de N` y ninguna por paquete.
-- [ ] Dado un permiso de notificaciones denegado o no disponible, cuando se intenta notificar, entonces los estados, logs y reintentos no cambian, y la UI muestra que las notificaciones estan deshabilitadas.
+- [x] Dada una transicion confirmada a `Terminada`, `ErrorSat`, `Rechazada` o `Vencida`, cuando se hace el commit, entonces se emite una sola notificacion por solicitud y transicion, aunque la verificacion se repita.
+- [x] Dada la descarga del ultimo paquete pendiente, cuando se hace el commit, entonces se emite una sola `Descarga completa: N de N` y ninguna por paquete.
+- [x] Dado un permiso de notificaciones denegado o no disponible, cuando se intenta notificar, entonces los estados, logs y reintentos no cambian, y la UI muestra que las notificaciones estan deshabilitadas.
 
 ### Integracion y humo real
 
-- [ ] Dada la app con el adaptador productivo y fakes de red, cuando se crea una solicitud desde la UI, entonces se persiste en `Creada` antes de cualquier llamada y el envio pasa por el ejecutor.
-- [ ] Dadas solicitudes pendientes y paquetes `Disponible`, cuando se cierra y reabre la app, entonces el worker continua la verificacion y la descarga, y una solicitud `Enviando` interrumpida queda `EnvioIncierto`.
-- [ ] Dada la precondicion cumplida, cuando el usuario ejecuta el humo (D2), entonces la evidencia en `sat-smoke-t009.md` muestra los estados recorridos (`Creada`, `Enviada`, verificaciones, `Terminada`, `Descargado`), los textos de las notificaciones, los paquetes con nombre enmascarado y tamano, el conteo de solicitudes reales (2 como maximo) y la reapertura de la app.
-- [ ] Antes del humo, con el llavero bloqueado o la credencial no `Lista`, cuando el usuario intenta enviar, entonces la solicitud sigue en `Creada` y no hay trafico SAT.
-- [ ] El escaneo de secretos de T006 sobre el arbol y el staging da resultado vacio despues de registrar la evidencia.
-- [ ] No se agrega parsing XML, metadata SAT ni funcionalidad comercial.
+- [x] Dada la app con el adaptador productivo y fakes de red, cuando se crea una solicitud desde la UI, entonces se persiste en `Creada` antes de cualquier llamada y el envio pasa por el ejecutor.
+- [x] Dadas solicitudes pendientes y paquetes `Disponible`, cuando se cierra y reabre la app, entonces el worker continua la verificacion y la descarga, y una solicitud `Enviando` interrumpida queda `EnvioIncierto`.
+- [x] Dada la precondicion cumplida, cuando el usuario ejecuta el humo (D2), entonces la evidencia en `sat-smoke-t009.md` muestra los estados recorridos (`Creada`, `Enviada`, verificaciones, `Terminada`, `Descargado`), los textos de las notificaciones, los paquetes con nombre enmascarado y tamano, el conteo de solicitudes reales (2 como maximo) y la reapertura de la app.
+- [x] Antes del humo, con el llavero bloqueado o la credencial no `Lista`, cuando el usuario intenta enviar, entonces la solicitud sigue en `Creada` y no hay trafico SAT.
+- [x] El escaneo de secretos de T006 sobre el arbol y el staging da resultado vacio despues de registrar la evidencia.
+- [x] No se agrega parsing XML, metadata SAT ni funcionalidad comercial.
 
 ## Verificacion
 
@@ -171,7 +172,20 @@ Las filas de Fault, HTTP no 200 y token rechazado se confirman o ajustan con `sa
 
 ## Resultado
 
-Pendiente.
+- `SatGateway` definido (`src/ports/SatGateway.h`, `src/ports/sat/`) con `SatGatewayProductivo` sobre los bloques de T006 (`QEventLoop` local
+  en el hilo del ejecutor, cancelacion, timeouts D7, endpoints solo HTTPS oficiales) y `SaneadoRespuestaSat` en la frontera: lista permitida de
+  `faultcode` y codigos, `Mensaje` enmascarado, diagnosticos con plantilla fija. `FakeSatGateway` y `ServidorHttpPrueba` para pruebas.
+- `OperacionesSatProductivo` sustituye a `OperacionesSatNulo` en el root: sesion de token por perfil (D6), tabla D8 completa, mensajes D10,
+  descarga hacia `PackageStorage`; puerto sincrono `AccesoCredencialSat` para el hilo del ejecutor; `SaneamientoOperacion` antes de persistir.
+- `OperacionExecutor`: guardia contra reentrada (un puerto que gira un event loop ya no solapa operaciones) y cancelacion fuera del mutex.
+- Notificaciones: `OSIntegration::notificar` (macOS y fake), puerto `Notificador` y `ServicioNotificaciones` post-commit con dedupe (D1, D9).
+- UI: `CatalogoMensajes`, `Enviar` solo con credencial `Lista`, sin `Reintentar descarga` en 5008, aviso de notificaciones deshabilitadas,
+  `ultimoErrorDesglosado` en el detalle.
+- Pruebas: `TestSatGatewayProductivo` (21), `TestFakeSatGateway`, `TestOperacionesSatProductivo` (tabla D8 parametrizada, sesion, cancelacion,
+  saneado, reentrada), `TestNotificaciones`, `TestFlujoSat` (flujo completo con root real); `ctest -j6` 12/12 en `build/` y `build-signed/`.
+- Humo real (emitidos) correcto de punta a punta, con reapertura: [`sat-smoke-t009.md`](../design/sat-smoke-t009.md). Escaneo de secretos limpio.
+- Pendientes para T010: humo de recibidos; root sin inyeccion crea el gateway productivo en pruebas antiguas (sin trafico hoy); `TestFlujoSat`
+  avanza con `qWait(0)` en lugar de una barrera determinista.
 
 ## Riesgos y notas
 

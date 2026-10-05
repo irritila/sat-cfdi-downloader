@@ -73,6 +73,17 @@ Page {
         }
     }
 
+    // T009 D9: aviso cuando macOS no permite notificaciones (no afecta el flujo).
+    footer: Label {
+        objectName: "avisoNotificaciones"
+        visible: pagina.app.notificacionesDeshabilitadas
+        text: qsTr("Las notificaciones estan deshabilitadas. Activalas en Ajustes del Sistema para recibir avisos.")
+        wrapMode: Text.WordWrap
+        padding: 8
+        Accessible.role: Accessible.StaticText
+        Accessible.name: text
+    }
+
     ListView {
         id: lista
         objectName: "listaSolicitudes"

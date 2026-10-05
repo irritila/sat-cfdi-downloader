@@ -1,6 +1,7 @@
 #include "TestClienteHttpSat.h"
 
 #include "SatPruebasComun.h"
+#include "ServidorHttpPrueba.h"
 
 #include "infrastructure/sat/ClienteHttpSat.h"
 #include "infrastructure/sat/RespuestasSat.h"
@@ -15,104 +16,12 @@ using namespace satcfdi::sat;
 
 namespace {
 
+using satpruebas::ServidorPrueba;
+
 QByteArray fixture(const char* nombre)
 {
     return satpruebas::leer(QStringLiteral(SATCFDI_SAT_FIXTURES "/") + QString::fromLatin1(nombre));
 }
-
-// Servidor HTTP/1.1 minimo para pruebas. Cuenta peticiones COMPLETAS
-// (encabezados + Content-Length) y actua segun el modo.
-class ServidorPrueba : public QObject {
-public:
-    enum class Modo {
-        Responder,          // responde `estado` + `cuerpo` y cierra
-        CerrarTrasPeticion, // lee la peticion completa y corta sin responder
-        Silencio,           // lee la peticion y nunca responde
-        SinLeer,            // acepta TCP y no lee nada (TLS nunca avanza)
-        Manual,             // guarda la conexion; la prueba llama responderPendiente()
-    };
-
-    explicit ServidorPrueba(Modo modo) : m_modo(modo)
-    {
-        QObject::connect(&m_servidor, &QTcpServer::newConnection, this, [this]() {
-            while (QTcpSocket* s = m_servidor.nextPendingConnection()) {
-                s->setParent(this);
-                ++conexiones;
-                if (m_modo == Modo::SinLeer) {
-                    continue;
-                }
-                QObject::connect(s, &QTcpSocket::readyRead, this, [this, s]() { leer(s); });
-            }
-        });
-        m_servidor.listen(QHostAddress::LocalHost);
-    }
-
-    quint16 puerto() const { return m_servidor.serverPort(); }
-    void cerrar() { m_servidor.close(); }
-
-    int conexiones = 0;
-    int peticiones = 0;
-    QByteArray ultimaCabecera;
-    QByteArray ultimoCuerpo;
-    QStringList bitacora;
-    int estado = 200;
-    QByteArray cuerpo;
-
-    int pendientes() const { return static_cast<int>(m_pendientes.size()); }
-    void responderPendiente()
-    {
-        QTcpSocket* s = m_pendientes.takeFirst();
-        bitacora.append(QStringLiteral("respondida"));
-        responder(s);
-    }
-
-private:
-    void leer(QTcpSocket* s)
-    {
-        QByteArray& buf = m_buffers[s];
-        buf += s->readAll();
-        const qsizetype finCabecera = buf.indexOf("\r\n\r\n");
-        if (finCabecera < 0) {
-            return;
-        }
-        const QByteArray cabecera = buf.left(finCabecera);
-        qsizetype largo = 0;
-        for (const QByteArray& linea : cabecera.split('\n')) {
-            if (linea.toLower().startsWith("content-length:")) {
-                largo = linea.mid(15).trimmed().toLongLong();
-            }
-        }
-        if (buf.size() < finCabecera + 4 + largo) {
-            return;
-        }
-        ++peticiones;
-        ultimaCabecera = cabecera;
-        ultimoCuerpo = buf.mid(finCabecera + 4, largo);
-        bitacora.append(QStringLiteral("recibida:") + QString::fromUtf8(ultimoCuerpo));
-        buf.clear();
-        switch (m_modo) {
-        case Modo::Responder: responder(s); break;
-        case Modo::CerrarTrasPeticion: s->abort(); break;
-        case Modo::Manual: m_pendientes.append(s); break;
-        case Modo::Silencio:
-        case Modo::SinLeer: break;
-        }
-    }
-
-    void responder(QTcpSocket* s)
-    {
-        QByteArray r = "HTTP/1.1 " + QByteArray::number(estado) + (estado == 200 ? " OK" : " Internal Server Error")
-                       + "\r\nContent-Type: text/xml; charset=utf-8\r\nContent-Length: "
-                       + QByteArray::number(cuerpo.size()) + "\r\nConnection: close\r\n\r\n" + cuerpo;
-        s->write(r);
-        s->disconnectFromHost();
-    }
-
-    Modo m_modo;
-    QTcpServer m_servidor;
-    QHash<QTcpSocket*, QByteArray> m_buffers;
-    QList<QTcpSocket*> m_pendientes;
-};
 
 PeticionSat peticion(quint16 puerto, const QByteArray& sobre = "<s:Envelope/>", bool https = false)
 {

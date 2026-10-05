@@ -1,5 +1,6 @@
 #pragma once
 
+#include "application/profiles/PerfilConPreparacion.h"
 #include "application/requests/SolicitudDtos.h"
 
 #include <QDateTime>
@@ -18,6 +19,7 @@ namespace satcfdi {
 
 class AccionesSolicitud;
 class ConsultaExistenciaPaquetes;
+class ConsultaPreparacionPerfiles;
 
 class SolicitudesService;
 
@@ -94,6 +96,15 @@ class SolicitudDetailViewModel : public QObject {
     Q_PROPERTY(bool puedeReintentarDescarga READ puedeReintentarDescarga NOTIFY datosChanged)
     Q_PROPERTY(QString accionSolicitada READ accionSolicitada NOTIFY accionSolicitadaChanged)
 
+    // T009: Enviar (solicitud Creada) solo con la credencial del perfil Lista
+    // y perfil activo; motivoEnvio explica por que no (catalogo D10).
+    // mensajeEstado: mensaje del catalogo para el estado actual (vacio si no
+    // aplica). Cada paquete agrega "mensaje" en paquetes().
+    Q_PROPERTY(bool puedeEnviar READ puedeEnviar NOTIFY datosChanged)
+    Q_PROPERTY(bool envioVisible READ envioVisible NOTIFY datosChanged)
+    Q_PROPERTY(QString motivoEnvio READ motivoEnvio NOTIFY datosChanged)
+    Q_PROPERTY(QString mensajeEstado READ mensajeEstado NOTIFY datosChanged)
+
 public:
     enum class Estado {
         Ninguno,
@@ -154,6 +165,15 @@ public:
     // paquetes()[i]["existencia"]: "" (no aplica), "Comprobando", "Presente",
     // "NoEncontrado" o "ErrorComprobacion". Nunca cambia el estado persistido.
     void setConsultaExistencia(ConsultaExistenciaPaquetes* consulta);
+    // T009: preparacion de credenciales para habilitar Enviar. No propietario.
+    void setConsultaPreparacion(ConsultaPreparacionPerfiles* consulta);
+    // Reconsulta la preparacion (p. ej. al cambiar una credencial).
+    void recalcularPreparacion();
+    bool envioVisible() const;
+    bool puedeEnviar() const;
+    QString motivoEnvio() const;
+    QString mensajeEstado() const;
+    Q_INVOKABLE void enviar();
     bool puedeVerificar() const;
     bool puedeReintentarDescarga() const;
     QString accionSolicitada() const { return m_accionSolicitada; }
@@ -186,6 +206,10 @@ private:
     quint64 m_genEliminar = 0;
     AccionesSolicitud* m_acciones = nullptr;
     ConsultaExistenciaPaquetes* m_existencia = nullptr;
+    ConsultaPreparacionPerfiles* m_preparacion = nullptr;
+    // Resultado de la consulta de preparacion del perfil (por RFC).
+    std::optional<std::pair<PreparacionPerfil, bool>> m_credencial; // (preparacion, activo)
+    quint64 m_genPreparacion = 0;
     QHash<QString, QString> m_existencias; // idPaqueteSat -> clave
     quint64 m_genExistencia = 0;
     void consultarExistencias();

@@ -1,7 +1,9 @@
 #include "SolicitudDetailViewModel.h"
 
 #include "AccionesSolicitud.h"
+#include "CatalogoMensajes.h"
 #include "ConsultaExistenciaPaquetes.h"
+#include "application/profiles/ConsultaPreparacionPerfiles.h"
 #include "application/requests/SolicitudesService.h"
 #include "domain/solicitudes/EstadoResumen.h"
 #include "domain/solicitudes/SolicitudId.h"
@@ -207,6 +209,8 @@ QVariantList SolicitudDetailViewModel::paquetes() const
         mapa.insert(QStringLiteral("vencidoEn"), fechaONulo(p.vencidoEn));
         mapa.insert(QStringLiteral("codigoDescargaSat"), texto(p.codigoDescargaSat));
         mapa.insert(QStringLiteral("existencia"), m_existencias.value(p.idPaqueteSat));
+        mapa.insert(QStringLiteral("mensaje"), catalogo::mensajePaquete(p));
+        mapa.insert(QStringLiteral("maximoDescargas"), catalogo::esMaximoDescargas(p));
         lista.append(mapa);
     }
     return lista;
@@ -373,6 +377,73 @@ void SolicitudDetailViewModel::consultarExistencias()
     }
 }
 
+void SolicitudDetailViewModel::setConsultaPreparacion(ConsultaPreparacionPerfiles* consulta)
+{
+    m_preparacion = consulta;
+    recalcularPreparacion();
+}
+
+void SolicitudDetailViewModel::recalcularPreparacion()
+{
+    const quint64 generacion = ++m_genPreparacion;
+    m_credencial.reset();
+    if (!m_preparacion || !m_detalle || m_detalle->resumen.estadoLocal != EstadoLocal::Creada) {
+        return;
+    }
+    const QString rfc = m_detalle->resumen.perfilRfc;
+    m_preparacion->listarVerificados().then(this, [this, generacion, rfc](ConsultaPreparacionPerfiles::ResultadoLista r) {
+        if (generacion != m_genPreparacion) {
+            return;
+        }
+        m_credencial = std::pair{PreparacionPerfil::EstadoNoDisponible, true};
+        if (r) {
+            for (const PerfilConPreparacion& p : r.valor()) {
+                if (p.perfil.rfc == rfc) {
+                    m_credencial = std::pair{p.preparacion, p.perfil.activo};
+                    break;
+                }
+            }
+        }
+        emit datosChanged();
+    });
+}
+
+bool SolicitudDetailViewModel::envioVisible() const
+{
+    return m_acciones && m_detalle && m_detalle->resumen.estadoLocal == EstadoLocal::Creada;
+}
+
+bool SolicitudDetailViewModel::puedeEnviar() const
+{
+    return envioVisible() && m_credencial && m_credencial->first == PreparacionPerfil::Lista && m_credencial->second;
+}
+
+QString SolicitudDetailViewModel::motivoEnvio() const
+{
+    if (!envioVisible()) {
+        return {};
+    }
+    if (!m_credencial) {
+        return catalogo::motivoCredencial(PreparacionPerfil::Verificando, true);
+    }
+    return catalogo::motivoCredencial(m_credencial->first, m_credencial->second);
+}
+
+QString SolicitudDetailViewModel::mensajeEstado() const
+{
+    return m_detalle ? catalogo::mensajeSolicitud(*m_detalle) : QString();
+}
+
+void SolicitudDetailViewModel::enviar()
+{
+    if (!puedeEnviar()) {
+        return;
+    }
+    m_acciones->enviar(m_detalle->resumen.id);
+    m_accionSolicitada = tr("Envio solicitado.");
+    emit accionSolicitadaChanged();
+}
+
 bool SolicitudDetailViewModel::puedeVerificar() const
 {
     if (!m_acciones || !m_detalle || m_detalle->resumen.estadoLocal != EstadoLocal::Enviada) {
@@ -388,7 +459,9 @@ bool SolicitudDetailViewModel::puedeReintentarDescarga() const
         return false;
     }
     for (const PaqueteResumen& p : m_detalle->paquetes) {
-        if (p.estadoDescarga == EstadoDescarga::Disponible || p.estadoDescarga == EstadoDescarga::Error) {
+        // T009: un paquete con 5008 (maximo de descargas) no se reintenta.
+        if (p.estadoDescarga == EstadoDescarga::Disponible
+            || (p.estadoDescarga == EstadoDescarga::Error && !catalogo::esMaximoDescargas(p))) {
             return true;
         }
     }
@@ -422,6 +495,7 @@ void SolicitudDetailViewModel::setDetalle(std::optional<SolicitudDetalle> detall
     }
     m_detalle = std::move(detalle);
     consultarExistencias();
+    recalcularPreparacion();
     emit datosChanged();
 }
 

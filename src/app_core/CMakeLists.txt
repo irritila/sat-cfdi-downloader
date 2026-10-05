@@ -42,6 +42,9 @@ target_link_libraries(satcfdi_app_core
         satcfdi_infrastructure
         # T008: FilesystemPackageStorage (raiz de paquetes, D8).
         satcfdi_storage
+        # T009: SatGatewayProductivo (lo usa el adaptador OperacionesSat
+        # productivo en el hilo del ejecutor; nunca desde el hilo grafico).
+        satcfdi_sat
         satcfdi_domain
         satcfdi_ports
         Qt6::Core

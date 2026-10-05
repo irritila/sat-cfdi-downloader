@@ -64,6 +64,22 @@ public:
         friend bool operator==(const EstadoMonitoreo&, const EstadoMonitoreo&) = default;
     };
 
+    // Notificacion local (T009 D1, D9). `id`: clave estable de dedupe que
+    // decide el servicio de aplicacion (p. ej. "<solicitud>:terminada"); el SO
+    // reemplaza una notificacion con el mismo id en lugar de duplicarla.
+    // `tipo`: clave estable de la categoria ("terminada", "descarga_completa",
+    // "error_sat", "rechazada", "vencida", "credencial"). Titulo y cuerpo ya
+    // vienen del catalogo D10: sin RFC completo, Ids, token, rutas ni Mensaje
+    // SAT crudo.
+    struct NotificacionLocal {
+        QString id;
+        QString tipo;
+        QString titulo;
+        QString cuerpo;
+
+        friend bool operator==(const NotificacionLocal&, const NotificacionLocal&) = default;
+    };
+
     using QObject::QObject;
     ~OSIntegration() override;
 
@@ -98,6 +114,13 @@ public:
     // notificacionPruebaTerminada(resultado). Nunca solicita permiso por si
     // mismo: con NotDetermined responde PermissionNotDetermined.
     virtual void enviarNotificacionPrueba(const QString& titulo, const QString& cuerpo) = 0;
+
+    // T009 D9: entrega una notificacion local. Asincrono: emite SIEMPRE
+    // notificacionTerminada(id, resultado). Nunca solicita permiso: con
+    // NotDetermined/Denied/Unavailable solo reporta el resultado (no falla ni
+    // lanza). El llamador no debe cambiar estados, logs ni reintentos por el
+    // resultado.
+    virtual void notificar(const NotificacionLocal& notificacion) = 0;
 
     // Refleja en el menu bar estado ya confirmado por persistencia (check de
     // preferencia de inicio automatico; Pausar/Reanudar). No emite
@@ -143,6 +166,8 @@ signals:
     void loginItemConfigurado(bool habilitar, satcfdi::OSIntegration::LoginItemStatus estado);
     void permisoNotificacionesResuelto(satcfdi::OSIntegration::NotificationStatus estado);
     void notificacionPruebaTerminada(satcfdi::OSIntegration::NotificationSendResult resultado);
+    // Resultado de notificar() (uno por llamada).
+    void notificacionTerminada(const QString& id, satcfdi::OSIntegration::NotificationSendResult resultado);
 };
 
 } // namespace satcfdi

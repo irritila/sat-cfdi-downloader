@@ -1,4 +1,7 @@
 #include "PresentacionViewModels.h"
+#include "application/profiles/PerfilesSatService.h"
+#include "application/profiles/CredencialesSatService.h"
+#include "application/profiles/ConsultaPreparacionPerfiles.h"
 
 #include "AppViewModel.h"
 #include "EFirmaFormViewModel.h"
@@ -25,6 +28,19 @@ PresentacionViewModels::PresentacionViewModels(SolicitudesService* solicitudes,
     // del perfil: un reemplazo fallido muestra la credencial anterior.
     connect(m_eFirma, &EFirmaFormViewModel::operacionTerminada, m_perfiles,
             [this](const QString& perfilId, bool) { m_perfiles->reintentarEstado(perfilId); });
+    conectarPreparacionDetalle(perfiles, credenciales);
+}
+
+void PresentacionViewModels::conectarPreparacionDetalle(PerfilesSatService* perfiles, CredencialesSatService* credenciales)
+{
+    // T009: el detalle consulta la credencial del perfil para habilitar Enviar
+    // y la reconsulta cuando cambia una credencial o la lista de perfiles.
+    auto* consulta = new ConsultaPreparacionPerfiles(*perfiles, *credenciales, this);
+    m_detalle->setConsultaPreparacion(consulta);
+    connect(credenciales, &CredencialesSatService::credencialCambio, m_detalle,
+            &SolicitudDetailViewModel::recalcularPreparacion);
+    connect(perfiles, &PerfilesSatService::perfilesCambiaron, m_detalle,
+            &SolicitudDetailViewModel::recalcularPreparacion);
 }
 
 void PresentacionViewModels::setAccionesSolicitud(AccionesSolicitud* acciones)

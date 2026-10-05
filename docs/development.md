@@ -297,6 +297,24 @@ dialogo, no debe aceptarse a ciegas: la prueba no deberia pedir nada. Nota:
 los items del data protection keychain. La ausencia de residuos la comprueba la
 propia prueba (lista vacia tras borrar).
 
+## Flujo SAT integrado (T009)
+
+- `satcfdi_app` enlaza `satcfdi_sat`: el root crea `SatGatewayProductivo`, que
+  solo se invoca desde el hilo del ejecutor. La CLI del spike sigue fuera de la
+  app (la configuracion falla si `satcfdi_app` enlazara `satcfdi_sat_spike_core`).
+- Notificaciones: `OSIntegration::notificar(NotificacionLocal{id, tipo, titulo,
+  cuerpo})` responde con `notificacionTerminada(id, resultado)`. Nunca pide
+  permiso; con permiso denegado o no disponible solo reporta el resultado, no
+  cambia estados ni logs, y la lista de solicitudes muestra un aviso. El mismo
+  `id` reemplaza la notificacion en macOS. El cambio de credencial de un perfil
+  a un estado no `Lista` tambien notifica (texto del catalogo, sin RFC).
+- Detalle: `Enviar` aparece en solicitudes `Creada` y solo se habilita con la
+  credencial del perfil `Lista` (si no, muestra el motivo); los mensajes del
+  catalogo D10 describen rechazos, envio incierto y paquetes vencidos o con
+  maximo de descargas (5008, sin `Reintentar descarga`).
+- Las pruebas usan fakes de red (`FakeSatGateway`, `FakeOperacionesSat`); el humo
+  real lo ejecuta solo el usuario.
+
 ## Paquetes ZIP locales (T008)
 
 - Raiz de paquetes (D8): con `--data-dir <dir>`, `<dir>/paquetes`; sin

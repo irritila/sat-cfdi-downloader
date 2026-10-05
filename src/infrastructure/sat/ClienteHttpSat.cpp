@@ -47,6 +47,16 @@ QFuture<ResultadoHttp> ClienteHttpSat::enviar(const PeticionSat& peticion, const
     return futuro;
 }
 
+void ClienteHttpSat::cancelarEnCurso()
+{
+    // Copia: abort() puede emitir finished de forma sincrona, y ese manejador
+    // vacia m_abortarEnCurso.
+    const std::function<void()> abortar = m_abortarEnCurso;
+    if (abortar) {
+        abortar();
+    }
+}
+
 void ClienteHttpSat::iniciarSiguiente()
 {
     if (m_cola.empty()) {
@@ -76,8 +86,15 @@ void ClienteHttpSat::iniciarSiguiente()
     struct Estado {
         bool enviado = false;
         bool vencido = false;
+        bool cancelado = false;
     };
     auto estado = std::make_shared<Estado>();
+    m_abortarEnCurso = [estado, r = QPointer<QNetworkReply>(reply)]() {
+        estado->cancelado = true;
+        if (r) {
+            r->abort();
+        }
+    };
     auto* temporizador = new QTimer(reply);
     temporizador->setSingleShot(true);
     connect(reply, &QNetworkReply::requestSent, reply, [estado]() { estado->enviado = true; });
@@ -88,14 +105,16 @@ void ClienteHttpSat::iniciarSiguiente()
     auto promesa = actual.promesa;
     connect(reply, &QNetworkReply::finished, this, [this, reply, estado, promesa, temporizador]() {
         temporizador->stop();
+        m_abortarEnCurso = {};
         ResultadoHttp r;
         r.deadlineVencido = estado->vencido;
+        r.cancelado = estado->cancelado;
         const QNetworkReply::NetworkError err = reply->error();
         r.diagnostico = QString::fromLatin1(QMetaEnum::fromType<QNetworkReply::NetworkError>().valueToKey(err));
         const QVariant codigo = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
         // HTTP completo: hay codigo de estado, no vencio el deadline y el
         // error (si lo hay) es de nivel HTTP (>= 200 en QNetworkReply).
-        const bool httpCompleto = codigo.isValid() && !estado->vencido
+        const bool httpCompleto = codigo.isValid() && !estado->vencido && !estado->cancelado
                                   && (err == QNetworkReply::NoError || static_cast<int>(err) >= 200);
         if (httpCompleto) {
             r.fase = FaseResultado::RespuestaExplicita;

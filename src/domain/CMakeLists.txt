@@ -41,6 +41,7 @@ qt_add_library(satcfdi_domain STATIC
     operaciones/RegistrosOperacion.h
     operaciones/PoliticasOperacion.h
     operaciones/PoliticasOperacion.cpp
+    operaciones/TransicionNotificable.h
 )
 
 # Convencion de includes: rutas relativas a src/, por ejemplo

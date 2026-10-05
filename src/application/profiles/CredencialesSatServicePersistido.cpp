@@ -135,6 +135,42 @@ ErrorCredencialSat errorAlmacen(const Registro& registro, QStringView operacion,
     return ErrorCredencialSat::almacen(error.categoria, error.origen);
 }
 
+// Resumen sin descifrar (obtenerResumen y estadoEnHiloDeTrabajo).
+CredencialesSatService::ResultadoResumen leerResumen(PerfilSatRepository& perfiles,
+                                                     CredencialSatRepository& credenciales, SecretStore& store,
+                                                     const Registro& registro, const PerfilId& perfilId,
+                                                     const QDateTime& ahora)
+{
+    using R = CredencialesSatService::ResultadoResumen;
+    if (auto perfil = validarPerfil(perfiles, perfilId, false); !perfil) {
+        return R::fallo(std::move(perfil).error());
+    }
+    auto fila = credenciales.obtenerPorPerfil(perfilId);
+    if (!fila) {
+        return R::fallo(ErrorCredencialSat::persistencia(std::move(fila).error()));
+    }
+    ResumenCredencial resumen;
+    if (!fila.valor()) {
+        resumen.estado = EstadoCredencial::SinCredencial;
+        return R::exito(resumen);
+    }
+    const CredencialSat& c = *fila.valor();
+    // Vigencia desde la metadata 002 de SQLite: no descifra nada.
+    resumen.vigenteDesde = c.vigenteDesde;
+    resumen.vigenteHasta = c.vigenteHasta;
+    const auto ref = CredencialRef::desdeReferencias(c.certificadoRef, c.llavePrivadaRef, c.contrasenaRef);
+    if (!ref) {
+        resumen.estado = EstadoCredencial::MaterialDanado;
+        return R::exito(resumen);
+    }
+    auto estado = store.obtenerEstado(*ref, ahora);
+    if (!estado) {
+        return R::fallo(errorAlmacen(registro, u"credencial.estado", estado.error()));
+    }
+    resumen.estado = estado.valor();
+    return R::exito(resumen);
+}
+
 } // namespace
 
 // --- Servicio ------------------------------------------------------------------
@@ -329,35 +365,7 @@ CredencialesSatServicePersistido::obtenerResumen(const PerfilId& perfilId)
     SecretStore* store = &m_secretStore;
     const Registro registro = m_registro;
     return m_dispatcher.despachar<ResultadoResumen>([=]() -> ResultadoResumen {
-        using R = ResultadoResumen;
-        if (auto perfil = validarPerfil(*perfiles, perfilId, false); !perfil) {
-            return R::fallo(std::move(perfil).error());
-        }
-        auto fila = credenciales->obtenerPorPerfil(perfilId);
-        if (!fila) {
-            return R::fallo(ErrorCredencialSat::persistencia(std::move(fila).error()));
-        }
-        ResumenCredencial resumen;
-        if (!fila.valor()) {
-            resumen.estado = EstadoCredencial::SinCredencial;
-            return R::exito(resumen);
-        }
-        const CredencialSat& c = *fila.valor();
-        // Vigencia desde la metadata 002 de SQLite: no descifra nada.
-        resumen.vigenteDesde = c.vigenteDesde;
-        resumen.vigenteHasta = c.vigenteHasta;
-        const auto ref =
-            CredencialRef::desdeReferencias(c.certificadoRef, c.llavePrivadaRef, c.contrasenaRef);
-        if (!ref) {
-            resumen.estado = EstadoCredencial::MaterialDanado;
-            return R::exito(resumen);
-        }
-        auto estado = store->obtenerEstado(*ref, ahora);
-        if (!estado) {
-            return R::fallo(errorAlmacen(registro, u"credencial.estado", estado.error()));
-        }
-        resumen.estado = estado.valor();
-        return R::exito(resumen);
+        return leerResumen(*perfiles, *credenciales, *store, registro, perfilId, ahora);
     });
 }
 
@@ -451,9 +459,7 @@ CredencialesSatServicePersistido::obtenerMaterialFirma(const PerfilId& perfilId)
 {
     using R = ResultadoMaterial;
     // Nunca desde el hilo grafico: verificacion en runtime (no Q_ASSERT).
-    QThread* const actual = QThread::currentThread();
-    const QCoreApplication* app = QCoreApplication::instance();
-    if (actual == thread() || (app != nullptr && actual == app->thread())) {
+    if (enHiloNoPermitido()) {
         return R::fallo(ErrorCredencialSat::hiloNoPermitido());
     }
     const QMutexLocker bloqueo(m_exclusion.get());
@@ -478,6 +484,34 @@ CredencialesSatServicePersistido::obtenerMaterialFirma(const PerfilId& perfilId)
         return R::fallo(errorAlmacen(m_registro, u"credencial.material", material.error()));
     }
     return R::exito(std::move(material).valor());
+}
+
+bool CredencialesSatServicePersistido::enHiloNoPermitido() const
+{
+    QThread* const actual = QThread::currentThread();
+    const QCoreApplication* app = QCoreApplication::instance();
+    return actual == thread() || (app != nullptr && actual == app->thread());
+}
+
+Resultado<EstadoCredencial, ErrorCredencialSat>
+CredencialesSatServicePersistido::estadoEnHiloDeTrabajo(const PerfilId& perfilId)
+{
+    using R = Resultado<EstadoCredencial, ErrorCredencialSat>;
+    if (enHiloNoPermitido()) {
+        return R::fallo(ErrorCredencialSat::hiloNoPermitido());
+    }
+    const QMutexLocker bloqueo(m_exclusion.get());
+    auto r = leerResumen(m_perfiles, m_credenciales, m_secretStore, m_registro, perfilId, m_reloj());
+    if (!r) {
+        return R::fallo(std::move(r).error());
+    }
+    return R::exito(r.valor().estado);
+}
+
+Resultado<MaterialFirma, ErrorCredencialSat>
+CredencialesSatServicePersistido::materialEnHiloDeTrabajo(const PerfilId& perfilId)
+{
+    return obtenerMaterialFirma(perfilId);
 }
 
 } // namespace satcfdi

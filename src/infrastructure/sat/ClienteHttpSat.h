@@ -13,6 +13,7 @@
 
 #include <chrono>
 #include <deque>
+#include <functional>
 #include <memory>
 #include <optional>
 
@@ -47,6 +48,7 @@ struct ResultadoHttp {
     std::optional<int> estadoHttp; // solo en RespuestaExplicita
     QByteArray cuerpo;             // solo en RespuestaExplicita (descomprimido por Qt)
     bool deadlineVencido = false;
+    bool cancelado = false;        // T009: abortada por cancelarEnCurso()
     QString diagnostico;           // enum de QNetworkReply::NetworkError, sin URL ni cuerpo
 };
 
@@ -78,6 +80,12 @@ public:
     // encolar; el token no se retiene.
     QFuture<ResultadoHttp> enviar(const PeticionSat& peticion, const TokenSat* token = nullptr);
 
+    // T009: aborta la peticion EN CURSO (QNetworkReply::abort). Su resultado
+    // conserva la fase segun requestSent (AntesDeEnvio/DespuesDeEnvio) con
+    // cancelado=true; nunca es RespuestaExplicita. Sin peticion en curso, no
+    // hace nada. Mismo hilo que el cliente.
+    void cancelarEnCurso();
+
     // Peticiones en curso o en cola.
     int pendientes() const noexcept { return static_cast<int>(m_cola.size()) + (m_enCurso ? 1 : 0); }
 
@@ -93,6 +101,7 @@ private:
     QNetworkAccessManager m_red;
     std::deque<Pendiente> m_cola;
     bool m_enCurso = false;
+    std::function<void()> m_abortarEnCurso;
     std::chrono::milliseconds m_deadline{120000};
 };
 

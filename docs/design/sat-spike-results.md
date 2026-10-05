@@ -82,6 +82,7 @@ Confirma D8 con ajustes:
 ## Pendientes para T009
 
 - `SolicitaDescargaRecibidos` no se ejecuto contra el SAT (`No probada`); su sobre usa la misma firma que emitidos.
+  T009 (2026-10-05) tampoco la ejecuto: el humo integrado uso emitidos ([`sat-smoke-t009.md`](sat-smoke-t009.md)); queda para T010.
 - SOAP Fault real no observado; el parser se valida con fixture sintetico.
 - Codigos de error de solicitud (`5002`, `5005`), estados intermedios de verificacion (`1`, `2`) y vencimiento (`5007`) no
   observados en esta corrida.

@@ -51,6 +51,8 @@ qt_add_qml_module(satcfdi_presentation
         viewmodels/SolicitudDetailViewModel.h
         viewmodels/SolicitudDetailViewModel.cpp
         viewmodels/AccionesSolicitud.h
+        viewmodels/CatalogoMensajes.h
+        viewmodels/CatalogoMensajes.cpp
         viewmodels/ConsultaExistenciaPaquetes.h
         viewmodels/PresentacionViewModels.h
         viewmodels/PresentacionViewModels.cpp

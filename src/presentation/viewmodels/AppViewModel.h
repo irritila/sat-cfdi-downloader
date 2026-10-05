@@ -32,6 +32,10 @@ class AppViewModel : public QObject {
     Q_PROPERTY(Pagina pagina READ pagina NOTIFY paginaChanged)
     Q_PROPERTY(QString solicitudSeleccionadaId READ solicitudSeleccionadaId
                    NOTIFY solicitudSeleccionadaIdChanged)
+    // T009 D9: las notificaciones del sistema estan denegadas o no disponibles
+    // (lo fija el composition root desde OSIntegration). No afecta estados.
+    Q_PROPERTY(bool notificacionesDeshabilitadas READ notificacionesDeshabilitadas
+                   NOTIFY notificacionesDeshabilitadasChanged)
 
 public:
     enum class Pagina {
@@ -52,6 +56,15 @@ public:
     Pagina pagina() const { return m_pagina; }
     QString solicitudSeleccionadaId() const { return m_solicitudSeleccionadaId; }
 
+    bool notificacionesDeshabilitadas() const { return m_notificacionesDeshabilitadas; }
+    void setNotificacionesDeshabilitadas(bool valor)
+    {
+        if (m_notificacionesDeshabilitadas != valor) {
+            m_notificacionesDeshabilitadas = valor;
+            emit notificacionesDeshabilitadasChanged();
+        }
+    }
+
     Q_INVOKABLE void mostrarLista();
     Q_INVOKABLE void mostrarNueva();
     Q_INVOKABLE void mostrarPerfiles();
@@ -61,6 +74,7 @@ public:
 signals:
     void paginaChanged();
     void solicitudSeleccionadaIdChanged();
+    void notificacionesDeshabilitadasChanged();
 
 private:
     void setPagina(Pagina pagina);
@@ -71,6 +85,7 @@ private:
     QPointer<EFirmaFormViewModel> m_eFirma;
     Pagina m_pagina = Pagina::Lista;
     QString m_solicitudSeleccionadaId;
+    bool m_notificacionesDeshabilitadas = false;
 };
 
 } // namespace satcfdi

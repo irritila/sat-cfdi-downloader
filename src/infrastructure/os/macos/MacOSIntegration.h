@@ -2,6 +2,7 @@
 
 #include "ports/OSIntegration.h"
 
+#include <functional>
 #include <memory>
 
 namespace satcfdi {
@@ -51,6 +52,7 @@ public:
     void configurarLoginItem(bool habilitar) override;
     void solicitarPermisoNotificaciones() override;
     void enviarNotificacionPrueba(const QString& titulo, const QString& cuerpo) override;
+    void notificar(const NotificacionLocal& notificacion) override;
 
     void reflejarPreferenciaLoginItem(bool habilitado) override;
     void reflejarMonitoreoPausado(bool pausado) override;
@@ -67,6 +69,11 @@ private:
     void actualizarLoginItemStatus(LoginItemStatus estado);
     void actualizarNotificationStatus(NotificationStatus estado);
     void refrescarEstadosDelSistema();
+    // Entrega comun de notificacion de prueba y notificar(): sin pedir permiso;
+    // `alTerminar` se invoca en el hilo grafico con el resultado.
+    void entregarNotificacion(const QString& identificador, const QString& hilo, const QString& titulo,
+                              const QString& cuerpo,
+                              std::function<void(MacOSIntegration*, NotificationSendResult)> alTerminar);
     void actualizarMenu();
     void asegurarModoRegular();
 
