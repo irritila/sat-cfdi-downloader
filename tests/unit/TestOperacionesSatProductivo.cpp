@@ -575,6 +575,18 @@ public:
     {
         return m_base.eliminarTemporal(t);
     }
+    Resultado<RutaRevelable, ErrorAlmacenamiento> resolverArchivoRevelable(const QString& r) override
+    {
+        return m_base.resolverArchivoRevelable(r);
+    }
+    Resultado<RutaRevelable, ErrorAlmacenamiento> resolverCarpetaSolicitudRevelable(const QString& r) override
+    {
+        return m_base.resolverCarpetaSolicitudRevelable(r);
+    }
+    Resultado<RutaRevelable, ErrorAlmacenamiento> resolverRaizRevelable() override
+    {
+        return m_base.resolverRaizRevelable();
+    }
 
 private:
     fakes::FakePackageStorage& m_base;

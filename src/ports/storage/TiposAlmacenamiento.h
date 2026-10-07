@@ -99,6 +99,18 @@ struct ArchivoFinal {
     bool advertenciaDurabilidad = false; // promovido, pero fallo el fsync del directorio (D7)
 };
 
+// Resolucion de una ruta para revelarla en Finder (T009.1 D2/D3). Solo el
+// adaptador conoce la ruta absoluta; QML nunca la recibe.
+struct RutaRevelable {
+    enum class Estado { Disponible, NoEncontrada };
+    Estado estado = Estado::NoEncontrada;
+    QString rutaAbsoluta; // vacia si NoEncontrada
+
+    static RutaRevelable disponible(QString ruta) { return RutaRevelable{Estado::Disponible, std::move(ruta)}; }
+    static RutaRevelable noEncontrada() { return RutaRevelable{Estado::NoEncontrada, {}}; }
+    friend bool operator==(const RutaRevelable&, const RutaRevelable&) = default;
+};
+
 // Hallazgo del escaneo de recuperacion (D9). Solo estructura propia.
 enum class TipoHallazgo {
     Temporal, // .<archivo>.<16 hex>.part

@@ -6,6 +6,7 @@
 // efectos).
 
 #include "app_core/AppBootstrapper.h"
+#include "app_core/AccesoFinder.h"
 #include "app_core/AppCompositionRoot.h"
 
 #include "application/operaciones/OperacionExecutor.h"
@@ -13,6 +14,9 @@
 #include "application/profiles/CredencialesSatService.h"
 #include "application/profiles/PerfilesSatService.h"
 #include "application/requests/SolicitudesService.h"
+#include "presentation/viewmodels/AppViewModel.h"
+#include "presentation/viewmodels/PresentacionViewModels.h"
+#include "presentation/viewmodels/SolicitudDetailViewModel.h"
 
 #include "fakes/FakeOSIntegration.h"
 #include "fakes/FakeProgramador.h"
@@ -21,6 +25,7 @@
 
 #include <QDir>
 #include <QDirIterator>
+#include <QProcess>
 #include <QRegularExpression>
 #include <QTemporaryDir>
 #include <QTest>
@@ -117,6 +122,53 @@ struct Flujo {
     std::unique_ptr<AppCompositionRoot> root;
 };
 
+// Volcado SQL de la base (sqlite3 CLI del sistema): para comprobar que una
+// accion de solo lectura no cambia nada.
+QByteArray volcado(const QString& rutaBase)
+{
+    QProcess p;
+    p.start(QStringLiteral("/usr/bin/sqlite3"), {rutaBase, QStringLiteral(".dump")});
+    if (!p.waitForFinished(10000) || p.exitCode() != 0) {
+        return {};
+    }
+    return p.readAllStandardOutput();
+}
+
+// Lleva la solicitud hasta Descargado (2 paquetes) por el flujo real.
+bool hastaDescargado(Flujo& f, const SolicitudId& id)
+{
+    f.root->worker().enviar(id);
+    if (!QTest::qWaitFor([&] { return f.detalle(id)->resumen.estadoLocal == EstadoLocal::Enviada; }, 5000)) {
+        return false;
+    }
+    f.reloj.fijar(f.reloj.ahora().addSecs(11 * 60));
+    f.root->worker().ejecutarCiclo();
+    if (!QTest::qWaitFor([&] { return f.detalle(id)->paquetes.size() == 2; }, 5000)) {
+        return false;
+    }
+    return QTest::qWaitFor(
+        [&] {
+            f.root->worker().ejecutarCiclo();
+            const auto d = f.detalle(id);
+            if (!d) {
+                return false;
+            }
+            for (const PaqueteResumen& p : d->paquetes) {
+                if (p.estadoDescarga != EstadoDescarga::Descargado) {
+                    return false;
+                }
+            }
+            return true;
+        },
+        5000);
+}
+
+template <typename T>
+std::optional<T> resultadoDe(QFuture<T> f)
+{
+    return esperar(std::move(f));
+}
+
 } // namespace
 
 class TestFlujoSat : public QObject {
@@ -131,6 +183,7 @@ private slots:
 
     void flujoCompleto_data();
     void flujoCompleto();
+    void finderDestinosExactosYSinCambios();
 };
 
 void TestFlujoSat::flujoCompleto_data()
@@ -207,6 +260,87 @@ void TestFlujoSat::flujoCompleto()
         QVERIFY(f.os.notificacionesEntregadas.isEmpty());
     }
     QCOMPARE(f.detalle(*id)->resumen.estadoLocal, EstadoLocal::Enviada);
+}
+
+void TestFlujoSat::finderDestinosExactosYSinCambios()
+{
+    Flujo f(OSIntegration::NotificationStatus::Granted);
+    QVERIFY(f.ok);
+    const auto id = f.prepararSolicitud();
+    QVERIFY(id);
+    QVERIFY(f.root->cargar());
+    f.root->iniciarCicloDeVida(f.os, nullptr, [&f] { ++f.salidas; });
+    QVERIFY(hastaDescargado(f, *id));
+
+    const auto d = f.detalle(*id);
+    const QString idSat = d->paquetes.first().idPaqueteSat;
+    QString zip;
+    QDirIterator it(f.root->raizPaquetes(), {QStringLiteral("*.zip")}, QDir::Files, QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        const QString ruta = it.next();
+        if (QFileInfo(ruta).fileName().startsWith(idSat)) {
+            zip = ruta;
+        }
+    }
+    QVERIFY2(!zip.isEmpty(), qPrintable(idSat));
+    const QString rutaBase = QDir(f.tmp.path()).filePath(QStringLiteral("satcfdi.sqlite3"));
+    const QByteArray antes = volcado(rutaBase);
+    QVERIFY(!antes.isEmpty());
+
+    // Destinos exactos pedidos al SO: el ZIP, su carpeta y la raiz.
+    AccesoFinder& finder = f.root->accesoFinder();
+    auto r = resultadoDe(finder.mostrarPaquete(*id, idSat));
+    QVERIFY(r && r->estado == ResultadoAccionFinder::Estado::Mostrado);
+    QCOMPARE(f.os.peticionesFinder.last().metodo, QStringLiteral("mostrarEnFinder"));
+    QCOMPARE(QFileInfo(f.os.peticionesFinder.last().ruta).canonicalFilePath(), QFileInfo(zip).canonicalFilePath());
+    r = resultadoDe(finder.abrirCarpetaSolicitud(*id));
+    QVERIFY(r && r->estado == ResultadoAccionFinder::Estado::Mostrado);
+    QCOMPARE(f.os.peticionesFinder.last().metodo, QStringLiteral("abrirCarpetaEnFinder"));
+    QCOMPARE(QFileInfo(f.os.peticionesFinder.last().ruta).canonicalFilePath(),
+             QFileInfo(QFileInfo(zip).absolutePath()).canonicalFilePath());
+    r = resultadoDe(finder.abrirCarpetaPaquetes());
+    QVERIFY(r && r->estado == ResultadoAccionFinder::Estado::Mostrado);
+    QCOMPARE(QFileInfo(f.os.peticionesFinder.last().ruta).canonicalFilePath(),
+             QFileInfo(f.root->raizPaquetes()).canonicalFilePath());
+
+    // Finder fallido -> "No se pudo abrir Finder".
+    f.os.resultadoFinder = OSIntegration::ResultadoFinder::Fallido;
+    r = resultadoDe(finder.abrirCarpetaPaquetes());
+    QVERIFY(r && r->estado == ResultadoAccionFinder::Estado::Fallido);
+    QCOMPARE(r->mensaje, QStringLiteral("No se pudo abrir Finder"));
+    f.os.resultadoFinder = OSIntegration::ResultadoFinder::Mostrado;
+
+    // ZIP borrado antes del clic (detalle real): no se llama al SO, mensaje D7
+    // y la existencia se refresca a NoEncontrado.
+    SolicitudDetailViewModel* vm = f.root->viewModels().detalle();
+    vm->cargar(id->texto());
+    QTRY_VERIFY(vm->cargada());
+    QTRY_COMPARE(vm->paquetes().first().toMap().value(QStringLiteral("existencia")).toString(),
+                 QStringLiteral("Presente"));
+    QVERIFY(QFile::remove(zip));
+    const qsizetype peticiones = f.os.peticionesFinder.size();
+    vm->mostrarEnFinder(idSat);
+    QTRY_COMPARE(vm->mensajeFinder(), QStringLiteral("Archivo local no encontrado"));
+    QCOMPARE(f.os.peticionesFinder.size(), peticiones);
+    QTRY_COMPARE(vm->paquetes().first().toMap().value(QStringLiteral("existencia")).toString(),
+                 QStringLiteral("NoEncontrado"));
+    QCOMPARE(vm->paquetes().first().toMap().value(QStringLiteral("estadoDescarga")).toString(),
+             QStringLiteral("Descargado"));
+
+    // Menu bar: la intencion abre la raiz; si Finder falla, el aviso D7 va a
+    // la lista de la ventana (sin crear nada).
+    const qsizetype antesMenu = f.os.peticionesFinder.size();
+    f.os.emitirAbrirCarpetaPaquetes();
+    QTRY_COMPARE(f.os.peticionesFinder.size(), antesMenu + 1);
+    QCOMPARE(QFileInfo(f.os.peticionesFinder.last().ruta).canonicalFilePath(),
+             QFileInfo(f.root->raizPaquetes()).canonicalFilePath());
+    f.os.resultadoFinder = OSIntegration::ResultadoFinder::Fallido;
+    f.os.emitirAbrirCarpetaPaquetes();
+    QTRY_COMPARE(f.root->viewModels().app()->mensajeFinder(), QStringLiteral("No se pudo abrir Finder"));
+    QCOMPARE(f.root->viewModels().app()->pagina(), AppViewModel::Pagina::Lista);
+
+    // Solo lectura: la base no cambio.
+    QCOMPARE(volcado(rutaBase), antes);
 }
 
 #include "TestFlujoSat.moc"

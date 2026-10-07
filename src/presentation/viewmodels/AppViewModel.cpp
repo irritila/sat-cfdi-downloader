@@ -1,5 +1,6 @@
 #include "AppViewModel.h"
 
+#include "AccionesFinder.h"
 #include "EFirmaFormViewModel.h"
 #include "NuevaSolicitudViewModel.h"
 #include "PerfilesSatViewModel.h"
@@ -29,6 +30,20 @@ AppViewModel::AppViewModel(NuevaSolicitudViewModel* nuevaSolicitud,
     // Tras eliminar desde el detalle se regresa a la lista (T003 2c).
     connect(detalle, &SolicitudDetailViewModel::eliminada, this,
             [this](const QString&) { mostrarLista(); });
+}
+
+void AppViewModel::abrirCarpetaPaquetes()
+{
+    if (!m_finder) {
+        return;
+    }
+    const quint64 generacion = ++m_genFinder;
+    setMensajeFinder(QString());
+    m_finder->abrirCarpetaPaquetes().then(this, [this, generacion](const ResultadoAccionFinder& r) {
+        if (generacion == m_genFinder) {
+            setMensajeFinder(r.estado == ResultadoAccionFinder::Estado::Mostrado ? QString() : r.mensaje);
+        }
+    });
 }
 
 void AppViewModel::mostrarLista()

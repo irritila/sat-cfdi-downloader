@@ -1,5 +1,6 @@
 #include "AppCompositionRoot.h"
 
+#include "AccesoFinder.h"
 #include "AppLifecycleController.h"
 #include "IntegracionWorker.h"
 #include "ProgramadorQt.h"
@@ -9,6 +10,7 @@
 #include "application/operaciones/OperacionExecutor.h"
 #include "application/notificaciones/ServicioNotificaciones.h"
 #include "application/operaciones/OperacionesSatProductivo.h"
+#include "application/paquetes/AccesoPaquetesService.h"
 #include "application/operaciones/WorkerLocal.h"
 #include "application/profiles/CredencialesSatServicePersistido.h"
 #include "application/persistence/PersistenceDispatcher.h"
@@ -119,6 +121,8 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
     m_extensionWorker = std::make_unique<ExtensionWorker>(*m_worker, *m_ejecutor);
     m_accionesWorker = std::make_unique<AccionesWorker>(*m_worker);
     m_consultaExistencia = std::make_unique<ConsultaExistenciaEjecutor>(*m_dispatcher, p.paquetes(), *m_ejecutor);
+    m_accesoPaquetes = std::make_unique<AccesoPaquetesEjecutor>(*m_ejecutor);
+    m_accesoFinder = std::make_unique<AccesoFinder>(*m_accesoPaquetes, *m_dispatcher, p.paquetes());
 
     // Los cambios aplicados por el ejecutor refrescan la UI por las senales
     // del servicio de solicitudes (lista y detalle).
@@ -155,6 +159,7 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
         m_solicitudesService.get(), m_perfilesService.get(), m_credencialesService.get());
     m_viewModels->setAccionesSolicitud(m_accionesWorker.get());
     m_viewModels->setConsultaExistencia(m_consultaExistencia.get());
+    m_viewModels->setAccionesFinder(m_accesoFinder.get());
 
     // Primera tarea del dispatcher serial: limpia generaciones huerfanas del
     // SecretStore (residuos de fallos previos). No se espera aqui; las
@@ -172,6 +177,8 @@ AppCompositionRoot::~AppCompositionRoot()
     // T007: el ejecutor termina antes que el dispatcher (y su hilo cierra su
     // propia conexion). Si la salida explicita ya lo detuvo, es inmediato.
     m_servicioNotificaciones.reset();
+    m_accesoFinder.reset();
+    m_accesoPaquetes.reset();
     m_accionesWorker.reset();
     m_consultaExistencia.reset();
     m_extensionWorker.reset();
@@ -241,6 +248,7 @@ AppLifecycleController& AppCompositionRoot::iniciarCicloDeVida(OSIntegration& os
     // servicio de aplicacion) y aviso de notificaciones deshabilitadas.
     m_os = &os;
     m_notificador->setOS(&os);
+    m_accesoFinder->setOS(&os);
     AppViewModel* app = m_viewModels->app();
     const auto reflejarPermiso = [app](OSIntegration::NotificationStatus s) {
         app->setNotificacionesDeshabilitadas(s == OSIntegration::NotificationStatus::Denied
@@ -255,6 +263,22 @@ AppLifecycleController& AppCompositionRoot::iniciarCicloDeVida(OSIntegration& os
     // Estado del worker -> menu bar (D2, D11): estado inicial y cada cambio.
     QObject::connect(m_worker.get(), &WorkerLocal::instantaneaCambiada, &os,
                      [&os](const InstantaneaWorker& i) { os.reflejarEstadoMonitoreo(estadoMonitoreoDe(i)); });
+
+    // T009.1 D1: "Abrir carpeta de paquetes" del menu bar. Si no se puede
+    // abrir (carpeta inexistente, error o Finder fallido) el aviso D7 se
+    // muestra en la lista de la ventana, que se trae al frente; nunca se crea
+    // la carpeta.
+    AppLifecycleController* controlador = m_controlador.get();
+    QObject::connect(&os, &OSIntegration::abrirCarpetaPaquetesSolicitada, controlador, [this, app, controlador] {
+        app->setMensajeFinder(QString());
+        m_accesoFinder->abrirCarpetaPaquetes().then(controlador, [app, controlador](const ResultadoAccionFinder& r) {
+            if (r.estado != ResultadoAccionFinder::Estado::Mostrado) {
+                app->setMensajeFinder(r.mensaje);
+                app->mostrarLista();
+                controlador->mostrarVentana();
+            }
+        });
+    });
 
     m_controlador->iniciar();
     os.reflejarEstadoMonitoreo(estadoMonitoreoDe(m_worker->instantanea()));

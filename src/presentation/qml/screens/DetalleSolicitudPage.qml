@@ -68,6 +68,15 @@ Page {
             onClicked: pagina.detalle.enviar()
         }
 
+        // T009.1 D1: carpeta de la solicitud en Finder (con algun Descargado).
+        BotonAccion {
+            objectName: "botonAbrirCarpetaSolicitud"
+            visible: pagina.conDatos && pagina.detalle.puedeAbrirCarpeta
+            text: qsTr("Abrir carpeta de la solicitud")
+            descripcion: qsTr("Mostrar en Finder la carpeta con los paquetes descargados de esta solicitud")
+            onClicked: pagina.detalle.abrirCarpetaSolicitud()
+        }
+
         // T007: acciones manuales; solo visibles si aplican al estado actual.
         BotonAccion {
             objectName: "botonVerificarAhora"
@@ -196,6 +205,21 @@ Page {
             spacing: 12
 
             Item { implicitHeight: 4 }
+
+            // T009.1 D7: aviso accesible de Finder (no encontrado o fallido).
+            Label {
+                objectName: "mensajeFinder"
+                visible: text.length > 0
+                text: pagina.detalle.mensajeFinder
+                color: "#b00020"
+                font.bold: true
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+                Layout.leftMargin: 16
+                Layout.rightMargin: 16
+                Accessible.role: Accessible.AlertMessage
+                Accessible.name: text
+            }
 
             // T009 D10: por que no se puede enviar y mensaje del estado actual.
             Label {
@@ -451,6 +475,16 @@ Page {
                                     Accessible.role: Accessible.StaticText
                                     Accessible.name: text
                                 }
+                            }
+                            // T009.1 D1: solo operable con el archivo local Presente.
+                            BotonAccion {
+                                objectName: "botonMostrarFinder_" + paquete.modelData.idPaqueteSat
+                                visible: paquete.modelData.estadoDescarga === "Descargado"
+                                enabled: paquete.modelData.puedeMostrarFinder === true
+                                text: qsTr("Mostrar en Finder")
+                                descripcion: qsTr("Mostrar el archivo del paquete %1 en Finder").arg(paquete.modelData.idPaqueteSat)
+                                Layout.alignment: Qt.AlignTop
+                                onClicked: pagina.detalle.mostrarEnFinder(paquete.modelData.idPaqueteSat)
                             }
                             EstadoBadge {
                                 clave: paquete.modelData.estadoDescarga

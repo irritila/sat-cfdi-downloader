@@ -33,6 +33,18 @@ int PosixFileOps::tipo(const QByteArray& ruta, TipoEntrada& tipo)
     return 0;
 }
 
+int PosixFileOps::tipoResuelto(const QByteArray& ruta, TipoEntrada& tipo)
+{
+    struct stat st {};
+    if (::stat(ruta.constData(), &st) != 0) {
+        return errno;
+    }
+    tipo = S_ISDIR(st.st_mode) ? TipoEntrada::Directorio
+           : S_ISREG(st.st_mode) ? TipoEntrada::Archivo
+                                 : TipoEntrada::Otro;
+    return 0;
+}
+
 int PosixFileOps::crearDirectorio(const QByteArray& ruta, unsigned modo)
 {
     if (::mkdir(ruta.constData(), mode_t(modo)) != 0) {

@@ -333,6 +333,15 @@ propia prueba (lista vacia tras borrar).
   presente, no se encontro o no se pudo comprobar; nunca cambia el estado.
 - Prueba manual: `satcfdi_app --data-dir /tmp/satcfdi-prueba` y comprobar que
   existe `/tmp/satcfdi-prueba/paquetes` (0700).
+- Acceso desde la app (T009.1): `Mostrar en Finder` por paquete `Descargado`
+  (solo si el archivo local esta presente), `Abrir carpeta de la solicitud` en
+  el detalle y `Abrir carpeta de paquetes` en la lista y en el menu bar. La ruta
+  se resuelve en el hilo del ejecutor y el adaptador de macOS la revalida justo
+  antes de `NSWorkspace`. Ninguna accion cambia estados, SQLite ni logs, no crea
+  carpetas ni abre el ZIP. Si el destino no existe o Finder falla, se muestra un
+  aviso accesible ("Archivo local no encontrado", "Carpeta de paquetes no
+  encontrada", "No se pudo abrir Finder"); desde el menu bar el aviso aparece en
+  la lista de la ventana, que se trae al frente.
 
 ## Monitoreo local: worker y ejecutor serial (T007)
 

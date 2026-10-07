@@ -31,6 +31,14 @@ public:
     {
         emit notificacionTerminada(n.id, NotificationSendResult::Unavailable);
     }
+    void mostrarEnFinder(const QString& peticionId, const QString&) override
+    {
+        emit finderTerminado(peticionId, ResultadoFinder::Fallido);
+    }
+    void abrirCarpetaEnFinder(const QString& peticionId, const QString&) override
+    {
+        emit finderTerminado(peticionId, ResultadoFinder::Fallido);
+    }
     void reflejarPreferenciaLoginItem(bool) override {}
     void reflejarMonitoreoPausado(bool) override {}
     void reflejarEstadoMonitoreo(const EstadoMonitoreo&) override {}

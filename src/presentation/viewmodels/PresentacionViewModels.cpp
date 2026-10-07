@@ -54,6 +54,12 @@ void PresentacionViewModels::setConsultaExistencia(ConsultaExistenciaPaquetes* c
     m_detalle->setConsultaExistencia(consulta);
 }
 
+void PresentacionViewModels::setAccionesFinder(AccionesFinder* acciones)
+{
+    m_detalle->setAccionesFinder(acciones);
+    m_app->setAccionesFinder(acciones);
+}
+
 QVariantMap PresentacionViewModels::initialProperties() const
 {
     return {

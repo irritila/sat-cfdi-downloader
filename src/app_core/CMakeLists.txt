@@ -5,6 +5,8 @@
 # Widgets (el dialogo de error vive en main.cpp). Qt6::Network solo por
 # QLocalServer/QLocalSocket (IPC local, sin red).
 qt_add_library(satcfdi_app_core STATIC
+    AccesoFinder.h
+    AccesoFinder.cpp
     AppBootstrapper.h
     AppBootstrapper.cpp
     AppCompositionRoot.h

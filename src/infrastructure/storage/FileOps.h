@@ -27,6 +27,9 @@ public:
 
     // lstat. ENOENT si no existe.
     virtual int tipo(const QByteArray& ruta, TipoEntrada& tipo) = 0;
+    // stat (SIGUE enlaces). T009.1: solo para la raiz, que puede vivir bajo
+    // enlaces del sistema (p. ej. /var -> /private/var).
+    virtual int tipoResuelto(const QByteArray& ruta, TipoEntrada& tipo) = 0;
     // mkdir con `modo` exacto (aplica chmod tras crear, sin depender de umask).
     // EEXIST si ya existe.
     virtual int crearDirectorio(const QByteArray& ruta, unsigned modo) = 0;
@@ -55,6 +58,7 @@ public:
 class PosixFileOps : public FileOps {
 public:
     int tipo(const QByteArray& ruta, TipoEntrada& tipo) override;
+    int tipoResuelto(const QByteArray& ruta, TipoEntrada& tipo) override;
     int crearDirectorio(const QByteArray& ruta, unsigned modo) override;
     int abrirExclusivo(const QByteArray& ruta, unsigned modo, int& fd) override;
     int escribir(int fd, const char* datos, std::size_t n) override;

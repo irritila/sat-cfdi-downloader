@@ -16,6 +16,8 @@ class QQmlApplicationEngine;
 namespace satcfdi {
 
 class AccionesWorker;
+class AccesoFinder;
+class AccesoPaquetesEjecutor;
 class NotificadorOS;
 class ServicioNotificaciones;
 class ConsultaExistenciaEjecutor;
@@ -120,6 +122,7 @@ public:
     OperacionExecutor& ejecutor() const { return *m_ejecutor; }
     PackageStorage& packageStorage() const { return *m_packageStorage; }
     SatGateway& satGateway() const { return *m_satGateway; }
+    AccesoFinder& accesoFinder() const { return *m_accesoFinder; }
     // Raiz absoluta efectiva de los paquetes (D8); vacia si se inyecto el storage.
     const QString& raizPaquetes() const noexcept { return m_raizPaquetes; }
     WorkerLocal& worker() const { return *m_worker; }
@@ -165,6 +168,9 @@ private:
     std::unique_ptr<ExtensionWorker> m_extensionWorker;
     std::unique_ptr<AccionesWorker> m_accionesWorker;
     std::unique_ptr<ConsultaExistenciaEjecutor> m_consultaExistencia;
+    // T009.1: fachada de acceso (sobre el ejecutor) y orquestacion con Finder.
+    std::unique_ptr<AccesoPaquetesEjecutor> m_accesoPaquetes;
+    std::unique_ptr<AccesoFinder> m_accesoFinder;
     bool m_monitoreoIniciado = false;
     std::unique_ptr<PresentacionViewModels> m_viewModels;
     std::unique_ptr<AppLifecycleController> m_controlador;

@@ -1,6 +1,7 @@
 #include "SolicitudDetailViewModel.h"
 
 #include "AccionesSolicitud.h"
+#include "AccionesFinder.h"
 #include "CatalogoMensajes.h"
 #include "ConsultaExistenciaPaquetes.h"
 #include "application/profiles/ConsultaPreparacionPerfiles.h"
@@ -211,6 +212,9 @@ QVariantList SolicitudDetailViewModel::paquetes() const
         mapa.insert(QStringLiteral("existencia"), m_existencias.value(p.idPaqueteSat));
         mapa.insert(QStringLiteral("mensaje"), catalogo::mensajePaquete(p));
         mapa.insert(QStringLiteral("maximoDescargas"), catalogo::esMaximoDescargas(p));
+        mapa.insert(QStringLiteral("puedeMostrarFinder"),
+                    m_finder != nullptr && p.estadoDescarga == EstadoDescarga::Descargado
+                        && m_existencias.value(p.idPaqueteSat) == QLatin1String("Presente"));
         lista.append(mapa);
     }
     return lista;
@@ -253,6 +257,8 @@ void SolicitudDetailViewModel::cargar(const QString& id)
             m_accionSolicitada.clear();
             emit accionSolicitadaChanged();
         }
+        ++m_genFinder;
+        setMensajeFinder(QString());
         setEliminacion(false, QString());
     }
     const quint64 generacion = ++m_genCarga;
@@ -406,6 +412,72 @@ void SolicitudDetailViewModel::recalcularPreparacion()
         }
         emit datosChanged();
     });
+}
+
+void SolicitudDetailViewModel::setAccionesFinder(AccionesFinder* acciones)
+{
+    m_finder = acciones;
+    emit datosChanged();
+}
+
+bool SolicitudDetailViewModel::puedeAbrirCarpeta() const
+{
+    if (!m_finder || !m_detalle) {
+        return false;
+    }
+    for (const PaqueteResumen& p : m_detalle->paquetes) {
+        if (p.estadoDescarga == EstadoDescarga::Descargado) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void SolicitudDetailViewModel::setMensajeFinder(const QString& mensaje)
+{
+    if (m_mensajeFinder != mensaje) {
+        m_mensajeFinder = mensaje;
+        emit mensajeFinderChanged();
+    }
+}
+
+template <typename Futuro>
+void SolicitudDetailViewModel::atenderFinder(Futuro futuro)
+{
+    const quint64 generacion = ++m_genFinder;
+    setMensajeFinder(QString());
+    futuro.then(this, [this, generacion](const ResultadoAccionFinder& r) {
+        if (generacion != m_genFinder) {
+            return;
+        }
+        setMensajeFinder(r.estado == ResultadoAccionFinder::Estado::Mostrado ? QString() : r.mensaje);
+        if (r.estado == ResultadoAccionFinder::Estado::NoEncontrado) {
+            // D7: refrescar la existencia (sin cambiar el estado persistido).
+            consultarExistencias();
+            emit datosChanged();
+        }
+    });
+}
+
+void SolicitudDetailViewModel::mostrarEnFinder(const QString& idPaqueteSat)
+{
+    if (!m_finder || !m_detalle) {
+        return;
+    }
+    for (const PaqueteResumen& p : m_detalle->paquetes) {
+        if (p.idPaqueteSat == idPaqueteSat && p.estadoDescarga == EstadoDescarga::Descargado
+            && m_existencias.value(idPaqueteSat) == QLatin1String("Presente")) {
+            atenderFinder(m_finder->mostrarPaquete(m_detalle->resumen.id, idPaqueteSat));
+            return;
+        }
+    }
+}
+
+void SolicitudDetailViewModel::abrirCarpetaSolicitud()
+{
+    if (puedeAbrirCarpeta()) {
+        atenderFinder(m_finder->abrirCarpetaSolicitud(m_detalle->resumen.id));
+    }
 }
 
 bool SolicitudDetailViewModel::envioVisible() const

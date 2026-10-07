@@ -25,6 +25,8 @@ qt_add_executable(satcfdi_infrastructure_tests
     TestSqliteOperaciones.cpp
     TestPackageStorageFs.h
     TestPackageStorageFs.cpp
+    TestPackageStorageRevelable.h
+    TestPackageStorageRevelable.cpp
     ../fakes/FakePackageStorage.h
 )
 

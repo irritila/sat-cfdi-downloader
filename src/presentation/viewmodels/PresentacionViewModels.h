@@ -6,6 +6,7 @@
 namespace satcfdi {
 
 class AccionesSolicitud;
+class AccionesFinder;
 class ConsultaExistenciaPaquetes;
 class AppViewModel;
 class CredencialesSatService;
@@ -52,6 +53,8 @@ public:
     void setAccionesSolicitud(AccionesSolicitud* acciones);
     // T008 D11: existencia de ZIP en el detalle. No propietario; nullptr = no consulta.
     void setConsultaExistencia(ConsultaExistenciaPaquetes* consulta);
+    // T009.1: Finder (detalle y lista). No propietario; nullptr = sin acciones.
+    void setAccionesFinder(AccionesFinder* acciones);
 
 private:
     void conectarPreparacionDetalle(PerfilesSatService* perfiles, CredencialesSatService* credenciales);

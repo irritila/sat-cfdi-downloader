@@ -10,6 +10,9 @@
 #include "infrastructure/os/macos/MacOSMapeos.h"
 
 #include <QAction>
+#include <sys/stat.h>
+#include <QFile>
+#include <QDir>
 #include <QUuid>
 #include <QCoreApplication>
 #include <QElapsedTimer>
@@ -420,6 +423,8 @@ void MacOSIntegration::inicializar()
             intencion(&OSIntegration::mostrarVentanaSolicitada));
     connect(menu->addAction(QStringLiteral("Nueva solicitud")), &QAction::triggered, this,
             intencion(&OSIntegration::nuevaSolicitudSolicitada));
+    connect(menu->addAction(QStringLiteral("Abrir carpeta de paquetes")), &QAction::triggered, this,
+            intencion(&OSIntegration::abrirCarpetaPaquetesSolicitada));
     menu->addSeparator();
 
     d->estadoMonitoreo = menu->addAction(QString());
@@ -755,6 +760,70 @@ void MacOSIntegration::entregarNotificacion(const QString& identificadorQt, cons
                      });
                  }];
     }];
+}
+
+// --- Finder (T009.1 D5) ---------------------------------------------------
+
+namespace {
+
+// Revalida el destino justo antes de llamar a Finder: existe, es del tipo
+// esperado y no es un enlace simbolico (lstat). Nunca abre ni lee el archivo.
+bool destinoValido(const QString& ruta, bool esperaDirectorio)
+{
+    if (ruta.isEmpty() || !QDir::isAbsolutePath(ruta)) {
+        return false;
+    }
+    struct stat st {};
+    if (::lstat(QFile::encodeName(ruta).constData(), &st) != 0) {
+        return false;
+    }
+    return esperaDirectorio ? S_ISDIR(st.st_mode) : S_ISREG(st.st_mode);
+}
+
+} // namespace
+
+void MacOSIntegration::mostrarEnFinder(const QString& peticionId, const QString& rutaAbsoluta)
+{
+    ResultadoFinder resultado = ResultadoFinder::NoEncontrado;
+    if (destinoValido(rutaAbsoluta, false)) {
+        @autoreleasepool {
+            NSURL* url = [NSURL fileURLWithPath:rutaAbsoluta.toNSString() isDirectory:NO];
+            // activateFileViewerSelectingURLs no reporta fallos: si NSWorkspace
+            // no existe (sin AppKit) se considera Fallido.
+            NSWorkspace* ws = [NSWorkspace sharedWorkspace];
+            if (ws != nil && url != nil) {
+                [ws activateFileViewerSelectingURLs:@[url]];
+                resultado = ResultadoFinder::Mostrado;
+            } else {
+                resultado = ResultadoFinder::Fallido;
+            }
+        }
+    }
+    const QPointer<MacOSIntegration> guardia(this);
+    QMetaObject::invokeMethod(this, [guardia, peticionId, resultado] {
+        if (guardia) {
+            emit guardia->finderTerminado(peticionId, resultado);
+        }
+    }, Qt::QueuedConnection);
+}
+
+void MacOSIntegration::abrirCarpetaEnFinder(const QString& peticionId, const QString& rutaAbsoluta)
+{
+    ResultadoFinder resultado = ResultadoFinder::NoEncontrado;
+    if (destinoValido(rutaAbsoluta, true)) {
+        @autoreleasepool {
+            NSURL* url = [NSURL fileURLWithPath:rutaAbsoluta.toNSString() isDirectory:YES];
+            NSWorkspace* ws = [NSWorkspace sharedWorkspace];
+            resultado = (ws != nil && url != nil && [ws openURL:url]) ? ResultadoFinder::Mostrado
+                                                                      : ResultadoFinder::Fallido;
+        }
+    }
+    const QPointer<MacOSIntegration> guardia(this);
+    QMetaObject::invokeMethod(this, [guardia, peticionId, resultado] {
+        if (guardia) {
+            emit guardia->finderTerminado(peticionId, resultado);
+        }
+    }, Qt::QueuedConnection);
 }
 
 // --- Activacion y salida ---------------------------------------------------

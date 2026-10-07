@@ -64,6 +64,13 @@ public:
         friend bool operator==(const EstadoMonitoreo&, const EstadoMonitoreo&) = default;
     };
 
+    // T009.1 D5: resultado de mostrarEnFinder/abrirCarpetaEnFinder.
+    // NoEncontrado: el destino no existe (o no es del tipo esperado) al
+    // revalidarlo justo antes de llamar a Finder; Fallido: Finder/NSWorkspace
+    // reporto un fallo o la plataforma no lo soporta.
+    enum class ResultadoFinder { Mostrado, NoEncontrado, Fallido };
+    Q_ENUM(ResultadoFinder)
+
     // Notificacion local (T009 D1, D9). `id`: clave estable de dedupe que
     // decide el servicio de aplicacion (p. ej. "<solicitud>:terminada"); el SO
     // reemplaza una notificacion con el mismo id en lugar de duplicarla.
@@ -122,6 +129,15 @@ public:
     // resultado.
     virtual void notificar(const NotificacionLocal& notificacion) = 0;
 
+    // T009.1 D5: abre Finder con el ARCHIVO `rutaAbsoluta` seleccionado.
+    // Asincrono: emite SIEMPRE finderTerminado(peticionId, resultado). Revalida
+    // que existe y es un archivo regular (no enlace) antes de llamar a Finder;
+    // nunca lee el archivo. No cambia estados ni logs.
+    virtual void mostrarEnFinder(const QString& peticionId, const QString& rutaAbsoluta) = 0;
+    // T009.1 D5: abre en Finder la CARPETA `rutaAbsoluta`. Mismas reglas
+    // (revalida que es un directorio, no enlace).
+    virtual void abrirCarpetaEnFinder(const QString& peticionId, const QString& rutaAbsoluta) = 0;
+
     // Refleja en el menu bar estado ya confirmado por persistencia (check de
     // preferencia de inicio automatico; Pausar/Reanudar). No emite
     // intenciones ni llama al SO para cambiar el Login Item.
@@ -144,6 +160,8 @@ signals:
     void ocultarVentanaSolicitada();
     void enfocarVentanaSolicitada();
     void nuevaSolicitudSolicitada();
+    // T009.1 D1: "Abrir carpeta de paquetes" desde el menu bar.
+    void abrirCarpetaPaquetesSolicitada();
     // true = pausar monitoreo; false = reanudar.
     void cambioMonitoreoSolicitado(bool pausar);
     // Preferencia de inicio automatico pedida por el usuario (check del menu).
@@ -168,6 +186,8 @@ signals:
     void notificacionPruebaTerminada(satcfdi::OSIntegration::NotificationSendResult resultado);
     // Resultado de notificar() (uno por llamada).
     void notificacionTerminada(const QString& id, satcfdi::OSIntegration::NotificationSendResult resultado);
+    // Resultado de mostrarEnFinder()/abrirCarpetaEnFinder() (uno por llamada).
+    void finderTerminado(const QString& peticionId, satcfdi::OSIntegration::ResultadoFinder resultado);
 };
 
 } // namespace satcfdi

@@ -43,6 +43,31 @@ enum class ExistenciaArchivo {
 
 QString claveEstable(ExistenciaArchivo existencia);
 
+// Resolucion de una ruta revelable en Finder (T009.1 D2, D4, D7). Solo
+// lectura: nunca cambia SQLite ni LogSolicitud ni crea directorios.
+// - Disponible: `rutaAbsoluta` validada bajo la raiz en ese momento (solo para
+//   OSIntegration; la UI no la muestra ni la concatena).
+// - NoEncontrado: la ruta es valida pero el destino no existe (`mensaje` D7).
+// - NoAplica: paquete no visible o no Descargado; solicitud eliminada o sin
+//   paquetes Descargado (la accion no se ofrece; sin mensaje).
+// - Error: validacion, lectura o ejecutor detenido (`mensaje` D7, sin ruta).
+struct ResolucionRevelable {
+    enum class Estado { Disponible, NoEncontrado, NoAplica, Error };
+
+    Estado estado = Estado::Error;
+    QString rutaAbsoluta; // solo con Disponible
+    QString mensaje;      // D7, solo con NoEncontrado y Error
+
+    friend bool operator==(const ResolucionRevelable&, const ResolucionRevelable&) = default;
+};
+
+QString claveEstable(ResolucionRevelable::Estado estado);
+
+namespace mensajesacceso {
+inline QString archivoNoEncontrado() { return QStringLiteral("Archivo local no encontrado"); }
+inline QString carpetaNoEncontrada() { return QStringLiteral("Carpeta de paquetes no encontrada"); }
+} // namespace mensajesacceso
+
 // Desenlace publicado de una operacion (senal encolada al hilo grafico).
 struct ResultadoOperacion {
     enum class Desenlace {
@@ -64,6 +89,7 @@ struct ResultadoOperacion {
 
 Q_DECLARE_METATYPE(satcfdi::TipoOperacion)
 Q_DECLARE_METATYPE(satcfdi::ResultadoOperacion)
+Q_DECLARE_METATYPE(satcfdi::ResolucionRevelable)
 Q_DECLARE_METATYPE(satcfdi::ExistenciaArchivo)
 // Senales de OperacionExecutor (T007 D9, T009 D9).
 Q_DECLARE_METATYPE(satcfdi::EstadoCredencial)

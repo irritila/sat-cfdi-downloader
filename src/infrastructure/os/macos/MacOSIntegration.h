@@ -53,6 +53,8 @@ public:
     void solicitarPermisoNotificaciones() override;
     void enviarNotificacionPrueba(const QString& titulo, const QString& cuerpo) override;
     void notificar(const NotificacionLocal& notificacion) override;
+    void mostrarEnFinder(const QString& peticionId, const QString& rutaAbsoluta) override;
+    void abrirCarpetaEnFinder(const QString& peticionId, const QString& rutaAbsoluta) override;
 
     void reflejarPreferenciaLoginItem(bool habilitado) override;
     void reflejarMonitoreoPausado(bool pausado) override;

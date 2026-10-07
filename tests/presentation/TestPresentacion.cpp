@@ -17,6 +17,7 @@
 #include "fakes/FakePerfilesSatService.h"
 
 #include "application/profiles/DemoPerfilesSatService.h"
+#include "AccionesFinder.h"
 #include "AccionesSolicitud.h"
 #include "ConsultaExistenciaPaquetes.h"
 #include "AppViewModel.h"
@@ -339,6 +340,34 @@ struct ExistenciaEspia final : ConsultaExistenciaPaquetes {
     }
 };
 
+// T009.1: acciones de Finder con promesas que resuelve la prueba.
+struct FinderEspia final : AccionesFinder {
+    QStringList llamadas;
+    QList<std::shared_ptr<QPromise<ResultadoAccionFinder>>> promesas;
+    QFuture<ResultadoAccionFinder> nueva(const QString& llamada)
+    {
+        llamadas.append(llamada);
+        auto p = std::make_shared<QPromise<ResultadoAccionFinder>>();
+        p->start();
+        promesas.append(p);
+        return p->future();
+    }
+    QFuture<ResultadoAccionFinder> mostrarPaquete(const SolicitudId&, const QString& id) override
+    {
+        return nueva(QStringLiteral("paquete:") + id);
+    }
+    QFuture<ResultadoAccionFinder> abrirCarpetaSolicitud(const SolicitudId&) override
+    {
+        return nueva(QStringLiteral("solicitud"));
+    }
+    QFuture<ResultadoAccionFinder> abrirCarpetaPaquetes() override { return nueva(QStringLiteral("raiz")); }
+    void resolver(int i, ResultadoAccionFinder::Estado e, const QString& mensaje = {})
+    {
+        promesas.at(i)->addResult(ResultadoAccionFinder{e, mensaje});
+        promesas.at(i)->finish();
+    }
+};
+
 } // namespace
 
 class TestPresentacion : public QObject {
@@ -392,6 +421,10 @@ private slots:
     void enviarSoloConCredencialLista();
     void mensajesDelCatalogoYSin5008();
     void avisoNotificacionesDeshabilitadas();
+
+    // T009.1
+    void finderEnDetalleSegunExistencia();
+    void finderCarpetaDePaquetesEnLista();
 };
 
 void TestPresentacion::init()
@@ -1760,6 +1793,102 @@ void TestPresentacion::avisoNotificacionesDeshabilitadas()
     QVERIFY(nombreAccesible(aviso).startsWith(QStringLiteral("Las notificaciones estan deshabilitadas")));
     e.vms.app()->setNotificacionesDeshabilitadas(false);
     QTRY_VERIFY(!aviso->isVisible());
+}
+
+void TestPresentacion::finderEnDetalleSegunExistencia()
+{
+    EscenarioAsincrono e;
+    ExistenciaEspia existencia;
+    FinderEspia finder;
+    e.vms.setConsultaExistencia(&existencia);
+    e.vms.setAccionesFinder(&finder);
+    QVERIFY(e.cargar());
+    e.solicitudes.lista.resolver(0, ResultadoListaSol::exito({}));
+    SolicitudDetailViewModel* d = e.vms.detalle();
+
+    // Sin paquetes Descargado: no hay carpeta de la solicitud.
+    SolicitudDetalle sinDescargas = detalleDePrueba(SolicitudId::generar()); // PAQ_01 Disponible
+    QVERIFY(e.vms.app()->abrirDetalle(sinDescargas.resumen.id.texto()));
+    QTRY_COMPARE(int(e.solicitudes.detalle.size()), 1);
+    e.solicitudes.detalle.resolver(0, SolicitudesService::ResultadoDetalle::exito(sinDescargas));
+    QTRY_VERIFY(d->cargada());
+    QVERIFY(!d->puedeAbrirCarpeta());
+    QTRY_VERIFY(e.item(QStringLiteral("botonAbrirCarpetaSolicitud")));
+    QVERIFY(!e.item(QStringLiteral("botonAbrirCarpetaSolicitud"))->isVisible());
+    QVERIFY(!e.item(QStringLiteral("botonMostrarFinder_PAQ_01"))->isVisible());
+
+    // Dos Descargado: uno Presente y otro NoEncontrado.
+    SolicitudDetalle detalle = detalleDePrueba(SolicitudId::generar());
+    detalle.paquetes.first().estadoDescarga = EstadoDescarga::Descargado;
+    detalle.paquetes.first().descargadoEn = detalle.resumen.creadaEn;
+    PaqueteResumen segundo = detalle.paquetes.first();
+    segundo.idPaqueteSat = QStringLiteral("PAQ_02");
+    detalle.paquetes.append(segundo);
+    QVERIFY(e.vms.app()->abrirDetalle(detalle.resumen.id.texto()));
+    QTRY_COMPARE(int(e.solicitudes.detalle.size()), 2);
+    e.solicitudes.detalle.resolver(1, SolicitudesService::ResultadoDetalle::exito(detalle));
+    QTRY_VERIFY(d->cargada() && d->solicitudId() == detalle.resumen.id.texto());
+    QTRY_COMPARE(existencia.promesas.size(), 2);
+    existencia.resolver(0, ExistenciaPaquete::Presente);
+    existencia.resolver(1, ExistenciaPaquete::NoEncontrado);
+
+    QQuickItem* mostrar1 = nullptr;
+    QTRY_VERIFY((mostrar1 = e.item(QStringLiteral("botonMostrarFinder_PAQ_01"))) && mostrar1->isEnabled());
+    QQuickItem* mostrar2 = e.item(QStringLiteral("botonMostrarFinder_PAQ_02"));
+    QVERIFY(mostrar2 && mostrar2->isVisible() && !mostrar2->isEnabled());
+    QCOMPARE(nombreAccesible(mostrar1), QStringLiteral("Mostrar en Finder"));
+    QQuickItem* carpeta = e.item(QStringLiteral("botonAbrirCarpetaSolicitud"));
+    QTRY_VERIFY(carpeta->isVisible());
+    QCOMPARE(nombreAccesible(carpeta), QStringLiteral("Abrir carpeta de la solicitud"));
+
+    // Un paquete no Presente no se puede mostrar ni via el view model.
+    d->mostrarEnFinder(QStringLiteral("PAQ_02"));
+    QVERIFY(finder.llamadas.isEmpty());
+
+    // Mostrar: el archivo ya no existe -> mensaje D7 y existencia refrescada.
+    QMetaObject::invokeMethod(mostrar1, "click");
+    QCOMPARE(finder.llamadas, QStringList{QStringLiteral("paquete:PAQ_01")});
+    finder.resolver(0, ResultadoAccionFinder::Estado::NoEncontrado, QStringLiteral("Archivo local no encontrado"));
+    QTRY_COMPARE(d->mensajeFinder(), QStringLiteral("Archivo local no encontrado"));
+    QTRY_VERIFY(e.item(QStringLiteral("mensajeFinder"))->isVisible());
+    QCOMPARE(nombreAccesible(e.item(QStringLiteral("mensajeFinder"))), QStringLiteral("Archivo local no encontrado"));
+    QTRY_COMPARE(existencia.promesas.size(), 4); // se volvio a consultar
+    QCOMPARE(d->paquetes().at(0).toMap().value(QStringLiteral("estadoDescarga")).toString(),
+             QStringLiteral("Descargado"));
+
+    // Carpeta: Finder fallido.
+    QMetaObject::invokeMethod(carpeta, "click");
+    QCOMPARE(finder.llamadas.last(), QStringLiteral("solicitud"));
+    QVERIFY(d->mensajeFinder().isEmpty());
+    finder.resolver(1, ResultadoAccionFinder::Estado::Fallido, QStringLiteral("No se pudo abrir Finder"));
+    QTRY_COMPARE(d->mensajeFinder(), QStringLiteral("No se pudo abrir Finder"));
+    QCOMPARE(e.solicitudes.detalle.size(), 2); // ni recargas ni escrituras
+    e.vms.setAccionesFinder(nullptr);
+    e.vms.setConsultaExistencia(nullptr);
+}
+
+void TestPresentacion::finderCarpetaDePaquetesEnLista()
+{
+    EscenarioAsincrono e;
+    FinderEspia finder;
+    QVERIFY(e.cargar());
+    e.solicitudes.lista.resolver(0, ResultadoListaSol::exito({}));
+    QQuickItem* boton = nullptr;
+    QTRY_VERIFY((boton = e.item(QStringLiteral("botonAbrirCarpetaPaquetes"))) != nullptr);
+    QVERIFY(!boton->isVisible()); // sin acciones conectadas
+    e.vms.setAccionesFinder(&finder);
+    QTRY_VERIFY(boton->isVisible());
+    QCOMPARE(nombreAccesible(boton), QStringLiteral("Abrir carpeta de paquetes"));
+    QMetaObject::invokeMethod(boton, "click");
+    QCOMPARE(finder.llamadas, QStringList{QStringLiteral("raiz")});
+    finder.resolver(0, ResultadoAccionFinder::Estado::NoEncontrado, QStringLiteral("Carpeta de paquetes no encontrada"));
+    QTRY_COMPARE(e.vms.app()->mensajeFinder(), QStringLiteral("Carpeta de paquetes no encontrada"));
+    QTRY_VERIFY(e.item(QStringLiteral("mensajeFinderLista"))->isVisible());
+    // Exito posterior limpia el aviso.
+    QMetaObject::invokeMethod(boton, "click");
+    finder.resolver(1, ResultadoAccionFinder::Estado::Mostrado);
+    QTRY_VERIFY(e.vms.app()->mensajeFinder().isEmpty());
+    e.vms.setAccionesFinder(nullptr);
 }
 
 #include "TestPresentacion.moc"

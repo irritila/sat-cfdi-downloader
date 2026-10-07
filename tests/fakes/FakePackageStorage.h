@@ -23,7 +23,9 @@
 #include <QSet>
 #include <QStringList>
 
+#include <algorithm>
 #include <functional>
+#include <map>
 #include <optional>
 #include <utility>
 
@@ -118,11 +120,98 @@ public:
         return t;
     }
     // Registro de llamadas: "guardar:<ruta>", "existe:<ruta>", "escanear",
-    // "eliminarTemporal:<ruta>".
+    // "eliminarTemporal:<ruta>", "revelarArchivo:<ruta>",
+    // "revelarCarpeta:<ruta>", "revelarRaiz".
     QStringList llamadas() const
     {
         QMutexLocker l(&m_mutex);
         return m_llamadas;
+    }
+
+    // --- T009.1: resoluciones revelables ----------------------------------------------
+    using ResultadoRevelable = satcfdi::Resultado<satcfdi::RutaRevelable, ErrorAlmacenamiento>;
+    enum class Revelable { Archivo, Carpeta, Raiz };
+    // Raiz ficticia de las rutas absolutas por defecto.
+    QString raizFicticia = QStringLiteral("/fake/paquetes");
+    // Resultado fijo para TODAS las llamadas siguientes de ese metodo (hasta
+    // limpiarlo con std::nullopt). Sin programar: archivo Disponible si es un
+    // final registrado; carpeta Disponible si contiene algun final; raiz
+    // Disponible salvo raizAusente. Una ruta con forma invalida siempre es
+    // EntradaInvalida.
+    void programarRevelable(Revelable metodo, std::optional<ResultadoRevelable> resultado)
+    {
+        QMutexLocker l(&m_mutex);
+        m_revelables.erase(metodo);
+        if (resultado) {
+            m_revelables.emplace(metodo, *resultado);
+        }
+    }
+    void establecerRaizAusente(bool ausente)
+    {
+        QMutexLocker l(&m_mutex);
+        m_raizAusente = ausente;
+    }
+    // Quita un final (simula un ZIP borrado entre la carga y el clic).
+    void quitarFinal(const QString& rutaRelativa)
+    {
+        QMutexLocker l(&m_mutex);
+        m_finales.remove(rutaRelativa);
+    }
+    int llamadasRevelables(Revelable metodo) const
+    {
+        QMutexLocker l(&m_mutex);
+        const auto it = m_conteoRevelables.find(metodo);
+        return it == m_conteoRevelables.end() ? 0 : it->second;
+    }
+
+    ResultadoRevelable resolverArchivoRevelable(const QString& rutaRelativa) override
+    {
+        QMutexLocker l(&m_mutex);
+        m_llamadas.append(QStringLiteral("revelarArchivo:") + rutaRelativa);
+        ++m_conteoRevelables[Revelable::Archivo];
+        if (!satcfdi::rutapaquete::esRutaFinalValida(rutaRelativa)) {
+            return ResultadoRevelable::fallo(ErrorAlmacenamiento::EntradaInvalida);
+        }
+        if (auto it = m_revelables.find(Revelable::Archivo); it != m_revelables.end()) {
+            return it->second;
+        }
+        if (m_raizAusente || !m_finales.contains(rutaRelativa)) {
+            return ResultadoRevelable::exito(satcfdi::RutaRevelable::noEncontrada());
+        }
+        return ResultadoRevelable::exito(satcfdi::RutaRevelable::disponible(raizFicticia + QLatin1Char('/') + rutaRelativa));
+    }
+
+    ResultadoRevelable resolverCarpetaSolicitudRevelable(const QString& rutaRelativaDePaquete) override
+    {
+        QMutexLocker l(&m_mutex);
+        m_llamadas.append(QStringLiteral("revelarCarpeta:") + rutaRelativaDePaquete);
+        ++m_conteoRevelables[Revelable::Carpeta];
+        if (!satcfdi::rutapaquete::esRutaFinalValida(rutaRelativaDePaquete)) {
+            return ResultadoRevelable::fallo(ErrorAlmacenamiento::EntradaInvalida);
+        }
+        if (auto it = m_revelables.find(Revelable::Carpeta); it != m_revelables.end()) {
+            return it->second;
+        }
+        const QString carpeta = rutaRelativaDePaquete.section(QLatin1Char('/'), 0, 2);
+        const bool hayFinal = std::any_of(m_finales.keyBegin(), m_finales.keyEnd(), [&](const QString& r) {
+            return r.startsWith(carpeta + QLatin1Char('/'));
+        });
+        if (m_raizAusente || !hayFinal) {
+            return ResultadoRevelable::exito(satcfdi::RutaRevelable::noEncontrada());
+        }
+        return ResultadoRevelable::exito(satcfdi::RutaRevelable::disponible(raizFicticia + QLatin1Char('/') + carpeta));
+    }
+
+    ResultadoRevelable resolverRaizRevelable() override
+    {
+        QMutexLocker l(&m_mutex);
+        m_llamadas.append(QStringLiteral("revelarRaiz"));
+        ++m_conteoRevelables[Revelable::Raiz];
+        if (auto it = m_revelables.find(Revelable::Raiz); it != m_revelables.end()) {
+            return it->second;
+        }
+        return ResultadoRevelable::exito(m_raizAusente ? satcfdi::RutaRevelable::noEncontrada()
+                                                       : satcfdi::RutaRevelable::disponible(raizFicticia));
     }
 
     // --- PackageStorage ------------------------------------------------------------
@@ -249,6 +338,9 @@ private:
     bool m_consumirAntesDeFallar = true;
     bool m_advertencia = false;
     std::optional<ErrorAlmacenamiento> m_fallaLectura;
+    std::map<Revelable, ResultadoRevelable> m_revelables;
+    std::map<Revelable, int> m_conteoRevelables;
+    bool m_raizAusente = false;
 };
 
 } // namespace fakes

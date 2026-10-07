@@ -20,6 +20,7 @@ namespace satcfdi {
 class AccionesSolicitud;
 class ConsultaExistenciaPaquetes;
 class ConsultaPreparacionPerfiles;
+class AccionesFinder;
 
 class SolicitudesService;
 
@@ -105,6 +106,12 @@ class SolicitudDetailViewModel : public QObject {
     Q_PROPERTY(QString motivoEnvio READ motivoEnvio NOTIFY datosChanged)
     Q_PROPERTY(QString mensajeEstado READ mensajeEstado NOTIFY datosChanged)
 
+    // T009.1: Finder. paquetes()[i]["puedeMostrarFinder"] solo con existencia
+    // Presente. puedeAbrirCarpeta: algun paquete Descargado. mensajeFinder:
+    // aviso D7 accesible del ultimo intento (vacio si se abrio).
+    Q_PROPERTY(bool puedeAbrirCarpeta READ puedeAbrirCarpeta NOTIFY datosChanged)
+    Q_PROPERTY(QString mensajeFinder READ mensajeFinder NOTIFY mensajeFinderChanged)
+
 public:
     enum class Estado {
         Ninguno,
@@ -174,6 +181,12 @@ public:
     QString motivoEnvio() const;
     QString mensajeEstado() const;
     Q_INVOKABLE void enviar();
+
+    void setAccionesFinder(AccionesFinder* acciones);
+    bool puedeAbrirCarpeta() const;
+    QString mensajeFinder() const { return m_mensajeFinder; }
+    Q_INVOKABLE void mostrarEnFinder(const QString& idPaqueteSat);
+    Q_INVOKABLE void abrirCarpetaSolicitud();
     bool puedeVerificar() const;
     bool puedeReintentarDescarga() const;
     QString accionSolicitada() const { return m_accionSolicitada; }
@@ -186,6 +199,7 @@ signals:
     void datosChanged();
     void eliminacionChanged();
     void accionSolicitadaChanged();
+    void mensajeFinderChanged();
     // La eliminacion pedida desde este view model termino con exito
     // (incluye cambio=false: ya no existia).
     void eliminada(const QString& id);
@@ -210,6 +224,12 @@ private:
     // Resultado de la consulta de preparacion del perfil (por RFC).
     std::optional<std::pair<PreparacionPerfil, bool>> m_credencial; // (preparacion, activo)
     quint64 m_genPreparacion = 0;
+    AccionesFinder* m_finder = nullptr;
+    QString m_mensajeFinder;
+    quint64 m_genFinder = 0;
+    void setMensajeFinder(const QString& mensaje);
+    template <typename Futuro>
+    void atenderFinder(Futuro futuro);
     QHash<QString, QString> m_existencias; // idPaqueteSat -> clave
     quint64 m_genExistencia = 0;
     void consultarExistencias();

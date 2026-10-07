@@ -59,6 +59,24 @@ public:
     // que no es archivo regular -> EntradaInvalida sin borrar. Ya ausente ->
     // Exito (idempotente). Permiso/Escritura si unlink falla.
     virtual Resultado<Exito, ErrorAlmacenamiento> eliminarTemporal(const HallazgoFilesystem& temporal) = 0;
+
+    // --- T009.1: rutas revelables en Finder (D2-D4) -------------------------
+    // Solo lectura de metadatos (lstat/stat): nunca crean directorios ni abren
+    // el ZIP. Comunes: raiz invalida (no absoluta) o ilegible -> LecturaRaiz;
+    // raiz o destino ausentes -> NoEncontrada; ruta con forma distinta a T008
+    // D5 (incluye '..' y absolutas) o que atraviesa un symlink, o un destino
+    // de tipo inesperado -> EntradaInvalida.
+
+    // Archivo FINAL `rutaRelativa` (ruta_local), como archivo regular.
+    virtual Resultado<RutaRevelable, ErrorAlmacenamiento> resolverArchivoRevelable(const QString& rutaRelativa) = 0;
+
+    // Carpeta <raiz>/<RFC>/<yyyy-mm>/<UUID>/, padre de la ruta_local de un
+    // paquete de la solicitud (D4). El archivo del paquete no necesita existir.
+    virtual Resultado<RutaRevelable, ErrorAlmacenamiento>
+    resolverCarpetaSolicitudRevelable(const QString& rutaRelativaDePaquete) = 0;
+
+    // La raiz efectiva, si existe y es un directorio.
+    virtual Resultado<RutaRevelable, ErrorAlmacenamiento> resolverRaizRevelable() = 0;
 };
 
 } // namespace satcfdi

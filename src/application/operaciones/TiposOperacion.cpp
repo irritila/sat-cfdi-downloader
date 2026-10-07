@@ -26,6 +26,17 @@ QString claveEstable(ExistenciaArchivo existencia)
     return {};
 }
 
+QString claveEstable(ResolucionRevelable::Estado estado)
+{
+    switch (estado) {
+    case ResolucionRevelable::Estado::Disponible: return QStringLiteral("Disponible");
+    case ResolucionRevelable::Estado::NoEncontrado: return QStringLiteral("NoEncontrado");
+    case ResolucionRevelable::Estado::NoAplica: return QStringLiteral("NoAplica");
+    case ResolucionRevelable::Estado::Error: return QStringLiteral("Error");
+    }
+    return {};
+}
+
 QString claveEstable(EstadoWorker estado)
 {
     switch (estado) {

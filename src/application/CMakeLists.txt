@@ -32,6 +32,8 @@ qt_add_library(satcfdi_application STATIC
     operaciones/OperacionExecutor.cpp
     operaciones/WorkerLocal.h
     operaciones/WorkerLocal.cpp
+    paquetes/AccesoPaquetesService.h
+    paquetes/AccesoPaquetesService.cpp
     persistence/PersistenceDispatcher.h
     persistence/PersistenceDispatcher.cpp
     persistence/PuertosPersistencia.h

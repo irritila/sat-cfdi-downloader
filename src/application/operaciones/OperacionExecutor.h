@@ -124,6 +124,18 @@ public:
     // Tambien emite existenciaConsultada (encolada al hilo grafico).
     QFuture<ExistenciaArchivo> consultarExistencia(const QString& rutaRelativa);
 
+    // T009.1 D2/D4/D6/D7: resolucion revelable en el hilo del ejecutor,
+    // prioridad Manual. Solo lectura (SQLite y filesystem): sin transaccion,
+    // estados, LogSolicitud ni senales. Ejecutor detenido o sin almacenamiento
+    // -> Error.
+    // Archivo de un paquete visible y Descargado (por su ruta_local).
+    QFuture<ResolucionRevelable> resolverArchivoPaquete(const QString& paqueteId);
+    // Carpeta <RFC>/<yyyy-mm>/<UUID>/ de una solicitud visible, desde la
+    // ruta_local de su primer paquete Descargado (D4).
+    QFuture<ResolucionRevelable> resolverCarpetaSolicitud(const SolicitudId& solicitudId);
+    // Raiz efectiva de paquetes; ausente -> NoEncontrado (no se crea).
+    QFuture<ResolucionRevelable> resolverRaizPaquetes();
+
     // Gate por perfil (D9), en el hilo del ejecutor y en orden de cola. Los
     // perfiles cuya consulta FALLA no aparecen en la lista (cuentan como no
     // Lista); estadoCredencialCambiado se emite al cambiar el estado observado.

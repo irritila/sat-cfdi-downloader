@@ -17,6 +17,7 @@
 #include "TestServiciosPersistidos.h"
 #include "TestOperacionesSatProductivo.h"
 #include "TestNotificaciones.h"
+#include "TestAccesoPaquetes.h"
 
 #include <QCoreApplication>
 #include <QTest>
@@ -46,5 +47,6 @@ int main(int argc, char* argv[])
     ejecutar(TestAlmacenamientoPaquetes()); // T008
     ejecutar(TestOperacionesSatProductivo()); // T009
     ejecutar(TestNotificaciones());           // T009
+    ejecutar(TestAccesoPaquetes());           // T009.1
     return fallos == 0 ? 0 : 1;
 }

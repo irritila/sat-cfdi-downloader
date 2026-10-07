@@ -361,4 +361,69 @@ Resultado<Exito, ErrorAlmacenamiento> FilesystemPackageStorage::eliminarTemporal
     return R::exito(Exito{});
 }
 
+// --- T009.1: rutas revelables --------------------------------------------------
+
+Resultado<RutaRevelable, ErrorAlmacenamiento>
+FilesystemPackageStorage::resolverBajoRaiz(const QStringList& componentes, FileOps::TipoEntrada tipoDestino)
+{
+    using R = Resultado<RutaRevelable, ErrorAlmacenamiento>;
+    using Tipo = FileOps::TipoEntrada;
+    if (!raizValida()) {
+        return R::fallo(ErrorAlmacenamiento::LecturaRaiz);
+    }
+    // La raiz puede estar bajo enlaces del sistema: se resuelve con stat.
+    Tipo tipoRaiz{};
+    const int e = m_ops->tipoResuelto(nativa(QString()), tipoRaiz);
+    if (e == ENOENT || e == ENOTDIR) {
+        return R::exito(RutaRevelable::noEncontrada());
+    }
+    if (e != 0 || tipoRaiz != Tipo::Directorio) {
+        return R::fallo(ErrorAlmacenamiento::LecturaRaiz);
+    }
+    // Bajo la raiz: lstat, sin seguir enlaces.
+    QString rel;
+    for (qsizetype i = 0; i < componentes.size(); ++i) {
+        rel += (i == 0 ? QString() : QStringLiteral("/")) + componentes.at(i);
+        const bool destino = i + 1 == componentes.size();
+        Tipo tipo{};
+        const int ec = m_ops->tipo(nativa(rel), tipo);
+        if (ec == ENOENT || ec == ENOTDIR) {
+            return R::exito(RutaRevelable::noEncontrada());
+        }
+        if (ec != 0) {
+            return R::fallo(ErrorAlmacenamiento::LecturaRaiz);
+        }
+        if (tipo != (destino ? tipoDestino : Tipo::Directorio)) {
+            return R::fallo(ErrorAlmacenamiento::EntradaInvalida); // symlink o tipo inesperado
+        }
+    }
+    return R::exito(RutaRevelable::disponible(rel.isEmpty() ? m_raiz : m_raiz + QLatin1Char('/') + rel));
+}
+
+Resultado<RutaRevelable, ErrorAlmacenamiento>
+FilesystemPackageStorage::resolverArchivoRevelable(const QString& rutaRelativa)
+{
+    // Forma exacta de T008 D5: excluye '..', absolutas y componentes vacios.
+    if (!rutapaquete::esRutaFinalValida(rutaRelativa)) {
+        return Resultado<RutaRevelable, ErrorAlmacenamiento>::fallo(ErrorAlmacenamiento::EntradaInvalida);
+    }
+    return resolverBajoRaiz(rutaRelativa.split(QLatin1Char('/')), FileOps::TipoEntrada::Archivo);
+}
+
+Resultado<RutaRevelable, ErrorAlmacenamiento>
+FilesystemPackageStorage::resolverCarpetaSolicitudRevelable(const QString& rutaRelativaDePaquete)
+{
+    if (!rutapaquete::esRutaFinalValida(rutaRelativaDePaquete)) {
+        return Resultado<RutaRevelable, ErrorAlmacenamiento>::fallo(ErrorAlmacenamiento::EntradaInvalida);
+    }
+    // D4: <RFC>/<yyyy-mm>/<UUID>, padre de la ruta del paquete.
+    return resolverBajoRaiz(rutaRelativaDePaquete.split(QLatin1Char('/')).mid(0, 3),
+                            FileOps::TipoEntrada::Directorio);
+}
+
+Resultado<RutaRevelable, ErrorAlmacenamiento> FilesystemPackageStorage::resolverRaizRevelable()
+{
+    return resolverBajoRaiz({}, FileOps::TipoEntrada::Directorio);
+}
+
 } // namespace satcfdi

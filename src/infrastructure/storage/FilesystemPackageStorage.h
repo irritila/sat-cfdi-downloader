@@ -36,9 +36,17 @@ public:
     Resultado<bool, ErrorAlmacenamiento> existeArchivoFinal(const QString& rutaRelativa) override;
     Resultado<QList<HallazgoFilesystem>, ErrorAlmacenamiento> escanearRecuperacion() override;
     Resultado<Exito, ErrorAlmacenamiento> eliminarTemporal(const HallazgoFilesystem& temporal) override;
+    Resultado<RutaRevelable, ErrorAlmacenamiento> resolverArchivoRevelable(const QString& rutaRelativa) override;
+    Resultado<RutaRevelable, ErrorAlmacenamiento>
+    resolverCarpetaSolicitudRevelable(const QString& rutaRelativaDePaquete) override;
+    Resultado<RutaRevelable, ErrorAlmacenamiento> resolverRaizRevelable() override;
 
 private:
     QByteArray nativa(const QString& rutaRelativa) const;
+    // T009.1 D3: raiz existente y directorio; despues `componentes` (relativos,
+    // en orden) como directorios REALES (lstat) y el ultimo del tipo pedido.
+    Resultado<RutaRevelable, ErrorAlmacenamiento> resolverBajoRaiz(const QStringList& componentes,
+                                                                   FileOps::TipoEntrada tipoDestino);
     bool raizValida() const;
 
     QString m_raiz;

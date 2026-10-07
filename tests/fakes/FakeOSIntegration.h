@@ -72,6 +72,7 @@ public:
     void emitirOcultarVentana() { emit ocultarVentanaSolicitada(); }
     void emitirEnfocarVentana() { emit enfocarVentanaSolicitada(); }
     void emitirNuevaSolicitud() { emit nuevaSolicitudSolicitada(); }
+    void emitirAbrirCarpetaPaquetes() { emit abrirCarpetaPaquetesSolicitada(); }
     void emitirCambioMonitoreo(bool pausar) { emit cambioMonitoreoSolicitado(pausar); }
     void emitirCambioInicioAutomatico(bool habilitar) { emit cambioInicioAutomaticoSolicitado(habilitar); }
     void emitirPermisoNotificaciones() { emit permisoNotificacionesSolicitado(); }
@@ -175,6 +176,35 @@ public:
     {
         if (!m_pendientesNotificar.isEmpty()) {
             resolverNotificacion(m_pendientesNotificar.takeFirst());
+        }
+    }
+
+    // T009.1: Finder. Registra cada peticion ("mostrarEnFinder"/
+    // "abrirCarpetaEnFinder", peticionId, ruta) y responde con
+    // `resultadoFinder` (Mostrado por defecto) al instante o con
+    // completarFinder() si responderInmediato == false. No toca el disco.
+    struct PeticionFinder {
+        QString metodo;
+        QString peticionId;
+        QString ruta;
+    };
+    QList<PeticionFinder> peticionesFinder;
+    ResultadoFinder resultadoFinder = ResultadoFinder::Mostrado;
+
+    void mostrarEnFinder(const QString& peticionId, const QString& rutaAbsoluta) override
+    {
+        registrarFinder(QStringLiteral("mostrarEnFinder"), peticionId, rutaAbsoluta);
+    }
+    void abrirCarpetaEnFinder(const QString& peticionId, const QString& rutaAbsoluta) override
+    {
+        registrarFinder(QStringLiteral("abrirCarpetaEnFinder"), peticionId, rutaAbsoluta);
+    }
+    int pendientesFinder() const { return int(m_pendientesFinder.size()); }
+    // Completa la peticion pendiente mas antigua con `resultado` (o el programado).
+    void completarFinder(std::optional<ResultadoFinder> resultado = std::nullopt)
+    {
+        if (!m_pendientesFinder.isEmpty()) {
+            emit finderTerminado(m_pendientesFinder.takeFirst(), resultado.value_or(resultadoFinder));
         }
     }
 
@@ -289,6 +319,18 @@ private:
     int m_pendientesPermiso = 0;
     QList<QPair<QString, QString>> m_pendientesEnvio;
     QList<NotificacionLocal> m_pendientesNotificar;
+    QStringList m_pendientesFinder;
+
+    void registrarFinder(const QString& metodo, const QString& peticionId, const QString& ruta)
+    {
+        comandos.append(metodo);
+        peticionesFinder.append({metodo, peticionId, ruta});
+        if (responderInmediato) {
+            emit finderTerminado(peticionId, resultadoFinder);
+        } else {
+            m_pendientesFinder.append(peticionId);
+        }
+    }
 };
 
 } // namespace fakes

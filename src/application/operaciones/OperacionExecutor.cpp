@@ -1043,6 +1043,83 @@ struct OperacionExecutor::Impl {
         return e;
     }
 
+    // --- Resolucion revelable (T009.1) -----------------------------------------
+
+    static ResolucionRevelable resolucion(ResolucionRevelable::Estado estado, QString mensaje = {},
+                                          QString ruta = {})
+    {
+        return ResolucionRevelable{estado, std::move(ruta), std::move(mensaje)};
+    }
+
+    // Traduce la respuesta del puerto; el diagnostico no sale (ni la ruta).
+    static ResolucionRevelable traducir(const Resultado<RutaRevelable, ErrorAlmacenamiento>& r,
+                                        const QString& mensajeD7)
+    {
+        using E = ResolucionRevelable::Estado;
+        if (!r) {
+            return resolucion(E::Error, mensajeD7);
+        }
+        if (r.valor().estado != RutaRevelable::Estado::Disponible || r.valor().rutaAbsoluta.isEmpty()) {
+            return resolucion(E::NoEncontrado, mensajeD7);
+        }
+        return resolucion(E::Disponible, {}, r.valor().rutaAbsoluta);
+    }
+
+    ResolucionRevelable ejecutarArchivoPaquete(const QString& paqueteId)
+    {
+        using E = ResolucionRevelable::Estado;
+        const QString mensaje = mensajesacceso::archivoNoEncontrado();
+        if (!p.almacenamiento) {
+            return resolucion(E::Error, mensaje);
+        }
+        auto leido = p.operaciones.obtenerPaquete(paqueteId);
+        if (!leido) {
+            return resolucion(E::Error, mensaje);
+        }
+        const std::optional<PaqueteDescargable>& paq = leido.valor();
+        if (!paq || paq->paquete.eliminadoEn || paq->paquete.estadoDescarga != EstadoDescarga::Descargado
+            || !paq->paquete.rutaLocal || paq->paquete.rutaLocal->isEmpty()) {
+            return resolucion(E::NoAplica);
+        }
+        return traducir(p.almacenamiento->resolverArchivoRevelable(*paq->paquete.rutaLocal), mensaje);
+    }
+
+    ResolucionRevelable ejecutarCarpetaSolicitud(const SolicitudId& solicitudId)
+    {
+        using E = ResolucionRevelable::Estado;
+        const QString mensaje = mensajesacceso::carpetaNoEncontrada();
+        if (!p.almacenamiento || !p.paquetes) {
+            return resolucion(E::Error, mensaje);
+        }
+        auto solicitud = p.solicitudes.obtenerVisible(solicitudId);
+        if (!solicitud) {
+            return resolucion(E::Error, mensaje);
+        }
+        if (!solicitud.valor()) {
+            return resolucion(E::NoAplica); // eliminada o inexistente
+        }
+        auto paquetes = p.paquetes->listarVisiblesPorSolicitud(solicitudId);
+        if (!paquetes) {
+            return resolucion(E::Error, mensaje);
+        }
+        for (const PaquetePersistido& paq : paquetes.valor()) {
+            if (paq.estadoDescarga == EstadoDescarga::Descargado && !paq.eliminadoEn && paq.rutaLocal
+                && !paq.rutaLocal->isEmpty()) {
+                return traducir(p.almacenamiento->resolverCarpetaSolicitudRevelable(*paq.rutaLocal), mensaje);
+            }
+        }
+        return resolucion(E::NoAplica);
+    }
+
+    ResolucionRevelable ejecutarRaizPaquetes()
+    {
+        const QString mensaje = mensajesacceso::carpetaNoEncontrada();
+        if (!p.almacenamiento) {
+            return resolucion(ResolucionRevelable::Estado::Error, mensaje);
+        }
+        return traducir(p.almacenamiento->resolverRaizRevelable(), mensaje);
+    }
+
     R ejecutarRecuperacion(const SenalCancelacion& cancelacion)
     {
         constexpr auto tipo = TipoOperacion::Recuperacion;
@@ -1175,6 +1252,7 @@ OperacionExecutor::OperacionExecutor(PuertosEjecutor puertos, RelojUtc reloj, Pr
     qRegisterMetaType<InstantaneaWorker>();
     qRegisterMetaType<ExistenciaArchivo>();
     qRegisterMetaType<TransicionNotificable>();
+    qRegisterMetaType<ResolucionRevelable>();
 
     m_impl->hilo.setObjectName(QStringLiteral("satcfdi-ejecutor"));
     m_impl->contexto = new QObject;
@@ -1297,6 +1375,39 @@ QFuture<ResultadoOperacion> OperacionExecutor::recuperar()
 {
     return m_impl->encolarOperacion(TipoOperacion::Recuperacion, OrigenLog::Recuperacion, std::nullopt, std::nullopt,
                                     [this](const SenalCancelacion& c) { return m_impl->ejecutarRecuperacion(c); });
+}
+
+namespace {
+
+ResolucionRevelable rechazoResolucion(const QString& mensaje)
+{
+    return ResolucionRevelable{ResolucionRevelable::Estado::Error, {}, mensaje};
+}
+
+} // namespace
+
+QFuture<ResolucionRevelable> OperacionExecutor::resolverArchivoPaquete(const QString& paqueteId)
+{
+    return m_impl->encolar<ResolucionRevelable>(
+        PrioridadOperacion::Manual, std::nullopt,
+        [this, paqueteId](const SenalCancelacion&) { return m_impl->ejecutarArchivoPaquete(paqueteId); },
+        [] { return rechazoResolucion(mensajesacceso::archivoNoEncontrado()); });
+}
+
+QFuture<ResolucionRevelable> OperacionExecutor::resolverCarpetaSolicitud(const SolicitudId& solicitudId)
+{
+    return m_impl->encolar<ResolucionRevelable>(
+        PrioridadOperacion::Manual, std::nullopt,
+        [this, solicitudId](const SenalCancelacion&) { return m_impl->ejecutarCarpetaSolicitud(solicitudId); },
+        [] { return rechazoResolucion(mensajesacceso::carpetaNoEncontrada()); });
+}
+
+QFuture<ResolucionRevelable> OperacionExecutor::resolverRaizPaquetes()
+{
+    return m_impl->encolar<ResolucionRevelable>(
+        PrioridadOperacion::Manual, std::nullopt,
+        [this](const SenalCancelacion&) { return m_impl->ejecutarRaizPaquetes(); },
+        [] { return rechazoResolucion(mensajesacceso::carpetaNoEncontrada()); });
 }
 
 QFuture<ExistenciaArchivo> OperacionExecutor::consultarExistencia(const QString& rutaRelativa)

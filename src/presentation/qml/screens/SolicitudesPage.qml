@@ -68,20 +68,47 @@ Page {
             objectName: "botonPerfilesSat"
             text: qsTr("Perfiles SAT")
             descripcion: qsTr("Administrar perfiles SAT y su e.firma")
-            KeyNavigation.tab: lista.visible ? lista : (botonReintentar.visible ? botonReintentar : botonNueva)
+            KeyNavigation.tab: botonCarpetaPaquetes.visible
+                               ? botonCarpetaPaquetes
+                               : (lista.visible ? lista : (botonReintentar.visible ? botonReintentar : botonNueva))
             onClicked: pagina.app.mostrarPerfiles()
+        }
+        // T009.1 D1: abre la carpeta de paquetes en Finder (no la crea).
+        BotonAccion {
+            id: botonCarpetaPaquetes
+            objectName: "botonAbrirCarpetaPaquetes"
+            visible: pagina.app.puedeAbrirCarpetaPaquetes
+            text: qsTr("Abrir carpeta de paquetes")
+            descripcion: qsTr("Mostrar en Finder la carpeta donde se guardan los paquetes descargados")
+            KeyNavigation.tab: lista.visible ? lista : (botonReintentar.visible ? botonReintentar : botonNueva)
+            onClicked: pagina.app.abrirCarpetaPaquetes()
         }
     }
 
     // T009 D9: aviso cuando macOS no permite notificaciones (no afecta el flujo).
-    footer: Label {
-        objectName: "avisoNotificaciones"
-        visible: pagina.app.notificacionesDeshabilitadas
-        text: qsTr("Las notificaciones estan deshabilitadas. Activalas en Ajustes del Sistema para recibir avisos.")
-        wrapMode: Text.WordWrap
-        padding: 8
-        Accessible.role: Accessible.StaticText
-        Accessible.name: text
+    footer: Column {
+        // T009.1 D7: aviso accesible si no se pudo abrir la carpeta de paquetes.
+        Label {
+            objectName: "mensajeFinderLista"
+            visible: text.length > 0
+            width: parent ? parent.width : implicitWidth
+            text: pagina.app.mensajeFinder
+            color: "#b00020"
+            wrapMode: Text.WordWrap
+            padding: 8
+            Accessible.role: Accessible.AlertMessage
+            Accessible.name: text
+        }
+        Label {
+            objectName: "avisoNotificaciones"
+            visible: pagina.app.notificacionesDeshabilitadas
+            width: parent ? parent.width : implicitWidth
+            text: qsTr("Las notificaciones estan deshabilitadas. Activalas en Ajustes del Sistema para recibir avisos.")
+            wrapMode: Text.WordWrap
+            padding: 8
+            Accessible.role: Accessible.StaticText
+            Accessible.name: text
+        }
     }
 
     ListView {
