@@ -2,12 +2,17 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
+import SatCfdiDownloader
 
-// Ilustracion (T012, D5/D6) del menu de la app en la barra de menus de macOS,
+// Ilustración (T012, D5/D6) del menu de la app en la barra de menus de macOS,
 // tema claro. No contiene textos de la app: las opciones llegan en `entradas`
 // desde la definicion compartida del menu bar.
 //
-// entradas: [{ texto: string, habilitada: bool, separador: bool, marcada: bool }]
+// entradas: [{ texto: string, habilitada: bool, separador: bool, marcada: bool,
+//              icono: string }]
+// - icono (UX-38): nombre del SVG de la app (assets/icons, sin extension);
+//   vacio = sin icono. Si alguna entrada lo tiene, los textos se alinean en
+//   una columna despues de la de iconos, como en macOS.
 // - separador: dibuja una linea y omite el resto de campos.
 // - habilitada (por omision true): deshabilitada se dibuja en gris.
 // - marcada (por omision false): muestra la marca de verificacion.
@@ -19,6 +24,14 @@ Item {
     readonly property int anchoMenu: 320
     readonly property int altoEntrada: 24
     readonly property int altoSeparador: 11
+    readonly property bool hayIconos: {
+        for (let i = 0; i < raiz.entradas.length; ++i) {
+            const e = raiz.entradas[i]
+            if (e && e.separador !== true && e.icono && e.icono.length > 0)
+                return true
+        }
+        return false
+    }
 
     implicitWidth: 560
     implicitHeight: barra.height + 12 + menu.height + 40
@@ -143,10 +156,18 @@ Item {
                         font.pixelSize: 13
                         color: entrada.habilitada ? "#1d1d1f" : "#a1a1a6"
                     }
+                    Icono {
+                        visible: !entrada.esSeparador && nombre.length > 0
+                        x: 26
+                        anchors.verticalCenter: parent.verticalCenter
+                        nombre: entrada.esSeparador ? "" : (entrada.modelData.icono || "")
+                        color: entrada.habilitada ? "#1d1d1f" : "#a1a1a6"
+                        tamano: 14
+                    }
                     Label {
                         visible: !entrada.esSeparador
-                        x: 26
-                        width: parent.width - 34
+                        x: raiz.hayIconos ? 48 : 26
+                        width: parent.width - x - 8
                         anchors.verticalCenter: parent.verticalCenter
                         text: entrada.esSeparador ? "" : (entrada.modelData.texto || "")
                         elide: Text.ElideRight
@@ -170,7 +191,7 @@ Item {
         Label {
             id: rotulo
             anchors.centerIn: parent
-            text: "Ilustracion"
+            text: "Ilustración"
             color: "white"
             font.pixelSize: 12
             font.bold: true

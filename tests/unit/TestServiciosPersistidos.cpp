@@ -261,6 +261,44 @@ void TestServiciosPersistidos::listarYObtenerMapeanFilas()
     QVERIFY(!e.almacen.hilos.contains(QThread::currentThread()));
 }
 
+// T013 D8 (UX-09): nombre del perfil en la fila; orden creada_en DESC intacto.
+void TestServiciosPersistidos::listarIncluyeNombreDelPerfil()
+{
+    Entorno e;
+    const PerfilId sinNombre = PerfilId::generar();
+    const PerfilId eliminado = PerfilId::generar();
+    e.almacen.perfiles.append(PerfilSat{sinNombre, u"AAA010101AAA"_s, u"  "_s, false, kAhora, kAhora, std::nullopt});
+    e.almacen.perfiles.append(PerfilSat{eliminado, u"ZZZ010101ZZZ"_s, u"Borrado"_s, true, kAhora, kAhora, kAhora});
+    const SolicitudId a = e.sembrar(EstadoLocal::Creada, {}, {});
+    const SolicitudId b = e.sembrar(EstadoLocal::Creada, {}, {});
+    const SolicitudId c = e.sembrar(EstadoLocal::Creada, {}, {});
+    const QList<SolicitudId> ids{a, b, c};
+    const QList<PerfilId> perfiles{e.perfilActivo, sinNombre, eliminado};
+    for (int i = 0; i < 3; ++i) {
+        for (SolicitudPersistida& s : e.almacen.solicitudes) {
+            if (s.id == ids.at(i)) {
+                s.perfilSatId = perfiles.at(i);
+                s.creadaEn = kAhora.addSecs(-3600 * (3 - i)); // c la mas reciente
+            }
+        }
+    }
+    const auto lista = esperar(e.servicio.listar());
+    QVERIFY(lista && lista->esExito());
+    QCOMPARE(lista->valor().size(), 3);
+    QList<SolicitudId> orden;
+    QHash<SolicitudId, QString> nombres;
+    for (const SolicitudResumen& r : lista->valor()) {
+        orden.append(r.id);
+        nombres.insert(r.id, r.perfilNombre);
+    }
+    QCOMPARE(orden, (QList<SolicitudId>{c, b, a}));
+    QCOMPARE(nombres.value(a), e.almacen.perfiles.constFirst().nombre);
+    QVERIFY(!nombres.value(a).isEmpty());
+    QCOMPARE(nombres.value(b), QString()); // perfil sin nombre
+    QCOMPARE(nombres.value(c), QString()); // perfil eliminado
+    QVERIFY(!e.almacen.hilos.contains(QThread::currentThread()));
+}
+
 void TestServiciosPersistidos::obtenerInexistenteOEliminadaEsNoEncontrada()
 {
     Entorno e;

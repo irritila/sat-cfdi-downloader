@@ -17,7 +17,35 @@ set(_satcfdi_qml_files
     qml/components/EncabezadoPagina.qml
     qml/components/DialogoConfirmacion.qml
     qml/components/Etiquetas.js
+    qml/components/Icono.qml
+    qml/components/AnilloFoco.qml
+    qml/components/AvisoEnLinea.qml
+    qml/components/CampoArchivo.qml
+    qml/components/CampoCombo.qml
+    qml/components/CampoFormulario.qml
+    qml/components/CampoTexto.qml
+    qml/components/EstadoVacio.qml
+    qml/components/EventoHistorial.qml
+    qml/components/FilaPaquete.qml
+    qml/components/FilaPerfil.qml
+    qml/components/FilaSolicitud.qml
+    qml/components/ResumenEstado.qml
+    qml/components/SelectorSegmentado.qml
+    qml/Theme.qml
 )
+
+# T013 D3: Theme es singleton del modulo (import SatCfdiDownloader -> Theme).
+set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+
+# T013 D4: iconos de linea de la entrega (docs/design/ui-ux-v2/iconos/), solo
+# los que usan el traspaso y Theme.estado. Se publican en
+# qrc:/qt/qml/SatCfdiDownloader/assets/icons/<nombre>.svg (lo carga Icono.qml).
+file(GLOB _satcfdi_iconos RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
+     CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/qml/assets/icons/*.svg)
+foreach(_icono IN LISTS _satcfdi_iconos)
+    string(REPLACE "qml/" "" _alias_icono "${_icono}")
+    set_source_files_properties("${_icono}" PROPERTIES QT_RESOURCE_ALIAS "${_alias_icono}")
+endforeach()
 
 # Todos los archivos QML/JS se publican en la raiz del modulo para que se vean
 # entre si (y vean los tipos C++) sin imports por ruta.
@@ -33,6 +61,7 @@ qt_add_qml_module(satcfdi_presentation
     # El directorio de salida termina en la ruta del URI para qmllint/qmlls.
     OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/SatCfdiDownloader
     QML_FILES ${_satcfdi_qml_files}
+    RESOURCES ${_satcfdi_iconos}
     SOURCES
         viewmodels/AppViewModel.h
         viewmodels/AppViewModel.cpp
@@ -55,6 +84,12 @@ qt_add_qml_module(satcfdi_presentation
         viewmodels/CatalogoMensajes.h
         viewmodels/CatalogoMensajes.cpp
         viewmodels/ConsultaExistenciaPaquetes.h
+        estilo/EstiloVisual.h
+        estilo/EstiloVisual.cpp
+        componentes/IconoSvg.h
+        componentes/IconoSvg.cpp
+        viewmodels/FormatoFechas.h
+        viewmodels/FormatoFechas.cpp
         viewmodels/PresentacionViewModels.h
         viewmodels/PresentacionViewModels.cpp
 )
@@ -65,7 +100,11 @@ target_include_directories(satcfdi_presentation
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/..
         ${CMAKE_CURRENT_SOURCE_DIR}/viewmodels
+        ${CMAKE_CURRENT_SOURCE_DIR}/componentes
 )
+
+# QSvgRenderer para IconoSvg (T013 D4).
+find_package(Qt6 REQUIRED COMPONENTS Svg)
 
 target_link_libraries(satcfdi_presentation
     PUBLIC
@@ -75,6 +114,7 @@ target_link_libraries(satcfdi_presentation
         Qt6::Qml
         Qt6::Quick
         Qt6::QuickControls2
+        Qt6::Svg
 )
 
 satcfdi_enable_warnings(satcfdi_presentation)

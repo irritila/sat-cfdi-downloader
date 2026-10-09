@@ -3,7 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 
-// Ilustracion (T012, D5) de una ventana del Finder de macOS en vista de lista,
+// Ilustración (T012, D5) de una ventana del Finder de macOS en vista de lista,
 // tema claro. Datos ficticios (D7) por propiedades:
 // - carpeta: ruta ficticia (p. ej. "/Users/usuario/Documents/SAT/descargas");
 //   el titulo es su ultimo componente y la barra de ruta la muestra completa.
@@ -220,7 +220,7 @@ Item {
         Label {
             id: rotulo
             anchors.centerIn: parent
-            text: "Ilustracion"
+            text: "Ilustración"
             color: "white"
             font.pixelSize: 12
             font.bold: true

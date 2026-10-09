@@ -2,7 +2,7 @@
 
 ## Estado
 
-Pendiente (refinada 2026-10-09). Lista para implementar.
+Completada (2026-10-09). Refinada e implementada en la rama `t013-rediseno-visual`.
 
 ## Prioridad y tamano
 
@@ -66,36 +66,36 @@ El manual de T012 mostro la UI actual; con el se encargo un rediseno a Claude De
 
 ### Tema y tokens
 
-- [ ] Dado `tokens.json`, cuando corre la prueba de tema, entonces cada color, tamano, espaciado y radio de `Theme.qml` coincide con su token en claro y en oscuro.
-- [ ] Dado el modo claro u oscuro de macOS, cuando se abre o se cambia mientras la app corre, entonces todas las pantallas y dialogos usan los tokens de ese modo, sin colores del otro modo ni literales fuera de `Theme`.
-- [ ] Dados los pares texto/fondo del traspaso, cuando se miden en ambos temas, entonces el texto cumple 4.5:1 y el foco y los bordes de control 3:1.
+- [x] Dado `tokens.json`, cuando corre la prueba de tema, entonces cada color, tamano, espaciado y radio de `Theme.qml` coincide con su token en claro y en oscuro.
+- [x] Dado el modo claro u oscuro de macOS, cuando se abre o se cambia mientras la app corre, entonces todas las pantallas y dialogos usan los tokens de ese modo, sin colores del otro modo ni literales fuera de `Theme`.
+- [x] Dados los pares texto/fondo del traspaso, cuando se miden en ambos temas, entonces el texto cumple 4.5:1 y el foco y los bordes de control 3:1.
 
 ### Estados y componentes
 
-- [ ] Dado cada estado de solicitud, de paquete y de e.firma, cuando aparece en la lista, el detalle, perfiles o una notificacion, entonces se muestra con `EstadoBadge` (icono, texto y tono del alias del estado) y nunca solo con color.
-- [ ] Dado cada componente del traspaso, cuando se renderiza en sus estados (normal, hover, presionado, foco, deshabilitado, error), entonces respeta sus medidas y tokens.
+- [x] Dado cada estado de solicitud, de paquete y de e.firma, cuando aparece en la lista, el detalle, perfiles o una notificacion, entonces se muestra con `EstadoBadge` (icono, texto y tono del alias del estado) y nunca solo con color.
+- [x] Dado cada componente del traspaso, cuando se renderiza en sus estados (normal, hover, presionado, foco, deshabilitado, error), entonces respeta sus medidas y tokens.
 
 ### Pantallas
 
-- [ ] Dada cada pantalla en sus estados (cargando, vacio, error, con datos y especiales del traspaso), cuando se compara con su mockup claro, entonces coinciden estructura, jerarquia, acciones visibles y textos, salvo lo que pertenezca a T014.
-- [ ] Dada una solicitud, cuando se abre el detalle, entonces el resumen muestra un solo estado con titular y descripcion (D7), las pestanas Paquetes, Datos e Historial (Paquetes por omision si hay paquetes), una sola accion principal y `Eliminar...` separado con `Cancelar` por omision en su dialogo.
-- [ ] Dada la lista de solicitudes, cuando hay datos, entonces se ve como tabla con columnas Estado, Contribuyente (RFC y nombre del perfil, D8), Tipo, Periodo, Paquetes y Creada, ordenada de la mas reciente a la mas antigua.
-- [ ] Dadas las acciones existentes (crear, enviar, verificar, reintentar, eliminar, Finder, perfiles, e.firma), cuando se usan con la UI nueva, entonces producen el mismo efecto que antes y las pruebas funcionales de presentacion e integracion pasan.
+- [x] Dada cada pantalla en sus estados (cargando, vacio, error, con datos y especiales del traspaso), cuando se compara con su mockup claro, entonces coinciden estructura, jerarquia, acciones visibles y textos, salvo lo que pertenezca a T014.
+- [x] Dada una solicitud, cuando se abre el detalle, entonces el resumen muestra un solo estado con titular y descripcion (D7), las pestanas Paquetes, Datos e Historial (Paquetes por omision si hay paquetes), una sola accion principal y `Eliminar...` separado con `Cancelar` por omision en su dialogo.
+- [x] Dada la lista de solicitudes, cuando hay datos, entonces se ve como tabla con columnas Estado, Contribuyente (RFC y nombre del perfil, D8), Tipo, Periodo, Paquetes y Creada, ordenada de la mas reciente a la mas antigua.
+- [x] Dadas las acciones existentes (crear, enviar, verificar, reintentar, eliminar, Finder, perfiles, e.firma), cuando se usan con la UI nueva, entonces producen el mismo efecto que antes y las pruebas funcionales de presentacion e integracion pasan.
 
 ### Textos y fechas
 
-- [ ] Dados los textos de la UI, el menu bar y las notificaciones, cuando se inspeccionan, entonces usan acentos y n, y coinciden con `## Textos` del traspaso.
-- [ ] Dadas fechas con y sin hora, cuando se muestran, entonces usan el formato de D5, y un dia sin hora no cambia por la zona horaria.
+- [x] Dados los textos de la UI, el menu bar y las notificaciones, cuando se inspeccionan, entonces usan acentos y n, y coinciden con `## Textos` del traspaso.
+- [x] Dadas fechas con y sin hora, cuando se muestran, entonces usan el formato de D5, y un dia sin hora no cambia por la zona horaria.
 
 ### Accesibilidad y teclado
 
-- [ ] Dada cada pantalla, cuando se recorre con Tab y Shift+Tab, entonces el foco es visible y sigue el orden del traspaso; las flechas recorren listas, pestanas y el selector segmentado; Escape cierra dialogos y el foco vuelve al control que los abrio.
-- [ ] Dado cada control, fila, badge e icono accionable, cuando se inspecciona, entonces tiene nombre y rol accesibles; los errores y avisos se anuncian.
+- [x] Dada cada pantalla, cuando se recorre con Tab y Shift+Tab, entonces el foco es visible y sigue el orden del traspaso; las flechas recorren listas, pestanas y el selector segmentado; Escape cierra dialogos y el foco vuelve al control que los abrio.
+- [x] Dado cada control, fila, badge e icono accionable, cuando se inspecciona, entonces tiene nombre y rol accesibles; los errores y avisos se anuncian.
 
 ### Evidencia y regresion
 
-- [ ] Dado `manual_capturas`, cuando se ejecuta en claro y con `--tema oscuro`, entonces genera las pantallas sin errores; las claras actualizan `docs/manual/img/` y el manual se ajusta a la UI nueva, con `satcfdi_manual_enlaces` en verde.
-- [ ] `ctest --test-dir build` pasa completo; los `objectName` se conservan o sus pruebas se actualizaron en el mismo corte (D10).
+- [x] Dado `manual_capturas`, cuando se ejecuta en claro y con `--tema oscuro`, entonces genera las pantallas sin errores; las claras actualizan `docs/manual/img/` y el manual se ajusta a la UI nueva, con `satcfdi_manual_enlaces` en verde.
+- [x] `ctest --test-dir build` pasa completo; los `objectName` se conservan o sus pruebas se actualizaron en el mismo corte (D10).
 
 ## Verificacion
 
@@ -105,7 +105,19 @@ El manual de T012 mostro la UI actual; con el se encargo un rediseno a Claude De
 
 ## Resultado
 
-Pendiente.
+- Entrega de Claude Design versionada en `docs/design/ui-ux-v2/` (traspaso, tokens, README, indice, 46 mockups, 43 iconos).
+- Estilo Basic global (`fijarEstiloBasico`), `Theme.qml` singleton (tokens claro/oscuro, `estado()`, `estadoEFirma()`) con prueba de
+  coincidencia contra `tokens.json`, `Icono` sobre `IconoSvg` (Qt SVG, color exacto), `FormatoFechas` (corrigio el desplazamiento de un `QDate`
+  en QML).
+- 16 componentes (10 nuevos) y las cuatro pantallas, dialogos, menu bar (textos e iconos plantilla) y notificaciones en dos lineas, segun
+  UX-01..UX-42; un solo estado visible (D7); RFC y nombre del perfil en la lista (D8, unido en `SolicitudesServicePersistido::listar`).
+- Decisiones del usuario durante el desarrollo: Registrar e.firma exige `.cer`, `.key` y contrasena; tras un error se limpia la seleccion.
+- Ortografia completa en todo texto visible (presentacion, application y domain); logs y tipos de evento sin cambio.
+- Herramienta de capturas con `--tema oscuro` y target `manual_capturas_oscuro`; manual reescrito y 12 imagenes regeneradas.
+- Carrera de `TestMonitoreo` corregida; `ctest` 14/14; revision Codex de calidad aprobada con condiciones; prueba manual del usuario completa
+  (2026-10-09).
+- Riesgos aceptados: notificaciones sin `translate` (no hay traducciones); prueba de cambio de tema en caliente se omite en offscreen (verificada
+  en cocoa y por el usuario); ilustraciones solo en claro; Qt SVG debe incluirse al empaquetar (T011).
 
 ## Riesgos y notas
 

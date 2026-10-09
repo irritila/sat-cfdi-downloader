@@ -18,6 +18,7 @@
 #include "presentation/viewmodels/NuevaSolicitudViewModel.h"
 #include "presentation/viewmodels/PerfilesSatViewModel.h"
 #include "presentation/viewmodels/PresentacionViewModels.h"
+#include "presentation/estilo/EstiloVisual.h"
 
 #include <QApplication>
 #include <QDir>
@@ -51,6 +52,10 @@ constexpr int kAncho = 960;
 constexpr int kAlto = 640;
 constexpr int kEscala = 2; // D4: 1920x1280
 constexpr qint64 kPesoMaximo = 1024 * 1024; // PNG versionable: maximo 1 MB
+
+// T013 D9: --tema oscuro fija Theme.oscuro = true en cada engine de la app
+// (las ilustraciones imitan la interfaz de macOS en claro y no cambian).
+bool gTemaOscuro = false;
 
 // --- Datos sinteticos (D7) --------------------------------------------------
 
@@ -110,7 +115,7 @@ PaqueteResumen paquete(int solicitud, int n, EstadoDescarga estado)
         p.descargadoEn = kAhora.addSecs(45 * 60);
     }
     if (estado == EstadoDescarga::Vencido) {
-        p.vencidoEn = kAhora.addDays(3);
+        p.vencidoEn = kAhora.addSecs(50 * 60);
         p.codigoDescargaSat = QStringLiteral("5007");
     }
     return p;
@@ -121,6 +126,7 @@ SolicitudDetalle solicitud(int n, EstadoLocal local, std::optional<EstadoSolicit
     SolicitudDetalle d;
     d.resumen.id = solicitudId(n);
     d.resumen.perfilRfc = kRfcPerfil;
+    d.resumen.perfilNombre = perfilListo().nombre;
     d.resumen.tipoDescarga = n % 2 == 0 ? TipoDescarga::Emitidos : TipoDescarga::Recibidos;
     d.resumen.fechaInicial = QDate(2026, 9, dia);
     d.resumen.fechaFinal = QDate(2026, 9, dia);
@@ -160,6 +166,7 @@ SolicitudDetalle solicitudConIncidencia()
     SolicitudDetalle d = solicitud(5, EstadoLocal::Enviada, EstadoSolicitudSat::Terminada, 5);
     d.numeroCfdi = 4;
     d.codigoEstadoSolicitud = QStringLiteral("5000");
+    d.ultimaVerificacionEn = kAhora.addSecs(35 * 60);
     PaqueteResumen error = paquete(5, 1, EstadoDescarga::Error);
     error.codigoDescargaSat = QStringLiteral("5000");
     d.paquetes = {error, paquete(5, 2, EstadoDescarga::Descargado)};
@@ -169,6 +176,8 @@ SolicitudDetalle solicitudConIncidencia()
     return d;
 }
 
+// En el orden de los datos; SolicitudesFijas::listar ordena como la app real
+// (mas reciente primero).
 QList<SolicitudDetalle> solicitudesLista()
 {
     return {solicitud(1, EstadoLocal::Creada, std::nullopt, 1), solicitud(2, EstadoLocal::Enviada, EstadoSolicitudSat::EnProceso, 2),
@@ -243,6 +252,13 @@ struct Grafo {
         vms->setAccionesFinder(&acciones);
         vms->setConsultaExistencia(&existencia);
         engine = std::make_unique<QQmlApplicationEngine>();
+        if (gTemaOscuro) {
+            QObject* tema = engine->singletonInstance<QObject*>("SatCfdiDownloader", "Theme");
+            if (!tema || !tema->setProperty("oscuro", true)) {
+                std::fprintf(stderr, "error: no se pudo fijar Theme.oscuro\n");
+                return nullptr;
+            }
+        }
         engine->setInitialProperties(vms->initialProperties());
         engine->loadFromModule("SatCfdiDownloader", "Main");
         if (engine->rootObjects().isEmpty()) {
@@ -277,22 +293,12 @@ struct Grafo {
         return buscar(ventana->contentItem(), nombre);
     }
 
-    // Desplaza el Flickable que contiene `nombre` para que la seccion quede
-    // arriba (las capturas del detalle muestran paquetes e historial).
-    bool desplazarA(QQuickWindow* ventana, const QString& nombre) const
+    // Detalle (T013): pestanas Paquetes/Datos/Historial en vez de secciones
+    // desplazables; la captura muestra la pestana indicada.
+    bool mostrarPestana(QQuickWindow* ventana, const QString& clave) const
     {
-        QQuickItem* objetivo = buscar(ventana->contentItem(), nombre);
-        for (QQuickItem* p = objetivo ? objetivo->parentItem() : nullptr; p; p = p->parentItem()) {
-            if (p->inherits("QQuickFlickable")) {
-                QQuickItem* contenido = qvariant_cast<QQuickItem*>(p->property("contentItem"));
-                const qreal y = objetivo->mapToItem(contenido, QPointF(0, 0)).y();
-                const qreal maximo =
-                    qMax<qreal>(0, p->property("contentHeight").toReal() - p->height());
-                p->setProperty("contentY", qMin(qMax<qreal>(0, y - 8), maximo));
-                return true;
-            }
-        }
-        return false;
+        QQuickItem* p = pagina(ventana, QStringLiteral("paginaDetalleSolicitud"));
+        return p && p->setProperty("pestana", clave) && p->property("pestana").toString() == clave;
     }
 };
 
@@ -371,7 +377,8 @@ QVariantList entradasMenu()
         r.append(QVariantMap{{QStringLiteral("texto"), e.texto},
                              {QStringLiteral("habilitada"), e.habilitada},
                              {QStringLiteral("separador"), e.separador},
-                             {QStringLiteral("marcada"), e.marcable && e.marcada}});
+                             {QStringLiteral("marcada"), e.marcable && e.marcada},
+                             {QStringLiteral("icono"), e.icono}});
     }
     return r;
 }
@@ -507,7 +514,7 @@ QList<Escenario> escenarios()
                      return false;
                  }
                  esperar(500);
-                 return g.desplazarA(v, QStringLiteral("seccionPaquetes"));
+                 return g.mostrarPestana(v, QStringLiteral("paquetes"));
              });
          }},
         {QStringLiteral("09-detalle-incidencia.png"), QStringLiteral("Captura"),
@@ -519,7 +526,7 @@ QList<Escenario> escenarios()
                      return false;
                  }
                  esperar(500);
-                 return g.desplazarA(v, QStringLiteral("seccionPaquetes"));
+                 return g.mostrarPestana(v, QStringLiteral("paquetes"));
              });
          }},
         {QStringLiteral("10-finder.png"), QStringLiteral("Ilustracion"),
@@ -557,6 +564,7 @@ int main(int argc, char* argv[])
     qputenv("TZ", "UTC");
     ::tzset();
     QApplication app(argc, argv);
+    satcfdi::presentacion::fijarEstiloBasico(); // T013 D1, igual que la app
     QCoreApplication::setOrganizationName(QStringLiteral("Adenium"));
     QCoreApplication::setApplicationName(QStringLiteral("SAT CFDI Downloader"));
     QLocale::setDefault(QLocale(QLocale::Spanish, QLocale::Mexico));
@@ -570,8 +578,12 @@ int main(int argc, char* argv[])
             salida = args.at(++i);
         } else if (args.at(i) == QLatin1String("--solo") && i + 1 < args.size()) {
             solo = args.at(++i);
+        } else if (args.at(i) == QLatin1String("--tema") && i + 1 < args.size()
+                   && (args.at(i + 1) == QLatin1String("claro") || args.at(i + 1) == QLatin1String("oscuro"))) {
+            gTemaOscuro = args.at(++i) == QLatin1String("oscuro");
         } else {
-            std::fprintf(stderr, "uso: satcfdi_manual_capturas --salida <dir> [--solo <archivo.png>]\n");
+            std::fprintf(stderr,
+                         "uso: satcfdi_manual_capturas --salida <dir> [--solo <archivo.png>] [--tema claro|oscuro]\n");
             return 2;
         }
     }
@@ -595,7 +607,7 @@ int main(int argc, char* argv[])
         const bool valida = ok && tamano && peso;
         std::printf("%s %s %s %dx%d %lld bytes%s\n", valida ? "OK   " : "FALLA", qPrintable(e.archivo),
                     qPrintable(e.tipo), leida.width(), leida.height(), static_cast<long long>(bytes),
-                    peso ? "" : " (excede 1 MB)");
+                    bytes == 0 ? " (no generada)" : (peso ? "" : " (excede 1 MB)"));
         std::fflush(stdout);
         fallas += valida ? 0 : 1;
         ++generadas;

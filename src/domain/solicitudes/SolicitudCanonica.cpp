@@ -66,7 +66,7 @@ SolicitudCanonica::normalizar(const EntradaSolicitudCanonica& entrada)
         c.m_rfcSolicitante = *rfc;
     } else {
         errores.append({Codigo::RfcSolicitanteInvalido, QStringLiteral("rfc_solicitante"),
-                        QStringLiteral("El RFC del perfil no es valido.")});
+                        QStringLiteral("El RFC del perfil no es válido.")});
     }
 
     // Contrapartes.
@@ -78,7 +78,7 @@ SolicitudCanonica::normalizar(const EntradaSolicitudCanonica& entrada)
         }
         if (!rfc::esValido(n)) {
             errores.append({Codigo::RfcContraparteInvalido, QStringLiteral("rfc_contraparte"),
-                            QStringLiteral("El RFC de la contraparte no es valido.")});
+                            QStringLiteral("El RFC de la contraparte no es válido.")});
             continue;
         }
         contrapartes.append(n);

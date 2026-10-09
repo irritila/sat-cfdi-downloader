@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+
 // Servicios deterministas del manual (T012 D3, D7): futures ya resueltos con
 // datos sinteticos fijos. Sin SQLite, worker, SAT ni Keychain. Solo los usa
 // satcfdi_manual_capturas.
@@ -35,6 +37,9 @@ public:
         for (const SolicitudDetalle& d : detalles) {
             r.append(d.resumen);
         }
+        // Como la app real: mas reciente primero.
+        std::stable_sort(r.begin(), r.end(),
+                         [](const SolicitudResumen& a, const SolicitudResumen& b) { return a.creadaEn > b.creadaEn; });
         return listo(ResultadoLista::exito(r));
     }
     QFuture<ResultadoDetalle> obtener(const SolicitudId& id) override

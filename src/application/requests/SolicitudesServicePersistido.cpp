@@ -10,6 +10,8 @@
 #include "ports/repositories/SolicitudMasivaRepository.h"
 #include "ports/repositories/UnitOfWork.h"
 
+#include <QHash>
+
 #include <utility>
 
 namespace satcfdi {
@@ -176,10 +178,22 @@ QFuture<SolicitudesService::ResultadoLista> SolicitudesServicePersistido::listar
         if (!conteos.esExito()) {
             return ResultadoLista::fallo(std::move(conteos).error());
         }
+        // T013 D8: nombre del perfil por id (perfiles visibles, activos o no),
+        // en la misma tarea; el orden de la lista (creada_en DESC) no cambia.
+        auto perfiles = p.perfiles.listarVisibles();
+        if (!perfiles.esExito()) {
+            return ResultadoLista::fallo(std::move(perfiles).error());
+        }
+        QHash<PerfilId, QString> nombres;
+        for (const PerfilSat& perfil : perfiles.valor()) {
+            nombres.insert(perfil.id, perfil.nombre.trimmed());
+        }
         QList<SolicitudResumen> lista;
         lista.reserve(filas.valor().size());
         for (const SolicitudPersistida& s : filas.valor()) {
-            lista.append(aResumen(s, conteos.valor().value(s.id, 0)));
+            SolicitudResumen r = aResumen(s, conteos.valor().value(s.id, 0));
+            r.perfilNombre = nombres.value(s.perfilSatId);
+            lista.append(std::move(r));
         }
         return ResultadoLista::exito(std::move(lista));
     });

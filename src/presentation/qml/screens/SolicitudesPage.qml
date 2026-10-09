@@ -1,15 +1,21 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls.Basic
 import QtQuick.Layouts
 
-import "Etiquetas.js" as Etiquetas
-
-// Lista de solicitudes con estados Cargando, Vacia, Error y ConDatos
-// (SolicitudesListModel.estado). Teclado: foco inicial en la lista (o en "Nueva
-// solicitud" si esta vacia); flechas para moverse; Enter/Return/Espacio abre
-// el detalle por id; Tab alterna entre lista y boton.
+// Solicitudes (T013, traspaso "SolicitudesPage"; UX-06..UX-13).
+// - Encabezado raiz: titulo con contador y acciones Abrir carpeta de paquetes,
+//   Perfiles SAT y Nueva solicitud (primaria, al extremo).
+// - Avisos sobre la tabla: notificaciones desactivadas (AvisoEnLinea con
+//   bell-slash) y el resultado fallido de abrir la carpeta de paquetes.
+// - Tabla: encabezados de columna fijos y FilaSolicitud por solicitud (Estado,
+//   Contribuyente, Tipo, Periodo, Paquetes, Creada); bajo 960 se oculta Creada.
+// - Estados: cargando (BusyIndicator tras 300 ms), vacia y error (EstadoVacio,
+//   este ultimo con Reintentar enfocado).
+// Teclado: orden de foco por las acciones del encabezado y la lista; foco
+// inicial en la lista (primera fila); flechas para moverse; Enter/Return/
+// Espacio abre el detalle por id.
 Page {
     id: pagina
     objectName: "paginaSolicitudes"
@@ -17,9 +23,15 @@ Page {
     required property AppViewModel app
     required property SolicitudesListModel modelo
 
+    readonly property bool anchoAmplio: pagina.width >= 960
+
     focus: true
     Accessible.role: Accessible.Pane
     Accessible.name: qsTr("Solicitudes de descarga masiva")
+
+    background: Rectangle {
+        color: Theme.superficie
+    }
 
     // Foco inicial diferido: la pagina ya esta en la ventana.
     Component.onCompleted: Qt.callLater(pagina.enfocarInicial)
@@ -27,6 +39,8 @@ Page {
     function enfocarInicial() {
         if (lista.visible && lista.count > 0)
             lista.forceActiveFocus(Qt.TabFocusReason)
+        else if (error.visible)
+            error.botonAccion.forceActiveFocus(Qt.TabFocusReason)
         else
             botonNueva.forceActiveFocus(Qt.TabFocusReason)
     }
@@ -50,231 +64,242 @@ Page {
             pagina.app.abrirDetalle(id)
     }
 
-
     header: EncabezadoPagina {
         titulo: qsTr("Solicitudes")
+        contador: pagina.modelo.estado === SolicitudesListModel.ConDatos ? String(pagina.modelo.count) : ""
 
-        BotonAccion {
-            id: botonNueva
-            objectName: "botonNuevaSolicitud"
-            text: qsTr("Nueva solicitud")
-            descripcion: qsTr("Abrir el formulario de nueva solicitud")
-            highlighted: true
-            KeyNavigation.tab: botonPerfiles
-            onClicked: pagina.app.mostrarNueva()
-        }
-        BotonAccion {
-            id: botonPerfiles
-            objectName: "botonPerfilesSat"
-            text: qsTr("Perfiles SAT")
-            descripcion: qsTr("Administrar perfiles SAT y su e.firma")
-            KeyNavigation.tab: botonCarpetaPaquetes.visible
-                               ? botonCarpetaPaquetes
-                               : (lista.visible ? lista : (botonReintentar.visible ? botonReintentar : botonNueva))
-            onClicked: pagina.app.mostrarPerfiles()
-        }
         // T009.1 D1: abre la carpeta de paquetes en Finder (no la crea).
         BotonAccion {
             id: botonCarpetaPaquetes
             objectName: "botonAbrirCarpetaPaquetes"
             visible: pagina.app.puedeAbrirCarpetaPaquetes
+            icono: "folder"
             text: qsTr("Abrir carpeta de paquetes")
             descripcion: qsTr("Mostrar en Finder la carpeta donde se guardan los paquetes descargados")
-            KeyNavigation.tab: lista.visible ? lista : (botonReintentar.visible ? botonReintentar : botonNueva)
             onClicked: pagina.app.abrirCarpetaPaquetes()
         }
-    }
-
-    // T009 D9: aviso cuando macOS no permite notificaciones (no afecta el flujo).
-    footer: Column {
-        // T009.1 D7: aviso accesible si no se pudo abrir la carpeta de paquetes.
-        Label {
-            objectName: "mensajeFinderLista"
-            visible: text.length > 0
-            width: parent ? parent.width : implicitWidth
-            text: pagina.app.mensajeFinder
-            color: "#b00020"
-            wrapMode: Text.WordWrap
-            padding: 8
-            Accessible.role: Accessible.AlertMessage
-            Accessible.name: text
-        }
-        Label {
-            objectName: "avisoNotificaciones"
-            visible: pagina.app.notificacionesDeshabilitadas
-            width: parent ? parent.width : implicitWidth
-            text: qsTr("Las notificaciones estan deshabilitadas. Activalas en Ajustes del Sistema para recibir avisos.")
-            wrapMode: Text.WordWrap
-            padding: 8
-            Accessible.role: Accessible.StaticText
-            Accessible.name: text
-        }
-    }
-
-    ListView {
-        id: lista
-        objectName: "listaSolicitudes"
-        anchors.fill: parent
-        anchors.margins: 8
-        clip: true
-        spacing: 4
-        visible: pagina.modelo.estado === SolicitudesListModel.ConDatos
-        model: pagina.modelo
-        currentIndex: count > 0 ? 0 : -1
-        activeFocusOnTab: true
-        keyNavigationEnabled: true
-        boundsBehavior: Flickable.StopAtBounds
-        KeyNavigation.tab: botonNueva
-
-        Accessible.role: Accessible.List
-        Accessible.name: qsTr("Lista de solicitudes, %n elemento(s)", "", count)
-
-        ScrollBar.vertical: ScrollBar { }
-
-        Keys.onReturnPressed: pagina.abrir(pagina.modelo.idEn(lista.currentIndex))
-        Keys.onEnterPressed: pagina.abrir(pagina.modelo.idEn(lista.currentIndex))
-        Keys.onSpacePressed: pagina.abrir(pagina.modelo.idEn(lista.currentIndex))
-
-        delegate: ItemDelegate {
-            id: fila
-            objectName: "filaSolicitud_" + index
-
-            required property int index
-            required property var model
-
-            readonly property string solicitudId: model.id
-            readonly property string textoEstado: Etiquetas.estadoResumen(model.estadoResumen)
-            readonly property string textoTipo: Etiquetas.tipoDescarga(model.tipoDescarga)
-            readonly property string textoPaquetes: qsTr("%n paquete(s)", "", model.totalPaquetes)
-
-            width: ListView.view.width
-            focusPolicy: Qt.NoFocus
-            highlighted: ListView.isCurrentItem
-
-            Accessible.role: Accessible.ListItem
-            Accessible.name: qsTr("Solicitud %1, %2, del %3 al %4, estado %5, %6")
-                .arg(model.perfilRfc).arg(textoTipo).arg(model.fechaInicial)
-                .arg(model.fechaFinal).arg(textoEstado).arg(textoPaquetes)
-
-            onClicked: {
-                lista.currentIndex = index
-                pagina.abrir(solicitudId)
-            }
-
-            contentItem: ColumnLayout {
-                spacing: 4
-
-                RowLayout {
-                    spacing: 8
-                    Layout.fillWidth: true
-
-                    Label {
-                        text: fila.model.perfilRfc
-                        font.bold: true
-                        elide: Text.ElideRight
-                        Layout.fillWidth: true
-                        Accessible.ignored: true
-                    }
-                    EstadoBadge {
-                        clave: fila.model.estadoResumen
-                    }
-                }
-                Label {
-                    text: qsTr("%1 · %2 a %3 · %4%5")
-                        .arg(fila.textoTipo).arg(fila.model.fechaInicial).arg(fila.model.fechaFinal)
-                        .arg(fila.textoPaquetes)
-                        .arg(fila.model.rfcContraparte ? qsTr(" · Contraparte %1").arg(fila.model.rfcContraparte) : "")
-                    wrapMode: Text.WordWrap
-                    Layout.fillWidth: true
-                    Accessible.ignored: true
-                }
-                Label {
-                    text: qsTr("Creada %1").arg(Etiquetas.fechaHora(fila.model.creadaEn))
-                    opacity: 0.75
-                    elide: Text.ElideRight
-                    Layout.fillWidth: true
-                    Accessible.ignored: true
-                }
-            }
-        }
-    }
-
-    // Estado: vacia
-    ColumnLayout {
-        objectName: "estadoVacio"
-        anchors.centerIn: parent
-        width: Math.min(parent.width - 32, 420)
-        visible: pagina.modelo.estado === SolicitudesListModel.Vacia
-        spacing: 12
-
-        Accessible.role: Accessible.StaticText
-        Accessible.name: qsTr("No hay solicitudes. Crea una nueva solicitud para comenzar.")
-
-        Label {
-            text: qsTr("No hay solicitudes")
-            font.pixelSize: 18
-            font.bold: true
-            horizontalAlignment: Text.AlignHCenter
-            Layout.fillWidth: true
-            Accessible.ignored: true
-        }
-        Label {
-            text: qsTr("Crea una nueva solicitud para comenzar.")
-            wrapMode: Text.WordWrap
-            horizontalAlignment: Text.AlignHCenter
-            Layout.fillWidth: true
-            Accessible.ignored: true
-        }
-    }
-
-    // Estado: cargando
-    ColumnLayout {
-        objectName: "estadoCargando"
-        anchors.centerIn: parent
-        visible: pagina.modelo.estado === SolicitudesListModel.Cargando
-        spacing: 8
-        Accessible.role: Accessible.StaticText
-        Accessible.name: qsTr("Cargando solicitudes")
-
-        BusyIndicator {
-            running: parent.visible
-            Layout.alignment: Qt.AlignHCenter
-            Accessible.ignored: true
-        }
-        Label {
-            text: qsTr("Cargando solicitudes...")
-            Layout.alignment: Qt.AlignHCenter
-            Accessible.ignored: true
-        }
-    }
-
-    // Estado: error
-    ColumnLayout {
-        objectName: "estadoError"
-        anchors.centerIn: parent
-        width: Math.min(parent.width - 32, 420)
-        visible: pagina.modelo.estado === SolicitudesListModel.Error
-        spacing: 12
-
-        Label {
-            objectName: "errorLista"
-            text: pagina.modelo.errorMessage
-            color: "#b00020"
-            font.bold: true
-            wrapMode: Text.WordWrap
-            horizontalAlignment: Text.AlignHCenter
-            Layout.fillWidth: true
-            Accessible.role: Accessible.AlertMessage
-            Accessible.name: qsTr("Error: %1").arg(text)
+        BotonAccion {
+            id: botonPerfiles
+            objectName: "botonPerfilesSat"
+            icono: "person-card"
+            text: qsTr("Perfiles SAT")
+            descripcion: qsTr("Administrar perfiles SAT y su e.firma")
+            onClicked: pagina.app.mostrarPerfiles()
         }
         BotonAccion {
-            id: botonReintentar
-            objectName: "botonReintentarLista"
-            text: qsTr("Reintentar")
-            descripcion: qsTr("Volver a cargar la lista de solicitudes")
-            Layout.alignment: Qt.AlignHCenter
-            KeyNavigation.tab: botonNueva
-            onClicked: pagina.modelo.refrescar()
+            id: botonNueva
+            objectName: "botonNuevaSolicitud"
+            variante: "primario"
+            icono: "plus"
+            text: qsTr("Nueva solicitud")
+            descripcion: qsTr("Abrir el formulario de nueva solicitud")
+            onClicked: pagina.app.mostrarNueva()
+        }
+    }
+
+    ColumnLayout {
+        anchors.fill: parent
+        spacing: 0
+
+        // ---- Avisos sobre la tabla ----
+        Rectangle {
+            // Condiciones directas: la visibilidad efectiva de los hijos depende de esta.
+            visible: pagina.app.notificacionesDeshabilitadas || pagina.app.mensajeFinder.length > 0
+            color: Theme.superficie
+            Layout.fillWidth: true
+            implicitHeight: avisos.implicitHeight + 24
+
+            ColumnLayout {
+                id: avisos
+                anchors.fill: parent
+                anchors.leftMargin: Theme.espacioL
+                anchors.rightMargin: Theme.espacioL
+                anchors.topMargin: 12
+                anchors.bottomMargin: 12
+                spacing: Theme.espacioS
+
+                // T009.1 D7: aviso accesible si no se pudo abrir la carpeta de paquetes.
+                AvisoEnLinea {
+                    id: mensajeFinder
+                    objectName: "mensajeFinderLista"
+                    visible: pagina.app.mensajeFinder.length > 0
+                    variante: "error"
+                    icono: "folder"
+                    titulo: pagina.app.mensajeFinder
+                    Layout.fillWidth: true
+                }
+                // T009 D9: notificaciones deshabilitadas en macOS (no afecta el flujo).
+                AvisoEnLinea {
+                    id: avisoNotificaciones
+                    objectName: "avisoNotificaciones"
+                    visible: pagina.app.notificacionesDeshabilitadas
+                    variante: "advertencia"
+                    icono: "bell-slash"
+                    anunciar: false
+                    titulo: qsTr("Las notificaciones están desactivadas.")
+                    descripcion: qsTr("Actívalas en Ajustes del Sistema para recibir avisos cuando una solicitud termine o falle.")
+                    Layout.fillWidth: true
+                }
+            }
+        }
+
+        // ---- Tabla ----
+        Item {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+
+            ListView {
+                id: lista
+                objectName: "listaSolicitudes"
+                anchors.fill: parent
+                clip: true
+                visible: pagina.modelo.estado === SolicitudesListModel.ConDatos
+                model: pagina.modelo
+                currentIndex: count > 0 ? 0 : -1
+                activeFocusOnTab: true
+                keyNavigationEnabled: true
+                boundsBehavior: Flickable.StopAtBounds
+                headerPositioning: ListView.OverlayHeader
+
+                Accessible.role: Accessible.List
+                Accessible.name: qsTr("Lista de solicitudes, %n elemento(s)", "", count)
+
+                ScrollBar.vertical: ScrollBar { }
+
+                Keys.onReturnPressed: pagina.abrir(pagina.modelo.idEn(lista.currentIndex))
+                Keys.onEnterPressed: pagina.abrir(pagina.modelo.idEn(lista.currentIndex))
+                Keys.onSpacePressed: pagina.abrir(pagina.modelo.idEn(lista.currentIndex))
+
+                header: Rectangle {
+                    objectName: "encabezadosColumnas"
+                    z: 2
+                    width: ListView.view.width
+                    height: 30
+                    color: Theme.superficie
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: Theme.espacioL
+                        anchors.rightMargin: Theme.espacioL
+                        spacing: Theme.espacioM
+
+                        Repeater {
+                            model: [
+                                { texto: qsTr("Estado"), ancho: 176 - Theme.espacioM, estirar: 0 },
+                                { texto: qsTr("Contribuyente"), ancho: 15, estirar: 15 },
+                                { texto: qsTr("Tipo"), ancho: 112 - Theme.espacioM, estirar: 0 },
+                                { texto: qsTr("Periodo"), ancho: 11, estirar: 11 },
+                                { texto: qsTr("Paquetes"), ancho: 72 - Theme.espacioM, estirar: 0, derecha: true },
+                                { texto: qsTr("Creada"), ancho: 150 - Theme.espacioM, estirar: 0, creada: true }
+                            ]
+                            delegate: Label {
+                                required property var modelData
+                                visible: !modelData.creada || pagina.anchoAmplio
+                                text: modelData.texto
+                                color: Theme.textoSecundario
+                                font.family: Theme.familia
+                                font.pixelSize: Theme.etiqueta.size
+                                font.weight: Font.DemiBold
+                                horizontalAlignment: modelData.derecha ? Text.AlignRight : Text.AlignLeft
+                                elide: Text.ElideRight
+                                Layout.preferredWidth: modelData.ancho
+                                Layout.fillWidth: modelData.estirar > 0
+                                Layout.horizontalStretchFactor: modelData.estirar > 0 ? modelData.estirar : -1
+                                Accessible.ignored: true
+                            }
+                        }
+                        // Columna del chevron.
+                        Item { Layout.preferredWidth: 16 }
+                    }
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        height: 1
+                        color: Theme.separador
+                    }
+                }
+
+                delegate: FilaSolicitud {
+                    id: fila
+                    required property int index
+                    required property var model
+
+                    objectName: "filaSolicitud_" + index
+                    width: ListView.view.width
+                    estado: model.estadoResumen
+                    rfc: model.perfilRfc
+                    nombrePerfil: model.perfilNombre
+                    tipoDescarga: model.tipoDescarga
+                    fechaInicial: model.fechaInicial
+                    fechaFinal: model.fechaFinal
+                    totalPaquetes: model.totalPaquetes
+                    creadaEn: model.creadaEn
+                    mostrarCreada: pagina.anchoAmplio
+                    seleccionada: ListView.isCurrentItem
+                    conFoco: ListView.isCurrentItem && lista.activeFocus
+
+                    onClicked: {
+                        lista.currentIndex = index
+                        pagina.abrir(model.id)
+                    }
+                }
+            }
+
+            // Estado: vacia
+            EstadoVacio {
+                id: vacio
+                objectName: "estadoVacio"
+                anchors.centerIn: parent
+                width: Math.min(parent.width - 2 * Theme.espacioXxl, 420)
+                visible: pagina.modelo.estado === SolicitudesListModel.Vacia
+                variante: "vacio"
+                titulo: qsTr("No hay solicitudes")
+                descripcion: qsTr("Crea una solicitud para descargar del SAT los CFDI emitidos o recibidos de un contribuyente.")
+                textoAccion: qsTr("Nueva solicitud")
+                accionPrimaria: true
+                objectNameAccion: "botonNuevaSolicitudVacia"
+                onAccionSolicitada: pagina.app.mostrarNueva()
+            }
+
+            // Estado: cargando (solo si tarda mas de 300 ms)
+            ColumnLayout {
+                id: cargando
+                objectName: "estadoCargando"
+                anchors.centerIn: parent
+                // Visible solo si la carga sigue tras 300 ms (el retraso ya disparo).
+                visible: pagina.modelo.estado === SolicitudesListModel.Cargando && !retraso.running
+                spacing: Theme.espacioS
+                Accessible.role: Accessible.StaticText
+                Accessible.name: qsTr("Cargando solicitudes")
+
+                Timer {
+                    id: retraso
+                    interval: 300
+                    running: pagina.modelo.estado === SolicitudesListModel.Cargando
+                }
+                BusyIndicator {
+                    running: parent.visible
+                    Layout.alignment: Qt.AlignHCenter
+                    Accessible.ignored: true
+                }
+            }
+
+            // Estado: error
+            EstadoVacio {
+                id: error
+                objectName: "estadoError"
+                anchors.centerIn: parent
+                width: Math.min(parent.width - 2 * Theme.espacioXxl, 420)
+                visible: pagina.modelo.estado === SolicitudesListModel.Error
+                variante: "error"
+                titulo: pagina.modelo.errorMessage
+                descripcion: qsTr("Tus solicitudes siguen guardadas en este equipo. Intenta cargarlas de nuevo.")
+                textoAccion: qsTr("Reintentar")
+                objectNameTitulo: "errorLista"
+                objectNameAccion: "botonReintentarLista"
+                onAccionSolicitada: pagina.modelo.refrescar()
+            }
         }
     }
 }

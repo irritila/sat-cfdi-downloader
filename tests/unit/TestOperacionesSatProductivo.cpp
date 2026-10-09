@@ -682,7 +682,23 @@ void TestOperacionesSatProductivo::ultimoErrorSeDesglosa()
     QCOMPARE(dp->mensaje, m::credencialVencida());
 
     QVERIFY(!desglosarUltimoError(u"CodEstatus 301"));
-    QVERIFY(!desglosarUltimoError(u"Envio interrumpido por cierre; resultado incierto"));
+    QVERIFY(!desglosarUltimoError(u"Envio interrumpido por cierre; resultado incierto")); // texto previo a T013
+    QVERIFY(!desglosarUltimoError(u"Envío interrumpido por cierre; resultado incierto"));
+
+    // T013 D6: ultimo_error guardado con el texto sin acentos (antes de T013)
+    // y con el actual se desglosan igual.
+    const auto viejo = desglosarUltimoError(
+        u"Autenticacion:InvalidSecurity: El SAT no acepto la autenticacion con esta e.firma. [HTTP 500; Fault]");
+    const auto nuevo = desglosarUltimoError(u"Autenticacion:InvalidSecurity: " + m::autenticacionRechazada()
+                                            + u" [HTTP 500; Fault]");
+    QVERIFY(viejo && nuevo);
+    QCOMPARE(viejo->fase, FaseOperacion::Autenticacion);
+    QCOMPARE(nuevo->fase, FaseOperacion::Autenticacion);
+    QCOMPARE(viejo->codigo, nuevo->codigo);
+    QCOMPARE(viejo->detalleTecnico, QStringLiteral("HTTP 500; Fault"));
+    QCOMPARE(nuevo->detalleTecnico, QStringLiteral("HTTP 500; Fault"));
+    QCOMPARE(viejo->mensaje, QStringLiteral("El SAT no acepto la autenticacion con esta e.firma."));
+    QCOMPARE(nuevo->mensaje, QStringLiteral("El SAT no aceptó la autenticación con esta e.firma."));
 }
 
 namespace {

@@ -66,6 +66,8 @@ class PerfilesSatViewModel : public QObject {
     Q_PROPERTY(QString seleccionPreparacion READ seleccionPreparacion NOTIFY seleccionChanged)
     Q_PROPERTY(QString seleccionEstadoTexto READ seleccionEstadoTexto NOTIFY seleccionChanged)
     Q_PROPERTY(bool seleccionListo READ seleccionListo NOTIFY seleccionChanged)
+    // Vigencia de la e.firma del perfil seleccionado ("AAAA-MM-DD") o vacia.
+    Q_PROPERTY(QString seleccionVigenteHasta READ seleccionVigenteHasta NOTIFY seleccionChanged)
     Q_PROPERTY(bool tieneCredencial READ tieneCredencial NOTIFY seleccionChanged)
     Q_PROPERTY(bool puedeGestionarEFirma READ puedeGestionarEFirma NOTIFY seleccionChanged)
 
@@ -114,6 +116,7 @@ public:
     QString seleccionPreparacion() const;
     QString seleccionEstadoTexto() const;
     bool seleccionListo() const;
+    QString seleccionVigenteHasta() const;
     bool tieneCredencial() const;
     bool puedeGestionarEFirma() const;
 

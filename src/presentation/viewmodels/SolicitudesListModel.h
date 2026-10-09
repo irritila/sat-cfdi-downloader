@@ -57,6 +57,9 @@ public:
         EstadoResumenRole,
         CreadaEnRole,
         TotalPaquetesRole,
+        // T013 D8 (UX-09): nombre del perfil bajo el RFC. Vacio mientras el
+        // DTO SolicitudResumen no lo traiga (pendiente de application).
+        PerfilNombreRole,
     };
     Q_ENUM(Rol)
 

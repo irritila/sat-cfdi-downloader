@@ -26,8 +26,18 @@ satcfdi_enable_warnings(satcfdi_manual_capturas)
 # Ejecuta la herramienta en una sesion grafica real (D4: cocoa, no offscreen).
 add_custom_target(manual_capturas
     COMMAND ${CMAKE_COMMAND} -E env QT_QPA_PLATFORM=cocoa
-            $<TARGET_FILE:satcfdi_manual_capturas> --salida ${PROJECT_SOURCE_DIR}/docs/manual/img
+            $<TARGET_FILE:satcfdi_manual_capturas> --tema claro --salida ${PROJECT_SOURCE_DIR}/docs/manual/img
     DEPENDS satcfdi_manual_capturas
     USES_TERMINAL
     COMMENT "Generando las imagenes del manual en docs/manual/img"
+)
+
+# T013 D9: las mismas pantallas en tema oscuro, como evidencia de revision.
+# Se escriben en el build (fuera del repo); el manual sigue en claro.
+add_custom_target(manual_capturas_oscuro
+    COMMAND ${CMAKE_COMMAND} -E env QT_QPA_PLATFORM=cocoa
+            $<TARGET_FILE:satcfdi_manual_capturas> --tema oscuro --salida ${CMAKE_BINARY_DIR}/capturas-oscuro
+    DEPENDS satcfdi_manual_capturas
+    USES_TERMINAL
+    COMMENT "Generando las capturas en oscuro en ${CMAKE_BINARY_DIR}/capturas-oscuro"
 )

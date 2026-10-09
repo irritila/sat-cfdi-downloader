@@ -1,23 +1,22 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls.Basic
 import QtQuick.Layouts
 
-// Perfiles SAT (T005.1): lista de perfiles no eliminados con su preparacion,
-// formulario de alta/edicion y gestion de e.firma. Solo layout y estado
-// visual: reglas, elegibilidad y errores vienen de los view models.
+// Perfiles SAT (T013, traspaso "PerfilesSatPage"; UX-31..UX-34). Solo layout y
+// estado visual: reglas, elegibilidad y errores vienen de los view models.
 //
-// - Lista: Cargando, Vacia, Error (con reintento) y ConDatos. Cada perfil
-//   muestra RFC, nombre y su estado como TEXTO (no solo color); los inactivos
-//   se marcan "No disponible para solicitudes"; "Verificando" y "Estado no
-//   disponible" (con reintento por perfil).
-// - Formulario: RFC editable solo al crear; en edicion es identidad de solo
-//   lectura. Un error enfoca su campo (RfcDuplicado -> RFC).
-// - e.firma: Registrar (perfil guardado y activo) o Reemplazar, que pide
-//   confirmacion ANTES de abrir la captura.
-// - La captura se descarta al cambiar de perfil, al ocultar la ventana y al
-//   salir de la pagina.
+// - SplitView: a la izquierda la lista de FilaPerfil (340; 280..420); a la
+//   derecha el detalle con scroll y una columna de 640 como maximo.
+// - Detalle: grupo "Perfil" (RFC de solo lectura con candado en edicion,
+//   nombre descriptivo y, en su pie, Descartar y Guardar) y grupo "e.firma"
+//   (badge grande, linea de estado, ayuda y Registrar/Reemplazar e.firma).
+// - Reemplazar pide confirmacion ANTES de abrir la captura.
+// - Estados: cargando y error en la lista; sin perfiles en el panel derecho.
+//   Al cargar con datos se selecciona el primer perfil.
+// - La captura de e.firma se descarta al cambiar de perfil, al ocultar la
+//   ventana y al salir de la pagina.
 //
 // Teclado: foco inicial en la lista (o en "Nuevo perfil" si esta vacia);
 // flechas para moverse; Enter/Espacio edita el perfil con foco; R o Tab hasta
@@ -32,11 +31,20 @@ Page {
     required property EFirmaFormViewModel eFirma
 
     readonly property bool hayFormulario: pagina.perfiles.modo !== PerfilesSatViewModel.Ninguno
-    readonly property bool anchoAmplio: pagina.width >= 760
+    readonly property bool enEdicion: pagina.perfiles.modo === PerfilesSatViewModel.Edicion
+    readonly property string preparacion: pagina.perfiles.seleccionPreparacion
+    // e.firma que conviene renovar o volver a registrar: la accion es primaria.
+    readonly property bool eFirmaRequiereAccion: !pagina.perfiles.tieneCredencial
+        || pagina.preparacion === "Vencida" || pagina.preparacion === "NoVigenteAun"
+        || pagina.preparacion === "MaterialFaltante" || pagina.preparacion === "MaterialDanado"
 
     focus: true
     Accessible.role: Accessible.Pane
     Accessible.name: qsTr("Perfiles SAT")
+
+    background: Rectangle {
+        color: Theme.fondo
+    }
 
     Component.onCompleted: Qt.callLater(pagina.enfocarInicial)
 
@@ -98,11 +106,21 @@ Page {
         dialogoEFirma.open()
     }
 
+    // Con la lista cargada y sin formulario abierto, el primer perfil queda
+    // seleccionado (sin mover el foco).
+    function seleccionarPrimero() {
+        if (pagina.perfiles.estadoLista === PerfilesSatViewModel.ConDatos
+                && pagina.perfiles.modo === PerfilesSatViewModel.Ninguno
+                && pagina.perfiles.perfiles.count > 0)
+            pagina.perfiles.seleccionar(pagina.perfiles.perfiles.idEn(0))
+    }
+
     Keys.onEscapePressed: regresar()
 
     Connections {
         target: pagina.perfiles
         function onEnfocarCampo(campo) { pagina.enfocarCampo(campo) }
+        function onListaChanged() { Qt.callLater(pagina.seleccionarPrimero) }
         // Cambiar de perfil descarta la captura de e.firma en curso.
         function onFormularioChanged() {
             if (dialogoEFirma.visible && pagina.perfiles.perfilId !== pagina.eFirma.perfilId)
@@ -122,15 +140,16 @@ Page {
     EFirmaDialogo {
         id: dialogoEFirma
         eFirma: pagina.eFirma
+        nombrePerfil: pagina.eFirma.perfilId === pagina.perfiles.perfilId ? pagina.perfiles.nombre : ""
+        vigenteHasta: pagina.eFirma.perfilId === pagina.perfiles.perfilId ? pagina.perfiles.seleccionVigenteHasta : ""
     }
 
     DialogoConfirmacion {
         id: dialogoReemplazo
         objectName: "dialogoReemplazoEFirma"
         prefijoNombre: "dialogoReemplazo"
-        title: qsTr("Reemplazar e.firma")
-        mensaje: qsTr("La e.firma registrada de %1 se reemplazara solo si la nueva se valida. Si falla, la actual sigue registrada sin cambios.")
-                     .arg(pagina.perfiles.rfc)
+        title: qsTr("¿Reemplazar la e.firma de %1?").arg(pagina.perfiles.rfc)
+        mensaje: qsTr("La e.firma registrada se reemplazará solo si la nueva se valida. Si falla, la actual sigue registrada sin cambios.")
         textoConfirmar: qsTr("Continuar")
         onConfirmado: Qt.callLater(pagina.abrirReemplazo)
         onCancelado: Qt.callLater(pagina.enfocarBotonEFirma)
@@ -140,41 +159,49 @@ Page {
         id: encabezado
         titulo: qsTr("Perfiles SAT")
         mostrarRegresar: true
-        textoRegresar: qsTr("Volver a solicitudes")
+        textoRegresar: qsTr("Solicitudes")
         descripcionRegresar: qsTr("Volver a la lista de solicitudes (Escape)")
         onRegresarSolicitado: pagina.regresar()
 
         BotonAccion {
             id: botonNuevo
             objectName: "botonNuevoPerfil"
+            variante: "primario"
+            icono: "plus"
             text: qsTr("Nuevo perfil")
             descripcion: qsTr("Crear un perfil SAT")
-            highlighted: true
             KeyNavigation.tab: lista.visible ? lista : null
             onClicked: pagina.nuevoPerfil()
         }
     }
 
-    GridLayout {
+    SplitView {
         anchors.fill: parent
-        anchors.margins: 8
-        columns: pagina.anchoAmplio ? 2 : 1
-        columnSpacing: 12
-        rowSpacing: 12
+        orientation: Qt.Horizontal
 
-        // ---- Lista ----------------------------------------------------
-        Item {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            Layout.preferredWidth: pagina.anchoAmplio ? 1 : -1
-            Layout.minimumHeight: 160
+        handle: Rectangle {
+            implicitWidth: 1
+            color: Theme.separador
+            // Zona de arrastre mas ancha que la linea.
+            containmentMask: Item {
+                x: -3
+                width: 7
+                height: parent ? parent.height : 0
+            }
+        }
+
+        // ---- Lista ------------------------------------------------------
+        Rectangle {
+            SplitView.preferredWidth: Theme.anchoListaPerfiles
+            SplitView.minimumWidth: 280
+            SplitView.maximumWidth: 420
+            color: Theme.superficie
 
             ListView {
                 id: lista
                 objectName: "listaPerfiles"
                 anchors.fill: parent
                 clip: true
-                spacing: 4
                 visible: pagina.perfiles.estadoLista === PerfilesSatViewModel.ConDatos
                 model: pagina.perfiles.perfiles
                 currentIndex: count > 0 ? Math.max(0, pagina.perfiles.perfiles.filaDe(pagina.perfiles.perfilId)) : -1
@@ -198,121 +225,35 @@ Page {
                     }
                 }
 
-                delegate: ItemDelegate {
+                delegate: FilaPerfil {
                     id: fila
-                    objectName: "filaPerfil_" + index
-
                     required property int index
                     required property var model
 
-                    readonly property string textoDisponibilidad: !fila.model.activo
-                        ? qsTr("Inactivo: no disponible para solicitudes")
-                        : (fila.model.listoParaSolicitudes ? qsTr("Disponible para solicitudes")
-                                                           : qsTr("No disponible para solicitudes"))
-
+                    objectName: "filaPerfil_" + index
+                    objectNameBadge: "badgePreparacion_" + index
+                    objectNameDisponibilidad: "disponibilidad_" + index
+                    objectNameReintentar: "botonReintentarEstado_" + index
                     width: ListView.view.width
-                    focusPolicy: Qt.NoFocus
-                    highlighted: ListView.isCurrentItem || fila.model.id === pagina.perfiles.perfilId
-
-                    Accessible.role: Accessible.ListItem
-                    Accessible.name: qsTr("Perfil %1, %2, %3, %4")
-                        .arg(fila.model.rfc).arg(fila.model.nombre).arg(fila.model.estadoTexto)
-                        .arg(fila.textoDisponibilidad)
+                    rfc: model.rfc
+                    nombre: model.nombre
+                    preparacion: model.preparacion
+                    estadoTexto: model.estadoTexto
+                    activo: model.activo
+                    listo: model.listoParaSolicitudes
+                    vigenteHasta: model.vigenteHasta
+                    disponibilidad: !model.activo
+                        ? qsTr("Inactivo: no disponible para solicitudes")
+                        : (model.listoParaSolicitudes ? qsTr("Disponible para solicitudes")
+                                                      : qsTr("No disponible para solicitudes"))
+                    seleccionada: model.id === pagina.perfiles.perfilId
+                    conFoco: ListView.isCurrentItem && lista.activeFocus
 
                     onClicked: {
                         lista.currentIndex = index
-                        pagina.editar(fila.model.id)
+                        pagina.editar(model.id)
                     }
-
-                    contentItem: ColumnLayout {
-                        spacing: 4
-
-                        RowLayout {
-                            spacing: 8
-                            Layout.fillWidth: true
-                            Label {
-                                text: fila.model.rfc
-                                font.bold: true
-                                Accessible.ignored: true
-                            }
-                            Label {
-                                text: fila.model.nombre
-                                elide: Text.ElideRight
-                                Layout.fillWidth: true
-                                Accessible.ignored: true
-                            }
-                            BusyIndicator {
-                                visible: fila.model.verificando
-                                running: visible
-                                implicitWidth: 18
-                                implicitHeight: 18
-                                Accessible.ignored: true
-                            }
-                            EstadoBadge {
-                                objectName: "badgePreparacion_" + fila.index
-                                clave: fila.model.preparacion
-                                texto: fila.model.estadoTexto
-                                contexto: qsTr("e.firma")
-                            }
-                        }
-                        RowLayout {
-                            spacing: 8
-                            Layout.fillWidth: true
-                            Label {
-                                objectName: "disponibilidad_" + fila.index
-                                text: fila.textoDisponibilidad
-                                font.italic: !fila.model.activo
-                                opacity: 0.8
-                                elide: Text.ElideRight
-                                Layout.fillWidth: true
-                                Accessible.ignored: true
-                            }
-                            Label {
-                                visible: fila.model.vigenteHasta !== null
-                                text: fila.model.vigenteHasta !== null
-                                      ? qsTr("Vigente hasta %1").arg(Qt.formatDate(fila.model.vigenteHasta, "yyyy-MM-dd"))
-                                      : ""
-                                opacity: 0.8
-                                Accessible.ignored: true
-                            }
-                            // Alcanzable con Tab desde la lista (ademas del atajo R).
-                            BotonAccion {
-                                objectName: "botonReintentarEstado_" + fila.index
-                                visible: fila.model.preparacion === "EstadoNoDisponible"
-                                text: qsTr("Reintentar")
-                                descripcion: qsTr("Volver a consultar el estado de la e.firma de %1").arg(fila.model.rfc)
-                                activeFocusOnTab: true
-                                Accessible.name: qsTr("Reintentar estado de %1").arg(fila.model.rfc)
-                                onClicked: pagina.perfiles.reintentarEstado(fila.model.id)
-                            }
-                        }
-                    }
-                }
-            }
-
-            ColumnLayout {
-                objectName: "estadoVacioPerfiles"
-                anchors.centerIn: parent
-                width: Math.min(parent.width - 32, 380)
-                visible: pagina.perfiles.estadoLista === PerfilesSatViewModel.Vacia
-                spacing: 8
-                Accessible.role: Accessible.StaticText
-                Accessible.name: qsTr("No hay perfiles SAT. Usa Nuevo perfil para crear uno.")
-
-                Label {
-                    text: qsTr("No hay perfiles SAT")
-                    font.pixelSize: 18
-                    font.bold: true
-                    horizontalAlignment: Text.AlignHCenter
-                    Layout.fillWidth: true
-                    Accessible.ignored: true
-                }
-                Label {
-                    text: qsTr("Crea un perfil con el RFC del contribuyente y despues registra su e.firma.")
-                    wrapMode: Text.WordWrap
-                    horizontalAlignment: Text.AlignHCenter
-                    Layout.fillWidth: true
-                    Accessible.ignored: true
+                    onReintentarSolicitado: pagina.perfiles.reintentarEstado(model.id)
                 }
             }
 
@@ -320,7 +261,7 @@ Page {
                 objectName: "estadoCargandoPerfiles"
                 anchors.centerIn: parent
                 visible: pagina.perfiles.estadoLista === PerfilesSatViewModel.Cargando
-                spacing: 8
+                spacing: Theme.espacioS
                 Accessible.role: Accessible.StaticText
                 Accessible.name: qsTr("Cargando perfiles SAT")
                 BusyIndicator {
@@ -328,220 +269,275 @@ Page {
                     Layout.alignment: Qt.AlignHCenter
                     Accessible.ignored: true
                 }
-                Label {
-                    text: qsTr("Cargando perfiles SAT...")
-                    Accessible.ignored: true
-                }
             }
 
-            ColumnLayout {
+            EstadoVacio {
                 objectName: "estadoErrorPerfiles"
                 anchors.centerIn: parent
-                width: Math.min(parent.width - 32, 380)
+                width: parent.width - 2 * Theme.espacioL
                 visible: pagina.perfiles.estadoLista === PerfilesSatViewModel.Error
-                spacing: 8
-                Label {
-                    objectName: "errorListaPerfiles"
-                    text: pagina.perfiles.errorListaMessage
-                    color: "#b00020"
-                    font.bold: true
-                    wrapMode: Text.WordWrap
-                    horizontalAlignment: Text.AlignHCenter
-                    Layout.fillWidth: true
-                    Accessible.role: Accessible.AlertMessage
-                    Accessible.name: qsTr("Error: %1").arg(text)
-                }
-                BotonAccion {
-                    objectName: "botonReintentarPerfiles"
-                    text: qsTr("Reintentar")
-                    descripcion: qsTr("Volver a cargar los perfiles SAT")
-                    Layout.alignment: Qt.AlignHCenter
-                    onClicked: pagina.perfiles.cargar()
-                }
+                variante: "error"
+                titulo: pagina.perfiles.errorListaMessage
+                textoAccion: qsTr("Reintentar")
+                objectNameTitulo: "errorListaPerfiles"
+                objectNameAccion: "botonReintentarPerfiles"
+                onAccionSolicitada: pagina.perfiles.cargar()
             }
         }
 
-        // ---- Formulario ------------------------------------------------
-        ScrollView {
-            id: panel
-            objectName: "panelPerfil"
-            visible: pagina.hayFormulario
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            Layout.preferredWidth: pagina.anchoAmplio ? 1 : -1
-            contentWidth: availableWidth
-            clip: true
+        // ---- Detalle ----------------------------------------------------
+        Item {
+            SplitView.fillWidth: true
+            SplitView.minimumWidth: 360
 
-            ColumnLayout {
-                width: panel.availableWidth
-                spacing: 6
+            EstadoVacio {
+                objectName: "estadoVacioPerfiles"
+                anchors.centerIn: parent
+                width: Math.min(parent.width - 2 * Theme.espacioXxl, 420)
+                visible: pagina.perfiles.estadoLista === PerfilesSatViewModel.Vacia && !pagina.hayFormulario
+                variante: "sinPerfiles"
+                titulo: qsTr("Aún no hay perfiles SAT")
+                descripcion: qsTr("Crea un perfil con el RFC del contribuyente y después registra su e.firma.")
+                textoAccion: qsTr("Nuevo perfil")
+                accionPrimaria: true
+                objectNameAccion: "botonNuevoPerfilVacio"
+                onAccionSolicitada: pagina.nuevoPerfil()
+            }
 
-                Label {
-                    text: pagina.perfiles.modo === PerfilesSatViewModel.Nuevo ? qsTr("Nuevo perfil")
-                                                                              : qsTr("Editar perfil")
-                    font.pixelSize: 16
-                    font.bold: true
-                    Accessible.role: Accessible.Heading
-                    Accessible.name: text
-                }
+            ScrollView {
+                id: panel
+                objectName: "panelPerfil"
+                anchors.fill: parent
+                visible: pagina.hayFormulario
+                contentWidth: availableWidth
+                clip: true
 
-                Label { text: qsTr("RFC"); Accessible.ignored: true }
-                TextField {
-                    id: campoRfc
-                    objectName: "campoRfcPerfil"
-                    Layout.fillWidth: true
-                    text: pagina.perfiles.rfc
-                    readOnly: !pagina.perfiles.rfcEditable
-                    enabled: !pagina.perfiles.guardando
-                    maximumLength: 13
-                    onTextEdited: pagina.perfiles.rfc = text
-                    onAccepted: pagina.perfiles.guardar()
-                    Accessible.name: pagina.perfiles.rfcEditable ? qsTr("RFC del perfil")
-                                                                 : qsTr("RFC del perfil, no editable")
-                    Accessible.description: pagina.perfiles.errorRfc
-                }
-                Label {
-                    objectName: "errorRfcPerfil"
-                    visible: text.length > 0
-                    text: pagina.perfiles.errorRfc
-                    color: "#b00020"
-                    font.bold: true
-                    wrapMode: Text.WordWrap
-                    Layout.fillWidth: true
-                    Accessible.role: Accessible.AlertMessage
-                    Accessible.name: qsTr("Error en RFC: %1").arg(text)
-                }
-                Label {
-                    visible: !pagina.perfiles.rfcEditable
-                    text: qsTr("El RFC identifica al perfil y no se puede cambiar.")
-                    opacity: 0.75
-                    wrapMode: Text.WordWrap
-                    Layout.fillWidth: true
-                }
+                ColumnLayout {
+                    id: columna
+                    x: Math.max(Theme.espacioL, (panel.availableWidth - width) / 2)
+                    width: Math.min(Theme.anchoFormulario, panel.availableWidth - 2 * Theme.espacioL)
+                    spacing: Theme.espacioS
 
-                Label { text: qsTr("Nombre descriptivo"); Accessible.ignored: true }
-                TextField {
-                    id: campoNombre
-                    objectName: "campoNombrePerfil"
-                    Layout.fillWidth: true
-                    text: pagina.perfiles.nombre
-                    enabled: !pagina.perfiles.guardando
-                    onTextEdited: pagina.perfiles.nombre = text
-                    onAccepted: pagina.perfiles.guardar()
-                    Accessible.name: qsTr("Nombre descriptivo del perfil")
-                    Accessible.description: pagina.perfiles.errorNombre
-                }
-                Label {
-                    objectName: "errorNombrePerfil"
-                    visible: text.length > 0
-                    text: pagina.perfiles.errorNombre
-                    color: "#b00020"
-                    font.bold: true
-                    wrapMode: Text.WordWrap
-                    Layout.fillWidth: true
-                    Accessible.role: Accessible.AlertMessage
-                    Accessible.name: qsTr("Error en nombre: %1").arg(text)
-                }
-                Label {
-                    objectName: "errorPerfil"
-                    visible: text.length > 0 && pagina.perfiles.campoConError === ""
-                    text: pagina.perfiles.errorMessage
-                    color: "#b00020"
-                    font.bold: true
-                    wrapMode: Text.WordWrap
-                    Layout.fillWidth: true
-                    Accessible.role: Accessible.AlertMessage
-                    Accessible.name: qsTr("Error: %1").arg(text)
-                }
+                    Item { implicitHeight: Theme.espacioXl - Theme.espacioS }
 
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-                    Item { Layout.fillWidth: true }
-                    BusyIndicator {
-                        running: pagina.perfiles.guardando
-                        visible: running
-                        implicitWidth: 24
-                        implicitHeight: 24
-                        Accessible.name: qsTr("Guardando")
+                    // Errores sin campo (persistencia, perfil no encontrado...).
+                    AvisoEnLinea {
+                        objectName: "errorPerfil"
+                        visible: pagina.perfiles.errorMessage.length > 0 && pagina.perfiles.campoConError === ""
+                        variante: "error"
+                        titulo: pagina.perfiles.errorMessage
+                        Layout.fillWidth: true
+                        Layout.bottomMargin: Theme.espacioS
                     }
-                    BotonAccion {
-                        objectName: "botonDescartarPerfil"
-                        text: qsTr("Descartar")
-                        enabled: pagina.perfiles.sucio && !pagina.perfiles.guardando
-                        onClicked: pagina.perfiles.descartar()
+
+                    // ---- Grupo Perfil ----
+                    Label {
+                        text: pagina.perfiles.modo === PerfilesSatViewModel.Nuevo ? qsTr("Nuevo perfil") : qsTr("Perfil")
+                        color: Theme.textoSecundario
+                        font.family: Theme.familia
+                        font.pixelSize: Theme.etiqueta.size
+                        font.weight: Font.DemiBold
+                        leftPadding: Theme.espacioM
+                        Accessible.role: Accessible.Heading
+                        Accessible.name: text
                     }
-                    BotonAccion {
-                        objectName: "botonGuardarPerfil"
-                        text: qsTr("Guardar")
-                        highlighted: true
-                        enabled: pagina.perfiles.puedeGuardar
-                        onClicked: pagina.perfiles.guardar()
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: grupoPerfil.implicitHeight
+                        radius: Theme.radioTarjeta
+                        color: Theme.superficie
+                        border.width: 1
+                        border.color: Theme.separador
+
+                        ColumnLayout {
+                            id: grupoPerfil
+                            width: parent.width
+                            spacing: 0
+
+                            CampoFormulario {
+                                objectName: "filaRfcPerfil"
+                                etiqueta: qsTr("RFC")
+                                ayuda: pagina.perfiles.rfcEditable ? ""
+                                                                   : qsTr("El RFC identifica al perfil y no se puede cambiar.")
+                                error: pagina.perfiles.errorRfc
+                                objectNameError: "errorRfcPerfil"
+
+                                CampoTexto {
+                                    id: campoRfc
+                                    objectName: "campoRfcPerfil"
+                                    Layout.fillWidth: true
+                                    text: pagina.perfiles.rfc
+                                    soloLectura: !pagina.perfiles.rfcEditable
+                                    conError: pagina.perfiles.errorRfc.length > 0
+                                    enabled: !pagina.perfiles.guardando
+                                    maximumLength: 13
+                                    onTextEdited: pagina.perfiles.rfc = text
+                                    onAccepted: pagina.perfiles.guardar()
+                                    Accessible.name: pagina.perfiles.rfcEditable ? qsTr("RFC del perfil")
+                                                                                 : qsTr("RFC del perfil, no editable")
+                                    Accessible.description: pagina.perfiles.errorRfc
+                                }
+                            }
+                            CampoFormulario {
+                                objectName: "filaNombrePerfil"
+                                etiqueta: qsTr("Nombre descriptivo")
+                                error: pagina.perfiles.errorNombre
+                                objectNameError: "errorNombrePerfil"
+
+                                CampoTexto {
+                                    id: campoNombre
+                                    objectName: "campoNombrePerfil"
+                                    Layout.fillWidth: true
+                                    text: pagina.perfiles.nombre
+                                    conError: pagina.perfiles.errorNombre.length > 0
+                                    enabled: !pagina.perfiles.guardando
+                                    onTextEdited: pagina.perfiles.nombre = text
+                                    onAccepted: pagina.perfiles.guardar()
+                                    Accessible.name: qsTr("Nombre descriptivo del perfil")
+                                    Accessible.description: pagina.perfiles.errorNombre
+                                }
+                            }
+
+                            // Pie del grupo: Descartar y Guardar.
+                            RowLayout {
+                                spacing: Theme.espacioS
+                                Layout.fillWidth: true
+                                Layout.margins: Theme.espacioM
+
+                                Item { Layout.fillWidth: true }
+                                BotonAccion {
+                                    objectName: "botonDescartarPerfil"
+                                    text: qsTr("Descartar")
+                                    descripcion: qsTr("Descartar los cambios del perfil")
+                                    enabled: pagina.perfiles.sucio && !pagina.perfiles.guardando
+                                    onClicked: pagina.perfiles.descartar()
+                                }
+                                BotonAccion {
+                                    objectName: "botonGuardarPerfil"
+                                    variante: "primario"
+                                    text: qsTr("Guardar")
+                                    descripcion: qsTr("Guardar el perfil")
+                                    cargando: pagina.perfiles.guardando
+                                    enabled: pagina.perfiles.puedeGuardar
+                                    onClicked: pagina.perfiles.guardar()
+                                }
+                            }
+                        }
                     }
-                }
 
-                // ---- e.firma (solo perfil guardado) ----
-                GroupBox {
-                    objectName: "seccionEFirma"
-                    visible: pagina.perfiles.modo === PerfilesSatViewModel.Edicion
-                    title: qsTr("e.firma")
-                    Layout.fillWidth: true
-                    Accessible.role: Accessible.Grouping
-                    Accessible.name: title
+                    // ---- Grupo e.firma (solo perfil guardado) ----
+                    Label {
+                        visible: pagina.enEdicion
+                        text: qsTr("e.firma")
+                        color: Theme.textoSecundario
+                        font.family: Theme.familia
+                        font.pixelSize: Theme.etiqueta.size
+                        font.weight: Font.DemiBold
+                        leftPadding: Theme.espacioM
+                        Layout.topMargin: Theme.espacioL
+                        Accessible.role: Accessible.Heading
+                        Accessible.name: text
+                    }
+                    Rectangle {
+                        objectName: "seccionEFirma"
+                        visible: pagina.enEdicion
+                        Layout.fillWidth: true
+                        implicitHeight: grupoEFirma.implicitHeight + 2 * Theme.espacioM
+                        radius: Theme.radioTarjeta
+                        color: Theme.superficie
+                        border.width: 1
+                        border.color: Theme.separador
+                        Accessible.role: Accessible.Grouping
+                        Accessible.name: qsTr("e.firma")
 
-                    ColumnLayout {
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        spacing: 6
+                        ColumnLayout {
+                            id: grupoEFirma
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            anchors.margins: Theme.espacioM
+                            spacing: Theme.espacioM
 
-                        RowLayout {
-                            spacing: 8
-                            Layout.fillWidth: true
-                            EstadoBadge {
-                                objectName: "badgeEFirmaSeleccion"
-                                clave: pagina.perfiles.seleccionPreparacion
-                                texto: pagina.perfiles.seleccionEstadoTexto
-                                contexto: qsTr("e.firma")
+                            RowLayout {
+                                spacing: Theme.espacioM
+                                Layout.fillWidth: true
+                                EstadoBadge {
+                                    objectName: "badgeEFirmaSeleccion"
+                                    eFirma: true
+                                    grande: true
+                                    clave: pagina.preparacion
+                                    texto: pagina.perfiles.seleccionEstadoTexto
+                                    contexto: qsTr("e.firma")
+                                }
+                                Label {
+                                    objectName: "listoSeleccion"
+                                    text: {
+                                        if (!pagina.perfiles.seleccionActiva)
+                                            return qsTr("Inactivo: no disponible para solicitudes")
+                                        if (pagina.preparacion === "SinCredencial")
+                                            return qsTr("Este perfil no tiene e.firma registrada.")
+                                        if (pagina.perfiles.seleccionListo)
+                                            return pagina.perfiles.seleccionVigenteHasta.length > 0
+                                                   ? qsTr("Lista para solicitudes · Vigente hasta %1")
+                                                         .arg(pagina.perfiles.seleccionVigenteHasta)
+                                                   : qsTr("Lista para solicitudes")
+                                        return qsTr("No disponible para solicitudes")
+                                    }
+                                    color: Theme.texto
+                                    font.family: Theme.familia
+                                    font.pixelSize: Theme.cuerpo.size
+                                    wrapMode: Text.WordWrap
+                                    Layout.fillWidth: true
+                                }
                             }
                             Label {
-                                objectName: "listoSeleccion"
-                                text: !pagina.perfiles.seleccionActiva
-                                      ? qsTr("Inactivo: no disponible para solicitudes")
-                                      : (pagina.perfiles.seleccionListo ? qsTr("Listo para solicitudes")
-                                                                        : qsTr("No listo para solicitudes"))
+                                objectName: "ayudaEFirma"
+                                text: pagina.perfiles.tieneCredencial
+                                      ? qsTr("La e.firma se guarda cifrada y su contraseña queda en el llavero de macOS.")
+                                      : qsTr("Regístrala para poder usar este perfil en solicitudes.")
+                                color: Theme.textoSecundario
+                                font.family: Theme.familia
+                                font.pixelSize: Theme.cuerpo.size
                                 wrapMode: Text.WordWrap
                                 Layout.fillWidth: true
                             }
-                        }
-                        Label {
-                            visible: pagina.perfiles.sucio
-                            text: qsTr("Guarda el perfil antes de gestionar su e.firma.")
-                            opacity: 0.75
-                            wrapMode: Text.WordWrap
-                            Layout.fillWidth: true
-                        }
-                        RowLayout {
-                            spacing: 8
-                            BotonAccion {
-                                id: botonEFirma
-                                objectName: "botonEFirma"
-                                text: pagina.perfiles.tieneCredencial ? qsTr("Reemplazar e.firma")
-                                                                      : qsTr("Registrar e.firma")
-                                descripcion: pagina.perfiles.tieneCredencial
-                                             ? qsTr("Pide confirmacion antes de capturar la nueva e.firma")
-                                             : qsTr("Elegir certificado, llave y contrasena")
-                                enabled: pagina.perfiles.puedeGestionarEFirma
-                                onClicked: pagina.gestionarEFirma()
+                            Label {
+                                objectName: "avisoGuardarAntes"
+                                visible: pagina.perfiles.sucio
+                                text: qsTr("Guarda el perfil antes de gestionar su e.firma.")
+                                color: Theme.tonoAdvertenciaTexto
+                                font.family: Theme.familia
+                                font.pixelSize: Theme.cuerpo.size
+                                wrapMode: Text.WordWrap
+                                Layout.fillWidth: true
                             }
-                            BotonAccion {
-                                objectName: "botonReintentarEstadoSeleccion"
-                                visible: pagina.perfiles.seleccionPreparacion === "EstadoNoDisponible"
-                                text: qsTr("Reintentar estado")
-                                descripcion: qsTr("Volver a consultar el estado de la e.firma")
-                                onClicked: pagina.perfiles.reintentarEstado(pagina.perfiles.perfilId)
+                            RowLayout {
+                                spacing: Theme.espacioS
+                                BotonAccion {
+                                    id: botonEFirma
+                                    objectName: "botonEFirma"
+                                    variante: pagina.eFirmaRequiereAccion ? "primario" : "secundario"
+                                    icono: "key"
+                                    text: pagina.perfiles.tieneCredencial ? qsTr("Reemplazar e.firma…")
+                                                                          : qsTr("Registrar e.firma…")
+                                    descripcion: pagina.perfiles.tieneCredencial
+                                                 ? qsTr("Pide confirmación antes de capturar la nueva e.firma")
+                                                 : qsTr("Elegir certificado, llave y contraseña")
+                                    enabled: pagina.perfiles.puedeGestionarEFirma
+                                    onClicked: pagina.gestionarEFirma()
+                                }
+                                BotonAccion {
+                                    objectName: "botonReintentarEstadoSeleccion"
+                                    visible: pagina.preparacion === "EstadoNoDisponible"
+                                    text: qsTr("Reintentar estado")
+                                    descripcion: qsTr("Volver a consultar el estado de la e.firma")
+                                    onClicked: pagina.perfiles.reintentarEstado(pagina.perfiles.perfilId)
+                                }
                             }
                         }
                     }
+
+                    Item { implicitHeight: Theme.espacioXl }
                 }
             }
         }

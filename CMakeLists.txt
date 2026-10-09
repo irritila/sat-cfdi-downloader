@@ -24,6 +24,7 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS
     Qml
     Quick
     QuickControls2
+    Svg
     Sql
     Network
     Test

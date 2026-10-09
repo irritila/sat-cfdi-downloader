@@ -40,15 +40,15 @@ QString textoDeValidacion(ErrorValidacion::Codigo codigo)
     case C::PerfilRequerido:
         return QObject::tr("Selecciona un perfil SAT.");
     case C::PerfilInexistente:
-        return QObject::tr("El perfil SAT seleccionado ya no esta disponible.");
+        return QObject::tr("El perfil SAT seleccionado ya no está disponible.");
     case C::FechaInicialRequerida:
-        return QObject::tr("Indica una fecha inicial valida (AAAA-MM-DD).");
+        return QObject::tr("Indica una fecha inicial válida (AAAA-MM-DD).");
     case C::FechaFinalRequerida:
-        return QObject::tr("Indica una fecha final valida (AAAA-MM-DD).");
+        return QObject::tr("Indica una fecha final válida (AAAA-MM-DD).");
     case C::RangoFechasInvalido:
         return QObject::tr("La fecha final debe ser igual o posterior a la fecha inicial.");
     }
-    return QObject::tr("La solicitud no es valida.");
+    return QObject::tr("La solicitud no es válida.");
 }
 
 QString textoDeMotivo(MotivoDuplicado motivo)
@@ -68,9 +68,9 @@ QString textoDeMotivo(MotivoDuplicado motivo)
     case M::TerminadaSinPaquetes:
         return QObject::tr("Existe una solicitud equivalente terminada sin paquetes.");
     case M::EnvioIncierto:
-        return QObject::tr("Existe una solicitud equivalente con envio incierto: el SAT pudo haberla recibido.");
+        return QObject::tr("Existe una solicitud equivalente con envío incierto: el SAT pudo haberla recibido.");
     case M::SolicitudSinExito:
-        return QObject::tr("Existe una solicitud equivalente que no tuvo exito.");
+        return QObject::tr("Existe una solicitud equivalente que no tuvo éxito.");
     case M::SolicitudEliminada:
         return QObject::tr("Existe una solicitud equivalente que eliminaste localmente.");
     }
@@ -120,11 +120,35 @@ QString NuevaSolicitudViewModel::errorMessage() const
     return m_tocado ? m_errorValidacion : QString();
 }
 
+QString NuevaSolicitudViewModel::campoConError() const
+{
+    if (!m_errorServicio.isEmpty()) {
+        return m_campoServicio;
+    }
+    return (m_tocado && !m_errorValidacion.isEmpty()) ? campoDeValidacion() : QString();
+}
+
+QString NuevaSolicitudViewModel::campoDeValidacion() const
+{
+    if (m_perfilId.isEmpty() || !m_perfilesDisponibles->contiene(m_perfilId)) {
+        return QStringLiteral("perfil");
+    }
+    const QDate inicial = fechaDesdeTexto(m_fechaInicial);
+    if (!inicial.isValid()) {
+        return QStringLiteral("fechaInicial");
+    }
+    const QDate final_ = fechaDesdeTexto(m_fechaFinal);
+    if (!final_.isValid() || final_ < inicial) {
+        return QStringLiteral("fechaFinal");
+    }
+    return {};
+}
+
 NuevaSolicitudViewModel::Observables NuevaSolicitudViewModel::observables() const
 {
     return {canSubmit(),        ocupado(),     errorMessage(),
             m_cargandoPerfiles, sinPerfiles(), confirmacionPendiente(),
-            m_motivoDuplicado,  m_solicitudExistenteId};
+            m_motivoDuplicado,  m_solicitudExistenteId, campoConError()};
 }
 
 template <typename F>
@@ -140,7 +164,7 @@ void NuevaSolicitudViewModel::actualizar(F&& cambio)
     if (antes.ocupado != despues.ocupado) {
         emit ocupadoChanged();
     }
-    if (antes.error != despues.error) {
+    if (antes.error != despues.error || antes.campo != despues.campo) {
         emit errorMessageChanged();
     }
     if (antes.cargandoPerfiles != despues.cargandoPerfiles || antes.sinPerfiles != despues.sinPerfiles
@@ -363,20 +387,52 @@ void NuevaSolicitudViewModel::aplicarErrorCrear(const ErrorCrear& error,
 {
     actualizar([&] {
         m_errorServicio.clear();
+        m_campoServicio.clear();
         m_solicitudExistenteId.clear();
         switch (error.tipo) {
         case ErrorCrear::Tipo::Validacion:
             m_errorServicio = error.validaciones.isEmpty()
-                                  ? tr("La solicitud no es valida.")
+                                  ? tr("La solicitud no es válida.")
                                   : textoDeValidacion(error.validaciones.constFirst().codigo);
+            if (!error.validaciones.isEmpty()) {
+                using C = ErrorValidacion::Codigo;
+                switch (error.validaciones.constFirst().codigo) {
+                case C::PerfilRequerido:
+                case C::PerfilInexistente:
+                    m_campoServicio = QStringLiteral("perfil");
+                    break;
+                case C::FechaInicialRequerida:
+                    m_campoServicio = QStringLiteral("fechaInicial");
+                    break;
+                case C::FechaFinalRequerida:
+                case C::RangoFechasInvalido:
+                    m_campoServicio = QStringLiteral("fechaFinal");
+                    break;
+                }
+            }
             break;
         case ErrorCrear::Tipo::FiltroInvalido: {
             QStringList mensajes;
             for (const ErrorSolicitudCanonica& f : error.filtros) {
                 mensajes.append(f.mensaje);
             }
-            m_errorServicio = mensajes.isEmpty() ? tr("Algun filtro no es valido.")
+            m_errorServicio = mensajes.isEmpty() ? tr("Algún filtro no es válido.")
                                                  : mensajes.join(QLatin1Char(' '));
+            if (!error.filtros.isEmpty()) {
+                // Campo del primer filtro invalido (columna de solicitud_masiva).
+                const QString c = error.filtros.constFirst().campo;
+                if (c.contains(QLatin1String("rfc"))) {
+                    m_campoServicio = QStringLiteral("rfcContraparte");
+                } else if (c.contains(QLatin1String("tipo_comprobante"))) {
+                    m_campoServicio = QStringLiteral("tipoComprobante");
+                } else if (c.contains(QLatin1String("complemento"))) {
+                    m_campoServicio = QStringLiteral("complemento");
+                } else if (c.contains(QLatin1String("fecha_inicial"))) {
+                    m_campoServicio = QStringLiteral("fechaInicial");
+                } else if (c.contains(QLatin1String("fecha_final"))) {
+                    m_campoServicio = QStringLiteral("fechaFinal");
+                }
+            }
             break;
         }
         case ErrorCrear::Tipo::DedupBloqueado:
@@ -510,6 +566,7 @@ void NuevaSolicitudViewModel::cargarPerfiles()
                     m_perfilesCargados = true;
                 } else {
                     m_errorServicio = tr("No se pudieron cargar los perfiles SAT.");
+                    m_campoServicio.clear();
                 }
             });
         });

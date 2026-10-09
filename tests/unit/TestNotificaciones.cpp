@@ -1,11 +1,12 @@
 #include "TestNotificaciones.h"
 
 #include "application/notificaciones/ServicioNotificaciones.h"
-#include "application/operaciones/MensajesOperacionSat.h"
+#include "application/common/FechasLegibles.h"
 
 #include <QTest>
 
 using namespace satcfdi;
+using namespace Qt::StringLiterals;
 
 namespace {
 
@@ -50,33 +51,52 @@ void TestNotificaciones::textosPorTransicion()
     struct Caso {
         TipoTransicionNotificable tipo;
         QString clave;
-        QString inicio;
+        QString titulo;
+        QString resultado;
     };
     const QList<Caso> casos = {
-        {TipoTransicionNotificable::Terminada, QStringLiteral("terminada"), QStringLiteral("Terminada (3 paquetes). ")},
-        {TipoTransicionNotificable::DescargaCompleta, QStringLiteral("descarga_completa"),
-         QStringLiteral("Descarga completa: 3 de 3. ")},
-        {TipoTransicionNotificable::ErrorSat, QStringLiteral("error_sat"),
-         QStringLiteral("El SAT reporto un error en la solicitud. ")},
-        {TipoTransicionNotificable::Rechazada, QStringLiteral("rechazada"),
-         QStringLiteral("El SAT rechazo la solicitud. ")},
-        {TipoTransicionNotificable::Vencida, QStringLiteral("vencida"),
-         QStringLiteral("La solicitud vencio en el SAT; los paquetes pueden ya no estar disponibles. ")},
+        {TipoTransicionNotificable::Terminada, u"terminada"_s, u"Solicitud terminada"_s,
+         u"El SAT terminó la solicitud con 3 paquetes."_s},
+        {TipoTransicionNotificable::DescargaCompleta, u"descarga_completa"_s, u"Descarga completa"_s,
+         u"3 de 3 paquetes descargados."_s},
+        {TipoTransicionNotificable::ErrorSat, u"error_sat"_s, u"Error en el SAT"_s,
+         u"El SAT reportó un error en la solicitud."_s},
+        {TipoTransicionNotificable::Rechazada, u"rechazada"_s, u"Solicitud rechazada"_s,
+         u"El SAT rechazó la solicitud."_s},
+        {TipoTransicionNotificable::Vencida, u"vencida"_s, u"Solicitud vencida"_s,
+         u"La solicitud venció en el SAT; los paquetes pueden ya no estar disponibles."_s},
     };
+    // Periodo de un mes (rango D5 con guion largo).
+    const QString contexto = u"Recibidos · 1–30 sep 2026 · RFC ***3C9"_s;
     for (const Caso& c : casos) {
         const Notificacion n = ServicioNotificaciones::componer(transicion(c.tipo, id, 3, 3));
         QCOMPARE(n.tipo, c.clave);
         QCOMPARE(n.id, id.texto() + QLatin1Char(':') + c.clave);
-        QVERIFY2(n.cuerpo.startsWith(c.inicio), qPrintable(n.cuerpo));
-        QVERIFY(n.cuerpo.endsWith(QStringLiteral("Recibidos del 2026-09-01 al 2026-09-30, RFC ***3C9.")));
-        QVERIFY(!n.titulo.isEmpty());
+        QCOMPARE(n.titulo, c.titulo);
+        QCOMPARE(n.cuerpo, c.resultado + QLatin1Char('\n') + contexto);
         // Sin RFC completo ni Id local en lo visible.
         QVERIFY(!n.titulo.contains(kRfc) && !n.cuerpo.contains(kRfc));
         QVERIFY(!n.cuerpo.contains(id.texto()));
     }
-    QVERIFY(ServicioNotificaciones::componer(transicion(TipoTransicionNotificable::Terminada, id, 1))
-                .cuerpo.startsWith(QStringLiteral("Terminada (1 paquete). ")));
+    QCOMPARE(ServicioNotificaciones::componer(transicion(TipoTransicionNotificable::Terminada, id, 1)).cuerpo.section(
+                 QLatin1Char('\n'), 0, 0),
+             u"El SAT terminó la solicitud con 1 paquete."_s);
+
+    // Texto de referencia de UX-39 (un solo dia).
+    TransicionNotificable t = transicion(TipoTransicionNotificable::DescargaCompleta, id, 1, 1);
+    t.rfcSolicitante = u"XAXX010101000"_s;
+    t.fechaInicialSat = u"2026-09-03T00:00:00"_s;
+    t.fechaFinalSat = u"2026-09-03T23:59:59"_s;
+    QCOMPARE(ServicioNotificaciones::componer(t).cuerpo,
+             u"1 de 1 paquetes descargados.\nRecibidos · 3 sep 2026 · RFC ***000"_s);
     QCOMPARE(ServicioNotificaciones::rfcEnmascarado(QString()), QString());
+
+    // Formateador de fechas de aplicacion (equivalente a FormatoFechas).
+    using namespace satcfdi::fechaslegibles;
+    QCOMPARE(fecha(QDate(2026, 9, 3)), u"3 sep 2026"_s);
+    QCOMPARE(rango(QDate(2026, 9, 28), QDate(2026, 10, 2)), u"28 sep – 2 oct 2026"_s);
+    QCOMPARE(rango(QDate(2026, 12, 28), QDate(2027, 1, 2)), u"28 dic 2026 – 2 ene 2027"_s);
+    QCOMPARE(fecha(QDate()), QString());
 }
 
 void TestNotificaciones::dedupePorSolicitudYTransicion()
@@ -110,14 +130,15 @@ void TestNotificaciones::credencialPorPerfil()
     const Notificacion n = notificador.pedidas.constFirst();
     QCOMPARE(n.tipo, QStringLiteral("credencial"));
     QCOMPARE(n.id, QStringLiteral("credencial:") + p1.texto() + QStringLiteral(":Vencida"));
-    QVERIFY(n.cuerpo.startsWith(mensajessat::credencialVencida()));
+    QCOMPARE(n.titulo, u"e.firma no disponible"_s);
+    QCOMPARE(n.cuerpo, u"La e.firma está vencida. El monitoreo de ese perfil está en pausa.\nReemplázala en Perfiles SAT."_s);
     QVERIFY(!n.cuerpo.contains(p1.texto()));
 
     servicio.alCambiarEstadoCredencial(p1, EstadoCredencial::Lista); // no notifica, rearma
     servicio.alCambiarEstadoCredencial(p1, EstadoCredencial::Vencida);
     servicio.alCambiarEstadoCredencial(p2, EstadoCredencial::MaterialDanado);
     QCOMPARE(notificador.pedidas.size(), 3);
-    QVERIFY(notificador.pedidas.at(2).cuerpo.startsWith(mensajessat::credencialIlegible()));
+    QVERIFY(notificador.pedidas.at(2).cuerpo.startsWith(u"No se pudo leer la e.firma guardada. "_s));
     QVERIFY(!ServicioNotificaciones::componerCredencial(p1, EstadoCredencial::Validando));
 }
 

@@ -29,6 +29,7 @@ int main(int argc, char* argv[])
         return 0;
     case satcfdi::SingleInstanceCoordinator::Rol::Error:
         std::printf("Error\n");
+        std::fprintf(stderr, "%s\n", qPrintable(coordinador.error())); // motivo para el reporte del test
         return 1;
     case satcfdi::SingleInstanceCoordinator::Rol::Primary:
         break;

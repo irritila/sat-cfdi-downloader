@@ -120,15 +120,15 @@ private slots:
             }
         }
         QCOMPARE(visibles, (QStringList{
-                               QStringLiteral("Mostrar ventana"), QStringLiteral("Nueva solicitud"),
+                               QStringLiteral("Mostrar ventana"), QStringLiteral("Nueva solicitud…"),
                                QStringLiteral("Abrir carpeta de paquetes"), QStringLiteral("---"),
                                QStringLiteral("Monitoreo activo"), QStringLiteral("Pausar monitoreo"),
-                               QStringLiteral("---"), QStringLiteral("Iniciar al iniciar sesion"),
+                               QStringLiteral("---"), QStringLiteral("Abrir al iniciar sesión"),
                                textoEstadoLoginItem(satcfdi::OSIntegration::LoginItemStatus::Disabled),
                                QStringLiteral("---"),
                                textoEstadoNotificaciones(satcfdi::OSIntegration::NotificationStatus::NotDetermined),
                                QStringLiteral("Solicitar permiso de notificaciones"), QStringLiteral("---"),
-                               QStringLiteral("Salir")}));
+                               QStringLiteral("Salir de SAT CFDI Downloader")}));
         QVERIFY(!entrada(Id::EstadoMonitoreo, estado).habilitada);
         estado.monitoreo.pendientes = 2;
         estado.monitoreoPausado = true;
@@ -143,6 +143,74 @@ private slots:
         QVERIFY(!entrada(Id::SolicitarPermiso, estado).visible);
         QVERIFY(entrada(Id::EnviarPrueba, estado).visible);
         QVERIFY(entrada(Id::AbrirAjustesNotificaciones, estado).visible);
+        // Textos que abren ventana o dialogo llevan "…" (UX-37).
+        QCOMPARE(entrada(Id::AbrirAjustesLoginItem, estado).texto, QStringLiteral("Abrir ajustes de inicio de sesión…"));
+        QCOMPARE(entrada(Id::EnviarPrueba, estado).texto, QStringLiteral("Enviar notificación de prueba"));
+        QCOMPARE(entrada(Id::AbrirAjustesNotificaciones, estado).texto,
+                 QStringLiteral("Abrir ajustes de notificaciones…"));
+        QCOMPARE(entrada(Id::EstadoLoginItem, estado).texto, QStringLiteral("Estado en macOS: pendiente de aprobación"));
+    }
+
+    // T013 D6/UX-37: ningun texto del menu usa "..." ASCII ni palabras sin
+    // acento conocidas, en ningun estado.
+    void ortografiaMenuBar()
+    {
+        using namespace satcfdi::menubar;
+        using E = satcfdi::OSIntegration::EstadoMonitoreo;
+        using L = satcfdi::OSIntegration::LoginItemStatus;
+        using N = satcfdi::OSIntegration::NotificationStatus;
+        const QStringList prohibidas{QStringLiteral("..."), QStringLiteral("sesion"), QStringLiteral("notificacion "),
+                                     QStringLiteral("aprobacion"), QStringLiteral("pausado")};
+        for (E::Fase f : {E::Fase::Pausado, E::Fase::ActivoEnEspera, E::Fase::Ejecutando, E::Fase::Deteniendo,
+                          E::Fase::Detenido}) {
+            for (E::Actividad a : {E::Actividad::Ninguna, E::Actividad::Enviando, E::Actividad::Verificando,
+                                   E::Actividad::Descargando, E::Actividad::Otra}) {
+                for (L l : {L::Disabled, L::Enabled, L::RequiresApproval, L::Rejected, L::Unavailable}) {
+                    for (N n : {N::NotDetermined, N::Granted, N::Denied, N::Unavailable}) {
+                        EstadoMenu s;
+                        s.monitoreo.fase = f;
+                        s.monitoreo.actividad = a;
+                        s.monitoreo.pendientes = 1;
+                        s.loginItem = l;
+                        s.notificaciones = n;
+                        for (const Entrada& e : entradas(s)) {
+                            for (const QString& p : prohibidas) {
+                                QVERIFY2(!(e.texto + QLatin1Char(' ')).contains(p), qPrintable(e.texto));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // UX-38: iconos de las lineas informativas y existencia de los SVG.
+    void iconosMenuBar()
+    {
+        using namespace satcfdi::menubar;
+        using F = satcfdi::OSIntegration::EstadoMonitoreo::Fase;
+        EstadoMenu s;
+        s.monitoreo.pendientes = 3;
+        s.monitoreo.fase = F::ActivoEnEspera;
+        QCOMPARE(entrada(Id::EstadoMonitoreo, s).icono, QStringLiteral("check-circle"));
+        s.monitoreo.fase = F::Pausado;
+        QCOMPARE(entrada(Id::EstadoMonitoreo, s).icono, QStringLiteral("clock"));
+        s.monitoreo.fase = F::Ejecutando;
+        QCOMPARE(entrada(Id::EstadoMonitoreo, s).icono, QStringLiteral("arrow-down-circle-dotted"));
+        s.monitoreo.fase = F::Detenido;
+        QVERIFY(entrada(Id::EstadoMonitoreo, s).icono.isEmpty());
+        QCOMPARE(entrada(Id::PendientesMonitoreo, s).icono, QStringLiteral("clock"));
+        // Las acciones no llevan icono.
+        for (const Entrada& e : entradas(s)) {
+            if (e.habilitada && !e.separador) {
+                QVERIFY2(e.icono.isEmpty(), qPrintable(e.texto));
+            }
+        }
+        for (const char* n : {"check-circle", "clock", "arrow-down-circle-dotted"}) {
+            const QString ruta = QFINDTESTDATA(QStringLiteral("../../../../presentation/qml/assets/icons/%1.svg")
+                                                   .arg(QLatin1String(n)));
+            QVERIFY2(!ruta.isEmpty(), n);
+        }
     }
 
     // T007 D2: textos de la linea de estado del worker.
@@ -156,11 +224,11 @@ private slots:
             return textoEstadoMonitoreo(e);
         };
         QCOMPARE(texto(E::Fase::ActivoEnEspera), QStringLiteral("Monitoreo activo"));
-        QCOMPARE(texto(E::Fase::Pausado), QStringLiteral("Monitoreo pausado"));
-        QCOMPARE(texto(E::Fase::Ejecutando, E::Actividad::Enviando), QStringLiteral("Trabajando: enviando..."));
-        QCOMPARE(texto(E::Fase::Ejecutando, E::Actividad::Verificando), QStringLiteral("Trabajando: verificando..."));
-        QCOMPARE(texto(E::Fase::Ejecutando, E::Actividad::Descargando), QStringLiteral("Trabajando: descargando..."));
-        QCOMPARE(texto(E::Fase::Ejecutando, E::Actividad::Otra), QStringLiteral("Trabajando..."));
+        QCOMPARE(texto(E::Fase::Pausado), QStringLiteral("Monitoreo en pausa"));
+        QCOMPARE(texto(E::Fase::Ejecutando, E::Actividad::Enviando), QStringLiteral("Trabajando: enviando…"));
+        QCOMPARE(texto(E::Fase::Ejecutando, E::Actividad::Verificando), QStringLiteral("Trabajando: verificando…"));
+        QCOMPARE(texto(E::Fase::Ejecutando, E::Actividad::Descargando), QStringLiteral("Trabajando: descargando…"));
+        QCOMPARE(texto(E::Fase::Ejecutando, E::Actividad::Otra), QStringLiteral("Trabajando…"));
         QVERIFY(!texto(E::Fase::Deteniendo).isEmpty());
         QVERIFY(!texto(E::Fase::Detenido).isEmpty());
         QCOMPARE(textoPendientes(0), QString());

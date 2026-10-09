@@ -12,6 +12,7 @@ private slots:
     void senalesTrasCommitYAntesDeCompletarFuture();
     void senalesDeEliminarYPerfilAntesDeCompletarFuture();
     void listarYObtenerMapeanFilas();
+    void listarIncluyeNombreDelPerfil();
     void obtenerInexistenteOEliminadaEsNoEncontrada();
     void matrizDuplicados_data();
     void matrizDuplicados();

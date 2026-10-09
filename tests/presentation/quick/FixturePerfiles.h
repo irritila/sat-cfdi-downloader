@@ -13,7 +13,10 @@
 #include "AppViewModel.h"
 #include "EFirmaFormViewModel.h"
 #include "PerfilesSatViewModel.h"
+#include "NuevaSolicitudViewModel.h"
 #include "PresentacionViewModels.h"
+#include "SolicitudDetailViewModel.h"
+#include "SolicitudesListModel.h"
 
 #include <QObject>
 #include <QUrl>
@@ -28,6 +31,10 @@ class FixturePerfiles : public QObject {
     Q_PROPERTY(satcfdi::AppViewModel* app READ app NOTIFY reiniciado)
     Q_PROPERTY(satcfdi::PerfilesSatViewModel* perfiles READ perfiles NOTIFY reiniciado)
     Q_PROPERTY(satcfdi::EFirmaFormViewModel* eFirma READ eFirma NOTIFY reiniciado)
+    // T013: resto del grafo, para pruebas y revision visual de las pantallas.
+    Q_PROPERTY(satcfdi::SolicitudesListModel* solicitudesModel READ solicitudesModel NOTIFY reiniciado)
+    Q_PROPERTY(satcfdi::NuevaSolicitudViewModel* nuevaSolicitud READ nuevaSolicitud NOTIFY reiniciado)
+    Q_PROPERTY(satcfdi::SolicitudDetailViewModel* detalle READ detalle NOTIFY reiniciado)
 
 public:
     explicit FixturePerfiles(QObject* parent = nullptr);
@@ -36,6 +43,24 @@ public:
     satcfdi::AppViewModel* app() const;
     satcfdi::PerfilesSatViewModel* perfiles() const;
     satcfdi::EFirmaFormViewModel* eFirma() const;
+    satcfdi::SolicitudesListModel* solicitudesModel() const;
+    satcfdi::NuevaSolicitudViewModel* nuevaSolicitud() const;
+    satcfdi::SolicitudDetailViewModel* detalle() const;
+
+    // Lista de solicitudes (listar() `indice`) con filas
+    // [{estadoLocal, estadoSat?, tipo, inicial, final, paquetes, creada (ISO UTC), rfc?}].
+    Q_INVOKABLE void resolverSolicitudes(int indice, const QVariantList& filas);
+    Q_INVOKABLE void fallarSolicitudes(int indice);
+    Q_INVOKABLE int numListasSolicitudes() const;
+    Q_INVOKABLE void fijarNotificacionesDeshabilitadas(bool valor);
+    // evaluarDuplicado() `indice`: "Libre", "Bloqueado" o "RequiereConfirmacion"
+    // con el motivo por clave (SolicitudEnCurso, TerminadaSinPaquetes...).
+    Q_INVOKABLE void resolverEvaluacion(int indice, const QString& clasificacion, const QString& motivo);
+    Q_INVOKABLE int numEvaluaciones() const;
+    // obtener() `indice` con un detalle de ejemplo: "terminada", "errorPaquete",
+    // "creada" o "enProceso" (datos ficticios D7).
+    Q_INVOKABLE void resolverDetalleEjemplo(int indice, const QString& escenario);
+    Q_INVOKABLE int numDetalles() const;
 
     // Grafo nuevo (llamar en init(), sin objetos QML vivos del anterior).
     Q_INVOKABLE void reiniciar();

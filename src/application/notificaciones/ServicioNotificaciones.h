@@ -30,8 +30,10 @@ namespace satcfdi {
 //   MaterialDanado); volver a Lista no notifica pero rearma el aviso.
 // - El resultado de la entrega no se observa: un permiso denegado no cambia
 //   estados, logs ni reintentos.
-// - Textos sin RFC completo (solo los 3 ultimos caracteres), Ids ni Mensaje
-//   SAT.
+// - Textos (T013 D6, UX-39): titulo = evento; cuerpo en dos lineas separadas
+//   por "\n": resultado y "{Tipo} · {periodo D5} · RFC ***000". Ortografia
+//   completa. Sin RFC completo (solo los 3 ultimos caracteres), Ids ni
+//   Mensaje SAT.
 class ServicioNotificaciones final : public QObject {
     Q_OBJECT
 

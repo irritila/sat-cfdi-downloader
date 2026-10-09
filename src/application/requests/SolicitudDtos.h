@@ -31,6 +31,9 @@ struct SolicitudResumen {
     std::optional<EstadoSolicitudSat> estadoSat; // nulo sin respuesta SAT
     QDateTime creadaEn;                          // UTC
     int totalPaquetes = 0;                       // paquetes visibles
+    // T013 D8 (UX-09): nombre del perfil SAT de la solicitud; "" si el perfil
+    // no tiene nombre o ya no es visible (eliminado).
+    QString perfilNombre;
 };
 
 struct PaqueteResumen {

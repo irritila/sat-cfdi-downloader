@@ -4,7 +4,7 @@ namespace satcfdi::mensajessat {
 
 QString credencialVencida()
 {
-    return QStringLiteral("La e.firma de este perfil esta vencida. Reemplazala para continuar.");
+    return QStringLiteral("La e.firma de este perfil está vencida. Reemplázala para continuar.");
 }
 QString credencialIlegible()
 {
@@ -12,33 +12,33 @@ QString credencialIlegible()
 }
 QString llaveroBloqueado()
 {
-    return QStringLiteral("El llavero de macOS esta bloqueado. Desbloquea tu sesion e intenta de nuevo.");
+    return QStringLiteral("El llavero de macOS está bloqueado. Desbloquea tu sesión e intenta de nuevo.");
 }
 QString credencialNoVigenteAun()
 {
-    return QStringLiteral("La e.firma de este perfil aun no es vigente.");
+    return QStringLiteral("La e.firma de este perfil aún no es vigente.");
 }
 
 QString autenticacionRechazada()
 {
-    return QStringLiteral("El SAT no acepto la autenticacion con esta e.firma.");
+    return QStringLiteral("El SAT no aceptó la autenticación con esta e.firma.");
 }
 QString autenticacionSinConexion()
 {
-    return QStringLiteral("No se pudo conectar con el SAT para autenticar. Intenta mas tarde.");
+    return QStringLiteral("No se pudo conectar con el SAT para autenticar. Intenta más tarde.");
 }
 
 QString solicitudAceptada()
 {
-    return QStringLiteral("El SAT acepto la solicitud.");
+    return QStringLiteral("El SAT aceptó la solicitud.");
 }
 QString solicitudRechazada(QStringView codigo)
 {
-    return QStringLiteral("El SAT rechazo la solicitud (codigo %1). No se registro en el SAT.").arg(codigo);
+    return QStringLiteral("El SAT rechazó la solicitud (código %1). No se registró en el SAT.").arg(codigo);
 }
 QString solicitudNoAutorizada()
 {
-    return QStringLiteral("No estas autorizado para descargar estos CFDI (5001).");
+    return QStringLiteral("No estás autorizado para descargar estos CFDI (5001).");
 }
 QString limiteCriterio5002()
 {
@@ -46,7 +46,7 @@ QString limiteCriterio5002()
 }
 QString limiteMaximo5003()
 {
-    return QStringLiteral("La consulta supera el maximo de CFDI; usa un rango mas corto.");
+    return QStringLiteral("La consulta supera el máximo de CFDI; usa un rango más corto.");
 }
 QString solicitudActiva5005()
 {
@@ -54,16 +54,16 @@ QString solicitudActiva5005()
 }
 QString limiteDiario5011()
 {
-    return QStringLiteral("Se alcanzo el limite diario del SAT. Intenta manana.");
+    return QStringLiteral("Se alcanzó el límite diario del SAT. Intenta mañana.");
 }
 QString envioIncierto()
 {
     return QStringLiteral(
-        "No se sabe si el SAT registro la solicitud. No se reenviara automaticamente; revisa antes de crear otra.");
+        "No se sabe si el SAT registró la solicitud. No se reenviará automáticamente; revisa antes de crear otra.");
 }
 QString envioNoIniciado()
 {
-    return QStringLiteral("No se pudo conectar con el SAT; la solicitud no se envio.");
+    return QStringLiteral("No se pudo conectar con el SAT; la solicitud no se envió.");
 }
 
 QString verificacionAceptada()
@@ -72,11 +72,11 @@ QString verificacionAceptada()
 }
 QString verificacionTransitoria()
 {
-    return QStringLiteral("No se pudo consultar el estado; se reintentara automaticamente.");
+    return QStringLiteral("No se pudo consultar el estado; se reintentará automáticamente.");
 }
 QString solicitudNoEncontrada()
 {
-    return QStringLiteral("El SAT no encontro esta solicitud. La verificacion automatica se detuvo.");
+    return QStringLiteral("El SAT no encontró esta solicitud. La verificación automática se detuvo.");
 }
 
 QString paqueteDescargado()
@@ -89,7 +89,7 @@ QString paqueteVencido()
 }
 QString paqueteMaximoDescargas()
 {
-    return QStringLiteral("El paquete alcanzo el maximo de descargas permitidas.");
+    return QStringLiteral("El paquete alcanzó el máximo de descargas permitidas.");
 }
 QString descargaFallida()
 {

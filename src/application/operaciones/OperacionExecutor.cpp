@@ -1136,7 +1136,7 @@ struct OperacionExecutor::Impl {
             AplicacionEnvio a;
             a.solicitudId = id;
             a.destino = EstadoLocal::EnvioIncierto;
-            a.ultimoError = QStringLiteral("Envio interrumpido por cierre; resultado incierto");
+            a.ultimoError = QStringLiteral("Envío interrumpido por cierre; resultado incierto");
             RB r = enTransaccion([&]() -> RB {
                 auto ap = p.operaciones.aplicarEnvio(a);
                 if (!ap || !ap.valor()) {

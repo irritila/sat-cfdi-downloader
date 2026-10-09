@@ -18,11 +18,11 @@ QString PerfilesSatListModel::textoDe(PreparacionPerfil preparacion)
     case PreparacionPerfil::Vencida:
         return tr("e.firma vencida");
     case PreparacionPerfil::NoVigenteAun:
-        return tr("e.firma aun no vigente");
+        return tr("e.firma aún no vigente");
     case PreparacionPerfil::MaterialFaltante:
         return tr("e.firma incompleta en el llavero");
     case PreparacionPerfil::MaterialDanado:
-        return tr("e.firma danada en el llavero");
+        return tr("e.firma dañada en el llavero");
     case PreparacionPerfil::EstadoNoDisponible:
         return tr("Estado no disponible");
     }

@@ -3,7 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 
-// Ilustracion (T012, D5/D6) de una notificacion de macOS (banner del Centro de
+// Ilustración (T012, D5/D6) de una notificacion de macOS (banner del Centro de
 // notificaciones), tema claro. `titulo` y `cuerpo` salen de
 // ServicioNotificaciones con un Notificador fake; aqui no hay textos de la app.
 Item {
@@ -117,7 +117,7 @@ Item {
         Label {
             id: rotulo
             anchors.centerIn: parent
-            text: "Ilustracion"
+            text: "Ilustración"
             color: "white"
             font.pixelSize: 12
             font.bold: true

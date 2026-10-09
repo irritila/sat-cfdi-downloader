@@ -7,6 +7,8 @@
 # solo se instancian en el composition root (o en pruebas).
 qt_add_library(satcfdi_application STATIC
     common/Errores.h
+    common/FechasLegibles.h
+    common/FechasLegibles.cpp
     configuration/ConfiguracionAppService.h
     configuration/ConfiguracionAppServicePersistido.h
     configuration/ConfiguracionAppServicePersistido.cpp

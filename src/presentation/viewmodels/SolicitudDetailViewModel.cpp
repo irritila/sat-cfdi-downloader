@@ -506,13 +506,113 @@ QString SolicitudDetailViewModel::mensajeEstado() const
     return m_detalle ? catalogo::mensajeSolicitud(*m_detalle) : QString();
 }
 
+namespace {
+
+struct ConteoPaquetes {
+    int total = 0;
+    int descargados = 0;
+    int disponibles = 0;
+    int conError = 0;
+    int vencidos = 0;
+};
+
+ConteoPaquetes contar(const QList<PaqueteResumen>& paquetes)
+{
+    ConteoPaquetes c;
+    c.total = int(paquetes.size());
+    for (const PaqueteResumen& p : paquetes) {
+        switch (p.estadoDescarga) {
+        case EstadoDescarga::Descargado: ++c.descargados; break;
+        case EstadoDescarga::Disponible:
+        case EstadoDescarga::Descargando: ++c.disponibles; break;
+        case EstadoDescarga::Error: ++c.conError; break;
+        case EstadoDescarga::Vencido: ++c.vencidos; break;
+        }
+    }
+    return c;
+}
+
+} // namespace
+
+bool SolicitudDetailViewModel::todoDescargado() const
+{
+    if (!m_detalle || estadoResumen() != QLatin1String("Terminada")) {
+        return false;
+    }
+    const ConteoPaquetes c = contar(m_detalle->paquetes);
+    return c.total > 0 && c.descargados == c.total;
+}
+
+QString SolicitudDetailViewModel::titularResumen() const
+{
+    if (!m_detalle) {
+        return {};
+    }
+    const QString e = estadoResumen();
+    if (e == QLatin1String("Creada")) return tr("La solicitud aún no se envía al SAT");
+    if (e == QLatin1String("Enviando")) return tr("Enviando la solicitud al SAT…");
+    if (e == QLatin1String("Enviada")) return tr("El SAT recibió la solicitud");
+    if (e == QLatin1String("Aceptada")) return tr("El SAT aceptó la solicitud");
+    if (e == QLatin1String("EnProceso")) return tr("El SAT está preparando los paquetes");
+    if (e == QLatin1String("Terminada")) {
+        const ConteoPaquetes c = contar(m_detalle->paquetes);
+        if (c.total == 0) return tr("El SAT terminó sin paquetes");
+        if (c.descargados == c.total) return tr("Todos los paquetes están descargados");
+        if (c.conError > 0) return tr("Hay un paquete con error de descarga");
+        return tr("El SAT terminó la solicitud");
+    }
+    if (e == QLatin1String("EnvioFallido")) return tr("El SAT rechazó el envío");
+    if (e == QLatin1String("EnvioIncierto")) return tr("No se sabe si el SAT registró la solicitud");
+    if (e == QLatin1String("ErrorSat")) return tr("El SAT reportó un error en la solicitud");
+    if (e == QLatin1String("Rechazada")) return tr("El SAT rechazó la solicitud");
+    if (e == QLatin1String("Vencida")) return tr("La solicitud venció en el SAT");
+    return {};
+}
+
+QString SolicitudDetailViewModel::descripcionResumen() const
+{
+    if (!m_detalle) {
+        return {};
+    }
+    const QString e = estadoResumen();
+    if (e == QLatin1String("Creada")) return tr("Guardada en este equipo. Se enviará con la e.firma del perfil.");
+    if (e == QLatin1String("Enviando")) return tr("La app la está enviando con la e.firma del perfil.");
+    if (e == QLatin1String("Enviada")) return tr("Aún no hay respuesta del SAT. La app verificará automáticamente.");
+    if (e == QLatin1String("Aceptada")) return tr("La está atendiendo. La app verificará automáticamente.");
+    if (e == QLatin1String("EnProceso")) return tr("La app verifica el estado periódicamente. No necesitas hacer nada.");
+    if (e == QLatin1String("Terminada")) {
+        const ConteoPaquetes c = contar(m_detalle->paquetes);
+        if (c.total == 0) return tr("No hay paquetes que descargar para estos filtros.");
+        if (c.descargados == c.total) return tr("%1 de %1 paquetes en este equipo.").arg(c.total);
+        QStringList partes{tr("%1 de %2 paquetes descargados").arg(c.descargados).arg(c.total)};
+        if (c.disponibles > 0) {
+            partes.append(c.disponibles == 1 ? tr("1 disponible") : tr("%1 disponibles").arg(c.disponibles));
+        }
+        if (c.conError > 0) partes.append(tr("%1 con error").arg(c.conError));
+        if (c.vencidos > 0) {
+            partes.append(c.vencidos == 1 ? tr("1 vencido") : tr("%1 vencidos").arg(c.vencidos));
+        }
+        return partes.join(QStringLiteral(" · "));
+    }
+    if (e == QLatin1String("EnvioFallido")) {
+        return tr("No se registró en el SAT. Si necesitas repetirla, crea una solicitud nueva.");
+    }
+    if (e == QLatin1String("EnvioIncierto")) return tr("No se reenviará automáticamente; revisa antes de crear otra.");
+    if (e == QLatin1String("ErrorSat") || e == QLatin1String("Rechazada")) {
+        const QString m = mensajeEstado();
+        return m.isEmpty() ? ultimoError() : m;
+    }
+    if (e == QLatin1String("Vencida")) return tr("Los paquetes pueden ya no estar disponibles.");
+    return {};
+}
+
 void SolicitudDetailViewModel::enviar()
 {
     if (!puedeEnviar()) {
         return;
     }
     m_acciones->enviar(m_detalle->resumen.id);
-    m_accionSolicitada = tr("Envio solicitado.");
+    m_accionSolicitada = tr("Envío solicitado.");
     emit accionSolicitadaChanged();
 }
 
@@ -546,7 +646,7 @@ void SolicitudDetailViewModel::verificarAhora()
         return;
     }
     m_acciones->verificarAhora(m_detalle->resumen.id);
-    m_accionSolicitada = tr("Verificacion solicitada. Si el monitoreo esta pausado, queda pendiente.");
+    m_accionSolicitada = tr("Verificación solicitada. Si el monitoreo está pausado, queda pendiente.");
     emit accionSolicitadaChanged();
 }
 
@@ -556,7 +656,7 @@ void SolicitudDetailViewModel::reintentarDescarga()
         return;
     }
     m_acciones->reintentarDescarga(m_detalle->resumen.id);
-    m_accionSolicitada = tr("Descarga solicitada. Si el monitoreo esta pausado, queda pendiente.");
+    m_accionSolicitada = tr("Descarga solicitada. Si el monitoreo está pausado, queda pendiente.");
     emit accionSolicitadaChanged();
 }
 

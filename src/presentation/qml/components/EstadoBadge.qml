@@ -1,47 +1,71 @@
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls.Basic
 
 import "Etiquetas.js" as Etiquetas
 
-// Insignia de estado: siempre muestra texto; el color solo lo refuerza.
+// Insignia de estado (T013, ficha EstadoBadge): siempre icono, texto y tono
+// del alias del estado (Theme.estado / Theme.estadoEFirma); el color nunca va
+// solo. Variantes: normal (alto 20, icono 13, texto 11/600) y `grande` (alto 26,
+// icono 16, texto 13/600).
+// - clave: clave estable del estado (solicitud, paquete o, con `eFirma`, la
+//   preparacion del perfil). Vacia -> tono neutro.
+// - texto: texto visible (por omision el de estadoResumen).
+// - contexto: prefijo del nombre accesible ("Estado", "Estado SAT"...).
 Rectangle {
     id: badge
 
-    // Clave estable del estado (p. ej. "EnvioFallido").
     property string clave: ""
-    // Texto visible ya resuelto (por defecto, el de estadoResumen).
     property string texto: Etiquetas.estadoResumen(clave)
-    // Prefijo para el nombre accesible, p. ej. "Estado SAT".
     property string contexto: qsTr("Estado")
+    property bool eFirma: false
+    property bool grande: false
 
-    readonly property string tono: Etiquetas.tono(clave)
+    readonly property var estilo: badge.eFirma ? Theme.estadoEFirma(badge.clave) : Theme.estado(badge.clave)
+    readonly property string tono: badge.estilo.tono
+    readonly property string icono: badge.estilo.icono
 
-    implicitWidth: etiqueta.implicitWidth + 16
-    implicitHeight: etiqueta.implicitHeight + 6
+    // Padding 6/8 (8/10 en grande), icono 13 (16) y gap espacioXs.
+    readonly property int padIzq: badge.grande ? 8 : 6
+    readonly property int padDer: badge.grande ? 10 : 8
+    readonly property int anchoIcono: badge.grande ? 16 : 13
+
+    implicitHeight: badge.grande ? 26 : Theme.altoBadge
+    implicitWidth: badge.padIzq + badge.anchoIcono + Theme.espacioXs + etiqueta.implicitWidth + badge.padDer
     radius: height / 2
+    color: badge.estilo.fondo
     border.width: 1
-    border.color: Qt.darker(color, 1.4)
-    color: {
-        switch (tono) {
-        case "exito": return "#d7f0dc"
-        case "error": return "#f8d7d7"
-        case "advertencia": return "#fbecc8"
-        case "progreso": return "#d8e6fa"
-        default: return "#e6e6e6"
-        }
-    }
+    border.color: badge.estilo.borde
 
     Accessible.role: Accessible.StaticText
     Accessible.name: badge.contexto + ": " + badge.texto
 
-    Label {
-        id: etiqueta
-        anchors.centerIn: parent
-        width: Math.min(implicitWidth, badge.width - 16)
-        elide: Text.ElideRight
-        text: badge.texto
-        color: "#1d1d1f"
-        font.bold: true
-        Accessible.ignored: true
+    Row {
+        id: fila
+        x: badge.padIzq
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: Theme.espacioXs
+
+        Icono {
+            objectName: "iconoBadge"
+            nombre: badge.estilo.icono
+            color: badge.estilo.texto
+            tamano: badge.anchoIcono
+            anchors.verticalCenter: parent.verticalCenter
+        }
+        Label {
+            id: etiqueta
+            objectName: "textoBadge"
+            // Se recorta solo si el badge recibe menos ancho que el implicito.
+            width: Math.max(0, Math.min(implicitWidth, badge.width - badge.padIzq - badge.padDer
+                                                       - badge.anchoIcono - Theme.espacioXs))
+            anchors.verticalCenter: parent.verticalCenter
+            elide: Text.ElideRight
+            text: badge.texto
+            color: badge.estilo.texto
+            font.family: Theme.familia
+            font.pixelSize: badge.grande ? Theme.cuerpo.size : Theme.etiqueta.size
+            font.weight: Font.DemiBold
+            Accessible.ignored: true
+        }
     }
 }

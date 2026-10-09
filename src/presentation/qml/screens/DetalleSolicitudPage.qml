@@ -1,16 +1,23 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls.Basic
 import QtQuick.Layouts
 
 import "Etiquetas.js" as Etiquetas
 
-// Detalle de una solicitud cargada por id. Estados: Cargando, Error,
-// NoEncontrada y ConDatos. Con datos separa solicitud, filtros, estado
-// (local/SAT y codigos), paquetes e historial. "Eliminar solicitud" pide
-// confirmacion; al terminar se regresa a la lista. Teclado: foco inicial en
-// "Regresar"; Tab llega a "Eliminar solicitud"; Escape regresa.
+// Detalle de una solicitud (T013, traspaso "DetalleSolicitudPage";
+// UX-22..UX-30, D7). Estados: Cargando, Error, NoEncontrada y ConDatos.
+// - Encabezado: "Solicitud" con subtitulo "RFC · Tipo · periodo", "Abrir
+//   carpeta de la solicitud" y "Eliminar…" (destructivo, separado).
+// - ResumenEstado: un solo estado visible (el resumen), titular y descripcion
+//   por estado, 4 datos clave y la accion principal del estado (Enviar,
+//   Verificar ahora, Reintentar descarga o Abrir carpeta) con su motivo o
+//   resultado debajo.
+// - Pestanas Paquetes N / Datos / Historial N (Paquetes por omision si hay
+//   paquetes). El estado local y el SAT solo aparecen en Datos (D7).
+// Teclado: foco inicial en "Solicitudes"; Tab recorre encabezado, accion
+// principal, pestanas y contenido; Escape regresa.
 Page {
     id: pagina
     objectName: "paginaDetalleSolicitud"
@@ -20,16 +27,48 @@ Page {
 
     readonly property bool sinEstadoSat: pagina.detalle.estadoSat === null
     readonly property bool conDatos: pagina.detalle.cargada
+    readonly property bool hayPaquetes: pagina.detalle.totalPaquetes > 0
+    readonly property bool anchoAmplio: pagina.width >= 760
+
+    // Pestana activa: "paquetes", "datos" o "historial".
+    property string pestana: "datos"
 
     focus: true
     Accessible.role: Accessible.Pane
     Accessible.name: qsTr("Detalle de solicitud")
 
+    background: Rectangle {
+        color: Theme.fondo
+    }
+
     // Foco inicial diferido: la pagina ya esta en la ventana.
     Component.onCompleted: Qt.callLater(pagina.enfocarInicial)
 
+    // Al cargar otra solicitud, Paquetes si tiene paquetes; si no, Datos.
+    Connections {
+        target: pagina.detalle
+        function onSolicitudIdChanged() { pagina.pestanaInicialPendiente = true }
+        function onDatosChanged() {
+            if (pagina.pestanaInicialPendiente && pagina.conDatos) {
+                pagina.pestana = pagina.hayPaquetes ? "paquetes" : "datos"
+                pagina.pestanaInicialPendiente = false
+            }
+        }
+    }
+    property bool pestanaInicialPendiente: true
+    onConDatosChanged: {
+        if (pagina.conDatos && pagina.pestanaInicialPendiente) {
+            pagina.pestana = pagina.hayPaquetes ? "paquetes" : "datos"
+            pagina.pestanaInicialPendiente = false
+        }
+    }
+
     // Diferido: no quita el foco a un dialogo ya abierto.
     function enfocarInicial() {
+        if (pagina.conDatos && pagina.pestanaInicialPendiente) {
+            pagina.pestana = pagina.hayPaquetes ? "paquetes" : "datos"
+            pagina.pestanaInicialPendiente = false
+        }
         if (dialogoEliminar.visible)
             return
         encabezado.botonRegresar.forceActiveFocus(Qt.TabFocusReason)
@@ -44,63 +83,88 @@ Page {
             botonEliminar.forceActiveFocus(Qt.TabFocusReason)
     }
 
-    function textoOpcional(valor) {
-        return valor === null || valor === undefined || valor === "" ? "-" : String(valor)
+    // Cambia la pestana visible ("paquetes", "datos" o "historial").
+    function mostrarPestana(clave) {
+        pagina.pestana = clave
     }
+
+    function textoOpcional(valor) {
+        return valor === null || valor === undefined || valor === "" ? "" : String(valor)
+    }
+
+    function fechaHora(valor) {
+        return valor === null || valor === undefined ? "" : FormatoFechas.fechaHora(valor)
+    }
+
+    // Mensaje de una fila de paquete y su tono (FilaPaquete).
+    function mensajePaquete(p) {
+        if (p.estadoDescarga === "Descargado")
+            return Etiquetas.existenciaPaquete(p.existencia)
+        if (p.estadoDescarga === "Disponible")
+            return qsTr("La app lo descargará automáticamente.")
+        return p.mensaje
+    }
+    function tonoPaquete(p) {
+        switch (p.estadoDescarga) {
+        case "Descargado":
+            return p.existencia === "Presente" ? "exito" : (p.existencia === "Comprobando" ? "neutro" : "advertencia")
+        case "Error": return "error"
+        case "Vencido": return "advertencia"
+        default: return "neutro"
+        }
+    }
+    function metadatosPaquete(p) {
+        const partes = [qsTr("Disponible %1").arg(pagina.fechaHora(p.disponibleEn))]
+        if (p.descargadoEn !== null)
+            partes.push(qsTr("Descargado %1").arg(pagina.fechaHora(p.descargadoEn)))
+        if (p.vencidoEn !== null)
+            partes.push(qsTr("Venció %1").arg(pagina.fechaHora(p.vencidoEn)))
+        if (p.codigoDescargaSat !== "")
+            partes.push(qsTr("Código SAT %1").arg(p.codigoDescargaSat))
+        return partes.join(" · ")
+    }
+
+    readonly property string textoPeriodo: FormatoFechas.rango(pagina.detalle.fechaInicial, pagina.detalle.fechaFinal)
 
     Keys.onEscapePressed: regresar()
 
     header: EncabezadoPagina {
         id: encabezado
-        titulo: qsTr("Detalle de solicitud")
+        titulo: qsTr("Solicitud")
+        subtitulo: pagina.conDatos
+                   ? [pagina.detalle.perfilRfc, Etiquetas.tipoDescarga(pagina.detalle.tipoDescarga), pagina.textoPeriodo]
+                     .filter(t => t.length > 0).join(" · ")
+                   : ""
         mostrarRegresar: true
+        textoRegresar: qsTr("Solicitudes")
         onRegresarSolicitado: pagina.regresar()
 
-        // T009: Enviar una solicitud Creada solo con la credencial Lista.
-        BotonAccion {
-            objectName: "botonEnviarSolicitud"
-            visible: pagina.conDatos && pagina.detalle.envioVisible
-            enabled: pagina.detalle.puedeEnviar
-            text: qsTr("Enviar")
-            descripcion: pagina.detalle.puedeEnviar
-                         ? qsTr("Enviar la solicitud al SAT")
-                         : pagina.detalle.motivoEnvio
-            onClicked: pagina.detalle.enviar()
-        }
-
-        // T009.1 D1: carpeta de la solicitud en Finder (con algun Descargado).
+        // T009.1 D1: abre la carpeta de la solicitud en Finder. Con todo
+        // descargado pasa a ser la accion principal del resumen.
         BotonAccion {
             objectName: "botonAbrirCarpetaSolicitud"
-            visible: pagina.conDatos && pagina.detalle.puedeAbrirCarpeta
+            visible: pagina.conDatos && pagina.detalle.puedeAbrirCarpeta && !pagina.detalle.todoDescargado
+            icono: "folder"
             text: qsTr("Abrir carpeta de la solicitud")
             descripcion: qsTr("Mostrar en Finder la carpeta con los paquetes descargados de esta solicitud")
             onClicked: pagina.detalle.abrirCarpetaSolicitud()
         }
-
-        // T007: acciones manuales; solo visibles si aplican al estado actual.
-        BotonAccion {
-            objectName: "botonVerificarAhora"
-            visible: pagina.conDatos && pagina.detalle.puedeVerificar
-            text: qsTr("Verificar ahora")
-            descripcion: qsTr("Consultar ahora el estado de la solicitud en el SAT; si el monitoreo esta pausado, queda pendiente")
-            onClicked: pagina.detalle.verificarAhora()
+        Rectangle {
+            visible: pagina.conDatos
+            implicitWidth: 1
+            implicitHeight: 24
+            color: Theme.separador
         }
-
-        BotonAccion {
-            objectName: "botonReintentarDescarga"
-            visible: pagina.conDatos && pagina.detalle.puedeReintentarDescarga
-            text: qsTr("Reintentar descarga")
-            descripcion: qsTr("Descargar de nuevo los paquetes disponibles o con error; si el monitoreo esta pausado, queda pendiente")
-            onClicked: pagina.detalle.reintentarDescarga()
-        }
-
         BotonAccion {
             id: botonEliminar
             objectName: "botonEliminarSolicitud"
             visible: pagina.conDatos
             enabled: !pagina.detalle.eliminando
-            text: qsTr("Eliminar solicitud")
+            variante: "destructivo"
+            icono: "trash"
+            text: qsTr("Eliminar…")
             descripcion: qsTr("Eliminar la solicitud de este equipo; no modifica nada en el SAT")
+            Accessible.name: qsTr("Eliminar solicitud")
             onClicked: dialogoEliminar.open()
         }
     }
@@ -109,8 +173,10 @@ Page {
         id: dialogoEliminar
         objectName: "dialogoEliminar"
         prefijoNombre: "dialogoEliminar"
-        title: qsTr("Eliminar solicitud")
-        mensaje: qsTr("La solicitud se eliminara de esta aplicacion. No se modifica nada en el SAT.")
+        variante: "destructivo"
+        title: qsTr("¿Eliminar esta solicitud?")
+        mensaje: qsTr("La solicitud se eliminará de esta aplicación. No se modifica nada en el SAT.")
+        consecuencia: qsTr("Los ZIP ya descargados se quedan en su carpeta.")
         textoConfirmar: qsTr("Eliminar")
         textoCancelar: qsTr("Cancelar")
         onConfirmado: pagina.detalle.eliminar()
@@ -122,7 +188,7 @@ Page {
         objectName: "estadoCargandoDetalle"
         anchors.centerIn: parent
         visible: pagina.detalle.estado === SolicitudDetailViewModel.Cargando && !pagina.conDatos
-        spacing: 8
+        spacing: Theme.espacioS
         Accessible.role: Accessible.StaticText
         Accessible.name: qsTr("Cargando solicitud")
 
@@ -131,421 +197,394 @@ Page {
             Layout.alignment: Qt.AlignHCenter
             Accessible.ignored: true
         }
-        Label {
-            text: qsTr("Cargando solicitud...")
-            Layout.alignment: Qt.AlignHCenter
-            Accessible.ignored: true
-        }
     }
 
     // Estado: no encontrada
-    ColumnLayout {
+    EstadoVacio {
         objectName: "estadoNoEncontrada"
         anchors.centerIn: parent
-        width: Math.min(parent.width - 32, 420)
+        width: Math.min(parent.width - 2 * Theme.espacioXxl, 420)
         visible: pagina.detalle.estado === SolicitudDetailViewModel.NoEncontrada
-        spacing: 8
-        Accessible.role: Accessible.AlertMessage
-        Accessible.name: qsTr("Solicitud no encontrada. Pudo haber sido eliminada.")
-
-        Label {
-            text: qsTr("Solicitud no encontrada")
-            font.pixelSize: 18
-            font.bold: true
-            horizontalAlignment: Text.AlignHCenter
-            Layout.fillWidth: true
-            Accessible.ignored: true
-        }
-        Label {
-            text: qsTr("La solicitud no existe o fue eliminada.")
-            wrapMode: Text.WordWrap
-            horizontalAlignment: Text.AlignHCenter
-            Layout.fillWidth: true
-            Accessible.ignored: true
-        }
+        variante: "vacio"
+        titulo: qsTr("Solicitud no encontrada")
+        descripcion: qsTr("La solicitud no existe o fue eliminada.")
+        textoAccion: qsTr("Solicitudes")
+        objectNameAccion: "botonVolverNoEncontrada"
+        onAccionSolicitada: pagina.regresar()
     }
 
     // Estado: error
-    ColumnLayout {
+    EstadoVacio {
         objectName: "estadoErrorDetalle"
         anchors.centerIn: parent
-        width: Math.min(parent.width - 32, 420)
+        width: Math.min(parent.width - 2 * Theme.espacioXxl, 420)
         visible: pagina.detalle.estado === SolicitudDetailViewModel.Error
-        spacing: 12
-
-        Label {
-            objectName: "errorDetalle"
-            text: pagina.detalle.errorMessage
-            color: "#b00020"
-            font.bold: true
-            wrapMode: Text.WordWrap
-            horizontalAlignment: Text.AlignHCenter
-            Layout.fillWidth: true
-            Accessible.role: Accessible.AlertMessage
-            Accessible.name: qsTr("Error: %1").arg(text)
-        }
-        BotonAccion {
-            objectName: "botonReintentarDetalle"
-            text: qsTr("Reintentar")
-            Layout.alignment: Qt.AlignHCenter
-            onClicked: pagina.detalle.recargar()
-        }
+        variante: "error"
+        titulo: pagina.detalle.errorMessage
+        textoAccion: qsTr("Reintentar")
+        objectNameTitulo: "errorDetalle"
+        objectNameAccion: "botonReintentarDetalle"
+        onAccionSolicitada: pagina.detalle.recargar()
     }
 
     // Estado: con datos
-    ScrollView {
-        id: desplazamiento
+    ColumnLayout {
         anchors.fill: parent
-        contentWidth: availableWidth
-        clip: true
+        anchors.margins: Theme.espacioL
+        spacing: Theme.espacioM
         visible: pagina.conDatos
 
-        ColumnLayout {
-            width: desplazamiento.availableWidth
-            spacing: 12
+        // T009.1 D7: aviso accesible de Finder (no encontrado o fallido).
+        AvisoEnLinea {
+            objectName: "mensajeFinder"
+            visible: pagina.detalle.mensajeFinder.length > 0
+            variante: "error"
+            icono: "folder"
+            titulo: pagina.detalle.mensajeFinder
+            Layout.fillWidth: true
+        }
+        AvisoEnLinea {
+            objectName: "errorEliminacion"
+            visible: pagina.detalle.errorEliminacion.length > 0
+            variante: "error"
+            titulo: pagina.detalle.errorEliminacion
+            Layout.fillWidth: true
+        }
 
-            Item { implicitHeight: 4 }
+        ResumenEstado {
+            objectName: "resumenEstado"
+            Layout.fillWidth: true
+            clave: pagina.detalle.estadoResumen
+            titular: pagina.detalle.titularResumen
+            descripcion: pagina.detalle.descripcionResumen
+            ocupado: pagina.detalle.estadoResumen === "Enviando"
+            // T009 D10: por que no se puede enviar.
+            accionHabilitada: !pagina.detalle.envioVisible || pagina.detalle.puedeEnviar
+            motivo: pagina.detalle.envioVisible && !pagina.detalle.puedeEnviar ? pagina.detalle.motivoEnvio : ""
+            objectNameMotivo: "motivoEnvio"
+            mensajeResultado: pagina.detalle.accionSolicitada
+            objectNameResultado: "accionSolicitada"
+            datos: [
+                { etiqueta: qsTr("Contribuyente"), valor: pagina.detalle.perfilRfc },
+                { etiqueta: qsTr("Tipo · periodo"),
+                  valor: Etiquetas.tipoDescarga(pagina.detalle.tipoDescarga) + " · " + pagina.textoPeriodo },
+                { etiqueta: qsTr("CFDI reportados"), valor: pagina.textoOpcional(pagina.detalle.numeroCfdi) },
+                { etiqueta: qsTr("Última verificación"), valor: pagina.fechaHora(pagina.detalle.ultimaVerificacionEn) }
+            ]
 
-            // T009.1 D7: aviso accesible de Finder (no encontrado o fallido).
-            Label {
-                objectName: "mensajeFinder"
-                visible: text.length > 0
-                text: pagina.detalle.mensajeFinder
-                color: "#b00020"
-                font.bold: true
-                wrapMode: Text.WordWrap
-                Layout.fillWidth: true
-                Layout.leftMargin: 16
-                Layout.rightMargin: 16
-                Accessible.role: Accessible.AlertMessage
-                Accessible.name: text
+            // Una accion principal por estado (normalmente solo una es visible).
+            // T009: Enviar una solicitud Creada solo con la credencial Lista.
+            BotonAccion {
+                objectName: "botonEnviarSolicitud"
+                visible: pagina.detalle.envioVisible
+                enabled: pagina.detalle.puedeEnviar
+                variante: "primario"
+                icono: "paperplane"
+                text: qsTr("Enviar")
+                descripcion: pagina.detalle.puedeEnviar ? qsTr("Enviar la solicitud al SAT")
+                                                        : pagina.detalle.motivoEnvio
+                onClicked: pagina.detalle.enviar()
             }
-
-            // T009 D10: por que no se puede enviar y mensaje del estado actual.
-            Label {
-                objectName: "motivoEnvio"
-                visible: text.length > 0 && !pagina.detalle.puedeEnviar
-                text: pagina.detalle.motivoEnvio
-                wrapMode: Text.WordWrap
-                Layout.fillWidth: true
-                Layout.leftMargin: 16
-                Layout.rightMargin: 16
-                Accessible.role: Accessible.StaticText
-                Accessible.name: text
+            // T007: acciones manuales; solo visibles si aplican al estado actual.
+            BotonAccion {
+                objectName: "botonReintentarDescarga"
+                visible: pagina.detalle.puedeReintentarDescarga
+                variante: "primario"
+                text: qsTr("Reintentar descarga")
+                descripcion: qsTr("Descargar de nuevo los paquetes disponibles o con error; si el monitoreo está pausado, queda pendiente")
+                onClicked: pagina.detalle.reintentarDescarga()
             }
-
-            Label {
-                objectName: "mensajeEstado"
-                visible: text.length > 0
-                text: pagina.detalle.mensajeEstado
-                font.bold: true
-                wrapMode: Text.WordWrap
-                Layout.fillWidth: true
-                Layout.leftMargin: 16
-                Layout.rightMargin: 16
-                Accessible.role: Accessible.StaticText
-                Accessible.name: text
+            BotonAccion {
+                objectName: "botonVerificarAhora"
+                visible: pagina.detalle.puedeVerificar
+                text: qsTr("Verificar ahora")
+                descripcion: qsTr("Consultar ahora el estado de la solicitud en el SAT; si el monitoreo está pausado, queda pendiente")
+                onClicked: pagina.detalle.verificarAhora()
             }
-
-            Label {
-                objectName: "accionSolicitada"
-                visible: text.length > 0
-                text: pagina.detalle.accionSolicitada
-                wrapMode: Text.WordWrap
-                Layout.fillWidth: true
-                Layout.leftMargin: 16
-                Layout.rightMargin: 16
-                Accessible.role: Accessible.StaticText
-                Accessible.name: text
+            BotonAccion {
+                objectName: "accionAbrirCarpeta"
+                visible: pagina.detalle.todoDescargado && pagina.detalle.puedeAbrirCarpeta
+                variante: "primario"
+                icono: "folder"
+                text: qsTr("Abrir carpeta de la solicitud")
+                descripcion: qsTr("Mostrar en Finder la carpeta con los paquetes descargados de esta solicitud")
+                onClicked: pagina.detalle.abrirCarpetaSolicitud()
             }
+        }
 
-            Label {
-                objectName: "errorEliminacion"
-                visible: text.length > 0
-                text: pagina.detalle.errorEliminacion
-                color: "#b00020"
-                font.bold: true
-                wrapMode: Text.WordWrap
-                Layout.fillWidth: true
-                Layout.leftMargin: 16
-                Layout.rightMargin: 16
-                Accessible.role: Accessible.AlertMessage
-                Accessible.name: qsTr("Error: %1").arg(text)
-            }
+        // T009 D10: mensaje del catalogo para el estado (cuando no es la descripcion).
+        AvisoEnLinea {
+            objectName: "mensajeEstado"
+            visible: pagina.detalle.mensajeEstado.length > 0
+                     && pagina.detalle.descripcionResumen !== pagina.detalle.mensajeEstado
+            variante: pagina.detalle.estadoResumen === "EnvioIncierto" || pagina.detalle.estadoResumen === "Enviada"
+                      ? "advertencia" : "error"
+            titulo: pagina.detalle.mensajeEstado
+            anunciar: false
+            Layout.fillWidth: true
+        }
 
-            GroupBox {
-                objectName: "seccionMetadata"
-                title: qsTr("Solicitud")
-                Layout.fillWidth: true
-                Layout.leftMargin: 16
-                Layout.rightMargin: 16
-                Accessible.role: Accessible.Grouping
-                Accessible.name: title
+        SelectorSegmentado {
+            objectName: "pestanasDetalle"
+            variante: "pestanas"
+            nombreAccesible: qsTr("Secciones del detalle")
+            valor: pagina.pestana
+            opciones: [
+                { clave: "paquetes", texto: qsTr("Paquetes"), contador: pagina.detalle.totalPaquetes },
+                { clave: "datos", texto: qsTr("Datos") },
+                { clave: "historial", texto: qsTr("Historial"), contador: pagina.detalle.logs.length }
+            ]
+            onActivado: (clave) => { pagina.pestana = clave }
+        }
 
-                ColumnLayout {
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    spacing: 6
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            radius: Theme.radioTarjeta
+            color: Theme.superficie
+            border.width: 1
+            border.color: Theme.separador
+            clip: true
 
-                    CampoDetalle { etiqueta: qsTr("Identificador local"); valor: pagina.detalle.solicitudId }
-                    CampoDetalle { objectName: "campoPerfilRfc"; etiqueta: qsTr("Perfil SAT (RFC)"); valor: pagina.detalle.perfilRfc }
-                    CampoDetalle { etiqueta: qsTr("Tipo de descarga"); valor: Etiquetas.tipoDescarga(pagina.detalle.tipoDescarga) }
-                    CampoDetalle { etiqueta: qsTr("Creada"); valor: Etiquetas.fechaHora(pagina.detalle.creadaEn) }
-                }
-            }
+            StackLayout {
+                anchors.fill: parent
+                anchors.margins: 1
+                currentIndex: pagina.pestana === "paquetes" ? 0 : (pagina.pestana === "datos" ? 1 : 2)
 
-            GroupBox {
-                objectName: "seccionFiltros"
-                title: qsTr("Filtros")
-                Layout.fillWidth: true
-                Layout.leftMargin: 16
-                Layout.rightMargin: 16
-                Accessible.role: Accessible.Grouping
-                Accessible.name: title
+                // ---- Paquetes ----
+                ScrollView {
+                    id: desplazamientoPaquetes
+                    objectName: "seccionPaquetes"
+                    contentWidth: availableWidth
+                    clip: true
+                    Accessible.role: Accessible.Grouping
+                    Accessible.name: qsTr("Paquetes (%1)").arg(pagina.detalle.totalPaquetes)
 
-                ColumnLayout {
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    spacing: 6
+                    ColumnLayout {
+                        width: desplazamientoPaquetes.availableWidth
+                        spacing: 0
 
-                    CampoDetalle { etiqueta: qsTr("Fecha inicial"); valor: pagina.detalle.fechaInicialSat || pagina.detalle.fechaInicial }
-                    CampoDetalle { etiqueta: qsTr("Fecha final"); valor: pagina.detalle.fechaFinalSat || pagina.detalle.fechaFinal }
-                    CampoDetalle {
-                        objectName: "campoContrapartes"
-                        etiqueta: qsTr("RFC contraparte")
-                        valor: pagina.detalle.rfcContrapartes.length > 0
-                               ? pagina.detalle.rfcContrapartes.join(", ")
-                               : pagina.detalle.rfcContraparte
-                    }
-                    CampoDetalle {
-                        objectName: "campoTipoComprobante"
-                        etiqueta: qsTr("Tipo de comprobante")
-                        valor: Etiquetas.tipoComprobante(pagina.detalle.tipoComprobante)
-                    }
-                    CampoDetalle { etiqueta: qsTr("Complemento"); valor: pagina.detalle.complemento }
-                }
-            }
-
-            GroupBox {
-                objectName: "seccionEstados"
-                title: qsTr("Estado")
-                Layout.fillWidth: true
-                Layout.leftMargin: 16
-                Layout.rightMargin: 16
-                Accessible.role: Accessible.Grouping
-                Accessible.name: title
-
-                ColumnLayout {
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    spacing: 8
-
-                    GridLayout {
-                        columns: 2
-                        columnSpacing: 12
-                        rowSpacing: 8
-                        Layout.fillWidth: true
-
-                        Label { text: qsTr("Estado local"); Layout.preferredWidth: 160; opacity: 0.75; Accessible.ignored: true }
-                        EstadoBadge {
-                            objectName: "badgeEstadoLocal"
-                            clave: pagina.detalle.estadoLocal
-                            texto: Etiquetas.estadoLocal(pagina.detalle.estadoLocal)
-                            contexto: qsTr("Estado local")
-                        }
-
-                        Label { text: qsTr("Estado SAT"); Layout.preferredWidth: 160; opacity: 0.75; Accessible.ignored: true }
-                        EstadoBadge {
-                            objectName: "badgeEstadoSat"
-                            clave: pagina.sinEstadoSat ? "" : pagina.detalle.estadoSat
-                            texto: Etiquetas.estadoSat(pagina.detalle.estadoSat)
-                            contexto: qsTr("Estado SAT")
-                        }
-
-                        Label { text: qsTr("Resumen"); Layout.preferredWidth: 160; opacity: 0.75; Accessible.ignored: true }
-                        EstadoBadge {
-                            objectName: "badgeEstadoResumen"
-                            clave: pagina.detalle.estadoResumen
-                            contexto: qsTr("Estado resumido")
-                        }
-                    }
-
-                    CampoDetalle { etiqueta: qsTr("Id solicitud SAT"); valor: pagina.detalle.idSolicitudSat }
-                    CampoDetalle {
-                        objectName: "campoCodigoSolicitud"
-                        etiqueta: qsTr("Codigo de solicitud SAT")
-                        valor: pagina.detalle.codEstatusSolicitud
-                               + (pagina.detalle.mensajeSolicitudSat ? " - " + pagina.detalle.mensajeSolicitudSat : "")
-                    }
-                    CampoDetalle {
-                        etiqueta: qsTr("Codigo de verificacion SAT")
-                        valor: pagina.detalle.codigoEstadoSolicitud
-                               + (pagina.detalle.mensajeVerificacionSat ? " - " + pagina.detalle.mensajeVerificacionSat : "")
-                    }
-                    CampoDetalle { etiqueta: qsTr("CFDI reportados"); valor: pagina.textoOpcional(pagina.detalle.numeroCfdi) }
-                    CampoDetalle { etiqueta: qsTr("Enviada"); valor: Etiquetas.fechaHora(pagina.detalle.enviadaEn) }
-                    CampoDetalle { etiqueta: qsTr("Ultima verificacion"); valor: Etiquetas.fechaHora(pagina.detalle.ultimaVerificacionEn) }
-                    CampoDetalle { etiqueta: qsTr("Ultimo error"); valor: pagina.detalle.ultimoError }
-                }
-            }
-
-            GroupBox {
-                objectName: "seccionPaquetes"
-                title: qsTr("Paquetes (%1)").arg(pagina.detalle.totalPaquetes)
-                Layout.fillWidth: true
-                Layout.leftMargin: 16
-                Layout.rightMargin: 16
-                Accessible.role: Accessible.Grouping
-                Accessible.name: title
-
-                ColumnLayout {
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    spacing: 8
-
-                    Label {
-                        objectName: "sinPaquetes"
-                        visible: pagina.detalle.totalPaquetes === 0
-                        text: qsTr("Sin paquetes registrados.")
-                        wrapMode: Text.WordWrap
-                        Layout.fillWidth: true
-                    }
-
-                    Repeater {
-                        model: pagina.detalle.paquetes
-
-                        delegate: RowLayout {
-                            id: paquete
-                            required property var modelData
-                            readonly property string textoEstado: Etiquetas.estadoDescarga(modelData.estadoDescarga)
-
+                        EstadoVacio {
+                            objectName: "sinPaquetes"
+                            visible: !pagina.hayPaquetes
+                            variante: "vacio"
+                            titulo: pagina.detalle.estadoResumen === "Terminada"
+                                    ? qsTr("Esta solicitud no tiene paquetes.")
+                                    : qsTr("El SAT aún no entrega paquetes.")
                             Layout.fillWidth: true
-                            spacing: 8
-                            Accessible.role: Accessible.ListItem
-                            readonly property string textoExistencia: Etiquetas.existenciaPaquete(modelData.existencia)
-                            Accessible.name: textoExistencia === ""
-                                             ? qsTr("Paquete %1, %2").arg(modelData.idPaqueteSat).arg(textoEstado)
-                                             : qsTr("Paquete %1, %2, %3").arg(modelData.idPaqueteSat).arg(textoEstado).arg(textoExistencia)
+                            Layout.topMargin: Theme.espacioXl
+                        }
 
-                            ColumnLayout {
+                        Repeater {
+                            model: pagina.detalle.paquetes
+                            delegate: FilaPaquete {
+                                id: paquete
+                                required property var modelData
                                 Layout.fillWidth: true
-                                spacing: 2
-                                Label {
-                                    text: paquete.modelData.idPaqueteSat
-                                    font.bold: true
-                                    wrapMode: Text.WrapAnywhere
-                                    Layout.fillWidth: true
-                                    Accessible.ignored: true
-                                }
-                                Label {
-                                    text: {
-                                        const d = paquete.modelData
-                                        let partes = [qsTr("Disponible %1").arg(Etiquetas.fechaHora(d.disponibleEn))]
-                                        if (d.descargadoEn !== null)
-                                            partes.push(qsTr("Descargado %1").arg(Etiquetas.fechaHora(d.descargadoEn)))
-                                        if (d.vencidoEn !== null)
-                                            partes.push(qsTr("Vencido %1").arg(Etiquetas.fechaHora(d.vencidoEn)))
-                                        if (d.codigoDescargaSat !== "")
-                                            partes.push(qsTr("Codigo SAT %1").arg(d.codigoDescargaSat))
-                                        return partes.join(" · ")
-                                    }
-                                    opacity: 0.75
-                                    wrapMode: Text.WordWrap
-                                    Layout.fillWidth: true
-                                    Accessible.ignored: true
-                                }
-                                // T009 D10: vencido, maximo de descargas o error.
-                                Label {
-                                    objectName: "mensajePaquete_" + paquete.modelData.idPaqueteSat
-                                    visible: text.length > 0
-                                    text: paquete.modelData.mensaje
-                                    wrapMode: Text.WordWrap
-                                    Layout.fillWidth: true
-                                    Accessible.role: Accessible.StaticText
-                                    Accessible.name: text
-                                }
-                                // T008 D11: existencia del ZIP local (solo Descargado).
-                                Label {
-                                    objectName: "existenciaPaquete_" + paquete.modelData.idPaqueteSat
-                                    visible: paquete.textoExistencia !== ""
-                                    text: paquete.textoExistencia
-                                    color: paquete.modelData.existencia === "Presente" ? palette.text : "#b00020"
-                                    wrapMode: Text.WordWrap
-                                    Layout.fillWidth: true
-                                    Accessible.role: Accessible.StaticText
-                                    Accessible.name: text
-                                }
-                            }
-                            // T009.1 D1: solo operable con el archivo local Presente.
-                            BotonAccion {
-                                objectName: "botonMostrarFinder_" + paquete.modelData.idPaqueteSat
-                                visible: paquete.modelData.estadoDescarga === "Descargado"
-                                enabled: paquete.modelData.puedeMostrarFinder === true
-                                text: qsTr("Mostrar en Finder")
-                                descripcion: qsTr("Mostrar el archivo del paquete %1 en Finder").arg(paquete.modelData.idPaqueteSat)
-                                Layout.alignment: Qt.AlignTop
-                                onClicked: pagina.detalle.mostrarEnFinder(paquete.modelData.idPaqueteSat)
-                            }
-                            EstadoBadge {
-                                clave: paquete.modelData.estadoDescarga
-                                texto: paquete.textoEstado
-                                contexto: qsTr("Estado de descarga")
-                                Layout.alignment: Qt.AlignTop
+                                idPaquete: modelData.idPaqueteSat
+                                estado: modelData.estadoDescarga
+                                metadatos: pagina.metadatosPaquete(modelData)
+                                mensaje: pagina.mensajePaquete(modelData)
+                                tonoMensaje: pagina.tonoPaquete(modelData)
+                                // T008 D11 / T009 D10: existencia del ZIP o mensaje del paquete.
+                                objectNameMensaje: modelData.estadoDescarga === "Descargado"
+                                                   ? "existenciaPaquete_" + modelData.idPaqueteSat
+                                                   : "mensajePaquete_" + modelData.idPaqueteSat
+                                // T009.1 D1: solo operable con el archivo local Presente.
+                                finderHabilitado: modelData.puedeMostrarFinder === true
+                                objectNameFinder: "botonMostrarFinder_" + modelData.idPaqueteSat
+                                onMostrarEnFinder: pagina.detalle.mostrarEnFinder(paquete.modelData.idPaqueteSat)
                             }
                         }
                     }
                 }
-            }
 
-            GroupBox {
-                objectName: "seccionHistorial"
-                title: qsTr("Historial (%1)").arg(pagina.detalle.logs.length)
-                Layout.fillWidth: true
-                Layout.leftMargin: 16
-                Layout.rightMargin: 16
-                Layout.bottomMargin: 16
-                Accessible.role: Accessible.Grouping
-                Accessible.name: title
+                // ---- Datos (D7: estado local y SAT solo aqui) ----
+                ScrollView {
+                    id: desplazamientoDatos
+                    objectName: "pestanaDatos"
+                    contentWidth: availableWidth
+                    clip: true
 
-                ColumnLayout {
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    spacing: 6
+                    ColumnLayout {
+                        width: desplazamientoDatos.availableWidth
+                        spacing: 0
 
-                    Label {
-                        visible: pagina.detalle.logs.length === 0
-                        text: qsTr("Sin eventos registrados.")
-                        Layout.fillWidth: true
-                    }
-
-                    Repeater {
-                        model: pagina.detalle.logs
-
-                        delegate: Label {
-                            id: evento
-                            required property var modelData
-                            required property int index
-                            objectName: "eventoLog_" + index
-
-                            readonly property string resumen: {
-                                const l = evento.modelData
-                                let partes = [Etiquetas.fechaHora(l.creadoEn), Etiquetas.eventoLog(l.tipoEvento)]
-                                const origen = Etiquetas.origenLog(l.origen)
-                                if (origen !== "")
-                                    partes.push(qsTr("origen %1").arg(origen))
-                                if (l.codigoSat !== "")
-                                    partes.push(qsTr("codigo SAT %1").arg(l.codigoSat))
-                                if (l.mensajeSat !== "")
-                                    partes.push(l.mensajeSat)
-                                return partes.join(" · ")
-                            }
-
-                            text: resumen
-                            textFormat: Text.PlainText
-                            wrapMode: Text.WordWrap
+                        component EncabezadoSeccion: Rectangle {
+                            id: seccion
+                            property string texto: ""
                             Layout.fillWidth: true
-                            Accessible.role: Accessible.ListItem
-                            Accessible.name: resumen
+                            implicitHeight: 28
+                            color: Theme.superficieSeccion
+                            Label {
+                                x: Theme.espacioL
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: seccion.texto
+                                color: Theme.textoSecundario
+                                font.family: Theme.familia
+                                font.pixelSize: Theme.etiqueta.size
+                                font.weight: Font.DemiBold
+                                Accessible.role: Accessible.Heading
+                                Accessible.name: text
+                            }
+                        }
+
+                        // Estado
+                        ColumnLayout {
+                            objectName: "seccionEstados"
+                            spacing: 0
+                            Layout.fillWidth: true
+                            Accessible.role: Accessible.Grouping
+                            Accessible.name: qsTr("Estado")
+
+                            EncabezadoSeccion { texto: qsTr("Estado") }
+                            Repeater {
+                                model: [
+                                    { nombre: "badgeEstadoResumen", etiqueta: qsTr("Resumen"), clave: pagina.detalle.estadoResumen,
+                                      texto: Etiquetas.estadoResumen(pagina.detalle.estadoResumen), contexto: qsTr("Estado resumido") },
+                                    { nombre: "badgeEstadoLocal", etiqueta: qsTr("Estado local"), clave: pagina.detalle.estadoLocal,
+                                      texto: Etiquetas.estadoLocal(pagina.detalle.estadoLocal), contexto: qsTr("Estado local") },
+                                    // "Error" del SAT es el alias ErrorSat (no el error de paquete).
+                                    { nombre: "badgeEstadoSat", etiqueta: qsTr("Estado SAT"),
+                                      clave: pagina.sinEstadoSat ? "" : (pagina.detalle.estadoSat === "Error" ? "ErrorSat" : pagina.detalle.estadoSat),
+                                      texto: Etiquetas.estadoSat(pagina.detalle.estadoSat), contexto: qsTr("Estado SAT") }
+                                ]
+                                delegate: Item {
+                                    id: filaEstado
+                                    required property var modelData
+                                    required property int index
+                                    Layout.fillWidth: true
+                                    implicitHeight: Math.max(Theme.altoBadge, etiquetaEstado.implicitHeight) + 14
+                                    Rectangle {
+                                        visible: filaEstado.index > 0
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        height: 1
+                                        color: Theme.separador
+                                    }
+                                    Label {
+                                        id: etiquetaEstado
+                                        x: Theme.espacioL
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: filaEstado.modelData.etiqueta
+                                        color: Theme.textoSecundario
+                                        font.family: Theme.familia
+                                        font.pixelSize: Theme.cuerpo.size
+                                        Accessible.ignored: true
+                                    }
+                                    EstadoBadge {
+                                        objectName: filaEstado.modelData.nombre
+                                        x: 200
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        clave: filaEstado.modelData.clave
+                                        texto: filaEstado.modelData.texto
+                                        contexto: filaEstado.modelData.contexto
+                                    }
+                                }
+                            }
+                            CampoDetalle { etiqueta: qsTr("Último error"); valor: pagina.detalle.ultimoError }
+                        }
+
+                        // SAT
+                        EncabezadoSeccion { texto: qsTr("SAT") }
+                        CampoDetalle { etiqueta: qsTr("Id solicitud SAT"); valor: pagina.detalle.idSolicitudSat; mono: true; primero: true }
+                        CampoDetalle {
+                            objectName: "campoCodigoSolicitud"
+                            etiqueta: qsTr("Código de solicitud SAT")
+                            valor: pagina.detalle.codEstatusSolicitud
+                                   + (pagina.detalle.mensajeSolicitudSat ? " · " + pagina.detalle.mensajeSolicitudSat : "")
+                        }
+                        CampoDetalle {
+                            etiqueta: qsTr("Código de verificación SAT")
+                            valor: pagina.detalle.codigoEstadoSolicitud
+                                   + (pagina.detalle.mensajeVerificacionSat ? " · " + pagina.detalle.mensajeVerificacionSat : "")
+                        }
+                        CampoDetalle { etiqueta: qsTr("CFDI reportados"); valor: pagina.textoOpcional(pagina.detalle.numeroCfdi) }
+                        CampoDetalle { etiqueta: qsTr("Enviada"); valor: pagina.fechaHora(pagina.detalle.enviadaEn) }
+                        CampoDetalle { etiqueta: qsTr("Última verificación"); valor: pagina.fechaHora(pagina.detalle.ultimaVerificacionEn) }
+
+                        // Solicitud
+                        ColumnLayout {
+                            objectName: "seccionMetadata"
+                            spacing: 0
+                            Layout.fillWidth: true
+                            Accessible.role: Accessible.Grouping
+                            Accessible.name: qsTr("Solicitud")
+
+                            EncabezadoSeccion { texto: qsTr("Solicitud") }
+                            CampoDetalle { etiqueta: qsTr("Identificador local"); valor: pagina.detalle.solicitudId; mono: true; primero: true }
+                            CampoDetalle { objectName: "campoPerfilRfc"; etiqueta: qsTr("Perfil"); valor: pagina.detalle.perfilRfc }
+                            CampoDetalle { etiqueta: qsTr("Tipo de descarga"); valor: Etiquetas.tipoDescarga(pagina.detalle.tipoDescarga) }
+                            CampoDetalle { etiqueta: qsTr("Creada"); valor: pagina.fechaHora(pagina.detalle.creadaEn) }
+                        }
+
+                        // Filtros
+                        ColumnLayout {
+                            objectName: "seccionFiltros"
+                            spacing: 0
+                            Layout.fillWidth: true
+                            Accessible.role: Accessible.Grouping
+                            Accessible.name: qsTr("Filtros")
+
+                            EncabezadoSeccion { texto: qsTr("Filtros") }
+                            CampoDetalle { etiqueta: qsTr("Periodo"); valor: pagina.textoPeriodo; primero: true }
+                            CampoDetalle {
+                                objectName: "campoContrapartes"
+                                etiqueta: qsTr("RFC contraparte")
+                                valor: pagina.detalle.rfcContrapartes.length > 0
+                                       ? pagina.detalle.rfcContrapartes.join(", ")
+                                       : pagina.detalle.rfcContraparte
+                            }
+                            CampoDetalle {
+                                objectName: "campoTipoComprobante"
+                                etiqueta: qsTr("Tipo de comprobante")
+                                valor: Etiquetas.tipoComprobante(pagina.detalle.tipoComprobante)
+                            }
+                            CampoDetalle { etiqueta: qsTr("Complemento"); valor: pagina.detalle.complemento }
+                        }
+                    }
+                }
+
+                // ---- Historial ----
+                ScrollView {
+                    id: desplazamientoHistorial
+                    objectName: "seccionHistorial"
+                    contentWidth: availableWidth
+                    clip: true
+                    Accessible.role: Accessible.Grouping
+                    Accessible.name: qsTr("Historial (%1)").arg(pagina.detalle.logs.length)
+
+                    ColumnLayout {
+                        width: desplazamientoHistorial.availableWidth
+                        spacing: 0
+
+                        Label {
+                            visible: pagina.detalle.logs.length === 0
+                            text: qsTr("Sin eventos registrados.")
+                            color: Theme.textoSecundario
+                            padding: Theme.espacioL
+                            Layout.fillWidth: true
+                        }
+                        Repeater {
+                            model: pagina.detalle.logs
+                            delegate: EventoHistorial {
+                                id: evento
+                                required property var modelData
+                                required property int index
+                                objectName: "eventoLog_" + index
+                                Layout.fillWidth: true
+                                fechaHora: modelData.creadoEn
+                                origen: modelData.origen
+                                descripcion: {
+                                    const l = evento.modelData
+                                    let partes = [Etiquetas.eventoLog(l.tipoEvento)]
+                                    if (l.codigoSat !== "")
+                                        partes.push(qsTr("código SAT %1").arg(l.codigoSat))
+                                    if (l.mensajeSat !== "")
+                                        partes.push(l.mensajeSat)
+                                    return partes.join(" · ")
+                                }
+                            }
                         }
                     }
                 }

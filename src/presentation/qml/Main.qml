@@ -1,7 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls.Basic
 
 // Ventana principal del shell. Los view models se inyectan desde C++
 // (composition root o pruebas) con setInitialProperties; no hay context
@@ -27,6 +27,26 @@ ApplicationWindow {
     minimumHeight: 420
     visible: false
     title: qsTr("SAT CFDI Downloader")
+
+    // T013: fondo y paleta de los controles Basic desde Theme (claro/oscuro);
+    // los componentes propios usan Theme directamente.
+    color: Theme.fondo
+    palette.window: Theme.fondo
+    palette.windowText: Theme.texto
+    palette.base: Theme.controlFondo
+    palette.alternateBase: Theme.superficieSeccion
+    palette.text: Theme.texto
+    palette.button: Theme.controlSecundario
+    palette.buttonText: Theme.texto
+    palette.highlight: Theme.acento
+    palette.highlightedText: Theme.textoSobreAcento
+    palette.placeholderText: Theme.textoSecundario
+    palette.toolTipBase: Theme.superficieElevada
+    palette.toolTipText: Theme.texto
+    palette.mid: Theme.borde
+    palette.dark: Theme.borde
+    palette.light: Theme.superficie
+    palette.midlight: Theme.separador
 
     // La pagina se cambia de forma diferida (Qt.callLater) para no destruir la
     // pagina actual dentro de su propio manejador de clic o tecla.

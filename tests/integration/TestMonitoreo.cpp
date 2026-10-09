@@ -337,8 +337,12 @@ void TestMonitoreo::credencialNoListaNotificaSinEfectosConPermisoDenegado()
     g.root->worker().enviar(*id);
     QTRY_VERIFY(g.sat.llamadas().contains(QStringLiteral("enviar:") + id->texto()));
     QTRY_COMPARE(g.sat.activas(), 0);
-    const auto antes = esperar(g.root->solicitudes().obtener(*id));
-    QVERIFY(antes && antes->esExito());
+    // activas()==0 solo indica que el puerto respondio; el ejecutor persiste
+    // despues (estado + log en una transaccion). Esperar el estado persistido.
+    std::optional<SolicitudesService::ResultadoDetalle> antes;
+    QTRY_VERIFY_WITH_TIMEOUT((antes = esperar(g.root->solicitudes().obtener(*id)), antes && antes->esExito()
+                                  && antes->valor().resumen.estadoLocal == EstadoLocal::Enviada),
+                             5000);
 
     QSignalSpy resultados(&g.os, &OSIntegration::notificacionTerminada);
     g.sat.fijarCredencial(perfil, EstadoCredencial::Vencida);

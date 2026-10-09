@@ -20,7 +20,7 @@ const QString kCampoNombre = QStringLiteral("nombre");
 QString textoValidacion(CodigoValidacionPerfil codigo)
 {
     return codigo == CodigoValidacionPerfil::RfcInvalido
-               ? QObject::tr("El RFC no es valido.")
+               ? QObject::tr("El RFC no es válido.")
                : QObject::tr("Indica un nombre para el perfil.");
 }
 
@@ -134,6 +134,15 @@ bool PerfilesSatViewModel::seleccionListo() const
 {
     const auto s = seleccion();
     return s && s->listoParaSolicitudes;
+}
+
+QString PerfilesSatViewModel::seleccionVigenteHasta() const
+{
+    const auto s = seleccion();
+    if (!s || !s->vigenteHasta) {
+        return {};
+    }
+    return s->vigenteHasta->toLocalTime().date().toString(QStringLiteral("yyyy-MM-dd"));
 }
 
 bool PerfilesSatViewModel::tieneCredencial() const

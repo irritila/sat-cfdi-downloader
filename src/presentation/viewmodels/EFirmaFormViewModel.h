@@ -33,6 +33,16 @@ struct ErrorCredencialSat;
 // adaptador ("certificado" | "llave" | "contrasena" | ""). En reemplazo
 // fallido el mensaje aclara que la e.firma anterior sigue registrada.
 //
+// Habilitacion: puedeEnviar exige certificado, llave y contrasena. QML solo
+// informa SI hay contrasena (claveEscrita, un bool), nunca su texto; la
+// validacion de enviar() (ContrasenaRequerida...) se conserva como defensa.
+// `faltante` explica que falta para enviar.
+//
+// Reintento: si la operacion falla en el servicio, las rutas ya se entregaron
+// (no se retienen) y tambien se descartan los basenames: los campos vuelven a
+// "Ningun archivo" y requiereNuevaSeleccion pide elegir de nuevo. El error
+// especifico se conserva.
+//
 // Generacion por operacion/perfil: iniciar() con otro perfil, cancelar() o un
 // envio nuevo invalidan respuestas tardias. operacionTerminada(perfilId,
 // exito) permite reverificar el estado real del perfil (tambien tras fallo).
@@ -47,7 +57,10 @@ class EFirmaFormViewModel : public QObject {
     Q_PROPERTY(bool esReemplazo READ esReemplazo NOTIFY cambio)
     Q_PROPERTY(QString nombreCertificado READ nombreCertificado NOTIFY cambio)
     Q_PROPERTY(QString nombreLlave READ nombreLlave NOTIFY cambio)
+    Q_PROPERTY(bool claveEscrita READ claveEscrita WRITE setClaveEscrita NOTIFY cambio)
     Q_PROPERTY(bool puedeEnviar READ puedeEnviar NOTIFY cambio)
+    Q_PROPERTY(QString faltante READ faltante NOTIFY cambio)
+    Q_PROPERTY(bool requiereNuevaSeleccion READ requiereNuevaSeleccion NOTIFY cambio)
     Q_PROPERTY(QString errorKey READ errorKey NOTIFY cambio)
     Q_PROPERTY(QString errorMessage READ errorMessage NOTIFY cambio)
     Q_PROPERTY(QString campoConError READ campoConError NOTIFY cambio)
@@ -70,7 +83,12 @@ public:
     bool esReemplazo() const { return m_esReemplazo; }
     QString nombreCertificado() const { return m_nombreCertificado; }
     QString nombreLlave() const { return m_nombreLlave; }
+    bool claveEscrita() const { return m_claveEscrita; }
+    void setClaveEscrita(bool valor);
     bool puedeEnviar() const;
+    // Que falta para enviar (vacio si nada falta o no aplica).
+    QString faltante() const;
+    bool requiereNuevaSeleccion() const { return m_requiereNuevaSeleccion; }
     QString errorKey() const { return m_errorKey; }
     QString errorMessage() const { return m_errorMessage; }
     QString campoConError() const { return m_campoConError; }
@@ -116,6 +134,8 @@ private:
     QString m_errorKey;
     QString m_errorMessage;
     QString m_campoConError;
+    bool m_claveEscrita = false;
+    bool m_requiereNuevaSeleccion = false;
 
     // Rutas completas: privadas, nunca expuestas.
     QString m_rutaCertificado;

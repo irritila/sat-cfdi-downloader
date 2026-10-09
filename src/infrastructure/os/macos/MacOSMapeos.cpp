@@ -1,6 +1,17 @@
 #include "infrastructure/os/macos/MacOSMapeos.h"
 
+#include <QCoreApplication>
+
 namespace satcfdi::macos {
+
+namespace {
+// Textos visibles del menu bar (T013 D6): UTF-8 con ortografia completa y
+// traducibles en el contexto "MenuBar".
+QString tr(const char* texto)
+{
+    return QCoreApplication::translate("MenuBar", texto);
+}
+} // namespace
 
 using LoginItemStatus = OSIntegration::LoginItemStatus;
 using NotificationStatus = OSIntegration::NotificationStatus;
@@ -89,37 +100,37 @@ QString textoEstadoLoginItem(LoginItemStatus estado)
 {
     switch (estado) {
     case LoginItemStatus::Disabled:
-        return QStringLiteral("Estado en macOS: deshabilitado");
+        return tr("Estado en macOS: deshabilitado");
     case LoginItemStatus::Enabled:
-        return QStringLiteral("Estado en macOS: habilitado");
+        return tr("Estado en macOS: habilitado");
     case LoginItemStatus::RequiresApproval:
-        return QStringLiteral("Estado en macOS: pendiente de aprobacion");
+        return tr("Estado en macOS: pendiente de aprobación");
     case LoginItemStatus::Rejected:
-        return QStringLiteral("Estado en macOS: rechazado");
+        return tr("Estado en macOS: rechazado");
     case LoginItemStatus::Unavailable:
-        return QStringLiteral("Estado en macOS: no disponible");
+        return tr("Estado en macOS: no disponible");
     }
-    return QStringLiteral("Estado en macOS: no disponible");
+    return tr("Estado en macOS: no disponible");
 }
 
 QString textoEstadoNotificaciones(NotificationStatus estado)
 {
     switch (estado) {
     case NotificationStatus::NotDetermined:
-        return QStringLiteral("Notificaciones: sin permiso solicitado");
+        return tr("Notificaciones: sin permiso solicitado");
     case NotificationStatus::Granted:
-        return QStringLiteral("Notificaciones: permitidas");
+        return tr("Notificaciones: permitidas");
     case NotificationStatus::Denied:
-        return QStringLiteral("Notificaciones: deshabilitadas");
+        return tr("Notificaciones: deshabilitadas");
     case NotificationStatus::Unavailable:
-        return QStringLiteral("Notificaciones: no disponibles");
+        return tr("Notificaciones: no disponibles");
     }
-    return QStringLiteral("Notificaciones: no disponibles");
+    return tr("Notificaciones: no disponibles");
 }
 
 QString textoAccionMonitoreo(bool pausado)
 {
-    return pausado ? QStringLiteral("Reanudar monitoreo") : QStringLiteral("Pausar monitoreo");
+    return pausado ? tr("Reanudar monitoreo") : tr("Pausar monitoreo");
 }
 
 QString textoEstadoMonitoreo(const OSIntegration::EstadoMonitoreo& estado)
@@ -128,33 +139,33 @@ QString textoEstadoMonitoreo(const OSIntegration::EstadoMonitoreo& estado)
     using Actividad = OSIntegration::EstadoMonitoreo::Actividad;
     switch (estado.fase) {
     case Fase::Pausado:
-        return QStringLiteral("Monitoreo pausado");
+        return tr("Monitoreo en pausa");
     case Fase::ActivoEnEspera:
-        return QStringLiteral("Monitoreo activo");
+        return tr("Monitoreo activo");
     case Fase::Ejecutando:
         switch (estado.actividad) {
         case Actividad::Enviando:
-            return QStringLiteral("Trabajando: enviando...");
+            return tr("Trabajando: enviando…");
         case Actividad::Verificando:
-            return QStringLiteral("Trabajando: verificando...");
+            return tr("Trabajando: verificando…");
         case Actividad::Descargando:
-            return QStringLiteral("Trabajando: descargando...");
+            return tr("Trabajando: descargando…");
         case Actividad::Ninguna:
         case Actividad::Otra:
             break;
         }
-        return QStringLiteral("Trabajando...");
+        return tr("Trabajando…");
     case Fase::Deteniendo:
-        return QStringLiteral("Deteniendo monitoreo...");
+        return tr("Deteniendo monitoreo…");
     case Fase::Detenido:
         break;
     }
-    return QStringLiteral("Monitoreo detenido");
+    return tr("Monitoreo detenido");
 }
 
 QString textoPendientes(int pendientes)
 {
-    return pendientes > 0 ? QStringLiteral("Pendientes: %1").arg(pendientes) : QString();
+    return pendientes > 0 ? tr("Pendientes: %1").arg(pendientes) : QString();
 }
 
 } // namespace satcfdi::macos

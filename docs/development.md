@@ -461,12 +461,18 @@ Finder, menu bar, notificacion) se alimentan de `menubar::entradas` y de
 
 ```bash
 cmake -S . -B build -G Ninja -DSATCFDI_BUILD_MANUAL_CAPTURAS=ON
-cmake --build build --target manual_capturas      # regenera las 12 imagenes
+cmake --build build --target manual_capturas      # regenera las 12 imagenes (claro)
+cmake --build build --target manual_capturas_oscuro  # evidencia en oscuro: build/capturas-oscuro
 # Una sola imagen o a otro directorio:
 QT_QPA_PLATFORM=cocoa ./build/tools/capturas-manual/satcfdi_manual_capturas \
     --salida docs/manual/img --solo 08-detalle-terminada.png
 ```
 
+- `--tema claro|oscuro` (claro por omision). En oscuro fija `Theme.oscuro = true`
+  antes de cargar la app (T013 D9); las ilustraciones (selector de archivos,
+  Finder, menu bar, notificacion) imitan la interfaz de macOS y quedan en claro.
+  Las capturas en oscuro son evidencia de revision: no se versionan y el manual
+  sigue en claro.
 - Requiere una sesion grafica de macOS: abre ventanas cocoa breves. No forma
   parte de `ctest` y no usa `screencapture`.
 - Guarda PNG sin perdida con compresion zlib maxima. Imprime

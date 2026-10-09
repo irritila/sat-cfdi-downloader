@@ -66,6 +66,11 @@ class NuevaSolicitudViewModel : public QObject {
     Q_PROPERTY(bool canSubmit READ canSubmit NOTIFY canSubmitChanged)
     Q_PROPERTY(bool ocupado READ ocupado NOTIFY ocupadoChanged)
     Q_PROPERTY(QString errorMessage READ errorMessage NOTIFY errorMessageChanged)
+    // T013 (UX-18): campo al que pertenece errorMessage, para mostrarlo bajo
+    // el control y enfocarlo: "perfil", "fechaInicial", "fechaFinal",
+    // "rfcContraparte", "tipoComprobante", "complemento" o "" (error general:
+    // bloqueo por duplicado, persistencia, carga de perfiles).
+    Q_PROPERTY(QString campoConError READ campoConError NOTIFY errorMessageChanged)
 
     Q_PROPERTY(bool confirmacionPendiente READ confirmacionPendiente NOTIFY estadoChanged)
     Q_PROPERTY(QString motivoDuplicado READ motivoDuplicado NOTIFY estadoChanged)
@@ -94,6 +99,7 @@ public:
     bool canSubmit() const;
     bool ocupado() const { return m_ocupado; }
     QString errorMessage() const;
+    QString campoConError() const;
 
     bool confirmacionPendiente() const { return m_snapshot.has_value(); }
     QString motivoDuplicado() const { return m_motivoDuplicado; }
@@ -142,6 +148,7 @@ private:
         bool pendiente;
         QString motivo;
         QString existente;
+        QString campo;
         bool operator==(const Observables&) const = default;
     };
     Observables observables() const;
@@ -157,6 +164,8 @@ private:
     // Valores iniciales del formulario sin cargar perfiles.
     void restablecerCampos();
     QString validar() const;
+    // Campo de la primera regla de validar() que falla ("" si ninguna).
+    QString campoDeValidacion() const;
     NuevaSolicitudRequest construirRequest() const;
     void crearConfirmacion(const NuevaSolicitudRequest& request, ConfirmacionDuplicado confirmacion);
     // Aplica un ErrorCrear al estado visible (incluye RequiereConfirmacion).
@@ -181,6 +190,7 @@ private:
     bool m_perfilesCargados = false;
     QString m_errorValidacion;
     QString m_errorServicio;
+    QString m_campoServicio; // campo de m_errorServicio
 
     std::optional<NuevaSolicitudRequest> m_snapshot; // confirmacion pendiente
     QString m_motivoDuplicado;

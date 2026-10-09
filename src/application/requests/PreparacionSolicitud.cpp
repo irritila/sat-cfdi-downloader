@@ -17,7 +17,7 @@ prepararSolicitud(const NuevaSolicitudRequest& request,
         validaciones.append({C::PerfilRequerido, QStringLiteral("Selecciona un perfil SAT.")});
     } else if (!rfcPerfilActivo) {
         validaciones.append({C::PerfilInexistente,
-                             QStringLiteral("El perfil SAT seleccionado no existe o no esta activo.")});
+                             QStringLiteral("El perfil SAT seleccionado no existe o no está activo.")});
     }
 
     EntradaSolicitudCanonica entrada;

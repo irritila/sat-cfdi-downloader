@@ -564,18 +564,44 @@ menubar::EstadoMenu MacOSIntegration::estadoMenu() const
     return e;
 }
 
+namespace {
+
+// UX-38: icono de las lineas informativas. Los SVG viven en el modulo QML de
+// presentacion (qrc:/qt/qml/SatCfdiDownloader/assets/icons/, enlazado en la
+// app); los carga el iconengine SVG de Qt. setIsMask -> Qt cocoa marca el
+// NSImage como plantilla (setTemplate:), asi macOS lo tine segun el tema y el
+// estado deshabilitado. Si el recurso o el plugin faltan, el QIcon queda sin
+// representaciones y el NSMenuItem simplemente no muestra imagen.
+QIcon iconoPlantilla(const QString& nombre)
+{
+    if (nombre.isEmpty()) {
+        return {};
+    }
+    static QHash<QString, QIcon> cache;
+    auto it = cache.find(nombre);
+    if (it == cache.end()) {
+        QIcon icono(QStringLiteral(":/qt/qml/SatCfdiDownloader/assets/icons/%1.svg").arg(nombre));
+        icono.setIsMask(true);
+        it = cache.insert(nombre, icono);
+    }
+    return *it;
+}
+
+} // namespace
+
 void MacOSIntegration::actualizarMenu()
 {
     if (!d->menu) {
         return;
     }
-    // T012 D6: textos, visibilidad, habilitacion y marca de MenuBarDefinicion.
+    // T012 D6: textos, icono, visibilidad, habilitacion y marca de MenuBarDefinicion.
     for (const menubar::Entrada& e : menubar::entradas(estadoMenu())) {
         QAction* accion = d->acciones.value(static_cast<int>(e.id));
         if (accion == nullptr) {
             continue;
         }
         accion->setText(e.texto);
+        accion->setIcon(iconoPlantilla(e.icono));
         accion->setEnabled(e.habilitada);
         accion->setVisible(e.visible);
         if (e.marcable) {

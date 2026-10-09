@@ -1,0 +1,667 @@
+{
+ "v": 3,
+ "layout": "files",
+ "createdOnFiles": {
+  "v": 1,
+  "at": "2026-10-09T15:30:41Z"
+ },
+ "title": "SAT CFDI Downloader",
+ "namespace": "SatCfdi",
+ "libraries": [],
+ "sections": {},
+ "groups": [
+  "Mockups",
+  "Iconos"
+ ],
+ "assetGroups": {
+  "Mockups": {
+   "name": "Mockups",
+   "tile": "l",
+   "order": [
+    "01-solicitudes-con-datos-dark.png",
+    "01-solicitudes-con-datos-light.png",
+    "02-solicitudes-vacia-dark.png",
+    "02-solicitudes-vacia-light.png",
+    "03-solicitudes-error-dark.png",
+    "03-solicitudes-error-light.png",
+    "04-solicitudes-sin-notificaciones-dark.png",
+    "04-solicitudes-sin-notificaciones-light.png",
+    "05-nueva-solicitud-formulario-dark.png",
+    "05-nueva-solicitud-formulario-light.png",
+    "06-nueva-solicitud-error-validacion-dark.png",
+    "06-nueva-solicitud-error-validacion-light.png",
+    "07-nueva-solicitud-bloqueada-dark.png",
+    "07-nueva-solicitud-bloqueada-light.png",
+    "08-nueva-solicitud-duplicado-dark.png",
+    "08-nueva-solicitud-duplicado-light.png",
+    "09-nueva-solicitud-sin-perfiles-dark.png",
+    "09-nueva-solicitud-sin-perfiles-light.png",
+    "10-detalle-terminada-dark.png",
+    "10-detalle-terminada-light.png",
+    "11-detalle-error-paquete-dark.png",
+    "11-detalle-error-paquete-light.png",
+    "12-detalle-creada-sin-efirma-dark.png",
+    "12-detalle-creada-sin-efirma-light.png",
+    "13-detalle-en-proceso-dark.png",
+    "13-detalle-en-proceso-light.png",
+    "14-detalle-eliminar-dark.png",
+    "14-detalle-eliminar-light.png",
+    "15-perfiles-con-datos-dark.png",
+    "15-perfiles-con-datos-light.png",
+    "16-perfiles-sin-efirma-dark.png",
+    "16-perfiles-sin-efirma-light.png",
+    "17-efirma-formulario-dark.png",
+    "17-efirma-formulario-light.png",
+    "18-efirma-validando-dark.png",
+    "18-efirma-validando-light.png",
+    "19-efirma-error-dark.png",
+    "19-efirma-error-light.png",
+    "20-efirma-exito-dark.png",
+    "20-efirma-exito-light.png",
+    "21-menubar-activo-dark.png",
+    "21-menubar-activo-light.png",
+    "22-menubar-pausado-dark.png",
+    "22-menubar-pausado-light.png",
+    "23-notificaciones-varias-dark.png",
+    "23-notificaciones-varias-light.png"
+   ],
+   "files": {
+    "01-solicitudes-con-datos-dark.png": {
+     "name": "01-solicitudes-con-datos-dark.png",
+     "blob": "a55755798dfb578f8db4ba1841cab782",
+     "size": 217898,
+     "type": "image/png"
+    },
+    "01-solicitudes-con-datos-light.png": {
+     "name": "01-solicitudes-con-datos-light.png",
+     "blob": "ce5da7985271e85e810c1d462b5f7866",
+     "size": 215103,
+     "type": "image/png"
+    },
+    "02-solicitudes-vacia-dark.png": {
+     "name": "02-solicitudes-vacia-dark.png",
+     "blob": "4dd89701d1292400d6f39ea0d9e72695",
+     "size": 60915,
+     "type": "image/png"
+    },
+    "02-solicitudes-vacia-light.png": {
+     "name": "02-solicitudes-vacia-light.png",
+     "blob": "6f22ee337d2d4796d2bad85c2cf7a7cc",
+     "size": 60881,
+     "type": "image/png"
+    },
+    "03-solicitudes-error-dark.png": {
+     "name": "03-solicitudes-error-dark.png",
+     "blob": "140ae2d7d32a3f2088fbc36967c383ed",
+     "size": 64499,
+     "type": "image/png"
+    },
+    "03-solicitudes-error-light.png": {
+     "name": "03-solicitudes-error-light.png",
+     "blob": "ba01c47171ae75b8f9edb6d4f86b3066",
+     "size": 64113,
+     "type": "image/png"
+    },
+    "04-solicitudes-sin-notificaciones-dark.png": {
+     "name": "04-solicitudes-sin-notificaciones-dark.png",
+     "blob": "05af2a5092afefd29715bb3e3a9d66ea",
+     "size": 191132,
+     "type": "image/png"
+    },
+    "04-solicitudes-sin-notificaciones-light.png": {
+     "name": "04-solicitudes-sin-notificaciones-light.png",
+     "blob": "81379f2d21094ee9828d304add2bf3d3",
+     "size": 189226,
+     "type": "image/png"
+    },
+    "05-nueva-solicitud-formulario-dark.png": {
+     "name": "05-nueva-solicitud-formulario-dark.png",
+     "blob": "abc00c152fffe0f48ae480e0bb025173",
+     "size": 125375,
+     "type": "image/png"
+    },
+    "05-nueva-solicitud-formulario-light.png": {
+     "name": "05-nueva-solicitud-formulario-light.png",
+     "blob": "1a84fd622f2d778cb1468e2b5f653607",
+     "size": 122912,
+     "type": "image/png"
+    },
+    "06-nueva-solicitud-error-validacion-dark.png": {
+     "name": "06-nueva-solicitud-error-validacion-dark.png",
+     "blob": "d7595ec491cace4ee44c28162ad7e4ca",
+     "size": 135254,
+     "type": "image/png"
+    },
+    "06-nueva-solicitud-error-validacion-light.png": {
+     "name": "06-nueva-solicitud-error-validacion-light.png",
+     "blob": "8b5aa495521a60398fc05c61d01d7b75",
+     "size": 132899,
+     "type": "image/png"
+    },
+    "07-nueva-solicitud-bloqueada-dark.png": {
+     "name": "07-nueva-solicitud-bloqueada-dark.png",
+     "blob": "9cd0a31f07ceaf8e84a9dd296b865aef",
+     "size": 149629,
+     "type": "image/png"
+    },
+    "07-nueva-solicitud-bloqueada-light.png": {
+     "name": "07-nueva-solicitud-bloqueada-light.png",
+     "blob": "44997bbae364d8a1f77b44b4e8b51ff7",
+     "size": 146849,
+     "type": "image/png"
+    },
+    "08-nueva-solicitud-duplicado-dark.png": {
+     "name": "08-nueva-solicitud-duplicado-dark.png",
+     "blob": "fc981a776ce3f7a3673375221dc7ebae",
+     "size": 123273,
+     "type": "image/png"
+    },
+    "08-nueva-solicitud-duplicado-light.png": {
+     "name": "08-nueva-solicitud-duplicado-light.png",
+     "blob": "904e6d4288e0f224e9a774c9df179b25",
+     "size": 128375,
+     "type": "image/png"
+    },
+    "09-nueva-solicitud-sin-perfiles-dark.png": {
+     "name": "09-nueva-solicitud-sin-perfiles-dark.png",
+     "blob": "09b55668e0ac077a1220d3d81e254917",
+     "size": 54934,
+     "type": "image/png"
+    },
+    "09-nueva-solicitud-sin-perfiles-light.png": {
+     "name": "09-nueva-solicitud-sin-perfiles-light.png",
+     "blob": "506637430e73ec4f34782b6d703a228f",
+     "size": 54600,
+     "type": "image/png"
+    },
+    "10-detalle-terminada-dark.png": {
+     "name": "10-detalle-terminada-dark.png",
+     "blob": "b440847ad997b051f439a234740a8d93",
+     "size": 206499,
+     "type": "image/png"
+    },
+    "10-detalle-terminada-light.png": {
+     "name": "10-detalle-terminada-light.png",
+     "blob": "9c4e3d92ad23ccc5f919ed25c65fe5d0",
+     "size": 204932,
+     "type": "image/png"
+    },
+    "11-detalle-error-paquete-dark.png": {
+     "name": "11-detalle-error-paquete-dark.png",
+     "blob": "7a9b72d0ef729c20a76ffcedcc37a7dd",
+     "size": 189899,
+     "type": "image/png"
+    },
+    "11-detalle-error-paquete-light.png": {
+     "name": "11-detalle-error-paquete-light.png",
+     "blob": "e74cff454ef9f47ce18178dfccdf8e9e",
+     "size": 188204,
+     "type": "image/png"
+    },
+    "12-detalle-creada-sin-efirma-dark.png": {
+     "name": "12-detalle-creada-sin-efirma-dark.png",
+     "blob": "c4ecd965efa34b4a45a8cae2103f063b",
+     "size": 145301,
+     "type": "image/png"
+    },
+    "12-detalle-creada-sin-efirma-light.png": {
+     "name": "12-detalle-creada-sin-efirma-light.png",
+     "blob": "0a83742d017a1b2327e73df307e59582",
+     "size": 144845,
+     "type": "image/png"
+    },
+    "13-detalle-en-proceso-dark.png": {
+     "name": "13-detalle-en-proceso-dark.png",
+     "blob": "d4163081455d31b1c958044431343715",
+     "size": 130904,
+     "type": "image/png"
+    },
+    "13-detalle-en-proceso-light.png": {
+     "name": "13-detalle-en-proceso-light.png",
+     "blob": "0366337ed2b2e78b04c2ff812ab11cb5",
+     "size": 130344,
+     "type": "image/png"
+    },
+    "14-detalle-eliminar-dark.png": {
+     "name": "14-detalle-eliminar-dark.png",
+     "blob": "307dff93d884256b677945bc3a20517b",
+     "size": 204077,
+     "type": "image/png"
+    },
+    "14-detalle-eliminar-light.png": {
+     "name": "14-detalle-eliminar-light.png",
+     "blob": "1977d9db0a28081ec102df8be68766b7",
+     "size": 219042,
+     "type": "image/png"
+    },
+    "15-perfiles-con-datos-dark.png": {
+     "name": "15-perfiles-con-datos-dark.png",
+     "blob": "32831b327b45eba0198a681f63b8ffa9",
+     "size": 135665,
+     "type": "image/png"
+    },
+    "15-perfiles-con-datos-light.png": {
+     "name": "15-perfiles-con-datos-light.png",
+     "blob": "443c32f2bfb3e8218b171bd937788fb8",
+     "size": 133291,
+     "type": "image/png"
+    },
+    "16-perfiles-sin-efirma-dark.png": {
+     "name": "16-perfiles-sin-efirma-dark.png",
+     "blob": "c2604c930a8866c145bfea9a84619bcd",
+     "size": 133115,
+     "type": "image/png"
+    },
+    "16-perfiles-sin-efirma-light.png": {
+     "name": "16-perfiles-sin-efirma-light.png",
+     "blob": "35d6b7be2f6a25ada8057831467da889",
+     "size": 131505,
+     "type": "image/png"
+    },
+    "17-efirma-formulario-dark.png": {
+     "name": "17-efirma-formulario-dark.png",
+     "blob": "ec21fdc40bbbc6b09d4e2734f51df6fe",
+     "size": 152600,
+     "type": "image/png"
+    },
+    "17-efirma-formulario-light.png": {
+     "name": "17-efirma-formulario-light.png",
+     "blob": "6f13b532c2313208043a5436368499e8",
+     "size": 158750,
+     "type": "image/png"
+    },
+    "18-efirma-validando-dark.png": {
+     "name": "18-efirma-validando-dark.png",
+     "blob": "4cbe7805b2c276eaa0fda1d2f1056717",
+     "size": 155029,
+     "type": "image/png"
+    },
+    "18-efirma-validando-light.png": {
+     "name": "18-efirma-validando-light.png",
+     "blob": "ada1b2b09a5f0c7237399ec52f6b329c",
+     "size": 161701,
+     "type": "image/png"
+    },
+    "19-efirma-error-dark.png": {
+     "name": "19-efirma-error-dark.png",
+     "blob": "a3d7299269a78eb0a12b4fc2fa05e808",
+     "size": 156214,
+     "type": "image/png"
+    },
+    "19-efirma-error-light.png": {
+     "name": "19-efirma-error-light.png",
+     "blob": "34d2f13614d29de42df4fa6ba6237d43",
+     "size": 162232,
+     "type": "image/png"
+    },
+    "20-efirma-exito-dark.png": {
+     "name": "20-efirma-exito-dark.png",
+     "blob": "f00b30431655f7b0c8855774fcb2f5c8",
+     "size": 149457,
+     "type": "image/png"
+    },
+    "20-efirma-exito-light.png": {
+     "name": "20-efirma-exito-light.png",
+     "blob": "61297d7ae6fc7638c38d248be2ff2409",
+     "size": 156838,
+     "type": "image/png"
+    },
+    "21-menubar-activo-dark.png": {
+     "name": "21-menubar-activo-dark.png",
+     "blob": "c8d0c006a0167328c904064cc50035d4",
+     "size": 89253,
+     "type": "image/png"
+    },
+    "21-menubar-activo-light.png": {
+     "name": "21-menubar-activo-light.png",
+     "blob": "f80e6e6d27e0ab90fdb3682fd4d7c60b",
+     "size": 89358,
+     "type": "image/png"
+    },
+    "22-menubar-pausado-dark.png": {
+     "name": "22-menubar-pausado-dark.png",
+     "blob": "008f14f9a86d443dfdffd09753dab8ee",
+     "size": 90006,
+     "type": "image/png"
+    },
+    "22-menubar-pausado-light.png": {
+     "name": "22-menubar-pausado-light.png",
+     "blob": "32d5c1a5fb9da3aaf07fed74a9231487",
+     "size": 90128,
+     "type": "image/png"
+    },
+    "23-notificaciones-varias-dark.png": {
+     "name": "23-notificaciones-varias-dark.png",
+     "blob": "f720ee8e532d8f7f8052f7b10c2ac410",
+     "size": 150634,
+     "type": "image/png"
+    },
+    "23-notificaciones-varias-light.png": {
+     "name": "23-notificaciones-varias-light.png",
+     "blob": "3ed51c6a279975ac8abc2c48bffa6fbc",
+     "size": 153504,
+     "type": "image/png"
+    }
+   }
+  },
+  "Iconos": {
+   "name": "Iconos",
+   "tile": "xs",
+   "order": [
+    "arrow-clockwise.svg",
+    "arrow-down-circle-dotted.svg",
+    "arrow-down-circle.svg",
+    "arrow-down-left.svg",
+    "arrow-up-circle.svg",
+    "arrow-up-right.svg",
+    "bell-slash.svg",
+    "calendar-clock.svg",
+    "calendar-exclamation.svg",
+    "calendar.svg",
+    "check-circle.svg",
+    "check-seal.svg",
+    "check-shield.svg",
+    "checkmark.svg",
+    "chevron-left.svg",
+    "chevron-right.svg",
+    "chevron-up-down.svg",
+    "circle-dashed.svg",
+    "clock-xmark.svg",
+    "clock.svg",
+    "doc-zip.svg",
+    "doc.svg",
+    "ellipsis-circle.svg",
+    "exclamation-lock.svg",
+    "exclamation-octagon.svg",
+    "exclamation-triangle.svg",
+    "folder.svg",
+    "gear.svg",
+    "info-circle.svg",
+    "key-slash.svg",
+    "key.svg",
+    "lock.svg",
+    "nosign.svg",
+    "paperplane.svg",
+    "person-card.svg",
+    "person.svg",
+    "plus.svg",
+    "question-circle.svg",
+    "question-diamond.svg",
+    "trash.svg",
+    "tray-arrow-down.svg",
+    "tray.svg",
+    "xmark-octagon.svg"
+   ],
+   "files": {
+    "arrow-clockwise.svg": {
+     "name": "arrow-clockwise.svg",
+     "blob": "e3a229e861d18a55b72a44bd45d6314d",
+     "size": 253,
+     "type": "image/svg+xml"
+    },
+    "arrow-down-circle-dotted.svg": {
+     "name": "arrow-down-circle-dotted.svg",
+     "blob": "2b492de91eff229fa76aa67f8aa2f2d2",
+     "size": 287,
+     "type": "image/svg+xml"
+    },
+    "arrow-down-circle.svg": {
+     "name": "arrow-down-circle.svg",
+     "blob": "dab19f4d0e1956fedd12ab2daa23cad9",
+     "size": 260,
+     "type": "image/svg+xml"
+    },
+    "arrow-down-left.svg": {
+     "name": "arrow-down-left.svg",
+     "blob": "e7900cf8b403187df22a501470356f9b",
+     "size": 217,
+     "type": "image/svg+xml"
+    },
+    "arrow-up-circle.svg": {
+     "name": "arrow-up-circle.svg",
+     "blob": "7631b6ce991469f7e6f77beb8d43f241",
+     "size": 261,
+     "type": "image/svg+xml"
+    },
+    "arrow-up-right.svg": {
+     "name": "arrow-up-right.svg",
+     "blob": "c64df335579a14d7be26e3bfe6654962",
+     "size": 215,
+     "type": "image/svg+xml"
+    },
+    "bell-slash.svg": {
+     "name": "bell-slash.svg",
+     "blob": "785a7991682a0ddcf47e934728a106c1",
+     "size": 282,
+     "type": "image/svg+xml"
+    },
+    "calendar-clock.svg": {
+     "name": "calendar-clock.svg",
+     "blob": "9494b0983f79ffb4c767111b2142be61",
+     "size": 302,
+     "type": "image/svg+xml"
+    },
+    "calendar-exclamation.svg": {
+     "name": "calendar-exclamation.svg",
+     "blob": "ea7deb9862f77cb79486cac89b974dde",
+     "size": 360,
+     "type": "image/svg+xml"
+    },
+    "calendar.svg": {
+     "name": "calendar.svg",
+     "blob": "615fdaf70984fcbe4830f13d31eaf033",
+     "size": 274,
+     "type": "image/svg+xml"
+    },
+    "check-circle.svg": {
+     "name": "check-circle.svg",
+     "blob": "a05144e25585a476f207969d1f6c1013",
+     "size": 250,
+     "type": "image/svg+xml"
+    },
+    "check-seal.svg": {
+     "name": "check-seal.svg",
+     "blob": "a3e73bdcf795bce07277818e23a67c16",
+     "size": 373,
+     "type": "image/svg+xml"
+    },
+    "check-shield.svg": {
+     "name": "check-shield.svg",
+     "blob": "3affa0212fafb50d0f38c3408f9b4622",
+     "size": 292,
+     "type": "image/svg+xml"
+    },
+    "checkmark.svg": {
+     "name": "checkmark.svg",
+     "blob": "35f80f4cbbd4e5be04b937862bc23cd1",
+     "size": 223,
+     "type": "image/svg+xml"
+    },
+    "chevron-left.svg": {
+     "name": "chevron-left.svg",
+     "blob": "1c225c261b7aacaa6bfbfaf062513494",
+     "size": 219,
+     "type": "image/svg+xml"
+    },
+    "chevron-right.svg": {
+     "name": "chevron-right.svg",
+     "blob": "c617f1899c850e18242f4a9aa01cfd8b",
+     "size": 220,
+     "type": "image/svg+xml"
+    },
+    "chevron-up-down.svg": {
+     "name": "chevron-up-down.svg",
+     "blob": "9ce1eb53bc724e3868c9a1a2ff2ea52e",
+     "size": 241,
+     "type": "image/svg+xml"
+    },
+    "circle-dashed.svg": {
+     "name": "circle-dashed.svg",
+     "blob": "42f91e5149771a7dc8e13d0e54c5f413",
+     "size": 243,
+     "type": "image/svg+xml"
+    },
+    "clock-xmark.svg": {
+     "name": "clock-xmark.svg",
+     "blob": "0c6206693e7957e60e410bcf1494fef1",
+     "size": 291,
+     "type": "image/svg+xml"
+    },
+    "clock.svg": {
+     "name": "clock.svg",
+     "blob": "8e73742a5a0d0de8605fa25815e16691",
+     "size": 241,
+     "type": "image/svg+xml"
+    },
+    "doc-zip.svg": {
+     "name": "doc-zip.svg",
+     "blob": "2f61c1201f27d4ad00e0cfe23800c6f9",
+     "size": 350,
+     "type": "image/svg+xml"
+    },
+    "doc.svg": {
+     "name": "doc.svg",
+     "blob": "2b51cbb6d0f70ec47aba303c851443da",
+     "size": 268,
+     "type": "image/svg+xml"
+    },
+    "ellipsis-circle.svg": {
+     "name": "ellipsis-circle.svg",
+     "blob": "cc7c3fddbc3f7950995b56a1864ed414",
+     "size": 401,
+     "type": "image/svg+xml"
+    },
+    "exclamation-lock.svg": {
+     "name": "exclamation-lock.svg",
+     "blob": "373c0730170e84784d3782e393789563",
+     "size": 360,
+     "type": "image/svg+xml"
+    },
+    "exclamation-octagon.svg": {
+     "name": "exclamation-octagon.svg",
+     "blob": "3d110d7c4c9e8d78907615adb00da156",
+     "size": 329,
+     "type": "image/svg+xml"
+    },
+    "exclamation-triangle.svg": {
+     "name": "exclamation-triangle.svg",
+     "blob": "090763559c3ca772f137320b70df21da",
+     "size": 302,
+     "type": "image/svg+xml"
+    },
+    "folder.svg": {
+     "name": "folder.svg",
+     "blob": "6604cf187684cbe38e76d887eb0fc0fd",
+     "size": 307,
+     "type": "image/svg+xml"
+    },
+    "gear.svg": {
+     "name": "gear.svg",
+     "blob": "be04e048f4c99cec429a22e25832fa43",
+     "size": 361,
+     "type": "image/svg+xml"
+    },
+    "info-circle.svg": {
+     "name": "info-circle.svg",
+     "blob": "f93b5d96969752f99f8b406d177aa487",
+     "size": 301,
+     "type": "image/svg+xml"
+    },
+    "key-slash.svg": {
+     "name": "key-slash.svg",
+     "blob": "1d9911910fe03b966f3127c580adf1b1",
+     "size": 296,
+     "type": "image/svg+xml"
+    },
+    "key.svg": {
+     "name": "key.svg",
+     "blob": "3126ee5fb7cfb42ae2e34dbaeda31677",
+     "size": 270,
+     "type": "image/svg+xml"
+    },
+    "lock.svg": {
+     "name": "lock.svg",
+     "blob": "4330be2b805cdd7b72cc36c350e0d24f",
+     "size": 276,
+     "type": "image/svg+xml"
+    },
+    "nosign.svg": {
+     "name": "nosign.svg",
+     "blob": "d9844d362afebca511ddbcc446165ca2",
+     "size": 246,
+     "type": "image/svg+xml"
+    },
+    "paperplane.svg": {
+     "name": "paperplane.svg",
+     "blob": "2e9f8deb8cd5eeb1693e82242c4b103b",
+     "size": 249,
+     "type": "image/svg+xml"
+    },
+    "person-card.svg": {
+     "name": "person-card.svg",
+     "blob": "ba4386e1e2b307cf4bfb4e7f1b304a95",
+     "size": 344,
+     "type": "image/svg+xml"
+    },
+    "person.svg": {
+     "name": "person.svg",
+     "blob": "972d60db5c6326e8080fefa284173a0d",
+     "size": 271,
+     "type": "image/svg+xml"
+    },
+    "plus.svg": {
+     "name": "plus.svg",
+     "blob": "9c0953629d71a8c0ad744c3aec73826f",
+     "size": 213,
+     "type": "image/svg+xml"
+    },
+    "question-circle.svg": {
+     "name": "question-circle.svg",
+     "blob": "2d4844f675b529990fadb06b81839bb6",
+     "size": 342,
+     "type": "image/svg+xml"
+    },
+    "question-diamond.svg": {
+     "name": "question-diamond.svg",
+     "blob": "584b85756ece31282d1aa09d90831907",
+     "size": 353,
+     "type": "image/svg+xml"
+    },
+    "trash.svg": {
+     "name": "trash.svg",
+     "blob": "61f1cdfdff86e13a75e8740b1e02f4f8",
+     "size": 267,
+     "type": "image/svg+xml"
+    },
+    "tray-arrow-down.svg": {
+     "name": "tray-arrow-down.svg",
+     "blob": "df0f1bae30ab07f28366e34d9d646e40",
+     "size": 339,
+     "type": "image/svg+xml"
+    },
+    "tray.svg": {
+     "name": "tray.svg",
+     "blob": "99d7d09dda1f394c06f0db164b2db63d",
+     "size": 305,
+     "type": "image/svg+xml"
+    },
+    "xmark-octagon.svg": {
+     "name": "xmark-octagon.svg",
+     "blob": "98ea18f56f6ddd1267089a9e747a9e2f",
+     "size": 272,
+     "type": "image/svg+xml"
+    }
+   }
+  }
+ },
+ "blobs": {},
+ "docs": {
+  "sections": []
+ },
+ "lastChange": {
+  "by": "Claude",
+  "at": "2026-10-09T15:30:41Z",
+  "via": "Claude",
+  "note": "Primera versión: tokens, 16 componentes, 7 pantallas, 46 mockups, iconos y traspaso UI/UX."
+ }
+}

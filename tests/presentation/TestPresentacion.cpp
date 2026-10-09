@@ -444,7 +444,7 @@ void TestPresentacion::rolesDelModelo()
 
     const QList<QByteArray> esperados = {
         "id", "perfilRfc", "rfcContraparte", "tipoDescarga", "fechaInicial", "fechaFinal",
-        "estadoLocal", "estadoSat", "estadoResumen", "creadaEn", "totalPaquetes",
+        "estadoLocal", "estadoSat", "estadoResumen", "creadaEn", "totalPaquetes", "perfilNombre",
     };
     const QList<QByteArray> nombres = modelo->roleNames().values();
     QCOMPARE(nombres.size(), esperados.size());
@@ -597,8 +597,12 @@ void TestPresentacion::navegacionListaADetallePorId()
     QCOMPARE(d->paquetes().size(), 4);
 
     // Secciones separadas y visibles.
-    for (const char* seccion : {"seccionMetadata", "seccionFiltros", "seccionEstados",
-                                "seccionPaquetes", "seccionHistorial"}) {
+    // T013 (UX-23): secciones en pestanas; cada una visible en su pestana.
+    const QList<QPair<const char*, const char*>> secciones = {
+        {"seccionMetadata", "datos"}, {"seccionFiltros", "datos"}, {"seccionEstados", "datos"},
+        {"seccionPaquetes", "paquetes"}, {"seccionHistorial", "historial"}};
+    for (const auto& [seccion, pestana] : secciones) {
+        QMetaObject::invokeMethod(e.pagina(), "mostrarPestana", Q_ARG(QVariant, QString::fromLatin1(pestana)));
         auto* item = e.item(QString::fromLatin1(seccion));
         QVERIFY2(item && item->isVisible(), seccion);
     }
@@ -614,7 +618,8 @@ void TestPresentacion::navegacionListaADetallePorId()
     QVERIFY(d->estadoSat().isNull());
     QTRY_COMPARE(e.item(QStringLiteral("badgeEstadoSat"))->property("texto").toString(),
                  QStringLiteral("Sin respuesta del SAT"));
-    QVERIFY(e.item(QStringLiteral("sinPaquetes"))->isVisible());
+    QMetaObject::invokeMethod(e.pagina(), "mostrarPestana", Q_ARG(QVariant, QStringLiteral("paquetes")));
+    QTRY_VERIFY(e.item(QStringLiteral("sinPaquetes"))->isVisible());
 
     e.vms.app()->mostrarLista();
     QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
@@ -634,16 +639,17 @@ void TestPresentacion::combosMuestranValorInicial()
 
     auto* tipo = e.item(QStringLiteral("campoTipoDescarga"));
     auto* comprobante = e.item(QStringLiteral("campoTipoComprobante"));
-    QTRY_COMPARE(tipo->property("displayText").toString(), QStringLiteral("Emitidos"));
-    QCOMPARE(tipo->property("currentIndex").toInt(), 0);
+    // T013 (UX-15): el tipo de descarga es un SelectorSegmentado.
+    QTRY_COMPARE(tipo->property("valor").toString(), QStringLiteral("Emitidos"));
+    QVERIFY(e.item(QStringLiteral("segmento_Emitidos")) != nullptr);
     QTRY_COMPARE(comprobante->property("displayText").toString(), QStringLiteral("Todos"));
     QCOMPARE(comprobante->property("currentIndex").toInt(), 0);
 
     // Tras reiniciar con la pagina abierta (valores sin cambio) se conservan.
     e.vms.nuevaSolicitud()->setTipoDescarga(QStringLiteral("Recibidos"));
-    QTRY_COMPARE(tipo->property("displayText").toString(), QStringLiteral("Recibidos"));
+    QTRY_COMPARE(tipo->property("valor").toString(), QStringLiteral("Recibidos"));
     e.vms.app()->mostrarNueva();
-    QTRY_COMPARE(e.item(QStringLiteral("campoTipoDescarga"))->property("displayText").toString(),
+    QTRY_COMPARE(e.item(QStringLiteral("campoTipoDescarga"))->property("valor").toString(),
                  QStringLiteral("Emitidos"));
 }
 
@@ -710,17 +716,21 @@ void TestPresentacion::envioInvalidoMuestraErrorYNoEnvia()
     NuevaSolicitudViewModel* f = e.vms.nuevaSolicitud();
     QTRY_COMPARE(f->perfilesDisponibles()->count(), 2);
     QSignalSpy enviado(f, &NuevaSolicitudViewModel::submitted);
+    // T013 (UX-18): los errores de validacion van bajo su campo.
     auto* mensaje = e.item(QStringLiteral("mensajeError"));
-    QVERIFY(mensaje);
+    auto* filaPerfil = e.item(QStringLiteral("filaPerfil"));
+    QVERIFY(mensaje && filaPerfil);
     QVERIFY(!mensaje->isVisible()); // formulario nuevo: sin error todavia
+    QVERIFY(filaPerfil->property("error").toString().isEmpty());
     QVERIFY(!f->canSubmit());
 
     // Sin perfil.
     QMetaObject::invokeMethod(e.item(QStringLiteral("botonCrearSolicitud")), "click");
     QVERIFY(!f->errorMessage().isEmpty());
-    QTRY_VERIFY(mensaje->isVisible());
-    QCOMPARE(mensaje->property("text").toString(), f->errorMessage());
-    QVERIFY(nombreAccesible(mensaje).contains(f->errorMessage()));
+    QCOMPARE(f->campoConError(), QStringLiteral("perfil"));
+    QTRY_COMPARE(filaPerfil->property("error").toString(), f->errorMessage());
+    QVERIFY(!mensaje->isVisible()); // un error con campo no va en el aviso general
+    QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("campoPerfil"));
 
     // Perfil valido, rango de fechas invertido.
     f->setPerfilId(f->perfilesDisponibles()->index(1).data(PerfilesDisponiblesModel::IdRole).toString());
@@ -728,6 +738,9 @@ void TestPresentacion::envioInvalidoMuestraErrorYNoEnvia()
     f->setFechaFinal(QStringLiteral("2026-08-01"));
     QVERIFY(!f->canSubmit());
     QVERIFY(f->errorMessage().contains(QStringLiteral("fecha final")));
+    QCOMPARE(f->campoConError(), QStringLiteral("fechaFinal"));
+    QTRY_COMPARE(e.item(QStringLiteral("filaPeriodo"))->property("error").toString(), f->errorMessage());
+    QVERIFY(e.item(QStringLiteral("campoFechaFinal"))->property("conError").toBool());
     f->submit();
 
     // Fecha con formato invalido.
@@ -746,7 +759,8 @@ void TestPresentacion::envioInvalidoMuestraErrorYNoEnvia()
     QCOMPARE(e.solicitudes.llamadasCrear(), 0);
     QCOMPARE(enviado.count(), 0);
     QCOMPARE(e.vms.app()->pagina(), Pagina::Nueva);
-    QTRY_VERIFY(mensaje->isVisible());
+    QCOMPARE(f->campoConError(), QStringLiteral("perfil"));
+    QTRY_VERIFY(!filaPerfil->property("error").toString().isEmpty());
 }
 
 void TestPresentacion::recorridoConTeclado()
@@ -780,8 +794,11 @@ void TestPresentacion::recorridoConTeclado()
     QTest::keyClick(e.ventana, Qt::Key_Return);
     QTRY_COMPARE(e.vms.app()->pagina(), Pagina::Lista);
 
-    // Tab lleva a "Nueva solicitud"; Espacio la activa.
+    // T013: Tab recorre las acciones del encabezado en orden (carpeta,
+    // Perfiles SAT, Nueva solicitud); Espacio activa "Nueva solicitud".
     QTRY_VERIFY(focoDentroDe(e.ventana, QStringLiteral("listaSolicitudes")));
+    QTest::keyClick(e.ventana, Qt::Key_Tab);
+    QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("botonPerfilesSat"));
     QTest::keyClick(e.ventana, Qt::Key_Tab);
     QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("botonNuevaSolicitud"));
     QTest::keyClick(e.ventana, Qt::Key_Space);
@@ -806,7 +823,9 @@ void TestPresentacion::recorridoConTeclado()
     QStringList visitados;
     for (int i = 0; i < 16 && objectNameConFoco(e.ventana) != esperados.constLast(); ++i) {
         QTest::keyClick(e.ventana, Qt::Key_Tab);
-        const QString actual = objectNameConFoco(e.ventana);
+        // El segmentado recibe el foco en su segmento activo (T013).
+        const QString actual = focoDentroDe(e.ventana, QStringLiteral("campoTipoDescarga"))
+                                   ? QStringLiteral("campoTipoDescarga") : objectNameConFoco(e.ventana);
         if (esperados.contains(actual)) {
             visitados.append(actual);
         }
@@ -851,7 +870,10 @@ void TestPresentacion::paginasExponenTextoAccesible()
     const QString nombreFila = nombreAccesible(fila0);
     QVERIFY2(nombreFila.contains(e.vms.solicitudes()->index(0).data(Rol::PerfilRfcRole).toString()),
              qPrintable(nombreFila));
-    QVERIFY2(nombreFila.contains(QStringLiteral("estado ")), qPrintable(nombreFila));
+    // T013 (FilaSolicitud): el nombre empieza con el texto del estado.
+    QVERIFY2(nombreFila.startsWith(QStringLiteral("Creada, ")) || nombreFila.contains(QStringLiteral(", ")),
+             qPrintable(nombreFila));
+    QVERIFY2(nombreFila.contains(QStringLiteral(" paquete")), qPrintable(nombreFila));
     QCOMPARE(QQmlProperty::read(fila0, QStringLiteral("Accessible.role"), qmlContext(fila0)).toInt(),
              int(QAccessible::ListItem));
     const auto badges = fila0->findChildren<QQuickItem*>();
@@ -907,6 +929,9 @@ void TestPresentacion::qmlSinImportsProhibidos()
     const QStringList permitidos = {
         QStringLiteral("QtQuick"), QStringLiteral("QtQuick.Controls"),
         QStringLiteral("QtQuick.Layouts"), QStringLiteral("\"Etiquetas.js\""),
+        // T013 D1: los controles del modulo son siempre Basic (tambien si el
+        // proceso no fija el estilo global).
+        QStringLiteral("QtQuick.Controls.Basic"),
         // T005.1 (DA4): selector de archivos de e.firma; entrega QUrl.
         QStringLiteral("QtQuick.Dialogs"),
     };
@@ -914,6 +939,7 @@ void TestPresentacion::qmlSinImportsProhibidos()
         QStringLiteral("eliminado_?en|dedup|sql|keychain|\\.zip|file:|XMLHttpRequest|"
                        "LocalStorage|solicitudReferencia"),
         QRegularExpression::CaseInsensitiveOption);
+    const QRegularExpression colorLiteral(QStringLiteral("[\"']#[0-9a-fA-F]{3,8}[\"']"));
     int archivos = 0;
     QDirIterator it(QStringLiteral(":/qt/qml/SatCfdiDownloader"),
                     {QStringLiteral("*.qml"), QStringLiteral("*.js")}, QDir::Files);
@@ -927,12 +953,18 @@ void TestPresentacion::qmlSinImportsProhibidos()
             QVERIFY2(permitidos.contains(modulo),
                      qPrintable(archivo.fileName() + QStringLiteral(": ") + modulo));
         }
+        // T013: ningun color literal fuera de Theme.qml (solo tokens).
+        if (!archivo.fileName().endsWith(QStringLiteral("/Theme.qml"))) {
+            const QRegularExpressionMatch literal = colorLiteral.match(contenido);
+            QVERIFY2(!literal.hasMatch(),
+                     qPrintable(archivo.fileName() + QStringLiteral(": color literal ") + literal.captured(0)));
+        }
         const QRegularExpressionMatch termino = prohibido.match(contenido);
         QVERIFY2(!termino.hasMatch(),
                  qPrintable(archivo.fileName() + QStringLiteral(": ") + termino.captured(0)));
         ++archivos;
     }
-    QCOMPARE(archivos, 12); // 11 .qml + Etiquetas.js
+    QCOMPARE(archivos, 27); // 26 .qml (Theme, Icono y componentes T013) + Etiquetas.js
 }
 
 // ---------------------------------------------------------------------------
@@ -960,7 +992,8 @@ void TestPresentacion::listaEstadosCargandoErrorVaciaConDatos()
     QTRY_VERIFY(e.item(QStringLiteral("estadoError"))->isVisible());
     auto* error = e.item(QStringLiteral("errorLista"));
     QVERIFY(!error->property("text").toString().isEmpty());
-    QVERIFY(nombreAccesible(error).startsWith(QStringLiteral("Error: ")));
+    // T013: el error de carga es un EstadoVacio de error, anunciado.
+    QVERIFY(nombreAccesible(e.item(QStringLiteral("estadoError"))).startsWith(QStringLiteral("Error: ")));
     // Texto de presentacion, no el mensaje tecnico de ErrorPersistencia.
     QCOMPARE(error->property("text").toString(), modelo->errorMessage());
     QVERIFY(modelo->errorMessage() != QStringLiteral("x"));
@@ -1265,7 +1298,7 @@ void TestPresentacion::filtroInvalidoMuestraMensajes()
     f->setRfcContraparte(QStringLiteral("NOVALIDO"));
 
     f->submit();
-    const QString mensaje1 = QStringLiteral("El RFC contraparte no es valido.");
+    const QString mensaje1 = QStringLiteral("El RFC contraparte no es válido.");
     const QString mensaje2 = QStringLiteral("El complemento contiene caracteres reservados.");
     e.solicitudes.evaluacion.resolver(
         0, SolicitudesService::ResultadoEvaluarDuplicado::fallo(ErrorCrear::filtroInvalido(
@@ -1274,7 +1307,9 @@ void TestPresentacion::filtroInvalidoMuestraMensajes()
     QTRY_VERIFY(f->errorMessage().contains(mensaje1));
     QVERIFY(f->errorMessage().contains(mensaje2));
     QVERIFY(!f->ocupado());
-    QTRY_VERIFY(e.item(QStringLiteral("mensajeError"))->isVisible());
+    // T013: el error de filtro va bajo el campo del primer filtro invalido.
+    QCOMPARE(f->campoConError(), QStringLiteral("rfcContraparte"));
+    QTRY_COMPARE(e.item(QStringLiteral("filaRfcContraparte"))->property("error").toString(), f->errorMessage());
 
     // Tambien si el error llega desde crear() (validacion autoritativa).
     f->setRfcContraparte(QStringLiteral("XAXX010101000"));
@@ -1366,7 +1401,7 @@ void TestPresentacion::detalleEstadosErrorConDatosYNoEncontrada()
     e.solicitudes.detalle.resolver(0, SolicitudesService::ResultadoDetalle::fallo(fallo));
     QTRY_COMPARE(d->estado(), EstadoDetalle::Error);
     QTRY_VERIFY(e.item(QStringLiteral("estadoErrorDetalle"))->isVisible());
-    QVERIFY(nombreAccesible(e.item(QStringLiteral("errorDetalle"))).startsWith(QStringLiteral("Error: ")));
+    QVERIFY(nombreAccesible(e.item(QStringLiteral("estadoErrorDetalle"))).startsWith(QStringLiteral("Error: ")));
     QMetaObject::invokeMethod(e.item(QStringLiteral("botonReintentarDetalle")), "click");
     QCOMPARE(e.solicitudes.detalle.size(), 2);
     QCOMPARE(d->estado(), EstadoDetalle::Cargando);
@@ -1386,6 +1421,9 @@ void TestPresentacion::detalleEstadosErrorConDatosYNoEncontrada()
     QCOMPARE(d->logs().size(), 1);
     QCOMPARE(d->logs().constFirst().toMap().value(QStringLiteral("tipoEvento")).toString(),
              QStringLiteral("solicitud_creada"));
+    // Con paquetes la pestana inicial es Paquetes; los filtros estan en Datos.
+    QTRY_VERIFY(e.item(QStringLiteral("seccionPaquetes"))->isVisible());
+    QMetaObject::invokeMethod(e.pagina(), "mostrarPestana", Q_ARG(QVariant, QStringLiteral("datos")));
     QTRY_VERIFY(e.item(QStringLiteral("seccionFiltros"))->isVisible());
     QVERIFY(!e.item(QStringLiteral("estadoCargandoDetalle"))->isVisible());
     QCOMPARE(e.item(QStringLiteral("campoTipoComprobante"))->property("valor").toString(),
@@ -1591,9 +1629,9 @@ void TestPresentacion::detalleAccionesManualesYEstadosAccesibles()
     // Textos de los eventos nuevos de T007 (Etiquetas.js).
     QTRY_VERIFY(e.item(QStringLiteral("eventoLog_2")));
     QVERIFY(e.item(QStringLiteral("eventoLog_1"))->property("text").toString().contains(
-        QStringLiteral("Envio no iniciado; puede reenviarse manualmente")));
+        QStringLiteral("Envío no iniciado; puede reenviarse manualmente")));
     QVERIFY(e.item(QStringLiteral("eventoLog_2"))->property("text").toString().contains(
-        QStringLiteral("Verificacion automatica suspendida; use Verificar ahora")));
+        QStringLiteral("Verificación automática suspendida; use Verificar ahora")));
 
     // Terminada y descargada: ninguna accion aplica.
     QVERIFY(e.vms.app()->abrirDetalle(SolicitudId::generar().texto()));
@@ -1676,12 +1714,14 @@ void TestPresentacion::detalleMuestraExistenciaSinCambiarEstado()
     QTRY_COMPARE(e.item(QStringLiteral("existenciaPaquete_PAQ_01"))->property("text").toString(),
                  QStringLiteral("Archivo local presente"));
     QCOMPARE(e.item(QStringLiteral("existenciaPaquete_PAQ_02"))->property("text").toString(),
-             QStringLiteral("Archivo local no encontrado"));
+             QStringLiteral("Archivo local no encontrado: el ZIP se movió o se borró fuera de la app."));
     QCOMPARE(e.item(QStringLiteral("existenciaPaquete_PAQ_03"))->property("text").toString(),
              QStringLiteral("No se pudo comprobar el archivo local"));
     QCOMPARE(nombreAccesible(e.item(QStringLiteral("existenciaPaquete_PAQ_02"))),
-             QStringLiteral("Archivo local no encontrado"));
-    QVERIFY(!e.item(QStringLiteral("existenciaPaquete_PAQ_04"))->isVisible());
+             QStringLiteral("Archivo local no encontrado: el ZIP se movió o se borró fuera de la app."));
+    // Disponible: sin texto de existencia (su mensaje es otro).
+    QQuickItem* existencia4 = e.item(QStringLiteral("existenciaPaquete_PAQ_04"));
+    QVERIFY(existencia4 == nullptr || !existencia4->isVisible());
     for (int i = 0; i < 3; ++i) {
         QCOMPARE(d->paquetes().at(i).toMap().value(QStringLiteral("estadoDescarga")).toString(),
                  QStringLiteral("Descargado"));
@@ -1714,7 +1754,7 @@ void TestPresentacion::enviarSoloConCredencialLista()
     // Credencial vencida: Enviar visible pero deshabilitado, con el motivo D10.
     QVERIFY(resolverPerfiles(e, listasAntes, {perfilDePrueba()}, EstadoCredencial::Vencida));
     QTRY_COMPARE(d->motivoEnvio(),
-                 QStringLiteral("La e.firma de este perfil esta vencida. Reemplazala para continuar."));
+                 QStringLiteral("La e.firma de este perfil está vencida. Reemplázala para continuar."));
     QVERIFY(!d->puedeEnviar());
     QQuickItem* enviar = e.item(QStringLiteral("botonEnviarSolicitud"));
     QTRY_VERIFY(enviar->isVisible());
@@ -1766,17 +1806,17 @@ void TestPresentacion::mensajesDelCatalogoYSin5008()
     creadaConError.ultimoError = QStringLiteral("x");
     UltimoErrorDesglosado ue;
     ue.fase = FaseOperacion::Autenticacion;
-    ue.mensaje = QStringLiteral("El SAT no acepto la autenticacion con esta e.firma.");
+    ue.mensaje = QStringLiteral("El SAT no aceptó la autenticación con esta e.firma.");
     creadaConError.ultimoErrorDesglosado = ue;
     abrir(1, creadaConError);
-    QCOMPARE(d->mensajeEstado(), QStringLiteral("El SAT no acepto la autenticacion con esta e.firma."));
+    QCOMPARE(d->mensajeEstado(), QStringLiteral("El SAT no aceptó la autenticación con esta e.firma."));
 
     // Envio incierto.
     SolicitudDetalle incierta;
     incierta.resumen = resumenDePrueba(SolicitudId::generar());
     incierta.resumen.estadoLocal = EstadoLocal::EnvioIncierto;
     abrir(2, incierta);
-    QVERIFY(d->mensajeEstado().startsWith(QStringLiteral("No se sabe si el SAT registro la solicitud.")));
+    QVERIFY(d->mensajeEstado().startsWith(QStringLiteral("No se sabe si el SAT registró la solicitud.")));
     QVERIFY(!d->envioVisible()); // nunca se reenvia el mismo registro
 
     // Paquetes: 5008 sin Reintentar; vencido; error reintentable.
@@ -1791,9 +1831,9 @@ void TestPresentacion::mensajesDelCatalogoYSin5008()
     abrir(3, conPaquetes);
     QVERIFY(!d->puedeReintentarDescarga()); // solo 5008 y Vencido: nada reintentable
     QTRY_COMPARE(e.item(QStringLiteral("mensajePaquete_PAQ_01"))->property("text").toString(),
-                 QStringLiteral("El paquete alcanzo el maximo de descargas permitidas."));
+                 QStringLiteral("El paquete alcanzó el máximo de descargas permitidas."));
     QCOMPARE(e.item(QStringLiteral("mensajePaquete_PAQ_02"))->property("text").toString(),
-             QStringLiteral("El paquete ya no existe en el SAT (vencido)."));
+             QStringLiteral("El paquete ya no existe en el SAT (vencido). Crea una solicitud nueva para el mismo periodo."));
     QVERIFY(!e.item(QStringLiteral("botonReintentarDescarga"))->isVisible());
 
     SolicitudDetalle reintentable = detalleDePrueba(SolicitudId::generar());
@@ -1818,7 +1858,7 @@ void TestPresentacion::avisoNotificacionesDeshabilitadas()
     QVERIFY(!aviso->isVisible());
     e.vms.app()->setNotificacionesDeshabilitadas(true);
     QTRY_VERIFY(aviso->isVisible());
-    QVERIFY(nombreAccesible(aviso).startsWith(QStringLiteral("Las notificaciones estan deshabilitadas")));
+    QVERIFY(nombreAccesible(aviso).startsWith(QStringLiteral("Las notificaciones están desactivadas")));
     e.vms.app()->setNotificacionesDeshabilitadas(false);
     QTRY_VERIFY(!aviso->isVisible());
 }
@@ -1865,7 +1905,10 @@ void TestPresentacion::finderEnDetalleSegunExistencia()
     QQuickItem* mostrar2 = e.item(QStringLiteral("botonMostrarFinder_PAQ_02"));
     QVERIFY(mostrar2 && mostrar2->isVisible() && !mostrar2->isEnabled());
     QCOMPARE(nombreAccesible(mostrar1), QStringLiteral("Mostrar en Finder"));
+    // T013: con todo descargado, "Abrir carpeta" es la accion principal del resumen.
     QQuickItem* carpeta = e.item(QStringLiteral("botonAbrirCarpetaSolicitud"));
+    if (!carpeta->isVisible())
+        carpeta = e.item(QStringLiteral("accionAbrirCarpeta"));
     QTRY_VERIFY(carpeta->isVisible());
     QCOMPARE(nombreAccesible(carpeta), QStringLiteral("Abrir carpeta de la solicitud"));
 

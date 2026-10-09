@@ -39,8 +39,37 @@ EFirmaFormViewModel::EFirmaFormViewModel(CredencialesSatService* credenciales, Q
 
 bool EFirmaFormViewModel::puedeEnviar() const
 {
-    return m_fase != Fase::Validando && !m_perfilId.isEmpty() && !m_nombreCertificado.isEmpty()
-           && !m_nombreLlave.isEmpty();
+    return m_fase != Fase::Validando && m_fase != Fase::Exito && !m_perfilId.isEmpty()
+           && !m_nombreCertificado.isEmpty() && !m_nombreLlave.isEmpty() && m_claveEscrita;
+}
+
+QString EFirmaFormViewModel::faltante() const
+{
+    if (m_fase == Fase::Validando || m_fase == Fase::Exito || m_perfilId.isEmpty()) {
+        return {};
+    }
+    if (m_nombreCertificado.isEmpty()) {
+        return tr("Elige el certificado (.cer).");
+    }
+    if (m_nombreLlave.isEmpty()) {
+        return tr("Elige la llave privada (.key).");
+    }
+    if (!m_claveEscrita) {
+        return tr("Escribe la contraseña de la llave privada.");
+    }
+    return {};
+}
+
+void EFirmaFormViewModel::setClaveEscrita(bool valor)
+{
+    if (m_claveEscrita == valor) {
+        return;
+    }
+    m_claveEscrita = valor;
+    if (valor && m_campoConError == QStringLiteral("contrasena") && m_errorKey == QStringLiteral("ContrasenaRequerida")) {
+        m_campoConError.clear();
+    }
+    emit cambio();
 }
 
 QString EFirmaFormViewModel::rutaLocal(const QUrl& archivo)
@@ -59,6 +88,7 @@ void EFirmaFormViewModel::restablecer()
     m_errorKey.clear();
     m_errorMessage.clear();
     m_campoConError.clear();
+    m_requiereNuevaSeleccion = false;
 }
 
 void EFirmaFormViewModel::iniciar(const QString& perfilId, const QString& perfilRfc, bool esReemplazo)
@@ -140,7 +170,7 @@ bool EFirmaFormViewModel::enviar(const QUrl& certificado, const QUrl& llave, con
         return false;
     }
     if (secreto.vacio()) {
-        fallarLocal(QStringLiteral("ContrasenaRequerida"), tr("Escribe la contrasena de la llave privada."),
+        fallarLocal(QStringLiteral("ContrasenaRequerida"), tr("Escribe la contraseña de la llave privada."),
                     QStringLiteral("contrasena"));
         return false;
     }
@@ -153,6 +183,7 @@ bool EFirmaFormViewModel::enviar(const QUrl& certificado, const QUrl& llave, con
     const quint64 generacion = ++m_generacion;
     const QString perfil = m_perfilId;
     m_fase = Fase::Validando;
+    m_requiereNuevaSeleccion = false;
     m_errorKey.clear();
     m_errorMessage.clear();
     m_campoConError.clear();
@@ -186,7 +217,7 @@ void EFirmaFormViewModel::aplicarError(const ErrorCredencialSat& error)
     case ErrorCredencialSat::Tipo::PerfilInvalido:
         if (error.codigoPerfil == ErrorCredencialSat::CodigoPerfil::PerfilInactivo) {
             clave = QStringLiteral("PerfilInactivo");
-            mensaje = tr("El perfil esta inactivo; no se puede registrar su e.firma.");
+            mensaje = tr("El perfil está inactivo; no se puede registrar su e.firma.");
         } else {
             clave = QStringLiteral("PerfilInexistente");
             mensaje = tr("El perfil ya no existe.");
@@ -221,6 +252,13 @@ void EFirmaFormViewModel::aplicarError(const ErrorCredencialSat& error)
     m_errorKey = clave;
     m_errorMessage = mensaje;
     m_campoConError = campoDe(error.origen);
+    // Las rutas ya se entregaron al servicio; tambien se descartan los
+    // basenames para que el reintento empiece con una seleccion nueva.
+    m_rutaCertificado.clear();
+    m_rutaLlave.clear();
+    m_nombreCertificado.clear();
+    m_nombreLlave.clear();
+    m_requiereNuevaSeleccion = true;
     emit cambio();
 }
 

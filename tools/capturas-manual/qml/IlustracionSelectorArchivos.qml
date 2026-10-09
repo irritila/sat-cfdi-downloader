@@ -3,7 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 
-// Ilustracion (T012, D5) del selector de archivos nativo de macOS (panel
+// Ilustración (T012, D5) del selector de archivos nativo de macOS (panel
 // "Abrir"), tema claro. Datos ficticios (D7) por propiedades:
 // - carpeta: ruta ficticia; el menu emergente muestra su ultimo componente.
 // - archivos: lista de nombres (string) u objetos { nombre, tamano, fecha }.
@@ -228,7 +228,7 @@ Item {
         Label {
             id: rotulo
             anchors.centerIn: parent
-            text: "Ilustracion"
+            text: "Ilustración"
             color: "white"
             font.pixelSize: 12
             font.bold: true

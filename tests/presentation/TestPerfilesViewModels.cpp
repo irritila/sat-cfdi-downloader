@@ -491,7 +491,12 @@ void TestPerfilesViewModels::eFirmaBasenamesSinRutasNiContrasena()
     f->seleccionarLlave(QUrl::fromLocalFile(kRutaKey));
     QCOMPARE(f->nombreCertificado(), QStringLiteral("efirma_CENTINELA.cer"));
     QCOMPARE(f->nombreLlave(), QStringLiteral("efirma_CENTINELA.key"));
+    // Registrar exige tambien la contrasena (QML solo informa si la hay).
+    QVERIFY(!f->puedeEnviar());
+    QCOMPARE(f->faltante(), QStringLiteral("Escribe la contraseña de la llave privada."));
+    f->setClaveEscrita(true);
     QVERIFY(f->puedeEnviar());
+    QVERIFY(f->faltante().isEmpty());
     verificarSinSecretos(f);
 
     QSignalSpy cambio(f, &EFirmaFormViewModel::cambio);
@@ -594,7 +599,26 @@ void TestPerfilesViewModels::eFirmaErroresPorOrigen()
     QVERIFY(!f->errorMessage().isEmpty());
     QVERIFY(!f->errorMessage().contains(QStringLiteral("CENTINELA")));
     QVERIFY(!f->errorMessage().contains(QStringLiteral("AAA010101AAA")));
-    QVERIFY(f->puedeEnviar()); // se puede corregir y reintentar
+
+    // Tras el fallo la seleccion se descarta por completo y se pide de nuevo.
+    QVERIFY(f->nombreCertificado().isEmpty());
+    QVERIFY(f->nombreLlave().isEmpty());
+    QVERIFY(f->requiereNuevaSeleccion());
+    QVERIFY(!f->puedeEnviar());
+    QCOMPARE(f->faltante(), QStringLiteral("Elige el certificado (.cer)."));
+    QCOMPARE(f->errorKey(), clave); // el error especifico se conserva
+    QVERIFY(!f->enviar(QUrl(), QUrl(), kContrasena)); // sin rutas retenidas
+    QCOMPARE(f->errorKey(), QStringLiteral("CertificadoRequerido"));
+
+    // Reintento con una seleccion nueva.
+    f->seleccionarCertificado(QUrl::fromLocalFile(kRutaCer));
+    f->seleccionarLlave(QUrl::fromLocalFile(kRutaKey));
+    f->setClaveEscrita(true);
+    QVERIFY(f->puedeEnviar());
+    QVERIFY(f->enviar(QUrl(), QUrl(), kContrasena));
+    QCOMPARE(f->fase(), Fase::Validando);
+    QVERIFY(!f->requiereNuevaSeleccion());
+    QCOMPARE(g.credenciales.importaciones.size(), 2);
 }
 
 void TestPerfilesViewModels::eFirmaValidacionLocal()

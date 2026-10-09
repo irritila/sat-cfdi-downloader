@@ -27,22 +27,22 @@ QString mensajeVisible(ErrorSecretStore::Categoria categoria)
     using C = ErrorSecretStore::Categoria;
     switch (categoria) {
     case C::ArchivoIlegible: return QStringLiteral("No se pudo leer el certificado o la llave.");
-    case C::FormatoInvalido: return QStringLiteral("El certificado o la llave no tienen un formato valido.");
-    case C::ContrasenaIncorrecta: return QStringLiteral("La contrasena de la llave privada es incorrecta.");
+    case C::FormatoInvalido: return QStringLiteral("El certificado o la llave no tienen un formato válido.");
+    case C::ContrasenaIncorrecta: return QStringLiteral("La contraseña de la llave privada es incorrecta.");
     case C::ParejaIncompatible: return QStringLiteral("El certificado y la llave privada no corresponden.");
     case C::RfcNoCoincide: return QStringLiteral("El RFC del certificado no coincide con el del perfil.");
     case C::NoEsEFirma: return QStringLiteral("El certificado no es una e.firma admisible.");
-    case C::Vencida: return QStringLiteral("La e.firma esta vencida.");
-    case C::NoVigenteAun: return QStringLiteral("La e.firma aun no es vigente.");
+    case C::Vencida: return QStringLiteral("La e.firma está vencida.");
+    case C::NoVigenteAun: return QStringLiteral("La e.firma aún no es vigente.");
     case C::CredencialNoEncontrada: return QStringLiteral("El perfil no tiene una e.firma registrada.");
-    case C::CredencialDanada: return QStringLiteral("La e.firma guardada esta danada.");
-    case C::AlmacenBloqueado: return QStringLiteral("El llavero esta bloqueado; intenta de nuevo tras desbloquear la sesion.");
-    case C::AccesoDenegado: return QStringLiteral("Se denego el acceso al llavero.");
-    case C::CanceladoPorUsuario: return QStringLiteral("La operacion se cancelo.");
-    case C::AlmacenMalConfigurado: return QStringLiteral("El almacen seguro no esta configurado correctamente.");
-    case C::AlmacenNoDisponible: return QStringLiteral("El almacen seguro no esta disponible.");
+    case C::CredencialDanada: return QStringLiteral("La e.firma guardada está dañada.");
+    case C::AlmacenBloqueado: return QStringLiteral("El llavero está bloqueado; intenta de nuevo tras desbloquear la sesión.");
+    case C::AccesoDenegado: return QStringLiteral("Se denegó el acceso al llavero.");
+    case C::CanceladoPorUsuario: return QStringLiteral("La operación se canceló.");
+    case C::AlmacenMalConfigurado: return QStringLiteral("El almacén seguro no está configurado correctamente.");
+    case C::AlmacenNoDisponible: return QStringLiteral("El almacén seguro no está disponible.");
     case C::FalloEscritura: return QStringLiteral("No se pudo guardar la e.firma.");
-    case C::Interno: return QStringLiteral("Ocurrio un error interno con la e.firma.");
+    case C::Interno: return QStringLiteral("Ocurrió un error interno con la e.firma.");
     }
     return {};
 }
@@ -53,7 +53,7 @@ ErrorCredencialSat ErrorCredencialSat::perfil(CodigoPerfil codigo)
     e.tipo = Tipo::PerfilInvalido;
     e.codigoPerfil = codigo;
     e.mensaje = codigo == CodigoPerfil::PerfilInactivo
-                    ? QStringLiteral("El perfil esta inactivo.")
+                    ? QStringLiteral("El perfil está inactivo.")
                     : QStringLiteral("El perfil no existe.");
     return e;
 }
@@ -97,7 +97,7 @@ ErrorCredencialSat ErrorCredencialSat::hiloNoPermitido()
 {
     ErrorCredencialSat e;
     e.tipo = Tipo::HiloNoPermitido;
-    e.mensaje = QStringLiteral("Operacion de e.firma no permitida en este hilo.");
+    e.mensaje = QStringLiteral("Operación de e.firma no permitida en este hilo.");
     return e;
 }
 

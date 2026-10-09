@@ -106,6 +106,14 @@ class SolicitudDetailViewModel : public QObject {
     Q_PROPERTY(QString motivoEnvio READ motivoEnvio NOTIFY datosChanged)
     Q_PROPERTY(QString mensajeEstado READ mensajeEstado NOTIFY datosChanged)
 
+    // T013 (UX-22, UX-30): textos de ResumenEstado por estado de resumen
+    // (tabla del traspaso). descripcionResumen de Terminada lleva los conteos
+    // de paquetes; la de ErrorSat y Rechazada, el mensaje del catalogo.
+    // todoDescargado: Terminada con paquetes y todos Descargado.
+    Q_PROPERTY(QString titularResumen READ titularResumen NOTIFY datosChanged)
+    Q_PROPERTY(QString descripcionResumen READ descripcionResumen NOTIFY datosChanged)
+    Q_PROPERTY(bool todoDescargado READ todoDescargado NOTIFY datosChanged)
+
     // T009.1: Finder. paquetes()[i]["puedeMostrarFinder"] solo con existencia
     // Presente. puedeAbrirCarpeta: algun paquete Descargado. mensajeFinder:
     // aviso D7 accesible del ultimo intento (vacio si se abrio).
@@ -180,6 +188,9 @@ public:
     bool puedeEnviar() const;
     QString motivoEnvio() const;
     QString mensajeEstado() const;
+    QString titularResumen() const;
+    QString descripcionResumen() const;
+    bool todoDescargado() const;
     Q_INVOKABLE void enviar();
 
     void setAccionesFinder(AccionesFinder* acciones);

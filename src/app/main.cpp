@@ -5,6 +5,7 @@
 #include "app_core/AppCompositionRoot.h"
 #include "app_core/SingleInstanceCoordinator.h"
 #include "infrastructure/storage/FilesystemPackageStorage.h"
+#include "presentation/estilo/EstiloVisual.h"
 
 #include <QApplication>
 #include <QDir>
@@ -31,6 +32,8 @@ int main(int argc, char* argv[])
 {
     QApplication app(argc, argv);
     satcfdi::configurarIdentidadAplicacion();
+    // T013 D1: estilo Basic antes de cargar QML.
+    satcfdi::presentacion::fijarEstiloBasico();
 
     auto opciones = satcfdi::AppBootstrapper::opcionesDesdeArgumentos(QApplication::arguments());
     if (!opciones) {

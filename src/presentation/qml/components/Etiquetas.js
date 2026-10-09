@@ -7,8 +7,8 @@ const estadosResumen = {
     "Creada": "Creada",
     "Enviando": "Enviando",
     "Enviada": "Enviada",
-    "EnvioFallido": "Envio fallido",
-    "EnvioIncierto": "Envio incierto",
+    "EnvioFallido": "Envío fallido",
+    "EnvioIncierto": "Envío incierto",
     "Aceptada": "Aceptada por SAT",
     "EnProceso": "En proceso SAT",
     "Terminada": "Terminada",
@@ -21,8 +21,8 @@ const estadosLocales = {
     "Creada": "Creada",
     "Enviando": "Enviando",
     "Enviada": "Enviada",
-    "EnvioFallido": "Envio fallido",
-    "EnvioIncierto": "Envio incierto"
+    "EnvioFallido": "Envío fallido",
+    "EnvioIncierto": "Envío incierto"
 }
 
 const estadosSat = {
@@ -51,19 +51,19 @@ const tiposComprobante = {
     "I": "Ingreso",
     "E": "Egreso",
     "T": "Traslado",
-    "N": "Nomina",
+    "N": "Nómina",
     "P": "Pago"
 }
 
 const eventosLog = {
     "solicitud_creada": "Solicitud creada",
     "duplicado_confirmado": "Duplicado confirmado por el usuario",
-    "envio_iniciado": "Envio iniciado",
+    "envio_iniciado": "Envío iniciado",
     "solicitud_enviada": "Solicitud enviada",
-    "envio_fallido": "Envio fallido",
-    "envio_incierto": "Envio incierto",
-    "verificacion_realizada": "Verificacion realizada",
-    "verificacion_fallida": "Verificacion fallida",
+    "envio_fallido": "Envío fallido",
+    "envio_incierto": "Envío incierto",
+    "verificacion_realizada": "Verificación realizada",
+    "verificacion_fallida": "Verificación fallida",
     "paquetes_registrados": "Paquetes registrados",
     "descarga_iniciada": "Descarga iniciada",
     "paquete_descargado": "Paquete descargado",
@@ -71,17 +71,17 @@ const eventosLog = {
     "descarga_interrumpida": "Descarga interrumpida",
     "paquete_reconciliado": "Paquete reconciliado",
     "paquete_vencido": "Paquete vencido",
-    "archivo_huerfano": "Archivo huerfano",
-    "accion_pendiente_registrada": "Accion pendiente registrada",
-    "accion_pendiente_descartada": "Accion pendiente descartada",
-    "envio_no_iniciado": "Envio no iniciado; puede reenviarse manualmente",
-    "verificacion_suspendida": "Verificacion automatica suspendida; use Verificar ahora"
+    "archivo_huerfano": "Archivo huérfano",
+    "accion_pendiente_registrada": "Acción pendiente registrada",
+    "accion_pendiente_descartada": "Acción pendiente descartada",
+    "envio_no_iniciado": "Envío no iniciado; puede reenviarse manualmente",
+    "verificacion_suspendida": "Verificación automática suspendida; use Verificar ahora"
 }
 
 const origenesLog = {
-    "worker": "Automatico",
+    "worker": "Automático",
     "usuario": "Usuario",
-    "recuperacion": "Recuperacion"
+    "recuperacion": "Recuperación"
 }
 
 function texto(tabla, clave, siVacio) {
@@ -100,9 +100,9 @@ function tipoComprobante(clave) { return texto(tiposComprobante, clave, "Todos")
 function eventoLog(clave) { return texto(eventosLog, clave, "Evento") }
 // T008 D11: existencia del ZIP local de un paquete Descargado ("" = no aplica).
 const existenciasPaquete = {
-    "Comprobando": "Comprobando archivo local...",
+    "Comprobando": "Comprobando archivo local…",
     "Presente": "Archivo local presente",
-    "NoEncontrado": "Archivo local no encontrado",
+    "NoEncontrado": "Archivo local no encontrado: el ZIP se movió o se borró fuera de la app.",
     "ErrorComprobacion": "No se pudo comprobar el archivo local"
 }
 function existenciaPaquete(clave) { return texto(existenciasPaquete, clave, "") }
@@ -138,13 +138,4 @@ function tono(clave) {
     default:
         return "neutro"
     }
-}
-
-function fechaHora(valor) {
-    if (valor === null || valor === undefined)
-        return "-"
-    const d = new Date(valor)
-    if (isNaN(d.getTime()))
-        return "-"
-    return Qt.formatDateTime(d, "yyyy-MM-dd HH:mm")
 }

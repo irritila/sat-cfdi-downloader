@@ -10,8 +10,8 @@ namespace satcfdi {
 // Transiciones de solicitud que generan notificacion local (T009 D1, D9).
 // Nunca hay notificacion por paquete.
 enum class TipoTransicionNotificable {
-    Terminada,        // estado SAT -> Terminada ("Terminada (N paquetes)")
-    DescargaCompleta, // no queda paquete por descargar ("Descarga completa: N de N")
+    Terminada,        // estado SAT -> Terminada ("El SAT terminó la solicitud con N paquetes.")
+    DescargaCompleta, // no queda paquete por descargar ("X de N paquetes descargados.")
     ErrorSat,         // estado SAT -> Error
     Rechazada,        // estado SAT -> Rechazada
     Vencida,          // estado SAT -> Vencida (los paquetes pueden ya no estar)

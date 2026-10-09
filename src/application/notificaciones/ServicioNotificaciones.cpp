@@ -1,21 +1,33 @@
 #include "application/notificaciones/ServicioNotificaciones.h"
 
-#include "application/operaciones/MensajesOperacionSat.h"
+#include "application/common/FechasLegibles.h"
+
+#include <QStringList>
 
 namespace satcfdi {
 
 namespace {
 
-QString descripcion(const TransicionNotificable& t)
+// Linea 2 (UX-39): "{Tipo} · {periodo} · RFC ***000".
+QString contexto(const TransicionNotificable& t)
 {
-    const QString tipo = t.tipoDescarga == TipoDescarga::Emitidos ? QStringLiteral("Emitidos")
-                                                                  : QStringLiteral("Recibidos");
-    QString texto = QStringLiteral("%1 del %2 al %3").arg(tipo, t.fechaInicialSat.left(10), t.fechaFinalSat.left(10));
+    QStringList partes;
+    partes << (t.tipoDescarga == TipoDescarga::Emitidos ? QStringLiteral("Emitidos") : QStringLiteral("Recibidos"));
+    const QString periodo = fechaslegibles::rango(fechaslegibles::diaDeTextoSat(t.fechaInicialSat),
+                                                  fechaslegibles::diaDeTextoSat(t.fechaFinalSat));
+    if (!periodo.isEmpty()) {
+        partes << periodo;
+    }
     const QString rfc = ServicioNotificaciones::rfcEnmascarado(t.rfcSolicitante);
     if (!rfc.isEmpty()) {
-        texto += QStringLiteral(", RFC ") + rfc;
+        partes << QStringLiteral("RFC ") + rfc;
     }
-    return texto + QLatin1Char('.');
+    return partes.join(QStringLiteral(" \u00B7 "));
+}
+
+QString dosLineas(const QString& resultado, const QString& contextoLinea)
+{
+    return contextoLinea.isEmpty() ? resultado : resultado + QLatin1Char('\n') + contextoLinea;
 }
 
 } // namespace
@@ -40,53 +52,57 @@ Notificacion ServicioNotificaciones::componer(const TransicionNotificable& t)
     Notificacion n;
     n.tipo = claveEstable(t.tipo);
     n.id = t.solicitudId.texto() + QLatin1Char(':') + n.tipo;
-    const QString detalle = descripcion(t);
+    QString resultado;
     switch (t.tipo) {
     case TipoTransicionNotificable::Terminada:
         n.titulo = QStringLiteral("Solicitud terminada");
-        n.cuerpo = (t.paquetes == 1 ? QStringLiteral("Terminada (1 paquete). ")
-                                    : QStringLiteral("Terminada (%1 paquetes). ").arg(t.paquetes))
-                   + detalle;
+        resultado = t.paquetes == 1
+                        ? QStringLiteral("El SAT terminó la solicitud con 1 paquete.")
+                        : QStringLiteral("El SAT terminó la solicitud con %1 paquetes.").arg(t.paquetes);
         break;
     case TipoTransicionNotificable::DescargaCompleta:
         n.titulo = QStringLiteral("Descarga completa");
-        n.cuerpo = QStringLiteral("Descarga completa: %1 de %2. ").arg(t.descargados).arg(t.paquetes) + detalle;
+        resultado = QStringLiteral("%1 de %2 paquetes descargados.").arg(t.descargados).arg(t.paquetes);
         break;
     case TipoTransicionNotificable::ErrorSat:
         n.titulo = QStringLiteral("Error en el SAT");
-        n.cuerpo = QStringLiteral("El SAT reporto un error en la solicitud. ") + detalle;
+        resultado = QStringLiteral("El SAT reportó un error en la solicitud.");
         break;
     case TipoTransicionNotificable::Rechazada:
         n.titulo = QStringLiteral("Solicitud rechazada");
-        n.cuerpo = QStringLiteral("El SAT rechazo la solicitud. ") + detalle;
+        resultado = QStringLiteral("El SAT rechazó la solicitud.");
         break;
     case TipoTransicionNotificable::Vencida:
         n.titulo = QStringLiteral("Solicitud vencida");
-        n.cuerpo = QStringLiteral("La solicitud vencio en el SAT; los paquetes pueden ya no estar disponibles. ")
-                   + detalle;
+        resultado = QStringLiteral("La solicitud venció en el SAT; los paquetes pueden ya no estar disponibles.");
         break;
     }
+    n.cuerpo = dosLineas(resultado, contexto(t));
     return n;
 }
 
 std::optional<Notificacion> ServicioNotificaciones::componerCredencial(const PerfilId& perfil,
                                                                        EstadoCredencial estado)
 {
-    QString cuerpo;
+    QString causa;
+    QString accion = QStringLiteral("Reemplázala en Perfiles SAT.");
     switch (estado) {
     case EstadoCredencial::Lista:
     case EstadoCredencial::Validando: return std::nullopt;
-    case EstadoCredencial::Vencida: cuerpo = mensajessat::credencialVencida(); break;
-    case EstadoCredencial::NoVigenteAun: cuerpo = mensajessat::credencialNoVigenteAun(); break;
+    case EstadoCredencial::Vencida: causa = QStringLiteral("La e.firma está vencida"); break;
+    case EstadoCredencial::NoVigenteAun: causa = QStringLiteral("La e.firma aún no es vigente"); break;
     case EstadoCredencial::SinCredencial:
+        causa = QStringLiteral("El perfil no tiene e.firma registrada");
+        accion = QStringLiteral("Regístrala en Perfiles SAT.");
+        break;
     case EstadoCredencial::MaterialFaltante:
-    case EstadoCredencial::MaterialDanado: cuerpo = mensajessat::credencialIlegible(); break;
+    case EstadoCredencial::MaterialDanado: causa = QStringLiteral("No se pudo leer la e.firma guardada"); break;
     }
     Notificacion n;
     n.tipo = QStringLiteral("credencial");
     n.id = QStringLiteral("credencial:") + perfil.texto() + QLatin1Char(':') + claveEstable(estado);
-    n.titulo = QStringLiteral("e.firma de un perfil");
-    n.cuerpo = cuerpo + QStringLiteral(" El monitoreo de ese perfil esta en pausa.");
+    n.titulo = QStringLiteral("e.firma no disponible");
+    n.cuerpo = dosLineas(causa + QStringLiteral(". El monitoreo de ese perfil está en pausa."), accion);
     return n;
 }
 

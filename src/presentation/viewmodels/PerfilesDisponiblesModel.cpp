@@ -30,7 +30,7 @@ QVariant PerfilesDisponiblesModel::data(const QModelIndex& index, int role) cons
     case EtiquetaRole:
     case Qt::DisplayRole:
         return p.nombre.isEmpty() ? p.rfc
-                                       : QStringLiteral("%1 - %2").arg(p.rfc, p.nombre);
+                                       : QStringLiteral("%1 — %2").arg(p.rfc, p.nombre);
     default:
         return {};
     }

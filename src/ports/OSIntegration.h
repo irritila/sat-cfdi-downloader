@@ -145,8 +145,8 @@ public:
     virtual void reflejarMonitoreoPausado(bool pausado) = 0;
 
     // T007 (D2, D11): refleja el estado del worker en una linea NO
-    // seleccionable del menu bar ("Monitoreo activo", "Monitoreo pausado",
-    // "Trabajando: enviando/verificando/descargando...") y "Pendientes: N"
+    // seleccionable del menu bar ("Monitoreo activo", "Monitoreo en pausa",
+    // "Trabajando: enviando…/verificando…/descargando…") y "Pendientes: N"
     // cuando N > 0. Sin errores detallados. No emite intenciones.
     virtual void reflejarEstadoMonitoreo(const EstadoMonitoreo& estado) = 0;
 
