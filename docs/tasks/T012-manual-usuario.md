@@ -2,7 +2,7 @@
 
 ## Estado
 
-Pendiente (refinada 2026-10-08). Lista para implementar.
+Completada (2026-10-09). Refinada 2026-10-08; implementada en la rama `t012-manual-usuario`.
 
 ## Prioridad y tamano
 
@@ -92,15 +92,15 @@ Imagenes minimas (los nombres finales pueden ajustarse manteniendo el orden):
 
 ## Criterios de aceptacion
 
-- [ ] Dado `-DSATCFDI_BUILD_MANUAL_CAPTURAS=ON`, cuando se ejecuta el target `manual_capturas` en macOS, entonces se escriben todas las imagenes de la tabla en `docs/manual/img/`, con la escala y dimensiones de D4, y el proceso termina con codigo 0. Sin la opcion, la app y `ctest` no cambian.
-- [ ] Dada la herramienta, cuando se ejecuta, entonces no abre la base real, no toca Keychain, no inicia el worker ni hace trafico de red.
-- [ ] Dadas dos ejecuciones seguidas en el mismo equipo, cuando se comparan, entonces producen los mismos archivos con los mismos escenarios y textos visibles.
-- [ ] Dado el manual, cuando la prueba de enlaces corre en `ctest`, entonces cada imagen referenciada existe y no hay PNG sin referenciar en `docs/manual/img/`.
-- [ ] Dadas las imagenes y el manual, cuando se inspeccionan, entonces no contienen RFC, Ids, rutas, e.firmas ni contrasenas reales; solo los datos de D7.
-- [ ] Dada una ilustracion nativa, cuando se ve en el manual, entonces esta rotulada como "Ilustracion", y sus textos coinciden con los del menu bar y las notificaciones de la app (D6).
-- [ ] Dado un cambio de texto en el menu bar o en una notificacion, cuando se regeneran las imagenes, entonces la ilustracion refleja el texto nuevo sin editar la herramienta.
-- [ ] El manual cubre las nueve secciones con al menos una imagen o un paso descrito en cada una.
-- [ ] `docs/development.md` explica como regenerar el manual.
+- [x] Dado `-DSATCFDI_BUILD_MANUAL_CAPTURAS=ON`, cuando se ejecuta el target `manual_capturas` en macOS, entonces se escriben todas las imagenes de la tabla en `docs/manual/img/`, con la escala y dimensiones de D4, y el proceso termina con codigo 0. Sin la opcion, la app y `ctest` no cambian.
+- [x] Dada la herramienta, cuando se ejecuta, entonces no abre la base real, no toca Keychain, no inicia el worker ni hace trafico de red.
+- [x] Dadas dos ejecuciones seguidas en el mismo equipo, cuando se comparan, entonces producen los mismos archivos con los mismos escenarios y textos visibles.
+- [x] Dado el manual, cuando la prueba de enlaces corre en `ctest`, entonces cada imagen referenciada existe y no hay PNG sin referenciar en `docs/manual/img/`.
+- [x] Dadas las imagenes y el manual, cuando se inspeccionan, entonces no contienen RFC, Ids, rutas, e.firmas ni contrasenas reales; solo los datos de D7.
+- [x] Dada una ilustracion nativa, cuando se ve en el manual, entonces esta rotulada como "Ilustracion", y sus textos coinciden con los del menu bar y las notificaciones de la app (D6).
+- [x] Dado un cambio de texto en el menu bar o en una notificacion, cuando se regeneran las imagenes, entonces la ilustracion refleja el texto nuevo sin editar la herramienta.
+- [x] El manual cubre las nueve secciones con al menos una imagen o un paso descrito en cada una.
+- [x] `docs/development.md` explica como regenerar el manual.
 
 ## Verificacion
 
@@ -111,7 +111,15 @@ Imagenes minimas (los nombres finales pueden ajustarse manteniendo el orden):
 
 ## Resultado
 
-Pendiente.
+- Herramienta `tools/capturas-manual/` (opcion `SATCFDI_BUILD_MANUAL_CAPTURAS`, target `manual_capturas`) sobre fakes deterministas, render
+  cocoa, 12 PNG de 1920x1280 comprimidos sin perdida (maximo 354 KB, limite de 1 MB en la herramienta).
+- Ilustraciones QML del menu bar, notificacion, Finder y selector de archivos; el menu sale de `src/infrastructure/os/MenuBarDefinicion.h`,
+  compartida con `MacOSIntegration.mm`, y la notificacion de `ServicioNotificaciones`.
+- `docs/manual/usuario.md` con 9 secciones; prueba `satcfdi_manual_enlaces` (label `docs`) en `ctest`.
+- Bug corregido durante la tarea (aprobado por el usuario): los ComboBox "Tipo de descarga" y "Tipo de comprobante" de Nueva solicitud se
+  mostraban vacios al abrir; prueba `combosMuestranValorInicial`.
+- `ctest` 13/13; revision Codex de calidad aprobada sin bloqueantes; el usuario reviso el manual, el menu bar real y la correccion (2026-10-09).
+- Limitaciones: render no identico en bytes entre corridas (aceptado por D8); la captura 08 recorta la fila "Resumen".
 
 ## Riesgos y notas
 

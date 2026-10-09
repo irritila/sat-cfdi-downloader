@@ -447,6 +447,37 @@ no solicitado antes por otro medio. Un rechazo 301-305 obliga a usar otro dia.
 Solo la salida de consola (ya enmascarada) se comparte para la evidencia; el
 ledger y los ZIP quedan locales.
 
+## Manual de usuario: capturas (T012)
+
+Las imagenes de `docs/manual/img/` se generan con la herramienta
+`satcfdi_manual_capturas` (`tools/capturas-manual/`). Usa los view models de
+presentacion sobre fakes deterministas: sin SQLite, worker, SAT ni Keychain, y
+solo datos sinteticos (RFC genericos `XAXX010101000`/`XEXX010101000`, rutas
+`/Users/usuario/...`, reloj fijo 2026-10-01 10:00 UTC). La herramienta fuerza
+tema claro, locale `es_MX`, zona UTC y ventana de 960x640; cada PNG se normaliza
+a 1920x1280 sin metadatos variables. Las ilustraciones (selector de archivos,
+Finder, menu bar, notificacion) se alimentan de `menubar::entradas` y de
+`ServicioNotificaciones`, asi que reflejan los textos reales.
+
+```bash
+cmake -S . -B build -G Ninja -DSATCFDI_BUILD_MANUAL_CAPTURAS=ON
+cmake --build build --target manual_capturas      # regenera las 12 imagenes
+# Una sola imagen o a otro directorio:
+QT_QPA_PLATFORM=cocoa ./build/tools/capturas-manual/satcfdi_manual_capturas \
+    --salida docs/manual/img --solo 08-detalle-terminada.png
+```
+
+- Requiere una sesion grafica de macOS: abre ventanas cocoa breves. No forma
+  parte de `ctest` y no usa `screencapture`.
+- Guarda PNG sin perdida con compresion zlib maxima. Imprime
+  `OK`/`FALLA <archivo> <tipo> <WxH> <bytes>` por imagen y termina con codigo 0
+  solo si todas miden 1920x1280 y ninguna pasa de 1 MB.
+- El determinismo es de contenido, no de bytes: dos corridas producen los mismos
+  nombres, dimensiones y escenarios, con diferencias minimas de antialiasing.
+- La prueba `satcfdi_manual_enlaces` (label `docs`, `ctest -L docs`) verifica que
+  cada `![...](img/X.png)` de `docs/manual/usuario.md` exista y que no haya PNG
+  sin referenciar.
+
 ## Directorios de build
 
 Todos los directorios `build*/` estan ignorados por git. Durante ciclos de

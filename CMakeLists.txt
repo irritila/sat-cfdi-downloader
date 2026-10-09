@@ -111,12 +111,21 @@ add_subdirectory(tests/secrets)
 add_subdirectory(tests/sat)
 add_subdirectory(tests/integration)
 add_subdirectory(tests/presentation)
+# T012 D8: enlaces de imagenes del manual de usuario (label docs).
+add_subdirectory(tests/docs)
 
 # T006 (D3): CLI manual del spike SAT. Apagada por defecto; fuera del bundle.
 # tests/sat (sin red) se registra desde src/infrastructure y corre siempre.
 option(SATCFDI_BUILD_SAT_SPIKE "Compilar la CLI manual del spike SAT (tools/sat_spike)" OFF)
 if(SATCFDI_BUILD_SAT_SPIKE)
     add_subdirectory(tools/sat_spike)
+endif()
+
+# T012 D2: herramienta que genera las imagenes del manual de usuario (cocoa;
+# no forma parte de la app ni de ctest). Target manual_capturas.
+option(SATCFDI_BUILD_MANUAL_CAPTURAS "Compilar la herramienta de capturas del manual (tools/capturas-manual)" OFF)
+if(SATCFDI_BUILD_MANUAL_CAPTURAS)
+    add_subdirectory(tools/capturas-manual)
 endif()
 
 # T006 criterio 8 / T009: desde T009 satcfdi_app SI enlaza satcfdi_sat (el

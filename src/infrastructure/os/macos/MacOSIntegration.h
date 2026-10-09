@@ -1,5 +1,6 @@
 #pragma once
 
+#include "infrastructure/os/MenuBarDefinicion.h"
 #include "ports/OSIntegration.h"
 
 #include <functional>
@@ -77,6 +78,7 @@ private:
                               const QString& cuerpo,
                               std::function<void(MacOSIntegration*, NotificationSendResult)> alTerminar);
     void actualizarMenu();
+    menubar::EstadoMenu estadoMenu() const;
     void asegurarModoRegular();
 
     std::unique_ptr<Impl> d;

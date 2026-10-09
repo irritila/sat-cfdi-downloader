@@ -383,6 +383,7 @@ private slots:
     void nuevaSolicitudDesdeCppConVentanaOculta();
     void estadoVacioConDatosVacios();
     void navegacionListaADetallePorId();
+    void combosMuestranValorInicial();
     void envioValidoAbreDetalleYApareceEnLista();
     void envioInvalidoMuestraErrorYNoEnvia();
     void recorridoConTeclado();
@@ -617,6 +618,33 @@ void TestPresentacion::navegacionListaADetallePorId()
 
     e.vms.app()->mostrarLista();
     QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
+}
+
+void TestPresentacion::combosMuestranValorInicial()
+{
+    // T012: al abrir el formulario los ComboBox muestran el valor inicial del
+    // view model (Emitidos, Todos) sin que el usuario elija nada.
+    Escenario e(DemoSolicitudesService::Datos::Representativos);
+    QVERIFY(e.cargar());
+    QVERIFY(QTest::qWaitForWindowExposed(e.ventana));
+    e.vms.app()->mostrarNueva();
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaNuevaSolicitud"));
+    QCOMPARE(e.vms.nuevaSolicitud()->tipoDescarga(), QStringLiteral("Emitidos"));
+    QCOMPARE(e.vms.nuevaSolicitud()->tipoComprobante(), QString());
+
+    auto* tipo = e.item(QStringLiteral("campoTipoDescarga"));
+    auto* comprobante = e.item(QStringLiteral("campoTipoComprobante"));
+    QTRY_COMPARE(tipo->property("displayText").toString(), QStringLiteral("Emitidos"));
+    QCOMPARE(tipo->property("currentIndex").toInt(), 0);
+    QTRY_COMPARE(comprobante->property("displayText").toString(), QStringLiteral("Todos"));
+    QCOMPARE(comprobante->property("currentIndex").toInt(), 0);
+
+    // Tras reiniciar con la pagina abierta (valores sin cambio) se conservan.
+    e.vms.nuevaSolicitud()->setTipoDescarga(QStringLiteral("Recibidos"));
+    QTRY_COMPARE(tipo->property("displayText").toString(), QStringLiteral("Recibidos"));
+    e.vms.app()->mostrarNueva();
+    QTRY_COMPARE(e.item(QStringLiteral("campoTipoDescarga"))->property("displayText").toString(),
+                 QStringLiteral("Emitidos"));
 }
 
 void TestPresentacion::envioValidoAbreDetalleYApareceEnLista()

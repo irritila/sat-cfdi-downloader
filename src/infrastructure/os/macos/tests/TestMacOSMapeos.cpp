@@ -2,6 +2,7 @@
 // AppKit, permisos, bundle firmado ni sesion grafica.
 
 #include "infrastructure/os/macos/MacOSMapeos.h"
+#include "infrastructure/os/MenuBarDefinicion.h"
 
 #include <QTest>
 
@@ -103,6 +104,45 @@ private slots:
         QCOMPARE(notif.size(), 4);
 
         QVERIFY(textoAccionMonitoreo(false) != textoAccionMonitoreo(true));
+    }
+
+    // T012 D6: definicion compartida del menu (orden, separadores, textos y
+    // reglas de visibilidad que antes vivian en MacOSIntegration.mm).
+    void definicionMenuBar()
+    {
+        using namespace satcfdi::menubar;
+        EstadoMenu estado;
+        estado.monitoreo.fase = satcfdi::OSIntegration::EstadoMonitoreo::Fase::ActivoEnEspera;
+        QStringList visibles;
+        for (const Entrada& e : entradas(estado)) {
+            if (e.visible) {
+                visibles.append(e.separador ? QStringLiteral("---") : e.texto);
+            }
+        }
+        QCOMPARE(visibles, (QStringList{
+                               QStringLiteral("Mostrar ventana"), QStringLiteral("Nueva solicitud"),
+                               QStringLiteral("Abrir carpeta de paquetes"), QStringLiteral("---"),
+                               QStringLiteral("Monitoreo activo"), QStringLiteral("Pausar monitoreo"),
+                               QStringLiteral("---"), QStringLiteral("Iniciar al iniciar sesion"),
+                               textoEstadoLoginItem(satcfdi::OSIntegration::LoginItemStatus::Disabled),
+                               QStringLiteral("---"),
+                               textoEstadoNotificaciones(satcfdi::OSIntegration::NotificationStatus::NotDetermined),
+                               QStringLiteral("Solicitar permiso de notificaciones"), QStringLiteral("---"),
+                               QStringLiteral("Salir")}));
+        QVERIFY(!entrada(Id::EstadoMonitoreo, estado).habilitada);
+        estado.monitoreo.pendientes = 2;
+        estado.monitoreoPausado = true;
+        estado.preferenciaLoginItem = true;
+        estado.loginItem = satcfdi::OSIntegration::LoginItemStatus::RequiresApproval;
+        estado.notificaciones = satcfdi::OSIntegration::NotificationStatus::Denied;
+        QCOMPARE(entrada(Id::PendientesMonitoreo, estado).texto, QStringLiteral("Pendientes: 2"));
+        QVERIFY(entrada(Id::PendientesMonitoreo, estado).visible);
+        QCOMPARE(entrada(Id::AccionMonitoreo, estado).texto, QStringLiteral("Reanudar monitoreo"));
+        QVERIFY(entrada(Id::InicioAutomatico, estado).marcada);
+        QVERIFY(entrada(Id::AbrirAjustesLoginItem, estado).visible);
+        QVERIFY(!entrada(Id::SolicitarPermiso, estado).visible);
+        QVERIFY(entrada(Id::EnviarPrueba, estado).visible);
+        QVERIFY(entrada(Id::AbrirAjustesNotificaciones, estado).visible);
     }
 
     // T007 D2: textos de la linea de estado del worker.

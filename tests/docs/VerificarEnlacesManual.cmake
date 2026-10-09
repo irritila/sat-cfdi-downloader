@@ -1,0 +1,35 @@
+# T012 D8: prueba ligera (sin render) de las imagenes del manual de usuario.
+# - Cada ![...](img/X.png) de docs/manual/usuario.md debe existir.
+# - No debe haber PNG en docs/manual/img/ sin referenciar.
+# Uso: cmake -DMANUAL=<usuario.md> -DIMAGENES=<dir img> -P VerificarEnlacesManual.cmake
+if(NOT EXISTS "${MANUAL}")
+    message(FATAL_ERROR "El manual de usuario no existe todavia: ${MANUAL} (T012). "
+                        "Escribelo y regenera las imagenes con el target manual_capturas.")
+endif()
+file(READ "${MANUAL}" _texto)
+string(REGEX MATCHALL "!\\[[^]]*\\]\\(img/[^)]+\\)" _enlaces "${_texto}")
+set(_referenciadas "")
+set(_faltantes "")
+foreach(_enlace IN LISTS _enlaces)
+    string(REGEX REPLACE "^!\\[[^]]*\\]\\(img/([^)]+)\\)$" "\\1" _archivo "${_enlace}")
+    list(APPEND _referenciadas "${_archivo}")
+    if(NOT EXISTS "${IMAGENES}/${_archivo}")
+        list(APPEND _faltantes "${_archivo}")
+    endif()
+endforeach()
+file(GLOB _pngs RELATIVE "${IMAGENES}" "${IMAGENES}/*.png")
+set(_huerfanas "")
+foreach(_png IN LISTS _pngs)
+    if(NOT _png IN_LIST _referenciadas)
+        list(APPEND _huerfanas "${_png}")
+    endif()
+endforeach()
+list(LENGTH _referenciadas _n)
+if(_n EQUAL 0)
+    message(FATAL_ERROR "El manual no referencia ninguna imagen img/*.png")
+endif()
+if(_faltantes OR _huerfanas)
+    message(FATAL_ERROR "Imagenes referenciadas que no existen: [${_faltantes}]; "
+                        "PNG sin referenciar en el manual: [${_huerfanas}]")
+endif()
+message(STATUS "Manual: ${_n} imagenes referenciadas, todas presentes y sin huerfanas")

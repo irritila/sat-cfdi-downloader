@@ -8,8 +8,10 @@
 
 #include "infrastructure/os/macos/MacOSIntegration.h"
 #include "infrastructure/os/macos/MacOSMapeos.h"
+#include "infrastructure/os/MenuBarDefinicion.h"
 
 #include <QAction>
+#include <QHash>
 #include <sys/stat.h>
 #include <QFile>
 #include <QDir>
@@ -327,6 +329,7 @@ struct MacOSIntegration::Impl {
 
     std::unique_ptr<QMenu> menu;
     QSystemTrayIcon* bandeja = nullptr; // hijo del adaptador
+    QHash<int, QAction*> acciones; // menubar::Id -> accion (T012 D6)
     QAction* accionMonitoreo = nullptr;
     QAction* estadoMonitoreo = nullptr;    // T007: linea no seleccionable
     QAction* pendientesMonitoreo = nullptr; // "Pendientes: N" (oculta si 0)
@@ -419,68 +422,94 @@ void MacOSIntegration::inicializar()
         };
     };
 
-    connect(menu->addAction(QStringLiteral("Mostrar ventana")), &QAction::triggered, this,
-            intencion(&OSIntegration::mostrarVentanaSolicitada));
-    connect(menu->addAction(QStringLiteral("Nueva solicitud")), &QAction::triggered, this,
-            intencion(&OSIntegration::nuevaSolicitudSolicitada));
-    connect(menu->addAction(QStringLiteral("Abrir carpeta de paquetes")), &QAction::triggered, this,
-            intencion(&OSIntegration::abrirCarpetaPaquetesSolicitada));
-    menu->addSeparator();
-
-    d->estadoMonitoreo = menu->addAction(QString());
-    d->estadoMonitoreo->setEnabled(false);
-    d->pendientesMonitoreo = menu->addAction(QString());
-    d->pendientesMonitoreo->setEnabled(false);
-    d->accionMonitoreo = menu->addAction(mapeos::textoAccionMonitoreo(d->monitoreoPausado));
-    connect(d->accionMonitoreo, &QAction::triggered, this, [this] {
-        if (!d->saliendo) {
-            emit cambioMonitoreoSolicitado(!d->monitoreoPausado);
+    // T012 D6: estructura, textos y estados salen de MenuBarDefinicion (la
+    // misma fuente que usa la ilustracion del manual).
+    using menubar::Id;
+    for (Id id : menubar::estructura()) {
+        if (id == Id::Separador) {
+            menu->addSeparator();
+            continue;
         }
-    });
-    menu->addSeparator();
-
-    d->accionInicioAutomatico = menu->addAction(QStringLiteral("Iniciar al iniciar sesion"));
-    d->accionInicioAutomatico->setCheckable(true);
-    d->accionInicioAutomatico->setChecked(d->preferenciaLoginItem);
-    // `triggered` no se emite con setChecked() programatico. El check solo
-    // muestra estado confirmado: se revierte y se emite la intencion.
-    connect(d->accionInicioAutomatico, &QAction::triggered, this, [this](bool marcado) {
-        d->accionInicioAutomatico->setChecked(d->preferenciaLoginItem);
-        if (!d->saliendo) {
-            emit cambioInicioAutomaticoSolicitado(marcado);
+        QAction* accion = menu->addAction(menubar::entrada(id, estadoMenu()).texto);
+        d->acciones.insert(static_cast<int>(id), accion);
+        switch (id) {
+        case Id::MostrarVentana:
+            connect(accion, &QAction::triggered, this, intencion(&OSIntegration::mostrarVentanaSolicitada));
+            break;
+        case Id::NuevaSolicitud:
+            connect(accion, &QAction::triggered, this, intencion(&OSIntegration::nuevaSolicitudSolicitada));
+            break;
+        case Id::AbrirCarpetaPaquetes:
+            connect(accion, &QAction::triggered, this, intencion(&OSIntegration::abrirCarpetaPaquetesSolicitada));
+            break;
+        case Id::EstadoMonitoreo:
+            d->estadoMonitoreo = accion;
+            break;
+        case Id::PendientesMonitoreo:
+            d->pendientesMonitoreo = accion;
+            break;
+        case Id::AccionMonitoreo:
+            d->accionMonitoreo = accion;
+            connect(accion, &QAction::triggered, this, [this] {
+                if (!d->saliendo) {
+                    emit cambioMonitoreoSolicitado(!d->monitoreoPausado);
+                }
+            });
+            break;
+        case Id::InicioAutomatico:
+            d->accionInicioAutomatico = accion;
+            accion->setCheckable(true);
+            accion->setChecked(d->preferenciaLoginItem);
+            // `triggered` no se emite con setChecked() programatico. El check
+            // solo muestra estado confirmado: se revierte y se emite la intencion.
+            connect(accion, &QAction::triggered, this, [this](bool marcado) {
+                d->accionInicioAutomatico->setChecked(d->preferenciaLoginItem);
+                if (!d->saliendo) {
+                    emit cambioInicioAutomaticoSolicitado(marcado);
+                }
+            });
+            break;
+        case Id::EstadoLoginItem:
+            d->estadoLoginItem = accion;
+            break;
+        case Id::AbrirAjustesLoginItem:
+            d->abrirAjustesLoginItem = accion;
+            connect(accion, &QAction::triggered, this, [] {
+                if (@available(macOS 13.0, *)) {
+                    [SMAppService openSystemSettingsLoginItems];
+                }
+            });
+            break;
+        case Id::EstadoNotificaciones:
+            d->estadoNotificaciones = accion;
+            break;
+        case Id::SolicitarPermiso:
+            d->solicitarPermiso = accion;
+            connect(accion, &QAction::triggered, this, intencion(&OSIntegration::permisoNotificacionesSolicitado));
+            break;
+        case Id::EnviarPrueba:
+            d->enviarPrueba = accion;
+            connect(accion, &QAction::triggered, this, intencion(&OSIntegration::notificacionPruebaSolicitada));
+            break;
+        case Id::AbrirAjustesNotificaciones:
+            d->abrirAjustesNotificaciones = accion;
+            connect(accion, &QAction::triggered, this, [] {
+                NSString* bundle = [NSBundle mainBundle].bundleIdentifier;
+                if (bundle == nil) {
+                    bundle = @"";
+                }
+                NSString* url = [@"x-apple.systempreferences:com.apple.Notifications-Settings.extension?id="
+                    stringByAppendingString:bundle];
+                [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:url]];
+            });
+            break;
+        case Id::Salir:
+            connect(accion, &QAction::triggered, this, intencion(&OSIntegration::salirSolicitado));
+            break;
+        case Id::Separador:
+            break;
         }
-    });
-    d->estadoLoginItem = menu->addAction(QString());
-    d->estadoLoginItem->setEnabled(false);
-    d->abrirAjustesLoginItem = menu->addAction(QStringLiteral("Abrir ajustes de inicio de sesion..."));
-    connect(d->abrirAjustesLoginItem, &QAction::triggered, this, [] {
-        if (@available(macOS 13.0, *)) {
-            [SMAppService openSystemSettingsLoginItems];
-        }
-    });
-    menu->addSeparator();
-
-    d->estadoNotificaciones = menu->addAction(QString());
-    d->estadoNotificaciones->setEnabled(false);
-    d->solicitarPermiso = menu->addAction(QStringLiteral("Solicitar permiso de notificaciones"));
-    connect(d->solicitarPermiso, &QAction::triggered, this,
-            intencion(&OSIntegration::permisoNotificacionesSolicitado));
-    d->enviarPrueba = menu->addAction(QStringLiteral("Enviar notificacion de prueba"));
-    connect(d->enviarPrueba, &QAction::triggered, this, intencion(&OSIntegration::notificacionPruebaSolicitada));
-    d->abrirAjustesNotificaciones = menu->addAction(QStringLiteral("Abrir ajustes de notificaciones..."));
-    connect(d->abrirAjustesNotificaciones, &QAction::triggered, this, [] {
-        NSString* bundle = [NSBundle mainBundle].bundleIdentifier;
-        if (bundle == nil) {
-            bundle = @"";
-        }
-        NSString* url = [@"x-apple.systempreferences:com.apple.Notifications-Settings.extension?id="
-            stringByAppendingString:bundle];
-        [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:url]];
-    });
-    menu->addSeparator();
-
-    connect(menu->addAction(QStringLiteral("Salir")), &QAction::triggered, this,
-            intencion(&OSIntegration::salirSolicitado));
+    }
 
     actualizarMenu();
 
@@ -524,26 +553,35 @@ void MacOSIntegration::inicializar()
                 }];
 }
 
+menubar::EstadoMenu MacOSIntegration::estadoMenu() const
+{
+    menubar::EstadoMenu e;
+    e.monitoreoPausado = d->monitoreoPausado;
+    e.monitoreo = d->monitoreo;
+    e.preferenciaLoginItem = d->preferenciaLoginItem;
+    e.loginItem = d->loginItem;
+    e.notificaciones = d->notificaciones;
+    return e;
+}
+
 void MacOSIntegration::actualizarMenu()
 {
     if (!d->menu) {
         return;
     }
-    d->accionMonitoreo->setText(mapeos::textoAccionMonitoreo(d->monitoreoPausado));
-    d->estadoMonitoreo->setText(mapeos::textoEstadoMonitoreo(d->monitoreo));
-    d->pendientesMonitoreo->setText(mapeos::textoPendientes(d->monitoreo.pendientes));
-    d->pendientesMonitoreo->setVisible(d->monitoreo.pendientes > 0);
-    d->accionInicioAutomatico->setChecked(d->preferenciaLoginItem);
-    d->accionInicioAutomatico->setEnabled(d->loginItem != LoginItemStatus::Unavailable || d->preferenciaLoginItem);
-    d->estadoLoginItem->setText(mapeos::textoEstadoLoginItem(d->loginItem));
-    d->abrirAjustesLoginItem->setVisible(d->loginItem == LoginItemStatus::RequiresApproval
-                                         || d->loginItem == LoginItemStatus::Rejected);
-
-    d->estadoNotificaciones->setText(mapeos::textoEstadoNotificaciones(d->notificaciones));
-    d->solicitarPermiso->setVisible(d->notificaciones == NotificationStatus::NotDetermined);
-    d->enviarPrueba->setVisible(d->notificaciones == NotificationStatus::Granted
-                                || d->notificaciones == NotificationStatus::Denied);
-    d->abrirAjustesNotificaciones->setVisible(d->notificaciones == NotificationStatus::Denied);
+    // T012 D6: textos, visibilidad, habilitacion y marca de MenuBarDefinicion.
+    for (const menubar::Entrada& e : menubar::entradas(estadoMenu())) {
+        QAction* accion = d->acciones.value(static_cast<int>(e.id));
+        if (accion == nullptr) {
+            continue;
+        }
+        accion->setText(e.texto);
+        accion->setEnabled(e.habilitada);
+        accion->setVisible(e.visible);
+        if (e.marcable) {
+            accion->setChecked(e.marcada);
+        }
+    }
 }
 
 void MacOSIntegration::reflejarPreferenciaLoginItem(bool habilitado)

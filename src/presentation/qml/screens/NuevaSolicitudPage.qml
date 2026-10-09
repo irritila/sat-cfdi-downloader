@@ -190,7 +190,9 @@ Page {
                     { clave: "Emitidos", texto: qsTr("Emitidos") },
                     { clave: "Recibidos", texto: qsTr("Recibidos") }
                 ]
-                currentIndex: indexOfValue(pagina.formulario.tipoDescarga)
+                // Depende de count: al crearse, indexOfValue() se evalua antes de
+                // que el modelo este listo y devolveria -1 (combo vacio).
+                currentIndex: count > 0 ? indexOfValue(pagina.formulario.tipoDescarga) : -1
                 onActivated: (indice) => { pagina.formulario.tipoDescarga = valueAt(indice) }
                 Accessible.name: qsTr("Tipo de descarga")
                 Accessible.description: displayText
@@ -279,7 +281,8 @@ Page {
                             { clave: "N", texto: qsTr("N - Nomina") },
                             { clave: "P", texto: qsTr("P - Pago") }
                         ]
-                        currentIndex: indexOfValue(pagina.formulario.tipoComprobante)
+                        // Depende de count (ver campoTipoDescarga).
+                        currentIndex: count > 0 ? indexOfValue(pagina.formulario.tipoComprobante) : -1
                         onActivated: (indice) => { pagina.formulario.tipoComprobante = valueAt(indice) }
                         Accessible.name: qsTr("Tipo de comprobante, opcional")
                         Accessible.description: displayText
