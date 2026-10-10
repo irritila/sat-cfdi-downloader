@@ -11,7 +11,9 @@
 
 #include "application/operaciones/OperacionExecutor.h"
 #include "application/operaciones/WorkerLocal.h"
+#include "application/profiles/ConsultaPreparacionPerfiles.h"
 #include "application/profiles/CredencialesSatService.h"
+#include "application/vencimiento/AvisoVencimientoEFirma.h"
 #include "application/profiles/PerfilesSatService.h"
 #include "application/requests/SolicitudesService.h"
 #include "presentation/viewmodels/AppViewModel.h"
@@ -27,6 +29,7 @@
 #include <QDirIterator>
 #include <QProcess>
 #include <QRegularExpression>
+#include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
 #include <QTimeZone>
@@ -64,6 +67,7 @@ struct Flujo {
         m.reloj = reloj.funcion();
         m.programadorEjecutor = &programadorEjecutor;
         m.programadorWorker = &programadorWorker;
+        m.programadorVencimiento = &programadorVencimiento; // T014.3
         root = std::make_unique<AppCompositionRoot>(arranque.valor().rutaBase, secretos, m);
     }
 
@@ -115,6 +119,7 @@ struct Flujo {
     fakes::FakeReloj reloj{QDateTime(QDate(2026, 10, 5), QTime(12, 0), QTimeZone::UTC)};
     fakes::FakeProgramador programadorEjecutor{reloj};
     fakes::FakeProgramador programadorWorker{reloj};
+    fakes::FakeProgramador programadorVencimiento{reloj};
     fakes::FakeSecretStore secretos;
     fakes::FakeSatGateway gateway;
     fakes::FakeOSIntegration os;
@@ -184,6 +189,7 @@ private slots:
     void flujoCompleto_data();
     void flujoCompleto();
     void finderDestinosExactosYSinCambios();
+    void vencimientoConPermisoDenegado();
 };
 
 void TestFlujoSat::flujoCompleto_data()
@@ -341,6 +347,63 @@ void TestFlujoSat::finderDestinosExactosYSinCambios()
 
     // Solo lectura: la base no cambio.
     QCOMPARE(volcado(rutaBase), antes);
+}
+
+// T014.3 D2/D3 con el root real y FakeOSIntegration con permiso DENEGADO: a 30
+// dias de vencer se intenta notificar (resultado PermissionDenied), el perfil
+// sigue trayendo diasParaVencer y nada mas cambia (ni reintentos, ni estados,
+// ni logs; solo el dedupe, igual que con permiso).
+void TestFlujoSat::vencimientoConPermisoDenegado()
+{
+    Flujo f(OSIntegration::NotificationStatus::Denied);
+    QVERIFY(f.ok);
+    // El servicio de credenciales usa el reloj del sistema: el reloj
+    // controlado parte de "ahora" y la e.firma vence en 30 dias (+1 h).
+    const QDateTime ahora = QDateTime::currentDateTimeUtc();
+    f.reloj.fijar(ahora);
+    f.secretos.vigenteHasta = ahora.addDays(30).addSecs(3600);
+    const auto id = f.prepararSolicitud();
+    QVERIFY(id);
+
+    QSignalSpy resultados(&f.os, &OSIntegration::notificacionTerminada);
+    QSignalSpy evaluaciones(&f.root->avisoVencimiento(), &AvisoVencimientoEFirma::evaluacionTerminada);
+    const QString rutaBase = QDir(f.tmp.path()).filePath(QStringLiteral("satcfdi.sqlite3"));
+    QVERIFY(f.root->cargar());
+    f.root->iniciarCicloDeVida(f.os, nullptr, [&f] { ++f.salidas; });
+    QTRY_COMPARE(evaluaciones.count(), 1);
+    QTRY_COMPARE(resultados.count(), 1);
+
+    // notificar() se intento con el tipo e id del aviso y el SO respondio
+    // PermissionDenied: nada se entrega.
+    QCOMPARE(f.notificaciones(QStringLiteral("efirma_por_vencer")), 1);
+    QVERIFY(f.os.notificacionesPedidas.constLast().id.startsWith(QStringLiteral("vencimiento:")));
+    QVERIFY(f.os.notificacionesPedidas.constLast().id.endsWith(QStringLiteral(":30")));
+    QCOMPARE(resultados.at(0).at(1).value<OSIntegration::NotificationSendResult>(),
+             OSIntegration::NotificationSendResult::PermissionDenied);
+    QVERIFY(f.os.notificacionesEntregadas.isEmpty());
+
+    // El perfil sigue trayendo diasParaVencer (badge) con el mismo reloj.
+    ConsultaPreparacionPerfiles consulta(f.root->perfiles(), f.root->credenciales(), nullptr, f.reloj.funcion());
+    const auto perfiles = esperar(consulta.listarVerificados());
+    QVERIFY(perfiles && perfiles->esExito());
+    QCOMPARE(perfiles->valor().size(), 1);
+    QCOMPARE(perfiles->valor().constFirst().preparacion, PreparacionPerfil::Lista);
+    QCOMPARE(perfiles->valor().constFirst().diasParaVencer, std::optional<int>(30));
+
+    // Nada mas cambia: la revision diaria y un cambio de credencial vuelven a
+    // evaluar sin reintentar la notificacion ni tocar la base.
+    const QByteArray antes = volcado(rutaBase);
+    QVERIFY(!antes.isEmpty());
+    QVERIFY(antes.contains("INSERT INTO aviso_vencimiento_efirma"));
+    f.programadorVencimiento.avanzar(std::chrono::hours(24));
+    QTRY_COMPARE(evaluaciones.count(), 2);
+    f.root->avisoVencimiento().alCambiarCredencial();
+    QTRY_COMPARE(evaluaciones.count(), 3);
+    QCOMPARE(f.notificaciones(QStringLiteral("efirma_por_vencer")), 1);
+    QCOMPARE(resultados.count(), 1);
+    QCOMPARE(volcado(rutaBase), antes);
+    QCOMPARE(f.detalle(*id)->resumen.estadoLocal, EstadoLocal::Creada);
+    QCOMPARE(f.gateway.llamadas(fakes::FakeSatGateway::Op::Crear), 0);
 }
 
 #include "TestFlujoSat.moc"

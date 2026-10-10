@@ -44,12 +44,23 @@ public:
     static Notificacion componer(const TransicionNotificable& transicion);
     // nullopt para estados que no se notifican (Lista, Validando).
     static std::optional<Notificacion> componerCredencial(const PerfilId& perfil, EstadoCredencial estado);
+    // T014.3 D2: aviso de vencimiento de e.firma. id
+    // "vencimiento:<perfilId>:<vigenteHasta ISO UTC>:<umbral>", tipo
+    // "efirma_por_vencer".
+    static Notificacion componerVencimiento(const PerfilId& perfil, const QString& rfc, const QDateTime& vigenteHasta,
+                                            int umbral, int dias);
     // "***XYZ" (ultimos 3 caracteres); vacio si no hay RFC.
     static QString rfcEnmascarado(const QString& rfc);
 
 public slots:
     void alConfirmarTransicion(const satcfdi::TransicionNotificable& transicion);
     void alCambiarEstadoCredencial(const satcfdi::PerfilId& perfil, satcfdi::EstadoCredencial estado);
+
+public:
+    // T014.3: lo invoca AvisoVencimientoEFirma tras persistir el dedupe. Dedupe
+    // tambien en memoria por id. Fire-and-forget (permiso denegado: no pasa nada).
+    void notificarVencimiento(const PerfilId& perfil, const QString& rfc, const QDateTime& vigenteHasta, int umbral,
+                              int dias);
 
 private:
     Notificador& m_notificador;

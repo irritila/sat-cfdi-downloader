@@ -20,6 +20,9 @@ class AccesoFinder;
 class AccesoPaquetesEjecutor;
 class NotificadorOS;
 class ServicioNotificaciones;
+class AvisoVencimientoEFirma;
+class ConsultaPrimerUso;
+class ConsultaPreparacionPerfiles;
 class ConsultaExistenciaEjecutor;
 class AppLifecycleController;
 class ExtensionWorker;
@@ -89,6 +92,9 @@ struct OpcionesMonitoreo {
     // T009: SatGateway. Nulo = SatGatewayProductivo propio del root (endpoints
     // productivos). Las pruebas inyectan FakeSatGateway.
     SatGateway* satGateway = nullptr;
+    // T014.3: programador del aviso de vencimiento de e.firma (cada 24 h).
+    // Nulo = ProgramadorQt propio con `reloj`.
+    Programador* programadorVencimiento = nullptr;
 };
 
 class AppCompositionRoot {
@@ -137,6 +143,10 @@ public:
     SolicitudesService& solicitudes() const;
     PerfilesSatService& perfiles() const;
     PresentacionViewModels& viewModels() const { return *m_viewModels; }
+    // T014.3: consulta de primer uso (D1) para AppViewModel, y aviso de
+    // vencimiento (D2), que iniciarMonitoreo() arranca.
+    ConsultaPrimerUso& consultaPrimerUso() const;
+    AvisoVencimientoEFirma& avisoVencimiento() const { return *m_avisoVencimiento; }
     QQmlApplicationEngine* engine() const { return m_engine.get(); }
 
 private:
@@ -159,6 +169,11 @@ private:
     std::unique_ptr<NotificadorOS> m_notificador;
     QMetaObject::Connection m_conexionInvalidarSesion;
     std::unique_ptr<ServicioNotificaciones> m_servicioNotificaciones;
+    // T014.3 (se destruyen antes que notificaciones, servicios y dispatcher).
+    std::unique_ptr<ConsultaPrimerUso> m_consultaPrimerUso;
+    std::unique_ptr<ConsultaPreparacionPerfiles> m_consultaVencimiento;
+    std::unique_ptr<Programador> m_programadorVencimientoPropio;
+    std::unique_ptr<AvisoVencimientoEFirma> m_avisoVencimiento;
     PackageStorage* m_packageStorage = nullptr;
     QString m_raizPaquetes;
     std::unique_ptr<Programador> m_programadorEjecutorPropio;

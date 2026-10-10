@@ -1,5 +1,6 @@
 #pragma once
 
+#include "application/persistence/PuertosPersistencia.h"
 #include "application/profiles/PerfilConPreparacion.h"
 #include "domain/common/Resultado.h"
 #include "ports/persistence/ErrorPersistencia.h"
@@ -31,8 +32,9 @@ class ConsultaPreparacionPerfiles : public QObject {
 public:
     using ResultadoLista = Resultado<QList<PerfilConPreparacion>, ErrorPersistencia>;
 
+    // `reloj` (T014.3): para diasParaVencer; por defecto el del sistema.
     ConsultaPreparacionPerfiles(PerfilesSatService& perfiles, CredencialesSatService& credenciales,
-                                QObject* parent = nullptr);
+                                QObject* parent = nullptr, RelojUtc reloj = relojSistema());
 
     // Fase 1: no eliminados (activos e inactivos, por RFC) en Verificando,
     // sin consultar credenciales. Error solo si falla listarNoEliminados.
@@ -53,6 +55,7 @@ public:
 private:
     PerfilesSatService& m_perfiles;
     CredencialesSatService& m_credenciales;
+    RelojUtc m_reloj;
 };
 
 } // namespace satcfdi

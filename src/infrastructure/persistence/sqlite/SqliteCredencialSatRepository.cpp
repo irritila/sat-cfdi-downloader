@@ -233,4 +233,42 @@ Resultado<QList<CredencialRef>, ErrorPersistencia> SqliteCredencialSatRepository
     return R::exito(std::move(refs));
 }
 
+// --- T014.3: aviso_vencimiento_efirma ------------------------------------------------
+
+SqliteAvisoVencimientoRepository::SqliteAvisoVencimientoRepository(SqliteConnectionProvider& proveedor)
+    : m_proveedor(proveedor)
+{
+}
+
+Resultado<bool, ErrorPersistencia> SqliteAvisoVencimientoRepository::registrarSiNuevo(const PerfilId& perfil,
+                                                                                  const QDateTime& vigenteHasta,
+                                                                                  int umbralDias,
+                                                                                  const QDateTime& avisadoEn)
+{
+    using R = Resultado<bool, ErrorPersistencia>;
+    constexpr QStringView kContexto = u"aviso_vencimiento_efirma.registrar";
+    auto conexion = sqlite::conexionEscritura(m_proveedor, kContexto);
+    if (!conexion) {
+        return R::fallo(std::move(conexion).error());
+    }
+    QSqlDatabase db = conexion.valor();
+    QSqlQuery q(db);
+    if (auto r = sqlite::preparar(q,
+                                  QStringLiteral("INSERT INTO aviso_vencimiento_efirma (perfil_sat_id, vigente_hasta, "
+                                                 "umbral_dias, avisado_en) VALUES (:perfil, :vigencia, :umbral, :en) "
+                                                 "ON CONFLICT (perfil_sat_id, vigente_hasta, umbral_dias) DO NOTHING"),
+                                  kContexto);
+        !r) {
+        return R::fallo(std::move(r).error());
+    }
+    q.bindValue(QStringLiteral(":perfil"), sqlite::texto(perfil.texto()));
+    q.bindValue(QStringLiteral(":vigencia"), sqlite::instante(vigenteHasta));
+    q.bindValue(QStringLiteral(":umbral"), sqlite::entero(umbralDias));
+    q.bindValue(QStringLiteral(":en"), sqlite::instante(avisadoEn));
+    if (auto r = sqlite::ejecutar(q, kContexto); !r) {
+        return R::fallo(std::move(r).error());
+    }
+    return R::exito(q.numRowsAffected() > 0);
+}
+
 } // namespace satcfdi

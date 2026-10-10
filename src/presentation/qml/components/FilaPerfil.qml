@@ -2,11 +2,15 @@ import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
 
+import "Etiquetas.js" as Etiquetas
+
 // Perfil en la lista de Perfiles SAT (T013, ficha FilaPerfil):
 // 1) RFC en cuerpoFuerte y EstadoBadge de e.firma; 2) nombre; 3) icono de 13 y
 // la disponibilidad en leyenda (con "Reintentar" sm si el estado no se pudo
 // consultar); 4) opcional, calendar y "Vigente hasta AAAA-MM-DD". Estados:
 // normal, `seleccionada`, `conFoco` (anillo interior) e inactivo.
+// T014.3 D2: `diasParaVencer` >= 0 agrega el badge de advertencia
+// "Vence en N días" (calendar-exclamation) junto a la vigencia.
 // Se usa como delegado (no toma foco: el foco es de la lista; R reintenta).
 ItemDelegate {
     id: fila
@@ -19,6 +23,8 @@ ItemDelegate {
     property bool activo: true
     property bool listo: false
     property var vigenteHasta: null
+    // -1 = sin aviso (el view model solo lo da con credencial Lista y <= 30 dias).
+    property int diasParaVencer: -1
     property bool seleccionada: false
     property bool conFoco: false
     property string objectNameReintentar: ""
@@ -30,6 +36,7 @@ ItemDelegate {
 
     readonly property string textoVigencia: fila.vigenteHasta
         ? qsTr("Vigente hasta %1").arg(Qt.formatDate(fila.vigenteHasta, "yyyy-MM-dd")) : ""
+    readonly property string textoVencimiento: Etiquetas.venceEn(fila.diasParaVencer)
 
     focusPolicy: Qt.NoFocus
     leftPadding: Theme.espacioL
@@ -38,7 +45,8 @@ ItemDelegate {
     bottomPadding: 10
 
     Accessible.role: Accessible.ListItem
-    Accessible.name: [fila.rfc, fila.nombre, fila.estadoTexto, fila.disponibilidad, fila.textoVigencia]
+    Accessible.name: [fila.rfc, fila.nombre, fila.estadoTexto, fila.disponibilidad, fila.textoVigencia,
+                      fila.textoVencimiento]
                      .filter(t => t.length > 0).join(", ")
 
     background: Rectangle {
@@ -123,7 +131,7 @@ ItemDelegate {
             }
         }
         RowLayout {
-            visible: fila.textoVigencia.length > 0
+            visible: fila.textoVigencia.length > 0 || fila.textoVencimiento.length > 0
             spacing: Theme.espacioXs
             Icono {
                 nombre: "calendar"
@@ -136,6 +144,15 @@ ItemDelegate {
                 color: Theme.textoSecundario
                 font.family: Theme.familia
                 font.pixelSize: Theme.leyenda.size
+                Accessible.ignored: true
+            }
+            EstadoBadge {
+                objectName: "badgeVencimientoPerfil"
+                visible: fila.textoVencimiento.length > 0
+                tonoDirecto: "advertencia"
+                iconoDirecto: "calendar-exclamation"
+                texto: fila.textoVencimiento
+                contexto: qsTr("e.firma")
                 Accessible.ignored: true
             }
         }

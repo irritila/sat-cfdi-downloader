@@ -18,6 +18,7 @@ class PaqueteSolicitudRepository;
 class LogSolicitudRepository;
 class ConfiguracionAppRepository;
 class CredencialSatRepository;
+class AvisoVencimientoRepository;
 class OperacionesSolicitudRepository;
 class UnitOfWork;
 
@@ -72,6 +73,7 @@ public:
     LogSolicitudRepository& logs() noexcept;
     ConfiguracionAppRepository& configuracion() noexcept;
     CredencialSatRepository& credenciales() noexcept; // T005
+    AvisoVencimientoRepository& avisosVencimiento() noexcept; // T014.3
     // T007: operaciones del OperacionExecutor. Mismo proveedor (conexion por
     // hilo): usado desde el hilo del ejecutor obtiene SU propia conexion,
     // distinta de la del PersistenceDispatcher. Sus escrituras usan

@@ -109,6 +109,13 @@ function existenciaPaquete(clave) { return texto(existenciasPaquete, clave, "") 
 function origenLog(clave) { return texto(origenesLog, clave, "") }
 
 // Categoria visual (solo refuerza el texto; nunca lo sustituye).
+// T014.3 D2: aviso de vencimiento de e.firma ("" si no aplica: dias < 0).
+function venceEn(dias) {
+    if (dias === undefined || dias === null || dias < 0) return ""
+    if (dias === 0) return "Vence hoy"
+    return dias === 1 ? "Vence en 1 día" : "Vence en " + dias + " días"
+}
+
 function tono(clave) {
     switch (clave) {
     case "Terminada":

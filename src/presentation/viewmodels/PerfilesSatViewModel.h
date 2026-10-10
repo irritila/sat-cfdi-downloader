@@ -2,6 +2,7 @@
 
 #include "PerfilesSatListModel.h"
 
+#include "application/persistence/PuertosPersistencia.h"
 #include "application/profiles/PerfilConPreparacion.h"
 
 #include <QHash>
@@ -68,6 +69,8 @@ class PerfilesSatViewModel : public QObject {
     Q_PROPERTY(bool seleccionListo READ seleccionListo NOTIFY seleccionChanged)
     // Vigencia de la e.firma del perfil seleccionado ("AAAA-MM-DD") o vacia.
     Q_PROPERTY(QString seleccionVigenteHasta READ seleccionVigenteHasta NOTIFY seleccionChanged)
+    // T014.3 D2: dias para vencer de la e.firma seleccionada (0..30) o -1.
+    Q_PROPERTY(int seleccionDiasParaVencer READ seleccionDiasParaVencer NOTIFY seleccionChanged)
     Q_PROPERTY(bool tieneCredencial READ tieneCredencial NOTIFY seleccionChanged)
     Q_PROPERTY(bool puedeGestionarEFirma READ puedeGestionarEFirma NOTIFY seleccionChanged)
 
@@ -89,9 +92,10 @@ public:
 
     // Ambos servicios son obligatorios y deben vivir mas que el view model.
     // Construye su propia ConsultaPreparacionPerfiles. No carga al construir:
-    // la carga empieza con cargar() (al abrir la pagina).
+    // la carga empieza con cargar() (al abrir la pagina). `reloj` (T014.3):
+    // el mismo que usa el aviso de vencimiento, para que el badge coincida.
     PerfilesSatViewModel(PerfilesSatService* perfiles, CredencialesSatService* credenciales,
-                         QObject* parent = nullptr);
+                         QObject* parent = nullptr, RelojUtc reloj = relojSistema());
 
     PerfilesSatListModel* perfiles() const { return m_modelo; }
     EstadoLista estadoLista() const;
@@ -117,6 +121,7 @@ public:
     QString seleccionEstadoTexto() const;
     bool seleccionListo() const;
     QString seleccionVigenteHasta() const;
+    int seleccionDiasParaVencer() const;
     bool tieneCredencial() const;
     bool puedeGestionarEFirma() const;
 

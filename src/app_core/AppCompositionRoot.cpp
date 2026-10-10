@@ -11,6 +11,9 @@
 #include "application/notificaciones/ServicioNotificaciones.h"
 #include "application/operaciones/OperacionesSatProductivo.h"
 #include "application/paquetes/AccesoPaquetesService.h"
+#include "application/primeruso/ConsultaPrimerUsoPersistida.h"
+#include "application/profiles/ConsultaPreparacionPerfiles.h"
+#include "application/vencimiento/AvisoVencimientoEFirma.h"
 #include "application/operaciones/WorkerLocal.h"
 #include "application/profiles/CredencialesSatServicePersistido.h"
 #include "application/persistence/PersistenceDispatcher.h"
@@ -155,11 +158,32 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
     QObject::connect(m_ejecutor.get(), &OperacionExecutor::estadoCredencialCambiado,
                      m_servicioNotificaciones.get(), &ServicioNotificaciones::alCambiarEstadoCredencial);
 
+    // T014.3 D1: primer uso (lectura en el dispatcher). D2/D3: aviso de
+    // vencimiento de e.firma; arranca con iniciarMonitoreo() y reevalua al
+    // cambiar una credencial (un reemplazo reinicia el dedupe).
+    m_consultaPrimerUso = std::make_unique<ConsultaPrimerUsoPersistida>(*m_dispatcher, p.perfiles(), p.solicitudes(),
+                                                                        p.credenciales(), secretStore, reloj);
+    m_consultaVencimiento = std::make_unique<ConsultaPreparacionPerfiles>(*m_perfilesService, *m_credencialesService,
+                                                                          nullptr, reloj);
+    Programador* programadorVencimiento = monitoreo.programadorVencimiento;
+    if (!programadorVencimiento) {
+        m_programadorVencimientoPropio = std::make_unique<ProgramadorQt>(reloj);
+        programadorVencimiento = m_programadorVencimientoPropio.get();
+    }
+    ConsultaPreparacionPerfiles* consultaVencimiento = m_consultaVencimiento.get();
+    m_avisoVencimiento = std::make_unique<AvisoVencimientoEFirma>(
+        [consultaVencimiento] { return consultaVencimiento->listarVerificados(); }, *m_dispatcher,
+        p.avisosVencimiento(), p.unidadDeTrabajo(), *m_servicioNotificaciones, *programadorVencimiento, reloj);
+    QObject::connect(m_credencialesService.get(), &CredencialesSatService::credencialCambio, m_avisoVencimiento.get(),
+                     &AvisoVencimientoEFirma::alCambiarCredencial);
+
     m_viewModels = std::make_unique<PresentacionViewModels>(
-        m_solicitudesService.get(), m_perfilesService.get(), m_credencialesService.get());
+        m_solicitudesService.get(), m_perfilesService.get(), m_credencialesService.get(), nullptr,
+        reloj); // T014.3: mismo reloj que AvisoVencimientoEFirma (badge = aviso)
     m_viewModels->setAccionesSolicitud(m_accionesWorker.get());
     m_viewModels->setConsultaExistencia(m_consultaExistencia.get());
     m_viewModels->setAccionesFinder(m_accesoFinder.get());
+    m_viewModels->setConsultaPrimerUso(m_consultaPrimerUso.get()); // T014.3 D1
 
     // Primera tarea del dispatcher serial: limpia generaciones huerfanas del
     // SecretStore (residuos de fallos previos). No se espera aqui; las
@@ -176,6 +200,10 @@ AppCompositionRoot::~AppCompositionRoot()
 
     // T007: el ejecutor termina antes que el dispatcher (y su hilo cierra su
     // propia conexion). Si la salida explicita ya lo detuvo, es inmediato.
+    m_avisoVencimiento.reset(); // cancela su programacion; antes que notificaciones
+    m_programadorVencimientoPropio.reset();
+    m_consultaVencimiento.reset();
+    m_consultaPrimerUso.reset();
     m_servicioNotificaciones.reset();
     m_accesoFinder.reset();
     m_accesoPaquetes.reset();
@@ -228,6 +256,12 @@ void AppCompositionRoot::iniciarMonitoreo()
     }
     m_monitoreoIniciado = true;
     m_worker->iniciar(); // recuperacion (D9) y primer ciclo
+    m_avisoVencimiento->iniciar(); // T014.3: al arrancar y cada 24 h
+}
+
+ConsultaPrimerUso& AppCompositionRoot::consultaPrimerUso() const
+{
+    return *m_consultaPrimerUso;
 }
 
 AppLifecycleController& AppCompositionRoot::iniciarCicloDeVida(OSIntegration& os,

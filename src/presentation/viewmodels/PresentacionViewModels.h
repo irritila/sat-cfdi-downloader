@@ -1,5 +1,7 @@
 #pragma once
 
+#include "application/persistence/PuertosPersistencia.h"
+
 #include <QObject>
 #include <QVariantMap>
 
@@ -8,6 +10,7 @@ namespace satcfdi {
 class AccionesSolicitud;
 class AccionesFinder;
 class ConsultaExistenciaPaquetes;
+class ConsultaPrimerUso;
 class AppViewModel;
 class CredencialesSatService;
 class EFirmaFormViewModel;
@@ -30,10 +33,13 @@ public:
     // Los tres servicios son obligatorios (T005.1 DA6: el root productivo
     // pasa los persistidos; las pruebas, fakes). Construye las consultas de
     // preparacion que necesitan NuevaSolicitudViewModel y PerfilesSatViewModel.
+    // `reloj` (T014.3): el del aviso de vencimiento, para que diasParaVencer
+    // (badge) y la notificacion usen la misma hora.
     PresentacionViewModels(SolicitudesService* solicitudes,
                            PerfilesSatService* perfiles,
                            CredencialesSatService* credenciales,
-                           QObject* parent = nullptr);
+                           QObject* parent = nullptr,
+                           RelojUtc reloj = relojSistema());
 
     AppViewModel* app() const { return m_app; }
     SolicitudesListModel* solicitudes() const { return m_solicitudes; }
@@ -55,9 +61,12 @@ public:
     void setConsultaExistencia(ConsultaExistenciaPaquetes* consulta);
     // T009.1: Finder (detalle y lista). No propietario; nullptr = sin acciones.
     void setAccionesFinder(AccionesFinder* acciones);
+    // T014.3 D1: guia de primer uso en la lista. No propietario; nullptr = sin guia.
+    void setConsultaPrimerUso(ConsultaPrimerUso* consulta);
 
 private:
-    void conectarPreparacionDetalle(PerfilesSatService* perfiles, CredencialesSatService* credenciales);
+    void conectarPreparacionDetalle(PerfilesSatService* perfiles, CredencialesSatService* credenciales,
+                                    RelojUtc reloj);
 
     SolicitudesListModel* m_solicitudes;
     NuevaSolicitudViewModel* m_nuevaSolicitud;

@@ -6,6 +6,7 @@
 #include "application/requests/SolicitudesService.h"
 #include "infrastructure/persistence/sqlite/SqlitePersistencia.h"
 #include "fakes/FakeSecretStore.h"
+#include "presentation/viewmodels/AppViewModel.h"
 #include "presentation/viewmodels/PresentacionViewModels.h"
 #include "presentation/viewmodels/SolicitudesListModel.h"
 
@@ -111,6 +112,7 @@ private slots:
     void eliminarYReiniciarDaNoEncontrado();
     void grafoPersistidoSinDemosNiCarpetaZip();
     void bootstrapRechazaVersionFutura();
+    void guiaPrimerUsoConDataDirVacio();
 };
 
 void TestComposicionPersistida::init()
@@ -378,6 +380,23 @@ void TestComposicionPersistida::bootstrapRechazaVersionFutura()
     QCOMPARE(r.error().causa->tipo, ErrorPersistencia::Tipo::Migracion);
     QVERIFY(!r.error().mensaje.contains(tmp.path()));
     QCOMPARE(hashArchivo(ruta), hashAntes);
+}
+
+// T014.3 D1: con el root real y un --data-dir vacio, la consulta de primer uso
+// cableada en AppViewModel termina y muestra la guia (tres pasos sin marcar).
+void TestComposicionPersistida::guiaPrimerUsoConDataDirVacio()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    auto root = abrir(dir.filePath(QStringLiteral("datos")));
+    QVERIFY(root);
+    AppViewModel* app = root->viewModels().app();
+    QVERIFY(app);
+    app->refrescarPrimerUso();
+    QVERIFY(QTest::qWaitFor([&] { return app->mostrarGuiaPrimerUso(); }, 5000));
+    QVERIFY(!app->primerUsoCargando());
+    QVERIFY(!app->primerUsoError());
+    QCOMPARE(app->primerUsoPasos(), (QVariantList{false, false, false}));
 }
 
 #include "TestComposicionPersistida.moc"

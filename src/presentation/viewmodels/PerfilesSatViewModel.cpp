@@ -51,10 +51,10 @@ bool conCredencial(PreparacionPerfil p)
 
 PerfilesSatViewModel::PerfilesSatViewModel(PerfilesSatService* perfiles,
                                            CredencialesSatService* credenciales,
-                                           QObject* parent)
+                                           QObject* parent, RelojUtc reloj)
     : QObject(parent)
     , m_perfilesServicio(perfiles)
-    , m_consulta(new ConsultaPreparacionPerfiles(*perfiles, *credenciales, this))
+    , m_consulta(new ConsultaPreparacionPerfiles(*perfiles, *credenciales, this, std::move(reloj)))
     , m_modelo(new PerfilesSatListModel(this))
 {
     Q_ASSERT(perfiles != nullptr);
@@ -143,6 +143,12 @@ QString PerfilesSatViewModel::seleccionVigenteHasta() const
         return {};
     }
     return s->vigenteHasta->toLocalTime().date().toString(QStringLiteral("yyyy-MM-dd"));
+}
+
+int PerfilesSatViewModel::seleccionDiasParaVencer() const
+{
+    const auto s = seleccion();
+    return s ? s->diasParaVencer.value_or(-1) : -1;
 }
 
 bool PerfilesSatViewModel::tieneCredencial() const

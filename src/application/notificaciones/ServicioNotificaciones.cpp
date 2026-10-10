@@ -106,6 +106,44 @@ std::optional<Notificacion> ServicioNotificaciones::componerCredencial(const Per
     return n;
 }
 
+Notificacion ServicioNotificaciones::componerVencimiento(const PerfilId& perfil, const QString& rfc,
+                                                        const QDateTime& vigenteHasta, int umbral, int dias)
+{
+    Notificacion n;
+    n.tipo = QStringLiteral("efirma_por_vencer");
+    n.id = QStringLiteral("vencimiento:%1:%2:%3")
+               .arg(perfil.texto(), vigenteHasta.toUTC().toString(Qt::ISODate))
+               .arg(umbral);
+    n.titulo = QStringLiteral("e.firma por vencer");
+    const QString fecha = fechaslegibles::fecha(vigenteHasta.toLocalTime().date());
+    QString resultado;
+    if (dias <= 0) {
+        resultado = QStringLiteral("La e.firma vence hoy (%1).").arg(fecha);
+    } else if (dias == 1) {
+        resultado = QStringLiteral("La e.firma vence en 1 día (%1).").arg(fecha);
+    } else {
+        resultado = QStringLiteral("La e.firma vence en %1 días (%2).").arg(dias).arg(fecha);
+    }
+    QString contextoLinea = QStringLiteral("Reemplázala en Perfiles SAT.");
+    const QString rfcCorto = rfcEnmascarado(rfc);
+    if (!rfcCorto.isEmpty()) {
+        contextoLinea = QStringLiteral("RFC ") + rfcCorto + QStringLiteral(" \u00B7 ") + contextoLinea;
+    }
+    n.cuerpo = dosLineas(resultado, contextoLinea);
+    return n;
+}
+
+void ServicioNotificaciones::notificarVencimiento(const PerfilId& perfil, const QString& rfc,
+                                                  const QDateTime& vigenteHasta, int umbral, int dias)
+{
+    Notificacion n = componerVencimiento(perfil, rfc, vigenteHasta, umbral, dias);
+    if (m_emitidas.contains(n.id)) {
+        return;
+    }
+    m_emitidas.insert(n.id);
+    m_notificador.notificar(n);
+}
+
 void ServicioNotificaciones::alConfirmarTransicion(const TransicionNotificable& transicion)
 {
     Notificacion n = componer(transicion);

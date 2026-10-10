@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ports/repositories/AvisoVencimientoRepository.h"
 #include "ports/repositories/ConfiguracionAppRepository.h"
 #include "ports/repositories/CredencialSatRepository.h"
 #include "ports/repositories/LogSolicitudRepository.h"
@@ -84,6 +85,19 @@ public:
     Resultado<int, ErrorPersistencia>
     marcarEliminadosPorSolicitud(const SolicitudId& solicitudId,
                                  const QDateTime& eliminadoEn) override;
+
+private:
+    SqliteConnectionProvider& m_proveedor;
+};
+
+// T014.3: dedupe de avisos de vencimiento (migracion 005). Implementado en
+// SqliteCredencialSatRepository.cpp (mismo dominio de credencial).
+class SqliteAvisoVencimientoRepository final : public AvisoVencimientoRepository {
+public:
+    explicit SqliteAvisoVencimientoRepository(SqliteConnectionProvider& proveedor);
+
+    Resultado<bool, ErrorPersistencia> registrarSiNuevo(const PerfilId& perfil, const QDateTime& vigenteHasta,
+                                                        int umbralDias, const QDateTime& avisadoEn) override;
 
 private:
     SqliteConnectionProvider& m_proveedor;

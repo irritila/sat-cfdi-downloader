@@ -11,6 +11,8 @@ qt_add_library(satcfdi_domain STATIC
     common/Rfc.cpp
     configuracion/ConfiguracionApp.h
     credenciales/CredencialSat.h
+    credenciales/VencimientoEFirma.h
+    credenciales/VencimientoEFirma.cpp
     logs/LogSolicitud.h
     logs/LogSolicitud.cpp
     perfiles/PerfilId.h

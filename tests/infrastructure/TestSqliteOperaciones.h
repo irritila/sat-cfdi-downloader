@@ -12,6 +12,7 @@ class TestSqliteOperaciones : public QObject {
 private slots:
     void migracion003SobreBase002ConDatos();
     void migracion004SobreBase003ConDatos();
+    void migracion005SobreBase004ConDatosYDedupe();
     void intencionesPorPaquete();
     void escriturasExigenTransaccion();
     void perfilesConTrabajo();

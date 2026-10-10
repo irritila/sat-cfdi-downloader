@@ -4,6 +4,8 @@ import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
 
+import "Etiquetas.js" as Etiquetas
+
 // Perfiles SAT (T013, traspaso "PerfilesSatPage"; UX-31..UX-34). Solo layout y
 // estado visual: reglas, elegibilidad y errores vienen de los view models.
 //
@@ -245,6 +247,7 @@ Page {
                     activo: model.activo
                     listo: model.listoParaSolicitudes
                     vigenteHasta: model.vigenteHasta
+                    diasParaVencer: model.diasParaVencer
                     disponibilidad: !model.activo
                         ? qsTr("Inactivo: no disponible para solicitudes")
                         : (model.listoParaSolicitudes ? qsTr("Disponible para solicitudes")
@@ -470,6 +473,16 @@ Page {
                                     grande: true
                                     clave: pagina.preparacion
                                     texto: pagina.perfiles.seleccionEstadoTexto
+                                    contexto: qsTr("e.firma")
+                                }
+                                // T014.3 D2: aviso de vencimiento (30 y 7 dias).
+                                EstadoBadge {
+                                    objectName: "badgeVencimientoSeleccion"
+                                    visible: texto.length > 0
+                                    grande: true
+                                    tonoDirecto: "advertencia"
+                                    iconoDirecto: "calendar-exclamation"
+                                    texto: Etiquetas.venceEn(pagina.perfiles.seleccionDiasParaVencer)
                                     contexto: qsTr("e.firma")
                                 }
                                 Label {

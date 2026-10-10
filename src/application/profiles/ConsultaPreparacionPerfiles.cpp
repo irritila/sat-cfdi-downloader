@@ -2,6 +2,7 @@
 
 #include "application/profiles/CredencialesSatService.h"
 #include "application/profiles/PerfilesSatService.h"
+#include "domain/credenciales/VencimientoEFirma.h"
 
 #include <QFuture>
 
@@ -46,7 +47,7 @@ PerfilConPreparacion noDisponible(const PerfilResumen& perfil)
 }
 
 PerfilConPreparacion desdeResumen(const PerfilResumen& perfil,
-                                  const CredencialesSatService::ResultadoResumen& r)
+                                  const CredencialesSatService::ResultadoResumen& r, const QDateTime& ahora)
 {
     if (!r.esExito()) {
         return noDisponible(perfil);
@@ -56,17 +57,22 @@ PerfilConPreparacion desdeResumen(const PerfilResumen& perfil,
     if (preparacion != PreparacionPerfil::SinCredencial) {
         vigenteHasta = r.valor().vigenteHasta;
     }
-    return PerfilConPreparacion::componer(perfil, preparacion, std::move(vigenteHasta));
+    PerfilConPreparacion c = PerfilConPreparacion::componer(perfil, preparacion, std::move(vigenteHasta));
+    if (c.preparacion == PreparacionPerfil::Lista && c.vigenteHasta) {
+        c.diasParaVencer = vencimientoefirma::diasParaVencer(*c.vigenteHasta, ahora);
+    }
+    return c;
 }
 
 } // namespace
 
 ConsultaPreparacionPerfiles::ConsultaPreparacionPerfiles(PerfilesSatService& perfiles,
                                                          CredencialesSatService& credenciales,
-                                                         QObject* parent)
+                                                         QObject* parent, RelojUtc reloj)
     : QObject(parent)
     , m_perfiles(perfiles)
     , m_credenciales(credenciales)
+    , m_reloj(reloj ? std::move(reloj) : relojSistema())
 {
 }
 
@@ -88,7 +94,9 @@ QFuture<ConsultaPreparacionPerfiles::ResultadoLista> ConsultaPreparacionPerfiles
 QFuture<PerfilConPreparacion> ConsultaPreparacionPerfiles::verificar(const PerfilResumen& perfil)
 {
     return m_credenciales.obtenerResumen(perfil.id)
-        .then(this, [perfil](CredencialesSatService::ResultadoResumen r) { return desdeResumen(perfil, r); })
+        .then(this, [perfil, reloj = m_reloj](CredencialesSatService::ResultadoResumen r) {
+            return desdeResumen(perfil, r, reloj());
+        })
         .onFailed(this, [perfil]() { return noDisponible(perfil); })
         .onCanceled(this, [perfil]() { return noDisponible(perfil); });
 }

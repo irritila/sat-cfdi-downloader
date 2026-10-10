@@ -337,6 +337,31 @@ TestCase {
         verify(findChild(f, "disponibilidadPerfil").font.italic)
     }
 
+    // T014.3 D2: badge "Vence en N días" (advertencia, con icono y texto).
+    function test_filaPerfilVencimiento_data() { return temas() }
+    function test_filaPerfilVencimiento(fila) {
+        Theme.oscuro = fila.oscuro
+        const f = crear(perfilComp, { rfc: "XAXX010101000", preparacion: "Lista", estadoTexto: "e.firma lista",
+                                      listo: true, vigenteHasta: new Date(2026, 9, 17) })
+        const badge = findChild(f, "badgeVencimientoPerfil")
+        verify(!badge.visible)
+        verify(f.Accessible.name.indexOf("Vence") < 0)
+        f.diasParaVencer = 7
+        verify(badge.visible)
+        compare(badge.texto, "Vence en 7 días")
+        compare(badge.tono, "advertencia")
+        compare(badge.icono, "calendar-exclamation")
+        compare(badge.color, Theme.tonoAdvertenciaFondo)
+        compare(findChild(badge, "iconoBadge").color, Theme.tonoAdvertenciaTexto)
+        verify(f.Accessible.name.indexOf("Vence en 7 días") > 0)
+        f.diasParaVencer = 1
+        compare(badge.texto, "Vence en 1 día")
+        f.diasParaVencer = 0
+        compare(badge.texto, "Vence hoy")
+        f.diasParaVencer = -1
+        verify(!badge.visible)
+    }
+
     // ---- FilaSolicitud -------------------------------------------------
     function test_filaSolicitud_data() { return temas() }
     function test_filaSolicitud(fila) {

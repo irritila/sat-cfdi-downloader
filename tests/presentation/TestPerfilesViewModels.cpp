@@ -163,7 +163,7 @@ void TestPerfilesViewModels::rolesExactosSinSecretos()
         QStringLiteral("nombre"),      QStringLiteral("activo"),
         QStringLiteral("preparacion"), QStringLiteral("listoParaSolicitudes"),
         QStringLiteral("verificando"), QStringLiteral("estadoTexto"),
-        QStringLiteral("vigenteHasta"),
+        QStringLiteral("vigenteHasta"), QStringLiteral("diasParaVencer"), // T014.3 D2
     };
     esperados.sort();
     QCOMPARE(roles, esperados);
@@ -172,8 +172,9 @@ void TestPerfilesViewModels::rolesExactosSinSecretos()
     const PerfilResumen activo = FakePerfilesSatService::perfil("AAA010101AAA", "Activo");
     const PerfilResumen inactivo = FakePerfilesSatService::perfil("BBB010101BBB", "Inactivo", false);
     const QDateTime vigencia(QDate(2027, 1, 31), QTime(23, 59), QTimeZone::UTC);
-    modelo.reemplazar({PerfilConPreparacion::componer(activo, PreparacionPerfil::Lista, vigencia),
-                       PerfilConPreparacion::componer(inactivo, PreparacionPerfil::Lista)});
+    PerfilConPreparacion porVencer = PerfilConPreparacion::componer(activo, PreparacionPerfil::Lista, vigencia);
+    porVencer.diasParaVencer = 7;
+    modelo.reemplazar({porVencer, PerfilConPreparacion::componer(inactivo, PreparacionPerfil::Lista)});
     const QModelIndex i0 = modelo.index(0);
     const QModelIndex i1 = modelo.index(1);
     QCOMPARE(i0.data(PerfilesSatListModel::ListoParaSolicitudesRole).toBool(), true);
@@ -181,6 +182,9 @@ void TestPerfilesViewModels::rolesExactosSinSecretos()
     QCOMPARE(i0.data(PerfilesSatListModel::PreparacionRole).toString(), QStringLiteral("Lista"));
     QCOMPARE(i0.data(PerfilesSatListModel::VigenteHastaRole).toDateTime(), vigencia);
     QVERIFY(i1.data(PerfilesSatListModel::VigenteHastaRole).isNull());
+    // T014.3 D2: dias para vencer (o -1 sin aviso).
+    QCOMPARE(i0.data(PerfilesSatListModel::DiasParaVencerRole).toInt(), 7);
+    QCOMPARE(i1.data(PerfilesSatListModel::DiasParaVencerRole).toInt(), -1);
     QVERIFY(!i0.data(PerfilesSatListModel::EstadoTextoRole).toString().isEmpty());
     QCOMPARE(modelo.filaDe(inactivo.id.texto()), 1);
 }

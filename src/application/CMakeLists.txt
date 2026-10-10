@@ -35,6 +35,11 @@ qt_add_library(satcfdi_application STATIC
     operaciones/WorkerLocal.h
     operaciones/WorkerLocal.cpp
     paquetes/AccesoPaquetesService.h
+    primeruso/ConsultaPrimerUso.h
+    vencimiento/AvisoVencimientoEFirma.h
+    vencimiento/AvisoVencimientoEFirma.cpp
+    primeruso/ConsultaPrimerUsoPersistida.h
+    primeruso/ConsultaPrimerUsoPersistida.cpp
     paquetes/AccesoPaquetesService.cpp
     persistence/PersistenceDispatcher.h
     persistence/PersistenceDispatcher.cpp

@@ -11,6 +11,8 @@ import "Etiquetas.js" as Etiquetas
 //   preparacion del perfil). Vacia -> tono neutro.
 // - texto: texto visible (por omision el de estadoResumen).
 // - contexto: prefijo del nombre accesible ("Estado", "Estado SAT"...).
+// - tonoDirecto/iconoDirecto (T014.3): para avisos que no son un estado
+//   ("Vence en N días"): tono de Theme.tono() e icono propios.
 Rectangle {
     id: badge
 
@@ -19,8 +21,12 @@ Rectangle {
     property string contexto: qsTr("Estado")
     property bool eFirma: false
     property bool grande: false
+    property string tonoDirecto: ""
+    property string iconoDirecto: ""
 
-    readonly property var estilo: badge.eFirma ? Theme.estadoEFirma(badge.clave) : Theme.estado(badge.clave)
+    readonly property var estilo: badge.tonoDirecto.length > 0
+                                  ? Object.assign({ icono: badge.iconoDirecto }, Theme.tono(badge.tonoDirecto))
+                                  : badge.eFirma ? Theme.estadoEFirma(badge.clave) : Theme.estado(badge.clave)
     readonly property string tono: badge.estilo.tono
     readonly property string icono: badge.estilo.icono
 

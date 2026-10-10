@@ -57,6 +57,10 @@ struct PerfilConPreparacion {
     // notAfter de la metadata 002 (sin descifrar); nullopt si no hay
     // credencial, la fila es previa a 002 o el estado no esta disponible.
     std::optional<QDateTime> vigenteHasta;
+    // T014.3 D2: dias para vencer (0..30) solo con preparacion Lista y
+    // vigenteHasta dentro de 30 dias; nullopt en cualquier otro caso. La UI
+    // muestra "Vence en N días".
+    std::optional<int> diasParaVencer;
 
     static PerfilConPreparacion componer(PerfilResumen perfil, PreparacionPerfil preparacion,
                                          std::optional<QDateTime> vigenteHasta = std::nullopt)

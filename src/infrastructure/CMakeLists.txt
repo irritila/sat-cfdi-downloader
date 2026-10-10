@@ -37,6 +37,7 @@ qt_add_resources(satcfdi_infrastructure "satcfdi_migrations"
         persistence/migrations/002_credencial_metadata.sql
         persistence/migrations/003_worker_ejecutor.sql
         persistence/migrations/004_reintento_paquete.sql
+        persistence/migrations/005_aviso_vencimiento_efirma.sql
 )
 
 target_include_directories(satcfdi_infrastructure PUBLIC

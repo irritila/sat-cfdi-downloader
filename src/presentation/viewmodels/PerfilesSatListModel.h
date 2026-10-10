@@ -16,7 +16,9 @@ namespace satcfdi {
 //   id (UUID texto), rfc, nombre, activo, preparacion (clave estable de
 //   PreparacionPerfil), listoParaSolicitudes (derivado por aplicacion; QML no
 //   lo recalcula), verificando, estadoTexto (texto visible de la
-//   preparacion, no depende del color) y vigenteHasta (QDateTime UTC o null).
+//   preparacion, no depende del color), vigenteHasta (QDateTime UTC o null)
+//   y (T014.3 D2) diasParaVencer (0..30 o -1 si no aplica; lo calcula
+//   aplicacion solo con e.firma Lista).
 // Sin rutas, contrasenas ni datos del certificado. La identidad es `id`,
 // nunca el indice. Lo alimenta PerfilesSatViewModel (no invocable desde QML).
 class PerfilesSatListModel : public QAbstractListModel {
@@ -37,6 +39,7 @@ public:
         VerificandoRole,
         EstadoTextoRole,
         VigenteHastaRole,
+        DiasParaVencerRole,
     };
     Q_ENUM(Rol)
 

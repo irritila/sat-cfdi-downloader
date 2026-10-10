@@ -65,6 +65,8 @@ QVariant PerfilesSatListModel::data(const QModelIndex& index, int role) const
         return textoDe(p.preparacion);
     case VigenteHastaRole:
         return p.vigenteHasta ? QVariant(*p.vigenteHasta) : QVariant::fromValue(nullptr);
+    case DiasParaVencerRole:
+        return p.diasParaVencer.value_or(-1);
     default:
         return {};
     }
@@ -82,6 +84,7 @@ QHash<int, QByteArray> PerfilesSatListModel::roleNames() const
         {VerificandoRole, "verificando"},
         {EstadoTextoRole, "estadoTexto"},
         {VigenteHastaRole, "vigenteHasta"},
+        {DiasParaVencerRole, "diasParaVencer"},
     };
 }
 

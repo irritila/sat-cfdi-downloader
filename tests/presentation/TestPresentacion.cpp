@@ -16,6 +16,8 @@
 #include "fakes/FakeCredencialesSatService.h"
 #include "fakes/FakePerfilesSatService.h"
 
+#include "application/primeruso/ConsultaPrimerUso.h"
+#include "domain/credenciales/VencimientoEFirma.h"
 #include "application/profiles/DemoPerfilesSatService.h"
 #include "AccionesFinder.h"
 #include "AccionesSolicitud.h"
@@ -23,6 +25,8 @@
 #include "AppViewModel.h"
 #include "FormatoFechas.h"
 #include "NuevaSolicitudViewModel.h"
+#include "PerfilesSatListModel.h"
+#include "PerfilesSatViewModel.h"
 #include "PresentacionViewModels.h"
 #include "SolicitudDetailViewModel.h"
 #include "SolicitudesFiltroModel.h"
@@ -111,8 +115,8 @@ void procesarEventos()
 // Orden de miembros: view models -> engine (el engine se destruye primero).
 struct Vista {
     Vista(SolicitudesService* solicitudes, PerfilesSatService* perfiles,
-          CredencialesSatService* credenciales)
-        : vms(solicitudes, perfiles, credenciales)
+          CredencialesSatService* credenciales, RelojUtc reloj = relojSistema())
+        : vms(solicitudes, perfiles, credenciales, nullptr, std::move(reloj))
     {
     }
 
@@ -446,6 +450,13 @@ private slots:
 
     // T014.2: reintento por paquete
     void reintentoPorPaquete();
+
+    // T014.3: primer uso y vencimiento de e.firma
+    void guiaPrimerUsoPorPasos();
+    void guiaPrimerUsoCargandoOConErrorNoSeMuestra();
+    void badgeVencimientoEnPerfiles();
+    void guiaPrimerUsoRefrescoFallidoLaOculta();
+    void badgeConElMismoRelojQueElAviso();
 };
 
 void TestPresentacion::init()
@@ -2543,4 +2554,286 @@ void TestPresentacion::reintentoPorPaquete()
     e.vms.setAccionesSolicitud(nullptr);
     // Sin acciones no se ofrece reintento aunque el DTO lo permita.
     QVERIFY(!d->paquetes().at(0).toMap().value(QStringLiteral("puedeReintentar")).toBool());
+}
+
+// ---------------------------------------------------------------------------
+// T014.3: primer uso y vencimiento de e.firma
+
+namespace {
+
+struct ConsultaPrimerUsoEspia final : ConsultaPrimerUso {
+    QList<std::shared_ptr<QPromise<ResultadoPrimerUso>>> promesas;
+    QFuture<ResultadoPrimerUso> consultar() override
+    {
+        auto p = std::make_shared<QPromise<ResultadoPrimerUso>>();
+        p->start();
+        promesas.append(p);
+        return p->future();
+    }
+    void resolver(int i, EstadoPrimerUso e)
+    {
+        promesas.at(i)->addResult(ResultadoPrimerUso::exito(e));
+        promesas.at(i)->finish();
+    }
+    void fallar(int i)
+    {
+        promesas.at(i)->addResult(ResultadoPrimerUso::fallo(
+            ErrorPersistencia::de(ErrorPersistencia::Tipo::Almacenamiento, QStringLiteral("x"))));
+        promesas.at(i)->finish();
+    }
+};
+
+QString iconoDePaso(const Vista& v, const QString& paso)
+{
+    QQuickItem* icono = buscar(v.item(paso), QStringLiteral("iconoPaso"));
+    return icono ? icono->property("nombre").toString() : QString();
+}
+
+QString varianteDe(const Vista& v, const QString& nombre)
+{
+    QQuickItem* boton = v.item(nombre);
+    return boton ? boton->property("variante").toString() : QString();
+}
+
+} // namespace
+
+void TestPresentacion::guiaPrimerUsoPorPasos()
+{
+    EscenarioAsincrono e;
+    ConsultaPrimerUsoEspia consulta;
+    QVERIFY(e.cargar());
+    QVERIFY(e.activar());
+    AppViewModel* app = e.vms.app();
+    e.solicitudes.lista.resolver(0, ResultadoListaSol::exito({}));
+    QTRY_VERIFY(e.item(QStringLiteral("estadoVacio")) && e.item(QStringLiteral("estadoVacio"))->isVisible());
+
+    // Instalacion sin perfiles: tres pasos sin marcar; el primero es la accion principal.
+    e.vms.setConsultaPrimerUso(&consulta);
+    QCOMPARE(consulta.promesas.size(), 1);
+    consulta.resolver(0, {false, false, false});
+    QTRY_VERIFY(app->mostrarGuiaPrimerUso());
+    QTRY_VERIFY(e.item(QStringLiteral("guiaPrimerUso"))->isVisible());
+    QVERIFY(!e.item(QStringLiteral("estadoVacio"))->isVisible());
+    for (const char* paso : {"pasoPerfil", "pasoEFirma", "pasoSolicitud"}) {
+        QCOMPARE(iconoDePaso(e, QString::fromLatin1(paso)), QStringLiteral("circle-dashed"));
+        QVERIFY(nombreAccesible(e.item(QString::fromLatin1(paso))).endsWith(QStringLiteral("pendiente")));
+    }
+    QCOMPARE(nombreAccesible(e.item(QStringLiteral("pasoPerfil"))),
+             QStringLiteral("Paso 1 de 3: Crea un perfil SAT con el RFC del contribuyente, pendiente"));
+    QCOMPARE(varianteDe(e, QStringLiteral("boton_pasoPerfil")), QStringLiteral("primario"));
+    QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("boton_pasoPerfil"));
+
+    // Cada paso abre su pantalla.
+    QMetaObject::invokeMethod(e.item(QStringLiteral("boton_pasoPerfil")), "click");
+    QTRY_COMPARE(app->pagina(), Pagina::Perfiles);
+    app->mostrarLista();
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
+
+    // Perfil creado: paso 1 marcado. Un refresco conserva el ultimo resultado
+    // valido (sin parpadeo): no pasa a "cargando".
+    emit e.perfiles.perfilesCambiaron();
+    QCOMPARE(consulta.promesas.size(), 2);
+    QVERIFY(!app->primerUsoCargando());
+    QVERIFY(app->mostrarGuiaPrimerUso());
+    QTRY_VERIFY(e.item(QStringLiteral("guiaPrimerUso"))->isVisible());
+    consulta.resolver(1, {true, false, false});
+    QTRY_COMPARE(iconoDePaso(e, QStringLiteral("pasoPerfil")), QStringLiteral("check-circle"));
+    QVERIFY(nombreAccesible(e.item(QStringLiteral("pasoPerfil"))).endsWith(QStringLiteral("hecho")));
+    QCOMPARE(iconoDePaso(e, QStringLiteral("pasoEFirma")), QStringLiteral("circle-dashed"));
+    QCOMPARE(varianteDe(e, QStringLiteral("boton_pasoEFirma")), QStringLiteral("primario"));
+    QCOMPARE(varianteDe(e, QStringLiteral("boton_pasoPerfil")), QStringLiteral("secundario"));
+    QMetaObject::invokeMethod(e.item(QStringLiteral("boton_pasoEFirma")), "click");
+    QTRY_COMPARE(app->pagina(), Pagina::Perfiles);
+    app->mostrarLista();
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
+
+    // e.firma registrada: paso 2 marcado; el siguiente es la primera solicitud.
+    emit e.credenciales.credencialCambio(perfilDePrueba().id.texto());
+    QTRY_COMPARE(consulta.promesas.size(), 3);
+    consulta.resolver(2, {true, true, false});
+    QTRY_COMPARE(iconoDePaso(e, QStringLiteral("pasoEFirma")), QStringLiteral("check-circle"));
+    QCOMPARE(varianteDe(e, QStringLiteral("boton_pasoSolicitud")), QStringLiteral("primario"));
+    QMetaObject::invokeMethod(e.item(QStringLiteral("boton_pasoSolicitud")), "click");
+    QTRY_COMPARE(app->pagina(), Pagina::Nueva);
+    app->mostrarLista();
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
+
+    // Primera solicitud: la guia desaparece y se ve la lista.
+    const int lecturas = int(e.solicitudes.lista.size());
+    emit e.solicitudes.listaCambiada();
+    QTRY_COMPARE(int(e.solicitudes.lista.size()), lecturas + 1);
+    e.solicitudes.lista.resolver(lecturas, ResultadoListaSol::exito({resumenDePrueba(SolicitudId::generar())}));
+    QTRY_COMPARE(consulta.promesas.size(), 4);
+    consulta.resolver(3, {true, true, true});
+    QTRY_VERIFY(!app->mostrarGuiaPrimerUso());
+    QTRY_VERIFY(e.item(QStringLiteral("listaSolicitudes"))->isVisible());
+    QVERIFY(!e.item(QStringLiteral("guiaPrimerUso"))->isVisible());
+    e.vms.setConsultaPrimerUso(nullptr);
+}
+
+void TestPresentacion::guiaPrimerUsoCargandoOConErrorNoSeMuestra()
+{
+    EscenarioAsincrono e;
+    ConsultaPrimerUsoEspia consulta;
+    QVERIFY(e.cargar());
+    QVERIFY(QTest::qWaitForWindowExposed(e.ventana));
+    AppViewModel* app = e.vms.app();
+    e.solicitudes.lista.resolver(0, ResultadoListaSol::exito({}));
+    QTRY_VERIFY(e.item(QStringLiteral("estadoVacio")) && e.item(QStringLiteral("estadoVacio"))->isVisible());
+
+    // Sin consulta (shell sin root): estado vacio normal.
+    QVERIFY(!app->mostrarGuiaPrimerUso());
+    QVERIFY(!app->primerUsoCargando());
+    QVERIFY(!e.item(QStringLiteral("guiaPrimerUso"))->isVisible());
+
+    // Cargando: sin guia.
+    e.vms.setConsultaPrimerUso(&consulta);
+    QVERIFY(app->primerUsoCargando());
+    QVERIFY(!app->mostrarGuiaPrimerUso());
+    procesarEventos();
+    QVERIFY(!e.item(QStringLiteral("guiaPrimerUso"))->isVisible());
+    QVERIFY(e.item(QStringLiteral("estadoVacio"))->isVisible());
+
+    // Error: sin guia, estado vacio normal.
+    consulta.fallar(0);
+    QTRY_VERIFY(app->primerUsoError());
+    QVERIFY(!app->primerUsoCargando());
+    QVERIFY(!app->mostrarGuiaPrimerUso());
+    QVERIFY(!e.item(QStringLiteral("guiaPrimerUso"))->isVisible());
+    QVERIFY(e.item(QStringLiteral("estadoVacio"))->isVisible());
+
+    // Reintento tras el error: carga de nuevo; una respuesta tardia se descarta.
+    app->refrescarPrimerUso();
+    QVERIFY(app->primerUsoCargando());
+    app->refrescarPrimerUso();
+    QCOMPARE(consulta.promesas.size(), 3);
+    consulta.resolver(1, {false, false, false}); // tardia
+    procesarEventos();
+    QVERIFY(app->primerUsoCargando());
+    QVERIFY(!e.item(QStringLiteral("guiaPrimerUso"))->isVisible());
+    consulta.resolver(2, {true, false, false});
+    QTRY_VERIFY(app->mostrarGuiaPrimerUso());
+    QCOMPARE(app->primerUsoPasos(), (QVariantList{true, false, false}));
+    QTRY_VERIFY(e.item(QStringLiteral("guiaPrimerUso"))->isVisible());
+    e.vms.setConsultaPrimerUso(nullptr);
+}
+
+void TestPresentacion::guiaPrimerUsoRefrescoFallidoLaOculta()
+{
+    EscenarioAsincrono e;
+    ConsultaPrimerUsoEspia consulta;
+    QVERIFY(e.cargar());
+    QVERIFY(QTest::qWaitForWindowExposed(e.ventana));
+    AppViewModel* app = e.vms.app();
+    e.solicitudes.lista.resolver(0, ResultadoListaSol::exito({}));
+    e.vms.setConsultaPrimerUso(&consulta);
+    consulta.resolver(0, {true, false, false});
+    QTRY_VERIFY(e.item(QStringLiteral("guiaPrimerUso")) && e.item(QStringLiteral("guiaPrimerUso"))->isVisible());
+
+    // Un refresco que falla oculta la guia (estado vacio normal).
+    emit e.perfiles.perfilesCambiaron();
+    QCOMPARE(consulta.promesas.size(), 2);
+    QVERIFY(app->mostrarGuiaPrimerUso()); // mientras refresca, el ultimo resultado valido
+    consulta.fallar(1);
+    QTRY_VERIFY(app->primerUsoError());
+    QVERIFY(!app->mostrarGuiaPrimerUso());
+    QTRY_VERIFY(!e.item(QStringLiteral("guiaPrimerUso"))->isVisible());
+    QVERIFY(e.item(QStringLiteral("estadoVacio"))->isVisible());
+
+    // Tras el error, el siguiente refresco es una carga sin guia hasta resolver.
+    app->refrescarPrimerUso();
+    QVERIFY(app->primerUsoCargando());
+    QVERIFY(!app->mostrarGuiaPrimerUso());
+    consulta.resolver(2, {true, true, false});
+    QTRY_VERIFY(app->mostrarGuiaPrimerUso());
+    e.vms.setConsultaPrimerUso(nullptr);
+}
+
+void TestPresentacion::badgeConElMismoRelojQueElAviso()
+{
+    // Reloj fijo, distinto de la hora real: el badge debe usarlo (no el del sistema).
+    const QDateTime ahora(QDate(2026, 10, 1), QTime(10, 0), QTimeZone::UTC);
+    const RelojUtc reloj = [ahora] { return ahora; };
+    ServiciosAsincronos s;
+    Vista v(&s.solicitudes, &s.perfiles, &s.credenciales, reloj);
+    QVERIFY(v.cargar());
+    QVERIFY(QTest::qWaitForWindowExposed(v.ventana));
+    s.solicitudes.lista.resolver(0, ResultadoListaSol::exito({}));
+    v.vms.app()->mostrarPerfiles();
+    QTRY_COMPARE(v.pagina()->objectName(), QStringLiteral("paginaPerfilesSat"));
+    QTRY_COMPARE(s.perfiles.listas.size(), 1);
+
+    const PerfilResumen perfil = fakes::FakePerfilesSatService::perfil("AAA010101AAA", "Por vencer");
+    const QDateTime vigencia(QDate(2026, 10, 8), QTime(12, 0), QTimeZone::UTC);
+    const int base = int(s.credenciales.resumenes.size());
+    s.perfiles.listas.resolver(0, ResultadoListaPerfiles::exito({perfil}));
+    QTRY_COMPARE(int(s.credenciales.resumenes.size()), base + 1);
+    s.credenciales.resolverResumen(base, EstadoCredencial::Lista, vigencia);
+
+    // La misma regla y el mismo reloj que AvisoVencimientoEFirma::evaluar().
+    const std::optional<int> delAviso = vencimientoefirma::diasParaVencer(vigencia, reloj());
+    QCOMPARE(delAviso, std::optional<int>(7));
+    QCOMPARE(vencimientoefirma::umbralPara(*delAviso), vencimientoefirma::kUmbralUrgente);
+    PerfilesSatViewModel* p = v.vms.perfiles();
+    QTRY_COMPARE(p->perfiles()->index(0).data(PerfilesSatListModel::DiasParaVencerRole).toInt(), *delAviso);
+    QQuickItem* badge = nullptr;
+    QTRY_VERIFY((badge = buscar(v.item(QStringLiteral("filaPerfil_0")), QStringLiteral("badgeVencimientoPerfil")))
+                && badge->isVisible());
+    QCOMPARE(badge->property("texto").toString(), QStringLiteral("Vence en 7 días"));
+    QVERIFY(p->seleccionar(perfil.id.texto()));
+    QTRY_COMPARE(p->seleccionDiasParaVencer(), *delAviso);
+    QTRY_COMPARE(v.item(QStringLiteral("badgeVencimientoSeleccion"))->property("texto").toString(),
+                 QStringLiteral("Vence en 7 días"));
+}
+
+void TestPresentacion::badgeVencimientoEnPerfiles()
+{
+    EscenarioAsincrono e;
+    QVERIFY(e.cargar());
+    QVERIFY(e.activar());
+    e.solicitudes.lista.resolver(0, ResultadoListaSol::exito({}));
+    e.vms.app()->mostrarPerfiles();
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaPerfilesSat"));
+    QTRY_COMPARE(e.perfiles.listas.size(), 1);
+
+    // Dos perfiles Lista: uno vence en ~10 dias (con badge) y otro en un ano (sin badge).
+    const PerfilResumen porVencer = fakes::FakePerfilesSatService::perfil("AAA010101AAA", "Por vencer");
+    const PerfilResumen vigente = fakes::FakePerfilesSatService::perfil("BBB010101BBB", "Vigente");
+    const QDateTime ahora = QDateTime::currentDateTimeUtc();
+    const int base = int(e.credenciales.resumenes.size());
+    e.perfiles.listas.resolver(0, ResultadoListaPerfiles::exito({porVencer, vigente}));
+    QTRY_COMPARE(int(e.credenciales.resumenes.size()), base + 2);
+    for (int i = 0; i < 2; ++i) {
+        const bool esPorVencer = e.credenciales.idsResumen.at(base + i) == porVencer.id;
+        e.credenciales.resolverResumen(base + i, EstadoCredencial::Lista,
+                                       ahora.addDays(esPorVencer ? 10 : 400));
+    }
+    PerfilesSatViewModel* p = e.vms.perfiles();
+    const int fila = p->perfiles()->filaDe(porVencer.id.texto());
+    const int otra = p->perfiles()->filaDe(vigente.id.texto());
+    QTRY_VERIFY(p->perfiles()->index(fila).data(PerfilesSatListModel::DiasParaVencerRole).toInt() >= 0);
+    const int dias = p->perfiles()->index(fila).data(PerfilesSatListModel::DiasParaVencerRole).toInt();
+    QVERIFY(dias >= 9 && dias <= 10);
+    QCOMPARE(p->perfiles()->index(otra).data(PerfilesSatListModel::DiasParaVencerRole).toInt(), -1);
+
+    const QString esperado = QStringLiteral("Vence en %1 días").arg(dias);
+    QQuickItem* badge = nullptr;
+    QTRY_VERIFY((badge = buscar(e.item(QStringLiteral("filaPerfil_%1").arg(fila)),
+                                QStringLiteral("badgeVencimientoPerfil")))
+                && badge->isVisible());
+    QCOMPARE(badge->property("texto").toString(), esperado);
+    QCOMPARE(badge->property("tono").toString(), QStringLiteral("advertencia"));
+    QCOMPARE(badge->property("icono").toString(), QStringLiteral("calendar-exclamation"));
+    QVERIFY(nombreAccesible(e.item(QStringLiteral("filaPerfil_%1").arg(fila))).contains(esperado));
+    QVERIFY(!buscar(e.item(QStringLiteral("filaPerfil_%1").arg(otra)), QStringLiteral("badgeVencimientoPerfil"))
+                 ->isVisible());
+
+    // Grupo e.firma del perfil seleccionado.
+    QVERIFY(p->seleccionar(porVencer.id.texto()));
+    QTRY_COMPARE(p->seleccionDiasParaVencer(), dias);
+    QQuickItem* grupo = nullptr;
+    QTRY_VERIFY((grupo = e.item(QStringLiteral("badgeVencimientoSeleccion"))) && grupo->isVisible());
+    QCOMPARE(grupo->property("texto").toString(), esperado);
+    QVERIFY(p->seleccionar(vigente.id.texto()));
+    QTRY_VERIFY(!e.item(QStringLiteral("badgeVencimientoSeleccion"))->isVisible());
 }

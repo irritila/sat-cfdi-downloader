@@ -21,6 +21,7 @@ qt_add_library(satcfdi_ports STATIC
     repositories/PaqueteSolicitudRepository.h
     repositories/LogSolicitudRepository.h
     repositories/ConfiguracionAppRepository.h
+    repositories/AvisoVencimientoRepository.h
     repositories/UnitOfWork.h
 )
 

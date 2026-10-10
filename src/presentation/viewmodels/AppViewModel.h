@@ -3,11 +3,13 @@
 #include <QObject>
 #include <QPointer>
 #include <QString>
+#include <QVariantList>
 #include <QtQmlIntegration/qqmlintegration.h>
 
 namespace satcfdi {
 
 class AccionesFinder;
+class ConsultaPrimerUso;
 
 class EFirmaFormViewModel;
 class NuevaSolicitudViewModel;
@@ -48,6 +50,16 @@ class AppViewModel : public QObject {
     Q_PROPERTY(QString filtroEstado READ filtroEstado WRITE setFiltroEstado NOTIFY filtrosChanged)
     Q_PROPERTY(QString filtroTipo READ filtroTipo WRITE setFiltroTipo NOTIFY filtrosChanged)
     Q_PROPERTY(QString filtroMes READ filtroMes WRITE setFiltroMes NOTIFY filtrosChanged)
+    // T014.3 D1: primer uso, derivado de ConsultaPrimerUso (sin bandera).
+    // - primerUsoCargando: consulta en curso sin un resultado previo.
+    // - primerUsoError: la ultima consulta fallo (y no hay resultado previo).
+    // - primerUsoPasos: [hayPerfiles, hayEFirmaLista, haySolicitudes].
+    // - mostrarGuiaPrimerUso: hay resultado, no carga ni fallo y aun no hay
+    //   solicitudes. Un refresco con resultado previo lo conserva (sin parpadeo).
+    Q_PROPERTY(bool primerUsoCargando READ primerUsoCargando NOTIFY primerUsoChanged)
+    Q_PROPERTY(bool primerUsoError READ primerUsoError NOTIFY primerUsoChanged)
+    Q_PROPERTY(QVariantList primerUsoPasos READ primerUsoPasos NOTIFY primerUsoChanged)
+    Q_PROPERTY(bool mostrarGuiaPrimerUso READ mostrarGuiaPrimerUso NOTIFY primerUsoChanged)
 
 public:
     enum class Pagina {
@@ -103,6 +115,16 @@ public:
 
     Q_INVOKABLE void abrirCarpetaPaquetes();
 
+    // T014.3 D1: no propietaria; nullptr = sin guia (pruebas, shell). Al
+    // fijarla se consulta; refrescarPrimerUso() se llama cuando cambian la
+    // lista, los perfiles o una credencial (PresentacionViewModels).
+    void setConsultaPrimerUso(ConsultaPrimerUso* consulta);
+    Q_INVOKABLE void refrescarPrimerUso();
+    bool primerUsoCargando() const { return m_primerUsoCargando; }
+    bool primerUsoError() const { return m_primerUsoError; }
+    QVariantList primerUsoPasos() const;
+    bool mostrarGuiaPrimerUso() const;
+
     Q_INVOKABLE void mostrarLista();
     Q_INVOKABLE void mostrarNueva();
     Q_INVOKABLE void mostrarPerfiles();
@@ -115,6 +137,7 @@ signals:
     void notificacionesDeshabilitadasChanged();
     void mensajeFinderChanged();
     void filtrosChanged();
+    void primerUsoChanged();
 
 private:
     void setPagina(Pagina pagina);
@@ -140,6 +163,14 @@ private:
     QString m_filtroEstado;
     QString m_filtroTipo;
     QString m_filtroMes;
+    ConsultaPrimerUso* m_consultaPrimerUso = nullptr;
+    quint64 m_genPrimerUso = 0;
+    bool m_primerUsoCargando = false;
+    bool m_primerUsoError = false;
+    bool m_primerUsoConocido = false;
+    bool m_hayPerfiles = false;
+    bool m_hayEFirmaLista = false;
+    bool m_haySolicitudes = false;
 };
 
 } // namespace satcfdi

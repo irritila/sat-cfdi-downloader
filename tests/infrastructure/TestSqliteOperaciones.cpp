@@ -6,6 +6,7 @@
 #include "domain/logs/LogSolicitud.h"
 #include "domain/perfiles/PerfilSat.h"
 #include "infrastructure/persistence/sqlite/SqliteOperacionesConsultas.h"
+#include "ports/repositories/AvisoVencimientoRepository.h"
 #include "ports/repositories/LogSolicitudRepository.h"
 #include "ports/repositories/OperacionesSolicitudRepository.h"
 #include "ports/repositories/PerfilSatRepository.h"
@@ -337,7 +338,8 @@ void TestSqliteOperaciones::migracion004SobreBase003ConDatos()
     auto migrada = inicializarBaseSqlite(ruta);
     QVERIFY2(migrada, migrada ? "" : qPrintable(migrada.error().mensaje));
     QCOMPARE(migrada.valor().migracion.versionInicial, 3);
-    QCOMPARE(migrada.valor().migracion.aplicadas, QList<int>{4});
+    QCOMPARE(migrada.valor().migracion.aplicadas.first(), 4); // y las posteriores
+    QVERIFY(!migrada.valor().migracion.aplicadas.contains(3));
     QCOMPARE(migrada.valor().migracion.versionFinal, embebidas.valor().last().version);
 
     SqliteConnectionProvider prov(ruta);
@@ -367,6 +369,82 @@ void TestSqliteOperaciones::migracion004SobreBase003ConDatos()
                                .arg(citar(paqueteError))),
              QStringList{kAhora});
     otra.cerrarConexionDelHiloActual();
+}
+
+// T014.3: 005 sobre una base en 004 con datos (tabla nueva, filas previas
+// intactas), idempotente; dedupe de avisos por (perfil, vigencia, umbral).
+void TestSqliteOperaciones::migracion005SobreBase004ConDatosYDedupe()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString ruta = rutaBase(dir);
+    auto embebidas = migracionesSqliteEmbebidas();
+    QVERIFY(embebidas);
+    QVERIFY(embebidas.valor().size() >= 5);
+    QVERIFY(inicializarBaseSqlite(ruta, embebidas.valor().mid(0, 4)));
+    const QString perfil = uuid::generarCanonico();
+    const QString huellaSql = QStringLiteral(
+        "SELECT (SELECT group_concat(id || rfc || nombre, ',') FROM perfil_sat) || '|' || "
+        "(SELECT group_concat(id || estado_local, ',') FROM solicitud_masiva) || '|' || "
+        "(SELECT group_concat(id || estado_descarga || ifnull(reintento_pendiente_en, '-'), ',') FROM paquete_solicitud)");
+    QString huellaAntes;
+    {
+        SqliteConnectionProvider prov(ruta);
+        QCOMPARE(insertarPerfilFixture(prov, perfil, kRfcPerfil), QString());
+        const SolicitudFixture s = fixture(perfil, DedupKey::calcularV1("m005"), QStringLiteral("Enviada"),
+                                           QStringLiteral("Terminada"));
+        QCOMPARE(insertarSolicitudFixture(prov, s), QString());
+        const QString paq = uuid::generarCanonico();
+        QCOMPARE(insertarPaqueteFixture(prov, paq, s.id, QStringLiteral("PAQ_1"), QStringLiteral("Error")), QString());
+        QCOMPARE(ejecutarSql(prov, QStringLiteral("UPDATE paquete_solicitud SET reintento_pendiente_en = %1 WHERE id = %2")
+                                       .arg(citar(kAhora), citar(paq))),
+                 QString());
+        QVERIFY(!ejecutarSql(prov, QStringLiteral("SELECT * FROM aviso_vencimiento_efirma")).isEmpty()); // no existe
+        huellaAntes = escalar(prov, huellaSql).toString();
+        prov.cerrarConexionDelHiloActual();
+    }
+
+    auto migrada = inicializarBaseSqlite(ruta);
+    QVERIFY2(migrada, migrada ? "" : qPrintable(migrada.error().mensaje));
+    QCOMPARE(migrada.valor().migracion.versionInicial, 4);
+    QCOMPARE(migrada.valor().migracion.aplicadas, QList<int>{5});
+    {
+        SqliteConnectionProvider prov(ruta);
+        QCOMPARE(escalar(prov, huellaSql).toString(), huellaAntes);
+        QCOMPARE(escalar(prov, QStringLiteral("SELECT count(*) FROM aviso_vencimiento_efirma")).toInt(), 0);
+        // CHECK de umbral y FK de perfil.
+        QVERIFY(ejecutarSql(prov, QStringLiteral("INSERT INTO aviso_vencimiento_efirma VALUES (%1, %2, 15, %2)")
+                                      .arg(citar(perfil), citar(kAhora)))
+                    .contains(QStringLiteral("CHECK")));
+        QVERIFY(ejecutarSql(prov, QStringLiteral("INSERT INTO aviso_vencimiento_efirma VALUES (%1, %2, 30, %2)")
+                                      .arg(citar(uuid::generarCanonico()), citar(kAhora)))
+                    .contains(QStringLiteral("FOREIGN KEY")));
+        QVERIFY(consistente(prov));
+        prov.cerrarConexionDelHiloActual();
+    }
+    auto repetida = inicializarBaseSqlite(ruta);
+    QVERIFY(repetida);
+    QVERIFY(repetida.valor().migracion.aplicadas.isEmpty());
+
+    // Repositorio: registrarSiNuevo por clave; exige transaccion.
+    SqlitePersistencia p(ruta);
+    AvisoVencimientoRepository& avisos = p.avisosVencimiento();
+    const PerfilId id = pid(perfil);
+    const QDateTime vigencia = en(60 * 24 * 30);
+    auto sinTx = avisos.registrarSiNuevo(id, vigencia, 30, en(0));
+    QVERIFY(!sinTx && sinTx.error().tipo == ErrorPersistencia::Tipo::Transaccion);
+    auto registrar = [&](const QDateTime& v, int umbral) {
+        (void)p.unidadDeTrabajo().begin();
+        auto r = avisos.registrarSiNuevo(id, v, umbral, en(0));
+        (void)p.unidadDeTrabajo().commit();
+        return r;
+    };
+    QCOMPARE(registrar(vigencia, 30).valor(), true);
+    QCOMPARE(registrar(vigencia, 30).valor(), false); // dedupe
+    QCOMPARE(registrar(vigencia, 7).valor(), true);    // otro umbral
+    QCOMPARE(registrar(vigencia.addDays(365), 30).valor(), true); // reemplazo: otra vigencia
+    QCOMPARE(escalar(p.proveedor(), QStringLiteral("SELECT count(*) FROM aviso_vencimiento_efirma")).toInt(), 3);
+    p.cerrarConexionDelHiloActual();
 }
 
 // --- Transaccion requerida --------------------------------------------------------

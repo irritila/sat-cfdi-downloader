@@ -89,7 +89,7 @@ void TestSqliteMigraciones::recursoEmbebidoIgualAlFuente()
 
     auto lista = migracionesSqliteEmbebidas();
     QVERIFY(lista);
-    QCOMPARE(lista.valor().size(), 4);
+    QCOMPARE(lista.valor().size(), 5);
     for (int i = 0; i < lista.valor().size(); ++i) {
         QCOMPARE(lista.valor().at(i).version, i + 1); // consecutivas desde 1
     }
@@ -110,6 +110,12 @@ void TestSqliteMigraciones::recursoEmbebidoIgualAlFuente()
     QVERIFY(!fuente004.isEmpty());
     QCOMPARE(lista.valor().at(3).nombre, QStringLiteral("004_reintento_paquete"));
     QCOMPARE(lista.valor().at(3).sql.toUtf8(), fuente004);
+
+    // T014.3: 005 embebida igual al fuente.
+    const QByteArray fuente005 = leerArchivo(QStringLiteral(SATCFDI_MIGRACION_005_FUENTE));
+    QVERIFY(!fuente005.isEmpty());
+    QCOMPARE(lista.valor().at(4).nombre, QStringLiteral("005_aviso_vencimiento_efirma"));
+    QCOMPARE(lista.valor().at(4).sql.toUtf8(), fuente005);
 }
 
 void TestSqliteMigraciones::dividirSentenciasDm2()
@@ -175,7 +181,8 @@ void TestSqliteMigraciones::migraBaseVacia()
     const QStringList tablas = columna(
         proveedor, QStringLiteral("SELECT name FROM sqlite_master WHERE type = 'table' "
                                   "AND name NOT LIKE 'sqlite_%' ORDER BY name"));
-    QCOMPARE(tablas, (QStringList{QStringLiteral("configuracion_app"), QStringLiteral("credencial_sat"),
+    QCOMPARE(tablas, (QStringList{QStringLiteral("aviso_vencimiento_efirma"), // T014.3
+                                  QStringLiteral("configuracion_app"), QStringLiteral("credencial_sat"),
                                   QStringLiteral("log_solicitud"), QStringLiteral("paquete_solicitud"),
                                   QStringLiteral("perfil_sat"), QStringLiteral("schema_migrations"),
                                   QStringLiteral("solicitud_masiva")}));
