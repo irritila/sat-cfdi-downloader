@@ -146,6 +146,22 @@ SolicitudDetalle solicitud(int n, EstadoLocal local, std::optional<EstadoSolicit
     return d;
 }
 
+// Conteos del resumen coherentes con los paquetes (T014.1 D2, como
+// SolicitudesServicePersistido): Descargado; Disponible + Error pendientes.
+void contarPaquetes(SolicitudDetalle& d)
+{
+    d.resumen.totalPaquetes = int(d.paquetes.size());
+    d.resumen.paquetesDescargados = 0;
+    d.resumen.paquetesPendientesDescarga = 0;
+    for (const PaqueteResumen& p : d.paquetes) {
+        if (p.estadoDescarga == EstadoDescarga::Descargado) {
+            ++d.resumen.paquetesDescargados;
+        } else if (p.estadoDescarga == EstadoDescarga::Disponible || p.estadoDescarga == EstadoDescarga::Error) {
+            ++d.resumen.paquetesPendientesDescarga;
+        }
+    }
+}
+
 SolicitudDetalle solicitudTerminada()
 {
     SolicitudDetalle d = solicitud(3, EstadoLocal::Enviada, EstadoSolicitudSat::Terminada, 3);
@@ -154,7 +170,7 @@ SolicitudDetalle solicitudTerminada()
     d.ultimaVerificacionEn = kAhora.addSecs(35 * 60);
     d.paquetes = {paquete(3, 1, EstadoDescarga::Descargado), paquete(3, 2, EstadoDescarga::Disponible),
                   paquete(3, 3, EstadoDescarga::Vencido)};
-    d.resumen.totalPaquetes = int(d.paquetes.size());
+    contarPaquetes(d);
     d.logs.append(log(TipoEventoLog::VerificacionRealizada, OrigenLog::Worker, 35));
     d.logs.append(log(TipoEventoLog::PaquetesRegistrados, OrigenLog::Worker, 35));
     d.logs.append(log(TipoEventoLog::PaqueteDescargado, OrigenLog::Worker, 45));
@@ -170,7 +186,7 @@ SolicitudDetalle solicitudConIncidencia()
     PaqueteResumen error = paquete(5, 1, EstadoDescarga::Error);
     error.codigoDescargaSat = QStringLiteral("5000");
     d.paquetes = {error, paquete(5, 2, EstadoDescarga::Descargado)};
-    d.resumen.totalPaquetes = int(d.paquetes.size());
+    contarPaquetes(d);
     d.logs.append(log(TipoEventoLog::VerificacionRealizada, OrigenLog::Worker, 35));
     d.logs.append(log(TipoEventoLog::DescargaFallida, OrigenLog::Worker, 46));
     return d;

@@ -21,6 +21,9 @@ ItemDelegate {
     property string fechaInicial: ""
     property string fechaFinal: ""
     property int totalPaquetes: 0
+    // T014.1 D2: conteos calculados en application (no en QML).
+    property int paquetesDescargados: 0
+    property int paquetesPendientes: 0
     property var creadaEn: null
     property bool seleccionada: false
     property bool conFoco: false
@@ -33,9 +36,18 @@ ItemDelegate {
     readonly property string textoCreada: FormatoFechas.fechaHora(fila.creadaEn)
     readonly property string textoPaquetes: fila.totalPaquetes === 1 ? qsTr("1 paquete")
                                                                      : qsTr("%1 paquetes").arg(fila.totalPaquetes)
-    // Columna Paquetes: "—" si aun no hay paquetes y la solicitud no termino.
-    readonly property string columnaPaquetes: fila.totalPaquetes === 0 && fila.estado !== "Terminada"
-                                              ? "—" : String(fila.totalPaquetes)
+    // Columna Paquetes: "—" si aun no hay paquetes y la solicitud no termino;
+    // con paquetes, "descargados/total" con barra o un check si estan todos.
+    readonly property bool todosDescargados: fila.totalPaquetes > 0 && fila.paquetesDescargados >= fila.totalPaquetes
+    readonly property bool conProgreso: fila.totalPaquetes > 0 && !fila.todosDescargados
+    readonly property string columnaPaquetes: fila.totalPaquetes === 0
+                                              ? (fila.estado !== "Terminada" ? "—" : "0")
+                                              : fila.todosDescargados ? String(fila.totalPaquetes)
+                                              : qsTr("%1/%2").arg(fila.paquetesDescargados).arg(fila.totalPaquetes)
+    readonly property string textoProgreso: fila.totalPaquetes === 0 ? ""
+        : fila.todosDescargados ? qsTr("todos descargados")
+        : qsTr("%1 de %2 descargados").arg(fila.paquetesDescargados).arg(fila.totalPaquetes)
+    readonly property bool pendienteDescarga: fila.paquetesPendientes > 0
 
     focusPolicy: Qt.NoFocus
     implicitHeight: Math.max(Theme.altoFila, contenido.implicitHeight + 16)
@@ -46,11 +58,11 @@ ItemDelegate {
 
     Accessible.role: Accessible.ListItem
     Accessible.name: qsTr("%1, %2 %3, %4, %5, %6, creada %7")
-                         .arg(fila.textoEstado)
+                         .arg(fila.textoEstado + (fila.pendienteDescarga ? ", " + qsTr("Pendiente de descarga") : ""))
                          .arg(fila.rfc).arg(fila.nombrePerfil)
                          .arg(fila.textoTipo)
                          .arg(fila.textoPeriodo)
-                         .arg(fila.textoPaquetes)
+                         .arg(fila.textoPaquetes + (fila.textoProgreso.length > 0 ? ", " + fila.textoProgreso : ""))
                          .arg(fila.textoCreada.replace(",", ""))
 
     background: Rectangle {
@@ -72,14 +84,35 @@ ItemDelegate {
         id: contenido
         spacing: Theme.espacioM
 
-        Item {
+        ColumnLayout {
+            spacing: 2
             Layout.preferredWidth: 176 - Theme.espacioM
-            Layout.preferredHeight: badge.implicitHeight
+            Layout.maximumWidth: 176 - Theme.espacioM
             EstadoBadge {
                 id: badge
                 objectName: "badgeFila"
                 clave: fila.estado
-                width: Math.min(implicitWidth, parent.width)
+                Layout.maximumWidth: 176 - Theme.espacioM
+            }
+            // T014.1 D2: paquetes Disponible o Error.
+            RowLayout {
+                objectName: "pendienteFila"
+                visible: fila.pendienteDescarga
+                spacing: Theme.espacioXs
+                Icono {
+                    nombre: "arrow-down-circle"
+                    color: Theme.tonoAdvertenciaTexto
+                    tamano: 12
+                }
+                Label {
+                    text: qsTr("Pendiente de descarga")
+                    color: Theme.tonoAdvertenciaTexto
+                    font.family: Theme.familia
+                    font.pixelSize: Theme.leyenda.size
+                    elide: Text.ElideRight
+                    Layout.fillWidth: true
+                    Accessible.ignored: true
+                }
             }
         }
         ColumnLayout {
@@ -140,16 +173,47 @@ ItemDelegate {
             Layout.horizontalStretchFactor: 11
             Accessible.ignored: true
         }
-        Label {
-            objectName: "paquetesFila"
-            text: fila.columnaPaquetes
-            color: Theme.texto
-            font.family: Theme.familia
-            font.pixelSize: Theme.cuerpo.size
-            font.features: { "tnum": 1 }
-            horizontalAlignment: Text.AlignRight
+        ColumnLayout {
+            spacing: 3
             Layout.preferredWidth: 72 - Theme.espacioM
-            Accessible.ignored: true
+            Layout.maximumWidth: 72 - Theme.espacioM
+            RowLayout {
+                spacing: Theme.espacioXs
+                Layout.alignment: Qt.AlignRight
+                Icono {
+                    objectName: "checkPaquetesFila"
+                    visible: fila.todosDescargados
+                    nombre: "check-circle"
+                    color: Theme.exito
+                    tamano: 14
+                }
+                Label {
+                    objectName: "paquetesFila"
+                    text: fila.columnaPaquetes
+                    color: Theme.texto
+                    font.family: Theme.familia
+                    font.pixelSize: Theme.cuerpo.size
+                    font.features: { "tnum": 1 }
+                    horizontalAlignment: Text.AlignRight
+                    Accessible.ignored: true
+                }
+            }
+            // Barra de 40 pt con la proporcion descargada.
+            Rectangle {
+                objectName: "barraPaquetesFila"
+                visible: fila.conProgreso
+                Layout.alignment: Qt.AlignRight
+                implicitWidth: 40
+                implicitHeight: 4
+                radius: 2
+                color: Theme.separador
+                Rectangle {
+                    width: parent.width * Math.min(1, fila.paquetesDescargados / Math.max(1, fila.totalPaquetes))
+                    height: parent.height
+                    radius: parent.radius
+                    color: Theme.acento
+                }
+            }
         }
         Label {
             objectName: "creadaFila"

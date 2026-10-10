@@ -23,6 +23,10 @@ Button {
     property bool compacto: false
     property bool cargando: false
     property string nombreAccesible: ""
+    // T014.1 D5: atajo de teclado visible ("⌘N"); se muestra en el ToolTip.
+    property string atajo: ""
+    readonly property string textoAyuda: (boton.esIcono ? boton.nombreAccesible : boton.text)
+                                         + (boton.atajo.length > 0 ? " (" + boton.atajo + ")" : "")
 
     readonly property bool esPrimario: boton.variante === "primario"
     readonly property bool esIcono: boton.variante === "icono"
@@ -50,10 +54,12 @@ Button {
 
     Accessible.role: Accessible.Button
     Accessible.name: boton.esIcono ? boton.nombreAccesible : boton.text
-    Accessible.description: boton.descripcion
+    Accessible.description: boton.atajo.length > 0
+                            ? (boton.descripcion.length > 0 ? boton.descripcion + ". " : "") + qsTr("Atajo: %1").arg(boton.atajo)
+                            : boton.descripcion
 
-    ToolTip.visible: boton.esIcono && boton.hovered && boton.nombreAccesible.length > 0
-    ToolTip.text: boton.nombreAccesible
+    ToolTip.visible: boton.hovered && ((boton.esIcono && boton.nombreAccesible.length > 0) || boton.atajo.length > 0)
+    ToolTip.text: boton.textoAyuda
     ToolTip.delay: 600
 
     Keys.onReturnPressed: (evento) => { if (boton.enabled) boton.click(); evento.accepted = true }

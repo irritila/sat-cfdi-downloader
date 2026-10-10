@@ -101,4 +101,16 @@ void AppViewModel::setPagina(Pagina pagina)
     }
 }
 
+void AppViewModel::limpiarFiltros()
+{
+    if (m_filtroTexto.isEmpty() && m_filtroEstado.isEmpty() && m_filtroTipo.isEmpty() && m_filtroMes.isEmpty()) {
+        return;
+    }
+    m_filtroTexto.clear();
+    m_filtroEstado.clear();
+    m_filtroTipo.clear();
+    m_filtroMes.clear();
+    emit filtrosChanged();
+}
+
 } // namespace satcfdi

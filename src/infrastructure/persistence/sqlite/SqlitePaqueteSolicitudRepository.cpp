@@ -88,6 +88,40 @@ SqlitePaqueteSolicitudRepository::contarVisiblesPorSolicitud()
     return R::exito(std::move(conteo));
 }
 
+Resultado<QHash<SolicitudId, ConteoPaquetes>, ErrorPersistencia>
+SqlitePaqueteSolicitudRepository::contarVisiblesPorSolicitudYEstado()
+{
+    using R = Resultado<QHash<SolicitudId, ConteoPaquetes>, ErrorPersistencia>;
+    constexpr QStringView kContexto = u"paquete_solicitud.contar_estado";
+    auto conexion = sqlite::conexionLectura(m_proveedor);
+    if (!conexion) {
+        return R::fallo(std::move(conexion).error());
+    }
+    QSqlDatabase db = conexion.valor();
+    QSqlQuery q(db);
+    q.setForwardOnly(true);
+    // estado_descarga se guarda con la clave estable del enum (claveEstable).
+    if (auto r = sqlite::ejecutarDirecto(
+            q,
+            QStringLiteral("SELECT solicitud_masiva_id, count(*), "
+                           "sum(CASE WHEN estado_descarga = 'Descargado' THEN 1 ELSE 0 END), "
+                           "sum(CASE WHEN estado_descarga IN ('Disponible', 'Error') THEN 1 ELSE 0 END) "
+                           "FROM paquete_solicitud WHERE eliminado_en IS NULL GROUP BY solicitud_masiva_id"),
+            kContexto);
+        !r) {
+        return R::fallo(std::move(r).error());
+    }
+    QHash<SolicitudId, ConteoPaquetes> conteo;
+    while (q.next()) {
+        const auto id = SolicitudId::desdeTexto(q.value(0).toString());
+        if (!id) {
+            return R::fallo(sqlite::filaIlegible(kTabla, u"solicitud_masiva_id"));
+        }
+        conteo.insert(*id, ConteoPaquetes{q.value(1).toInt(), q.value(2).toInt(), q.value(3).toInt()});
+    }
+    return R::exito(std::move(conteo));
+}
+
 Resultado<int, ErrorPersistencia>
 SqlitePaqueteSolicitudRepository::marcarEliminadosPorSolicitud(const SolicitudId& solicitudId,
                                                                const QDateTime& eliminadoEn)

@@ -21,12 +21,16 @@
 #include "AccionesSolicitud.h"
 #include "ConsultaExistenciaPaquetes.h"
 #include "AppViewModel.h"
+#include "FormatoFechas.h"
 #include "NuevaSolicitudViewModel.h"
 #include "PresentacionViewModels.h"
 #include "SolicitudDetailViewModel.h"
+#include "SolicitudesFiltroModel.h"
 #include "SolicitudesListModel.h"
 
 #include <QAccessible>
+#include <QClipboard>
+#include <QGuiApplication>
 #include <QCoreApplication>
 #include <QDir>
 #include <QDirIterator>
@@ -426,6 +430,15 @@ private slots:
     // T009.1
     void finderEnDetalleSegunExistencia();
     void finderCarpetaDePaquetesEnLista();
+
+    // T014.1: mejoras de pantalla
+    void filtrosLocalesDeLaLista();
+    void filtroPorMesIncluyePeriodosQueCruzan();
+    void conteoDePaquetesEnLaLista();
+    void atajosDePeriodoConRelojFijo();
+    void verSolicitudExistenteDesdeDuplicado();
+    void atajosDeTeclado();
+    void copiarIdentificadores();
 };
 
 void TestPresentacion::init()
@@ -445,6 +458,7 @@ void TestPresentacion::rolesDelModelo()
     const QList<QByteArray> esperados = {
         "id", "perfilRfc", "rfcContraparte", "tipoDescarga", "fechaInicial", "fechaFinal",
         "estadoLocal", "estadoSat", "estadoResumen", "creadaEn", "totalPaquetes", "perfilNombre",
+        "paquetesDescargados", "paquetesPendientesDescarga", // T014.1 D2
     };
     const QList<QByteArray> nombres = modelo->roleNames().values();
     QCOMPARE(nombres.size(), esperados.size());
@@ -964,7 +978,7 @@ void TestPresentacion::qmlSinImportsProhibidos()
                  qPrintable(archivo.fileName() + QStringLiteral(": ") + termino.captured(0)));
         ++archivos;
     }
-    QCOMPARE(archivos, 27); // 26 .qml (Theme, Icono y componentes T013) + Etiquetas.js
+    QCOMPARE(archivos, 28); // 27 .qml (Theme, Icono, componentes T013 y BotonCopiar) + Etiquetas.js
 }
 
 // ---------------------------------------------------------------------------
@@ -1963,3 +1977,489 @@ void TestPresentacion::finderCarpetaDePaquetesEnLista()
 }
 
 #include "TestPresentacion.moc"
+
+// ---------------------------------------------------------------------------
+// T014.1: mejoras de pantalla
+
+namespace {
+
+QAbstractItemModel* filtroDeLaPagina(const Vista& v)
+{
+    return v.pagina() ? qobject_cast<QAbstractItemModel*>(v.pagina()->property("filtroModelo").value<QObject*>())
+                      : nullptr;
+}
+
+QStringList idsDe(const QAbstractItemModel* m)
+{
+    QStringList ids;
+    for (int fila = 0; fila < m->rowCount(); ++fila) {
+        ids.append(m->index(fila, 0).data(Rol::IdRole).toString());
+    }
+    return ids;
+}
+
+template <typename Pred>
+QStringList idsQueCumplen(const QAbstractItemModel* m, Pred pred)
+{
+    QStringList ids;
+    for (int fila = 0; fila < m->rowCount(); ++fila) {
+        const QModelIndex i = m->index(fila, 0);
+        if (pred(i)) {
+            ids.append(i.data(Rol::IdRole).toString());
+        }
+    }
+    return ids;
+}
+
+SolicitudResumen resumenConPeriodo(QDate inicial, QDate final_)
+{
+    SolicitudResumen r = resumenDePrueba(SolicitudId::generar());
+    r.fechaInicial = inicial;
+    r.fechaFinal = final_;
+    return r;
+}
+
+SolicitudResumen resumenConPaquetes(int total, int descargados, int pendientes)
+{
+    SolicitudResumen r = resumenDePrueba(SolicitudId::generar());
+    r.estadoLocal = EstadoLocal::Enviada;
+    r.estadoSat = EstadoSolicitudSat::Terminada;
+    r.totalPaquetes = total;
+    r.paquetesDescargados = descargados;
+    r.paquetesPendientesDescarga = pendientes;
+    return r;
+}
+
+void atajo(QQuickWindow* ventana, Qt::Key tecla)
+{
+    QTest::keyClick(ventana, tecla, Qt::ControlModifier);
+    procesarEventos();
+}
+
+} // namespace
+
+void TestPresentacion::filtrosLocalesDeLaLista()
+{
+    Escenario e(DemoSolicitudesService::Datos::Representativos);
+    QVERIFY(e.cargar());
+    QVERIFY(e.activar());
+    SolicitudesListModel* m = e.vms.solicitudes();
+    AppViewModel* app = e.vms.app();
+    QTRY_COMPARE(m->rowCount(), 11);
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
+    QAbstractItemModel* filtro = filtroDeLaPagina(e);
+    QVERIFY(filtro);
+    const QStringList todos = idsDe(m);
+    QCOMPARE(idsDe(filtro), todos);
+    QVERIFY(!e.item(QStringLiteral("botonLimpiarFiltros"))->isVisible());
+
+    // Busqueda por parte del RFC, sin distinguir mayusculas, escrita con teclado.
+    const QString parte = m->index(0).data(Rol::PerfilRfcRole).toString().left(4).toLower();
+    auto* busqueda = e.item(QStringLiteral("campoBusqueda"));
+    QTRY_VERIFY(busqueda->isVisible());
+    QVERIFY(!nombreAccesible(busqueda).isEmpty());
+    busqueda->forceActiveFocus();
+    for (const QChar c : parte) {
+        QTest::keyClick(e.ventana, c.toLatin1());
+    }
+    QTRY_COMPARE(app->filtroTexto(), parte);
+    const auto coincideTexto = [&](const QModelIndex& i) {
+        return i.data(Rol::PerfilRfcRole).toString().contains(parte, Qt::CaseInsensitive)
+               || i.data(Rol::PerfilNombreRole).toString().contains(parte, Qt::CaseInsensitive);
+    };
+    QStringList esperado = idsQueCumplen(m, coincideTexto);
+    QVERIFY(!esperado.isEmpty());
+    QCOMPARE(idsDe(filtro), esperado); // mismo orden que la fuente
+    QVERIFY(e.item(QStringLiteral("botonLimpiarFiltros"))->isVisible());
+
+    // + Estado (desde el combo) y Tipo.
+    const QString estado = m->index(0).data(Rol::EstadoResumenRole).toString();
+    const QString tipo = m->index(0).data(Rol::TipoDescargaRole).toString();
+    auto* comboEstado = e.item(QStringLiteral("filtroEstado"));
+    const int indiceEstado = QQmlProperty::read(comboEstado, QStringLiteral("count")).toInt() > 0
+        ? [&] {
+              int i = -1;
+              QMetaObject::invokeMethod(comboEstado, "indexOfValue", Q_RETURN_ARG(int, i), Q_ARG(QVariant, estado));
+              return i;
+          }()
+        : -1;
+    QVERIFY(indiceEstado > 0);
+    QMetaObject::invokeMethod(comboEstado, "activated", Q_ARG(int, indiceEstado));
+    QTRY_COMPARE(app->filtroEstado(), estado);
+    app->setFiltroTipo(tipo);
+    esperado = idsQueCumplen(m, [&](const QModelIndex& i) {
+        return coincideTexto(i) && i.data(Rol::EstadoResumenRole).toString() == estado
+               && i.data(Rol::TipoDescargaRole).toString() == tipo;
+    });
+    QVERIFY(!esperado.isEmpty());
+    QCOMPARE(idsDe(filtro), esperado);
+    QCOMPARE(m->rowCount(), 11); // la lista persistida no cambia
+    QCOMPARE(e.item(QStringLiteral("listaSolicitudes"))->property("count").toInt(), esperado.size());
+
+    // Los filtros se conservan al navegar y volver.
+    QVERIFY(app->abrirDetalle(esperado.constFirst()));
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaDetalleSolicitud"));
+    app->mostrarLista();
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
+    filtro = filtroDeLaPagina(e);
+    QVERIFY(filtro);
+    QCOMPARE(idsDe(filtro), esperado);
+    QCOMPARE(e.item(QStringLiteral("campoBusqueda"))->property("text").toString(), parte);
+    QTRY_COMPARE(e.item(QStringLiteral("filtroEstado"))->property("currentValue").toString(), estado);
+    QTRY_COMPARE(e.item(QStringLiteral("filtroTipo"))->property("currentValue").toString(), tipo);
+
+    // Sin coincidencias: estado vacio con "Limpiar filtros".
+    app->setFiltroTexto(QStringLiteral("sin-coincidencias-xyz"));
+    QTRY_VERIFY(e.item(QStringLiteral("estadoSinCoincidencias"))->isVisible());
+    QVERIFY(!e.item(QStringLiteral("listaSolicitudes"))->isVisible());
+    QVERIFY(!e.item(QStringLiteral("estadoVacio"))->isVisible());
+    QCOMPARE(filtro->rowCount(), 0);
+    QCOMPARE(m->rowCount(), 11);
+    auto* limpiar = e.item(QStringLiteral("botonLimpiarFiltrosVacio"));
+    QCOMPARE(nombreAccesible(limpiar), QStringLiteral("Limpiar filtros"));
+    QMetaObject::invokeMethod(limpiar, "click");
+    QTRY_COMPARE(idsDe(filtro), todos);
+    QVERIFY(app->filtroTexto().isEmpty() && app->filtroEstado().isEmpty() && app->filtroTipo().isEmpty()
+            && app->filtroMes().isEmpty());
+    QTRY_VERIFY(e.item(QStringLiteral("listaSolicitudes"))->isVisible());
+    QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("campoBusqueda"));
+}
+
+void TestPresentacion::filtroPorMesIncluyePeriodosQueCruzan()
+{
+    SolicitudesServiceAsincrono servicio;
+    SolicitudesListModel modelo(&servicio);
+    const SolicitudResumen cruza = resumenConPeriodo(QDate(2026, 6, 15), QDate(2026, 8, 10));
+    const SolicitudResumen julio = resumenConPeriodo(QDate(2026, 7, 1), QDate(2026, 7, 31));
+    const SolicitudResumen septiembre = resumenConPeriodo(QDate(2026, 9, 1), QDate(2026, 9, 30));
+    const SolicitudResumen cambioDeAnio = resumenConPeriodo(QDate(2025, 12, 20), QDate(2026, 1, 5));
+    servicio.lista.resolver(0, ResultadoListaSol::exito({cruza, julio, septiembre, cambioDeAnio}));
+    QTRY_COMPARE(modelo.rowCount(), 4);
+
+    SolicitudesFiltroModel filtro;
+    QSignalSpy cambios(&filtro, &SolicitudesFiltroModel::countChanged);
+    filtro.setFuente(&modelo);
+    QCOMPARE(filtro.mesesDisponibles(),
+             (QStringList{QStringLiteral("2026-09"), QStringLiteral("2026-08"), QStringLiteral("2026-07"),
+                          QStringLiteral("2026-06"), QStringLiteral("2026-01"), QStringLiteral("2025-12")}));
+    const auto ids = [](std::initializer_list<SolicitudResumen> rs) {
+        QStringList r;
+        for (const SolicitudResumen& s : rs) {
+            r.append(s.id.texto());
+        }
+        return r;
+    };
+    QCOMPARE(idsDe(&filtro), ids({cruza, julio, septiembre, cambioDeAnio}));
+    QVERIFY(!filtro.hayFiltros());
+
+    filtro.setMes(QStringLiteral("2026-06"));
+    QCOMPARE(idsDe(&filtro), ids({cruza}));
+    QVERIFY(filtro.hayFiltros());
+    filtro.setMes(QStringLiteral("2026-07"));
+    QCOMPARE(idsDe(&filtro), ids({cruza, julio}));
+    filtro.setMes(QStringLiteral("2026-08"));
+    QCOMPARE(idsDe(&filtro), ids({cruza}));
+    filtro.setMes(QStringLiteral("2025-12"));
+    QCOMPARE(idsDe(&filtro), ids({cambioDeAnio}));
+    filtro.setMes(QStringLiteral("2026-01"));
+    QCOMPARE(idsDe(&filtro), ids({cambioDeAnio}));
+    filtro.setMes(QStringLiteral("2026-05"));
+    QCOMPARE(filtro.count(), 0);
+    QVERIFY(cambios.count() > 0);
+    filtro.setMes(QString());
+    QCOMPARE(idsDe(&filtro), ids({cruza, julio, septiembre, cambioDeAnio}));
+    QCOMPARE(filtro.idEn(1), julio.id.texto());
+    QCOMPARE(filtro.idEn(9), QString());
+    QCOMPARE(FormatoFechas().mesAnio(QStringLiteral("2026-09")), QStringLiteral("sep 2026"));
+    QCOMPARE(FormatoFechas().mesAnio(QStringLiteral("2026-13")), QString());
+}
+
+void TestPresentacion::conteoDePaquetesEnLaLista()
+{
+    EscenarioAsincrono e;
+    QVERIFY(e.cargar());
+    QVERIFY(QTest::qWaitForWindowExposed(e.ventana));
+    const SolicitudResumen ninguno = resumenConPaquetes(3, 0, 0);
+    SolicitudResumen dos = resumenConPaquetes(3, 2, 1);
+    const SolicitudResumen todos = resumenConPaquetes(3, 3, 0);
+    e.solicitudes.lista.resolver(0, ResultadoListaSol::exito({ninguno, dos, todos}));
+    QTRY_COMPARE(e.vms.solicitudes()->rowCount(), 3);
+    QCOMPARE(e.vms.solicitudes()->index(1).data(Rol::PaquetesDescargadosRole).toInt(), 2);
+    QCOMPARE(e.vms.solicitudes()->index(1).data(Rol::PaquetesPendientesDescargaRole).toInt(), 1);
+
+    const auto en = [&](int fila, const char* nombre) {
+        return buscar(e.item(QStringLiteral("filaSolicitud_%1").arg(fila)), QString::fromLatin1(nombre));
+    };
+    QTRY_VERIFY(e.item(QStringLiteral("filaSolicitud_2")));
+    QCOMPARE(en(0, "paquetesFila")->property("text").toString(), QStringLiteral("0/3"));
+    QVERIFY(en(0, "barraPaquetesFila")->isVisible());
+    QVERIFY(!en(0, "checkPaquetesFila")->isVisible());
+    QVERIFY(!en(0, "pendienteFila")->isVisible());
+    QCOMPARE(en(1, "paquetesFila")->property("text").toString(), QStringLiteral("2/3"));
+    QVERIFY(en(1, "barraPaquetesFila")->isVisible());
+    QVERIFY(en(1, "pendienteFila")->isVisible());
+    QVERIFY(nombreAccesible(e.item(QStringLiteral("filaSolicitud_1"))).contains(QStringLiteral("Pendiente de descarga")));
+    QCOMPARE(en(2, "paquetesFila")->property("text").toString(), QStringLiteral("3"));
+    QVERIFY(en(2, "checkPaquetesFila")->isVisible());
+    QVERIFY(!en(2, "barraPaquetesFila")->isVisible());
+    QVERIFY(!en(2, "pendienteFila")->isVisible());
+
+    // Tras una descarga, la solicitud se actualiza y el conteo cambia.
+    emit e.solicitudes.solicitudActualizada(dos.id);
+    dos.paquetesDescargados = 3;
+    dos.paquetesPendientesDescarga = 0;
+    QTRY_COMPARE(e.solicitudes.lista.size(), 2);
+    e.solicitudes.lista.resolver(1, ResultadoListaSol::exito({ninguno, dos, todos}));
+    QTRY_COMPARE(en(1, "paquetesFila")->property("text").toString(), QStringLiteral("3"));
+    QVERIFY(en(1, "checkPaquetesFila")->isVisible());
+    QVERIFY(!en(1, "pendienteFila")->isVisible());
+}
+
+void TestPresentacion::atajosDePeriodoConRelojFijo()
+{
+    EscenarioAsincrono e;
+    QVERIFY(prepararFormulario(e));
+    NuevaSolicitudViewModel* f = e.vms.nuevaSolicitud();
+
+    // Desde la UI: "Mes anterior" en enero.
+    f->setReloj([] { return QDate(2026, 1, 15); });
+    auto* boton = e.item(QStringLiteral("botonPeriodoMesAnterior"));
+    QTRY_VERIFY(boton && boton->isVisible());
+    QVERIFY(!nombreAccesible(boton).isEmpty());
+    QMetaObject::invokeMethod(boton, "click");
+    QCOMPARE(f->fechaInicial(), QStringLiteral("2025-12-01"));
+    QCOMPARE(f->fechaFinal(), QStringLiteral("2025-12-31"));
+    QTRY_COMPARE(e.item(QStringLiteral("campoFechaInicial"))->property("text").toString(), QStringLiteral("2025-12-01"));
+    QTRY_COMPARE(e.item(QStringLiteral("campoFechaFinal"))->property("text").toString(), QStringLiteral("2025-12-31"));
+    QVERIFY(f->canSubmit());
+    QVERIFY(e.item(QStringLiteral("botonPeriodoMesActual"))->isVisible());
+    QVERIFY(e.item(QStringLiteral("botonPeriodoMismoMesAnioAnterior"))->isVisible());
+
+    struct Caso {
+        QDate hoy;
+        const char* atajo;
+        QDate inicial;
+        QDate final_;
+    };
+    const QList<Caso> casos = {
+        {QDate(2026, 1, 15), "mesActual", QDate(2026, 1, 1), QDate(2026, 1, 15)},
+        {QDate(2026, 1, 15), "mismoMesAnioAnterior", QDate(2025, 1, 1), QDate(2025, 1, 31)},
+        {QDate(2026, 3, 31), "mesActual", QDate(2026, 3, 1), QDate(2026, 3, 31)},
+        {QDate(2026, 3, 31), "mesAnterior", QDate(2026, 2, 1), QDate(2026, 2, 28)},
+        {QDate(2026, 3, 31), "mismoMesAnioAnterior", QDate(2025, 3, 1), QDate(2025, 3, 31)},
+        {QDate(2024, 2, 29), "mesAnterior", QDate(2024, 1, 1), QDate(2024, 1, 31)},
+        {QDate(2024, 2, 29), "mismoMesAnioAnterior", QDate(2023, 2, 1), QDate(2023, 2, 28)},
+        {QDate(2024, 3, 1), "mesAnterior", QDate(2024, 2, 1), QDate(2024, 2, 29)},
+        {QDate(2026, 1, 1), "mesActual", QDate(2026, 1, 1), QDate(2026, 1, 1)},
+    };
+    for (const Caso& c : casos) {
+        f->setReloj([hoy = c.hoy] { return hoy; });
+        QVERIFY(f->aplicarPeriodo(QString::fromLatin1(c.atajo)));
+        QCOMPARE(f->fechaInicial(), c.inicial.toString(Qt::ISODate));
+        QCOMPARE(f->fechaFinal(), c.final_.toString(Qt::ISODate));
+        QVERIFY2(f->canSubmit(), c.atajo);
+        QVERIFY(f->campoConError().isEmpty());
+    }
+    const QString antes = f->fechaInicial();
+    QVERIFY(!f->aplicarPeriodo(QStringLiteral("otro")));
+    QCOMPARE(f->fechaInicial(), antes);
+}
+
+void TestPresentacion::verSolicitudExistenteDesdeDuplicado()
+{
+    {
+        EscenarioAsincrono e;
+        QVERIFY(prepararFormulario(e));
+        NuevaSolicitudViewModel* f = e.vms.nuevaSolicitud();
+        f->submit();
+        const EvaluacionDuplicado eval =
+            evaluacion(ClasificacionDuplicado::RequiereConfirmacion, MotivoDuplicado::SolicitudSinExito);
+        e.solicitudes.evaluacion.resolver(0, SolicitudesService::ResultadoEvaluarDuplicado::exito(eval));
+        QTRY_VERIFY(f->confirmacionPendiente());
+        QCOMPARE(f->solicitudEquivalenteId(), eval.solicitudReferencia->texto());
+        QObject* dialogo = e.dialogo(QStringLiteral("dialogoDuplicado"));
+        QTRY_VERIFY(dialogo->property("opened").toBool());
+        auto* ver = e.itemDeDialogo(QStringLiteral("dialogoDuplicado"), QStringLiteral("dialogoDuplicadoAlternativa"));
+        QVERIFY(ver);
+        QTRY_VERIFY(ver->isVisible());
+        QCOMPARE(nombreAccesible(ver), QStringLiteral("Ver solicitud existente"));
+        QMetaObject::invokeMethod(ver, "click");
+        QTRY_COMPARE(e.vms.app()->pagina(), Pagina::Detalle);
+        QCOMPARE(e.vms.app()->solicitudSeleccionadaId(), eval.solicitudReferencia->texto());
+        QVERIFY(e.solicitudes.requestsCrear.isEmpty()); // no se crea nada
+        QVERIFY(e.solicitudes.confirmaciones.isEmpty());
+        QVERIFY(!f->confirmacionPendiente());
+    }
+    {
+        // Equivalente eliminada localmente: el boton no aparece.
+        EscenarioAsincrono e;
+        QVERIFY(prepararFormulario(e));
+        NuevaSolicitudViewModel* f = e.vms.nuevaSolicitud();
+        f->submit();
+        e.solicitudes.evaluacion.resolver(
+            0, SolicitudesService::ResultadoEvaluarDuplicado::exito(evaluacion(
+                   ClasificacionDuplicado::RequiereConfirmacion, MotivoDuplicado::SolicitudEliminada)));
+        QTRY_VERIFY(f->confirmacionPendiente());
+        QVERIFY(f->solicitudEquivalenteId().isEmpty());
+        QObject* dialogo = e.dialogo(QStringLiteral("dialogoDuplicado"));
+        QTRY_VERIFY(dialogo->property("opened").toBool());
+        QVERIFY(!e.itemDeDialogo(QStringLiteral("dialogoDuplicado"), QStringLiteral("dialogoDuplicadoAlternativa"))
+                     ->isVisible());
+        QTest::keyClick(e.ventana, Qt::Key_Escape);
+        QTRY_VERIFY(!f->confirmacionPendiente());
+        QVERIFY(e.solicitudes.confirmaciones.isEmpty());
+    }
+}
+
+void TestPresentacion::atajosDeTeclado()
+{
+    EscenarioAsincrono e;
+    AccionesEspia acciones;
+    e.vms.setAccionesSolicitud(&acciones);
+    QVERIFY(e.cargar());
+    QVERIFY(e.activar());
+    AppViewModel* app = e.vms.app();
+    const SolicitudResumen resumen = resumenDePrueba(SolicitudId::generar());
+    e.solicitudes.lista.resolver(0, ResultadoListaSol::exito({resumen}));
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
+    // Foco inicial en la lista tambien si la carga termina despues.
+    QTRY_VERIFY(focoDentroDe(e.ventana, QStringLiteral("listaSolicitudes")));
+
+    // ToolTips con el atajo.
+    QCOMPARE(e.item(QStringLiteral("botonNuevaSolicitud"))->property("atajo").toString(), QStringLiteral("⌘N"));
+    QCOMPARE(e.item(QStringLiteral("botonPerfilesSat"))->property("atajo").toString(), QStringLiteral("⌘2"));
+
+    // ⌘F enfoca la busqueda; con el campo enfocado no actua ningun otro atajo.
+    atajo(e.ventana, Qt::Key_F);
+    QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("campoBusqueda"));
+    atajo(e.ventana, Qt::Key_N);
+    atajo(e.ventana, Qt::Key_2);
+    QCOMPARE(app->pagina(), Pagina::Lista);
+    // ⌘1 no aplica en la lista.
+    e.item(QStringLiteral("listaSolicitudes"))->forceActiveFocus();
+    atajo(e.ventana, Qt::Key_1);
+    QCOMPARE(app->pagina(), Pagina::Lista);
+
+    // ⌘N abre Nueva solicitud; ahi ⌘N no hace nada y ⌘1 regresa (fuera de campos).
+    atajo(e.ventana, Qt::Key_N);
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaNuevaSolicitud"));
+    atajo(e.ventana, Qt::Key_N);
+    QCOMPARE(app->pagina(), Pagina::Nueva);
+    e.item(QStringLiteral("campoFechaInicial"))->forceActiveFocus();
+    QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("campoFechaInicial"));
+    atajo(e.ventana, Qt::Key_1);
+    atajo(e.ventana, Qt::Key_2);
+    QCOMPARE(app->pagina(), Pagina::Nueva);
+    e.item(QStringLiteral("botonCancelarNueva"))->forceActiveFocus();
+    atajo(e.ventana, Qt::Key_1);
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
+
+    // ⌘2 abre Perfiles SAT; ⌘1 regresa.
+    QTRY_VERIFY(e.ventana->activeFocusItem());
+    e.item(QStringLiteral("listaSolicitudes"))->forceActiveFocus();
+    atajo(e.ventana, Qt::Key_2);
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaPerfilesSat"));
+    QTRY_VERIFY(e.ventana->activeFocusItem());
+    e.pagina()->forceActiveFocus();
+    atajo(e.ventana, Qt::Key_1);
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
+
+    // Detalle: ⌘R ejecuta la accion principal (Reintentar descarga si aplica).
+    QVERIFY(app->abrirDetalle(resumen.id.texto()));
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaDetalleSolicitud"));
+    SolicitudDetalle detalle = detalleDePrueba(resumen.id);
+    detalle.resumen.estadoSat = EstadoSolicitudSat::EnProceso;
+    e.solicitudes.detalle.resolver(0, SolicitudesService::ResultadoDetalle::exito(detalle));
+    QTRY_VERIFY(e.vms.detalle()->cargada());
+    QVERIFY(e.vms.detalle()->puedeReintentarDescarga());
+    QCOMPARE(e.item(QStringLiteral("botonReintentarDescarga"))->property("atajo").toString(), QStringLiteral("⌘R"));
+    QTRY_VERIFY(e.ventana->activeFocusItem());
+    e.item(QStringLiteral("botonEliminarSolicitud"))->forceActiveFocus();
+    atajo(e.ventana, Qt::Key_R);
+    QCOMPARE(acciones.llamadas, QStringList{QStringLiteral("descargar:") + resumen.id.texto()});
+
+    // ⌘⌫ solo abre la confirmacion.
+    QObject* dialogo = e.dialogo(QStringLiteral("dialogoEliminar"));
+    atajo(e.ventana, Qt::Key_Backspace);
+    QTRY_VERIFY(dialogo->property("opened").toBool());
+    QVERIFY(e.solicitudes.idsEliminar.isEmpty());
+
+    // Con el dialogo abierto ningun atajo actua.
+    atajo(e.ventana, Qt::Key_R);
+    atajo(e.ventana, Qt::Key_N);
+    atajo(e.ventana, Qt::Key_1);
+    atajo(e.ventana, Qt::Key_2);
+    atajo(e.ventana, Qt::Key_Backspace);
+    QCOMPARE(acciones.llamadas.size(), 1);
+    QCOMPARE(app->pagina(), Pagina::Detalle);
+    QVERIFY(dialogo->property("opened").toBool());
+    QVERIFY(e.solicitudes.idsEliminar.isEmpty());
+
+    // Escape cierra y devuelve el foco; nada se elimina.
+    QTest::keyClick(e.ventana, Qt::Key_Escape);
+    QTRY_VERIFY(!dialogo->property("visible").toBool());
+    QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("botonEliminarSolicitud"));
+    QVERIFY(e.solicitudes.idsEliminar.isEmpty());
+
+    // Sin reintento, ⌘R es Verificar ahora.
+    detalle.paquetes.first().estadoDescarga = EstadoDescarga::Descargado;
+    e.vms.detalle()->recargar();
+    QTRY_COMPARE(e.solicitudes.detalle.size(), 2);
+    e.solicitudes.detalle.resolver(1, SolicitudesService::ResultadoDetalle::exito(detalle));
+    QTRY_VERIFY(!e.vms.detalle()->puedeReintentarDescarga());
+    QVERIFY(e.vms.detalle()->puedeVerificar());
+    atajo(e.ventana, Qt::Key_R);
+    QCOMPARE(acciones.llamadas.size(), 2);
+    QCOMPARE(acciones.llamadas.at(1), QStringLiteral("verificar:") + resumen.id.texto());
+
+    atajo(e.ventana, Qt::Key_1);
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
+
+    // Escape sigue regresando desde las paginas (aqui, Perfiles SAT).
+    e.item(QStringLiteral("listaSolicitudes"))->forceActiveFocus();
+    atajo(e.ventana, Qt::Key_2);
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaPerfilesSat"));
+    QTRY_VERIFY(e.ventana->activeFocusItem());
+    e.pagina()->forceActiveFocus();
+    QTest::keyClick(e.ventana, Qt::Key_Escape);
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
+    e.vms.setAccionesSolicitud(nullptr);
+}
+
+void TestPresentacion::copiarIdentificadores()
+{
+    EscenarioAsincrono e;
+    QVERIFY(e.cargar());
+    QVERIFY(e.activar());
+    e.solicitudes.lista.resolver(0, ResultadoListaSol::exito({}));
+    const SolicitudId id = SolicitudId::generar();
+    QVERIFY(e.vms.app()->abrirDetalle(id.texto()));
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaDetalleSolicitud"));
+    const SolicitudDetalle detalle = detalleDePrueba(id);
+    e.solicitudes.detalle.resolver(0, SolicitudesService::ResultadoDetalle::exito(detalle));
+    QTRY_VERIFY(e.vms.detalle()->cargada());
+    QGuiApplication::clipboard()->clear();
+
+    // Nombre del paquete (pestana Paquetes).
+    QMetaObject::invokeMethod(e.pagina(), "mostrarPestana", Q_ARG(QVariant, QStringLiteral("paquetes")));
+    QQuickItem* paquete = nullptr;
+    QTRY_VERIFY((paquete = e.item(QStringLiteral("botonCopiarPaquete_PAQ_01"))) && paquete->isVisible());
+    QCOMPARE(nombreAccesible(paquete), QStringLiteral("Copiar Nombre del paquete"));
+    QMetaObject::invokeMethod(paquete, "click");
+    QCOMPARE(QGuiApplication::clipboard()->text(), QStringLiteral("PAQ_01"));
+    QVERIFY(paquete->property("copiado").toBool());
+    QCOMPARE(nombreAccesible(paquete), QStringLiteral("Copiado"));
+
+    // Id de solicitud SAT completo (pestana Datos).
+    QMetaObject::invokeMethod(e.pagina(), "mostrarPestana", Q_ARG(QVariant, QStringLiteral("datos")));
+    QQuickItem* campo = nullptr;
+    QTRY_VERIFY((campo = e.item(QStringLiteral("campoIdSolicitudSat"))) && campo->isVisible());
+    QQuickItem* copiar = buscar(campo, QStringLiteral("botonCopiar"));
+    QVERIFY(copiar && copiar->isVisible());
+    QCOMPARE(nombreAccesible(copiar), QStringLiteral("Copiar Id de solicitud SAT"));
+    QMetaObject::invokeMethod(copiar, "click");
+    QCOMPARE(QGuiApplication::clipboard()->text(), detalle.idSolicitudSat);
+    QCOMPARE(copiar->property("textoConfirmacion").toString(),
+             QStringLiteral("Id de solicitud SAT copiado al portapapeles."));
+    QCOMPARE(nombreAccesible(copiar), QStringLiteral("Copiado"));
+}

@@ -80,6 +80,13 @@ SolicitudDetalle aDetalle(const SolicitudPersistida& s, const QList<PaquetePersi
 {
     SolicitudDetalle d;
     d.resumen = aResumen(s, int(paquetes.size()));
+    for (const PaquetePersistido& p : paquetes) {
+        if (p.estadoDescarga == EstadoDescarga::Descargado) {
+            ++d.resumen.paquetesDescargados;
+        } else if (p.estadoDescarga == EstadoDescarga::Disponible || p.estadoDescarga == EstadoDescarga::Error) {
+            ++d.resumen.paquetesPendientesDescarga;
+        }
+    }
     d.fechaInicialSat = s.fechaInicialSat;
     d.fechaFinalSat = s.fechaFinalSat;
     if (s.tipoCfdi == TipoDescarga::Emitidos) {
@@ -174,7 +181,7 @@ QFuture<SolicitudesService::ResultadoLista> SolicitudesServicePersistido::listar
         if (!filas.esExito()) {
             return ResultadoLista::fallo(std::move(filas).error());
         }
-        auto conteos = p.paquetes.contarVisiblesPorSolicitud();
+        auto conteos = p.paquetes.contarVisiblesPorSolicitudYEstado();
         if (!conteos.esExito()) {
             return ResultadoLista::fallo(std::move(conteos).error());
         }
@@ -191,7 +198,10 @@ QFuture<SolicitudesService::ResultadoLista> SolicitudesServicePersistido::listar
         QList<SolicitudResumen> lista;
         lista.reserve(filas.valor().size());
         for (const SolicitudPersistida& s : filas.valor()) {
-            SolicitudResumen r = aResumen(s, conteos.valor().value(s.id, 0));
+            const ConteoPaquetes conteo = conteos.valor().value(s.id);
+            SolicitudResumen r = aResumen(s, conteo.total);
+            r.paquetesDescargados = conteo.descargados;
+            r.paquetesPendientesDescarga = conteo.pendientesDescarga;
             r.perfilNombre = nombres.value(s.perfilSatId);
             lista.append(std::move(r));
         }

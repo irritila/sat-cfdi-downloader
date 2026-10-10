@@ -16,6 +16,10 @@ import QtQuick.Layouts
 // - Sin perfiles listos: EstadoVacio con "Administrar perfiles SAT".
 // - Duplicado que requiere confirmacion: DialogoConfirmacion con "Cancelar"
 //   por omision.
+// - T014.1 D3: atajos de periodo ("Mes actual", "Mes anterior", "Mismo mes,
+//   año anterior") que escriben fechas ISO calculadas por el view model.
+// - T014.1 D4: el dialogo de duplicado ofrece "Ver solicitud existente" si la
+//   equivalente sigue visible (solicitudEquivalenteId); no crea nada.
 // Teclado: foco inicial en el perfil (o en "Administrar perfiles SAT");
 // Tab recorre los campos y el pie; Enter en un campo de texto envia; Escape o
 // "Solicitudes" vuelve a la lista.
@@ -28,6 +32,8 @@ Page {
 
     readonly property string campoError: pagina.formulario.campoConError
     readonly property bool bloqueada: pagina.formulario.solicitudExistenteId.length > 0
+    // T014.1 D5: con un dialogo abierto no actua ningun atajo (Main.qml).
+    readonly property bool dialogoAbierto: dialogoDuplicado.visible
 
     focus: true
     Accessible.role: Accessible.Pane
@@ -72,6 +78,19 @@ Page {
         case "tipoComprobante": selectorComprobante.forceActiveFocus(Qt.OtherFocusReason); break
         case "complemento": campoComplemento.forceActiveFocus(Qt.OtherFocusReason); break
         }
+    }
+
+    // T014.1 D3: "mesActual", "mesAnterior" o "mismoMesAnioAnterior".
+    function aplicarPeriodo(clave) {
+        pagina.formulario.aplicarPeriodo(clave)
+    }
+
+    // T014.1 D4: abre el detalle de la equivalente sin crear nada.
+    function verSolicitudEquivalente() {
+        const id = pagina.formulario.solicitudEquivalenteId
+        pagina.formulario.cancelarDuplicado()
+        if (id.length > 0)
+            pagina.app.abrirDetalle(id)
     }
 
     function enviar() {
@@ -120,10 +139,14 @@ Page {
         variante: "advertencia"
         title: qsTr("¿Crear otra solicitud con los mismos filtros?")
         mensaje: pagina.formulario.motivoDuplicado
-        consecuencia: qsTr("Puedes crear otra solicitud con los mismos filtros o cancelar.")
+        consecuencia: pagina.formulario.solicitudEquivalenteId.length > 0
+                      ? qsTr("Puedes ver la solicitud existente, crear otra con los mismos filtros o cancelar.")
+                      : qsTr("Puedes crear otra solicitud con los mismos filtros o cancelar.")
         textoConfirmar: qsTr("Crear de todos modos")
         textoCancelar: qsTr("Cancelar")
+        textoAlternativa: pagina.formulario.solicitudEquivalenteId.length > 0 ? qsTr("Ver solicitud existente") : ""
         onConfirmado: pagina.formulario.confirmarDuplicado()
+        onAlternativaSolicitada: pagina.verSolicitudEquivalente()
         onCancelado: {
             pagina.formulario.cancelarDuplicado()
             Qt.callLater(pagina.enfocarEnviar)
@@ -141,6 +164,7 @@ Page {
             icono: "person-card"
             text: qsTr("Perfiles SAT")
             descripcion: qsTr("Administrar perfiles SAT y su e.firma")
+            atajo: "⌘2"
             onClicked: pagina.app.mostrarPerfiles()
         }
     }
@@ -346,6 +370,35 @@ Page {
                                 onTextEdited: pagina.formulario.fechaFinal = text
                                 onAccepted: pagina.enviar()
                                 Accessible.name: qsTr("Fecha final")
+                            }
+                        }
+                        // T014.1 D3: atajos de periodo (reloj inyectable en el view model).
+                        Flow {
+                            objectName: "atajosPeriodo"
+                            spacing: Theme.espacioXs
+                            Layout.fillWidth: true
+                            Layout.topMargin: Theme.espacioXs
+                            Accessible.role: Accessible.Grouping
+                            Accessible.name: qsTr("Atajos de periodo")
+
+                            Repeater {
+                                model: [
+                                    { clave: "mesActual", nombre: "botonPeriodoMesActual", texto: qsTr("Mes actual"),
+                                      descripcion: qsTr("Del día 1 del mes actual a hoy") },
+                                    { clave: "mesAnterior", nombre: "botonPeriodoMesAnterior", texto: qsTr("Mes anterior"),
+                                      descripcion: qsTr("El mes anterior completo") },
+                                    { clave: "mismoMesAnioAnterior", nombre: "botonPeriodoMismoMesAnioAnterior",
+                                      texto: qsTr("Mismo mes, año anterior"),
+                                      descripcion: qsTr("El mes actual del año anterior, completo") }
+                                ]
+                                delegate: BotonAccion {
+                                    required property var modelData
+                                    objectName: modelData.nombre
+                                    compacto: true
+                                    text: modelData.texto
+                                    descripcion: modelData.descripcion
+                                    onClicked: pagina.aplicarPeriodo(modelData.clave)
+                                }
                             }
                         }
                     }

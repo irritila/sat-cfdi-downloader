@@ -444,6 +444,28 @@ public:
         return Resultado<QHash<SolicitudId, int>, ErrorPersistencia>::exito(r);
     }
 
+    Resultado<QHash<SolicitudId, ConteoPaquetes>, ErrorPersistencia> contarVisiblesPorSolicitudYEstado() override
+    {
+        using R = Resultado<QHash<SolicitudId, ConteoPaquetes>, ErrorPersistencia>;
+        if (auto e = m_a.registrar(QStringLiteral("contarPaquetesPorEstado"))) {
+            return R::fallo(*e);
+        }
+        QHash<SolicitudId, ConteoPaquetes> r;
+        for (const PaquetePersistido& p : m_a.paquetes) {
+            if (p.eliminadoEn) {
+                continue;
+            }
+            ConteoPaquetes& c = r[p.solicitudMasivaId];
+            ++c.total;
+            if (p.estadoDescarga == EstadoDescarga::Descargado) {
+                ++c.descargados;
+            } else if (p.estadoDescarga == EstadoDescarga::Disponible || p.estadoDescarga == EstadoDescarga::Error) {
+                ++c.pendientesDescarga;
+            }
+        }
+        return R::exito(r);
+    }
+
     Resultado<int, ErrorPersistencia> marcarEliminadosPorSolicitud(const SolicitudId& id,
                                                                    const QDateTime& en) override
     {

@@ -148,7 +148,7 @@ NuevaSolicitudViewModel::Observables NuevaSolicitudViewModel::observables() cons
 {
     return {canSubmit(),        ocupado(),     errorMessage(),
             m_cargandoPerfiles, sinPerfiles(), confirmacionPendiente(),
-            m_motivoDuplicado,  m_solicitudExistenteId, campoConError()};
+            m_motivoDuplicado,  m_solicitudExistenteId, m_solicitudEquivalenteId, campoConError()};
 }
 
 template <typename F>
@@ -169,7 +169,7 @@ void NuevaSolicitudViewModel::actualizar(F&& cambio)
     }
     if (antes.cargandoPerfiles != despues.cargandoPerfiles || antes.sinPerfiles != despues.sinPerfiles
         || antes.pendiente != despues.pendiente || antes.motivo != despues.motivo
-        || antes.existente != despues.existente) {
+        || antes.existente != despues.existente || antes.equivalente != despues.equivalente) {
         emit estadoChanged();
     }
 }
@@ -187,6 +187,7 @@ void NuevaSolicitudViewModel::editar(F&& cambio)
             ++m_genEnvio;
             m_snapshot.reset();
             m_motivoDuplicado.clear();
+            m_solicitudEquivalenteId.clear();
         }
     });
 }
@@ -452,6 +453,11 @@ void NuevaSolicitudViewModel::aplicarErrorCrear(const ErrorCrear& error,
             m_snapshot = request;
             m_motivoDuplicado = error.duplicado ? textoDeMotivo(error.duplicado->motivo)
                                                 : tr("Existe una solicitud equivalente.");
+            m_solicitudEquivalenteId.clear();
+            if (error.duplicado && error.duplicado->solicitudReferencia
+                && error.duplicado->motivo != MotivoDuplicado::SolicitudEliminada) {
+                m_solicitudEquivalenteId = error.duplicado->solicitudReferencia->texto();
+            }
             break;
         case ErrorCrear::Tipo::Persistencia:
         case ErrorCrear::Tipo::Integridad:
@@ -470,6 +476,7 @@ void NuevaSolicitudViewModel::confirmarDuplicado()
     actualizar([&] {
         m_snapshot.reset();
         m_motivoDuplicado.clear();
+        m_solicitudEquivalenteId.clear();
     });
     crearConfirmacion(request, ConfirmacionDuplicado::Confirmada);
 }
@@ -480,13 +487,42 @@ void NuevaSolicitudViewModel::cancelarDuplicado()
         ++m_genEnvio;
         m_snapshot.reset();
         m_motivoDuplicado.clear();
+        m_solicitudEquivalenteId.clear();
         m_ocupado = false;
     });
 }
 
+void NuevaSolicitudViewModel::setReloj(std::function<QDate()> reloj)
+{
+    m_reloj = std::move(reloj);
+}
+
+bool NuevaSolicitudViewModel::aplicarPeriodo(const QString& atajo)
+{
+    const QDate hoy = m_reloj ? m_reloj() : QDate::currentDate();
+    const QDate inicioMes(hoy.year(), hoy.month(), 1);
+    QDate inicial;
+    QDate final_;
+    if (atajo == QLatin1String("mesActual")) {
+        inicial = inicioMes;
+        final_ = hoy;
+    } else if (atajo == QLatin1String("mesAnterior")) {
+        inicial = inicioMes.addMonths(-1);
+        final_ = inicioMes.addDays(-1);
+    } else if (atajo == QLatin1String("mismoMesAnioAnterior")) {
+        inicial = inicioMes.addYears(-1);
+        final_ = inicial.addMonths(1).addDays(-1);
+    } else {
+        return false;
+    }
+    setFechaInicial(inicial.toString(Qt::ISODate));
+    setFechaFinal(final_.toString(Qt::ISODate));
+    return true;
+}
+
 void NuevaSolicitudViewModel::restablecerCampos()
 {
-    const QDate hoy = QDate::currentDate();
+    const QDate hoy = m_reloj ? m_reloj() : QDate::currentDate();
     const QString inicial = QDate(hoy.year(), hoy.month(), 1).toString(Qt::ISODate);
     const QString final_ = hoy.toString(Qt::ISODate);
     const QString tipo = claveEstable(TipoDescarga::Emitidos);
@@ -514,6 +550,7 @@ void NuevaSolicitudViewModel::restablecerCampos()
         m_snapshot.reset();
         m_motivoDuplicado.clear();
         m_solicitudExistenteId.clear();
+        m_solicitudEquivalenteId.clear();
     });
     if (cambiaPerfil) {
         emit perfilIdChanged();

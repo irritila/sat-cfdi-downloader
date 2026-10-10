@@ -74,6 +74,12 @@ QString FormatoFechas::rango(const QDate& inicial, const QDate& final_)
     return QStringLiteral("%1 %2 %3").arg(fecha(inicial), kGuionLargo, fecha(final_));
 }
 
+QString FormatoFechas::mesAnio(const QString& mesIso) const
+{
+    const QDate primero = QDate::fromString(mesIso.trimmed() + QStringLiteral("-01"), Qt::ISODate);
+    return primero.isValid() ? QStringLiteral("%1 %2").arg(mes(primero.month())).arg(primero.year()) : QString();
+}
+
 QDate FormatoFechas::diaDesde(const QVariant& valor)
 {
     if (valor.metaType() == QMetaType::fromType<QDate>()) {

@@ -596,6 +596,20 @@ void TestSqliteRepositorios::paquetesYLogsPorSolicitud()
     QCOMPARE(conteo.valor().size(), 1);
     QCOMPARE(conteo.valor().value(id), 2);
 
+    // T014.1 D2: desglose por estado_descarga en la misma agrupacion; el
+    // eliminado (Disponible) no cuenta y Vencido no es pendiente.
+    QCOMPARE(insertarPaqueteFixture(prov, uuid::generarCanonico(), s.id, QStringLiteral("D"),
+                                    QStringLiteral("Error")),
+             QString());
+    QCOMPARE(insertarPaqueteFixture(prov, uuid::generarCanonico(), s.id, QStringLiteral("E"),
+                                    QStringLiteral("Disponible")),
+             QString());
+    auto porEstado = e.p->paquetes().contarVisiblesPorSolicitudYEstado();
+    QVERIFY(porEstado);
+    QCOMPARE(porEstado.valor().size(), 1);
+    QCOMPARE(porEstado.valor().value(id), (ConteoPaquetes{4, 1, 2}));
+    QCOMPARE(e.p->paquetes().contarVisiblesPorSolicitud().valor().value(id), 4);
+
     // Logs: agregar en transaccion y listar en orden.
     const QDateTime t0 = timestamp::ahoraUtc();
     LogEntradaSaneada segundo = logSaneado(id, t0.addSecs(5));

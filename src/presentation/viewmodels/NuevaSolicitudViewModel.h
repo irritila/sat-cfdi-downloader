@@ -10,6 +10,9 @@
 #include <QString>
 #include <QtQmlIntegration/qqmlintegration.h>
 
+#include <QDate>
+
+#include <functional>
 #include <optional>
 
 namespace satcfdi {
@@ -75,6 +78,9 @@ class NuevaSolicitudViewModel : public QObject {
     Q_PROPERTY(bool confirmacionPendiente READ confirmacionPendiente NOTIFY estadoChanged)
     Q_PROPERTY(QString motivoDuplicado READ motivoDuplicado NOTIFY estadoChanged)
     Q_PROPERTY(QString solicitudExistenteId READ solicitudExistenteId NOTIFY estadoChanged)
+    // T014.1 D4: id de la equivalente en la confirmacion de duplicado; "" si
+    // no hay o si fue eliminada localmente (no tiene detalle).
+    Q_PROPERTY(QString solicitudEquivalenteId READ solicitudEquivalenteId NOTIFY estadoChanged)
 
 public:
     // Los tres servicios son obligatorios y deben vivir mas que el view
@@ -104,6 +110,16 @@ public:
     bool confirmacionPendiente() const { return m_snapshot.has_value(); }
     QString motivoDuplicado() const { return m_motivoDuplicado; }
     QString solicitudExistenteId() const { return m_solicitudExistenteId; }
+    QString solicitudEquivalenteId() const { return m_solicitudEquivalenteId; }
+
+    // T014.1 D3: reloj inyectable para los atajos de periodo (por omision,
+    // QDate::currentDate). Solo C++ (pruebas y composition root).
+    void setReloj(std::function<QDate()> reloj);
+    // Atajos de periodo: "mesActual" (dia 1 a hoy), "mesAnterior" (mes
+    // completo) y "mismoMesAnioAnterior" (mes completo). Escribe fechas ISO en
+    // fechaInicial/fechaFinal con la validacion de siempre. false si la clave
+    // no existe.
+    Q_INVOKABLE bool aplicarPeriodo(const QString& atajo);
 
     void setPerfilId(const QString& valor);
     void setTipoDescarga(const QString& valor);
@@ -148,6 +164,7 @@ private:
         bool pendiente;
         QString motivo;
         QString existente;
+        QString equivalente;
         QString campo;
         bool operator==(const Observables&) const = default;
     };
@@ -195,6 +212,8 @@ private:
     std::optional<NuevaSolicitudRequest> m_snapshot; // confirmacion pendiente
     QString m_motivoDuplicado;
     QString m_solicitudExistenteId;
+    QString m_solicitudEquivalenteId;
+    std::function<QDate()> m_reloj;
 
     // Tokens de generacion (DA6).
     quint64 m_genEnvio = 0;

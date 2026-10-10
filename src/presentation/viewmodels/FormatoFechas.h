@@ -42,6 +42,8 @@ public:
     Q_INVOKABLE QString fecha(const QVariant& valor) const;
     Q_INVOKABLE QString fechaHora(const QVariant& valor) const;
     Q_INVOKABLE QString rango(const QVariant& inicial, const QVariant& final_) const;
+    // T014.1 D1: mes "AAAA-MM" -> "sep 2026" ("" si no es valido).
+    Q_INVOKABLE QString mesAnio(const QString& mesIso) const;
 
     // Dia sin hora a partir de un QVariant (invalido si no aplica).
     static QDate diaDesde(const QVariant& valor);

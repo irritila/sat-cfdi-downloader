@@ -16,7 +16,8 @@ class SolicitudesService;
 // id (UUID texto), perfilRfc, rfcContraparte (texto o ""), tipoDescarga
 // (clave), fechaInicial/fechaFinal (ISO yyyy-MM-dd), estadoLocal (clave),
 // estadoSat (clave o null), estadoResumen (clave derivada), creadaEn
-// (QDateTime UTC) y totalPaquetes.
+// (QDateTime UTC), totalPaquetes, perfilNombre y (T014.1 D2)
+// paquetesDescargados / paquetesPendientesDescarga.
 //
 // Estados (propiedad `estado`): Cargando (primera carga o reintento tras
 // error), Vacia, Error y ConDatos. Un refresco con datos ya visibles conserva
@@ -60,6 +61,9 @@ public:
         // T013 D8 (UX-09): nombre del perfil bajo el RFC. Vacio mientras el
         // DTO SolicitudResumen no lo traiga (pendiente de application).
         PerfilNombreRole,
+        // T014.1 D2: paquetes Descargado y pendientes (Disponible + Error).
+        PaquetesDescargadosRole,
+        PaquetesPendientesDescargaRole,
     };
     Q_ENUM(Rol)
 

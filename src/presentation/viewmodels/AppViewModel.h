@@ -42,6 +42,12 @@ class AppViewModel : public QObject {
     // aviso D7 accesible cuando no se pudo abrir (vacio si se abrio).
     Q_PROPERTY(bool puedeAbrirCarpetaPaquetes READ puedeAbrirCarpetaPaquetes NOTIFY mensajeFinderChanged)
     Q_PROPERTY(QString mensajeFinder READ mensajeFinder NOTIFY mensajeFinderChanged)
+    // T014.1 D1: filtros de la lista durante la sesion (no se persisten).
+    // SolicitudesPage los enlaza a su SolicitudesFiltroModel.
+    Q_PROPERTY(QString filtroTexto READ filtroTexto WRITE setFiltroTexto NOTIFY filtrosChanged)
+    Q_PROPERTY(QString filtroEstado READ filtroEstado WRITE setFiltroEstado NOTIFY filtrosChanged)
+    Q_PROPERTY(QString filtroTipo READ filtroTipo WRITE setFiltroTipo NOTIFY filtrosChanged)
+    Q_PROPERTY(QString filtroMes READ filtroMes WRITE setFiltroMes NOTIFY filtrosChanged)
 
 public:
     enum class Pagina {
@@ -85,6 +91,16 @@ public:
             emit mensajeFinderChanged();
         }
     }
+    QString filtroTexto() const { return m_filtroTexto; }
+    void setFiltroTexto(const QString& valor) { cambiarFiltro(m_filtroTexto, valor); }
+    QString filtroEstado() const { return m_filtroEstado; }
+    void setFiltroEstado(const QString& valor) { cambiarFiltro(m_filtroEstado, valor); }
+    QString filtroTipo() const { return m_filtroTipo; }
+    void setFiltroTipo(const QString& valor) { cambiarFiltro(m_filtroTipo, valor); }
+    QString filtroMes() const { return m_filtroMes; }
+    void setFiltroMes(const QString& valor) { cambiarFiltro(m_filtroMes, valor); }
+    Q_INVOKABLE void limpiarFiltros();
+
     Q_INVOKABLE void abrirCarpetaPaquetes();
 
     Q_INVOKABLE void mostrarLista();
@@ -98,9 +114,17 @@ signals:
     void solicitudSeleccionadaIdChanged();
     void notificacionesDeshabilitadasChanged();
     void mensajeFinderChanged();
+    void filtrosChanged();
 
 private:
     void setPagina(Pagina pagina);
+    void cambiarFiltro(QString& campo, const QString& valor)
+    {
+        if (campo != valor) {
+            campo = valor;
+            emit filtrosChanged();
+        }
+    }
 
     QPointer<NuevaSolicitudViewModel> m_nuevaSolicitud;
     QPointer<SolicitudDetailViewModel> m_detalle;
@@ -112,6 +136,10 @@ private:
     AccionesFinder* m_finder = nullptr;
     QString m_mensajeFinder;
     quint64 m_genFinder = 0;
+    QString m_filtroTexto;
+    QString m_filtroEstado;
+    QString m_filtroTipo;
+    QString m_filtroMes;
 };
 
 } // namespace satcfdi

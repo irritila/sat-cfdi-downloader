@@ -46,6 +46,9 @@ Page {
         color: Theme.fondo
     }
 
+    // T014.1 D5: con un dialogo abierto no actua ningun atajo (Main.qml).
+    readonly property bool dialogoAbierto: dialogoEFirma.visible || dialogoReemplazo.visible
+
     Component.onCompleted: Qt.callLater(pagina.enfocarInicial)
 
     function enfocarInicial() {

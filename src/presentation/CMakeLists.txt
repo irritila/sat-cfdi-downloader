@@ -13,6 +13,7 @@ set(_satcfdi_qml_files
     qml/components/EFirmaDialogo.qml
     qml/components/EstadoBadge.qml
     qml/components/BotonAccion.qml
+    qml/components/BotonCopiar.qml
     qml/components/CampoDetalle.qml
     qml/components/EncabezadoPagina.qml
     qml/components/DialogoConfirmacion.qml
@@ -67,6 +68,10 @@ qt_add_qml_module(satcfdi_presentation
         viewmodels/AppViewModel.cpp
         viewmodels/SolicitudesListModel.h
         viewmodels/SolicitudesListModel.cpp
+        viewmodels/SolicitudesFiltroModel.h
+        viewmodels/SolicitudesFiltroModel.cpp
+        viewmodels/Portapapeles.h
+        viewmodels/Portapapeles.cpp
         viewmodels/PerfilesDisponiblesModel.h
         viewmodels/PerfilesDisponiblesModel.cpp
         viewmodels/PerfilesSatListModel.h

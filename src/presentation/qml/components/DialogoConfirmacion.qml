@@ -9,6 +9,9 @@ import QtQuick.Layouts
 // - mensaje: motivo (600); consecuencia: texto secundario opcional.
 // - procesando: BusyIndicator en la accion y botones deshabilitados.
 // - mensajeError: AvisoEnLinea de error sobre los botones.
+// - textoAlternativa (T014.1 D4): boton secundario opcional a la izquierda
+//   ("Ver solicitud existente"); emite alternativaSolicitada() y cierra sin
+//   confirmar ni cancelar.
 // Contenedor Theme.superficieElevada (radio 12) con velo Theme.velo; ancho 480,
 // padding 20. Foco inicial en "Cancelar" (opcion segura y boton por omision);
 // Tab alterna; Enter/Espacio activa; Escape cancela. Al cerrarse, Popup
@@ -25,9 +28,21 @@ Dialog {
     property string textoConfirmar: qsTr("Confirmar")
     property string textoCancelar: qsTr("Cancelar")
     property string prefijoNombre: "dialogo"
+    property string textoAlternativa: ""
 
     signal confirmado()
     signal cancelado()
+    signal alternativaSolicitada()
+
+    // Orden de Tab dentro del dialogo (el foco no sale del dialogo modal).
+    function siguienteFoco(desde, haciaAtras) {
+        const orden = [botonCancelar, botonConfirmar]
+        if (botonAlternativa.visible)
+            orden.unshift(botonAlternativa)
+        const i = orden.indexOf(desde)
+        const destino = orden[(i + (haciaAtras ? orden.length - 1 : 1)) % orden.length]
+        destino.forceActiveFocus(haciaAtras ? Qt.BacktabFocusReason : Qt.TabFocusReason)
+    }
 
     // Evita emitir cancelado() cuando el cierre viene de confirmar.
     property bool resuelto: false
@@ -149,6 +164,20 @@ Dialog {
             Layout.fillWidth: true
             Layout.topMargin: Theme.espacioXs
 
+            BotonAccion {
+                id: botonAlternativa
+                objectName: dialogo.prefijoNombre + "Alternativa"
+                visible: dialogo.textoAlternativa.length > 0
+                text: dialogo.textoAlternativa
+                enabled: !dialogo.procesando
+                Keys.onTabPressed: (evento) => { dialogo.siguienteFoco(botonAlternativa, false); evento.accepted = true }
+                Keys.onBacktabPressed: (evento) => { dialogo.siguienteFoco(botonAlternativa, true); evento.accepted = true }
+                onClicked: {
+                    dialogo.resuelto = true
+                    dialogo.close()
+                    dialogo.alternativaSolicitada()
+                }
+            }
             Item { Layout.fillWidth: true }
             BotonAccion {
                 id: botonCancelar
@@ -156,8 +185,8 @@ Dialog {
                 text: dialogo.textoCancelar
                 enabled: !dialogo.procesando
                 // Tab/Backtab explicitos: el foco no sale del dialogo modal.
-                Keys.onTabPressed: (evento) => { botonConfirmar.forceActiveFocus(Qt.TabFocusReason); evento.accepted = true }
-                Keys.onBacktabPressed: (evento) => { botonConfirmar.forceActiveFocus(Qt.BacktabFocusReason); evento.accepted = true }
+                Keys.onTabPressed: (evento) => { dialogo.siguienteFoco(botonCancelar, false); evento.accepted = true }
+                Keys.onBacktabPressed: (evento) => { dialogo.siguienteFoco(botonCancelar, true); evento.accepted = true }
                 onClicked: dialogo.close()
             }
             BotonAccion {
@@ -167,8 +196,8 @@ Dialog {
                 variante: dialogo.variante === "destructivo" ? "destructivo" : "primario"
                 enabled: !dialogo.procesando
                 cargando: dialogo.procesando
-                Keys.onTabPressed: (evento) => { botonCancelar.forceActiveFocus(Qt.TabFocusReason); evento.accepted = true }
-                Keys.onBacktabPressed: (evento) => { botonCancelar.forceActiveFocus(Qt.BacktabFocusReason); evento.accepted = true }
+                Keys.onTabPressed: (evento) => { dialogo.siguienteFoco(botonConfirmar, false); evento.accepted = true }
+                Keys.onBacktabPressed: (evento) => { dialogo.siguienteFoco(botonConfirmar, true); evento.accepted = true }
                 onClicked: {
                     dialogo.resuelto = true
                     dialogo.close()

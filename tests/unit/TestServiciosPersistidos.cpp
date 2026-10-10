@@ -299,6 +299,52 @@ void TestServiciosPersistidos::listarIncluyeNombreDelPerfil()
     QVERIFY(!e.almacen.hilos.contains(QThread::currentThread()));
 }
 
+// T014.1 D2: descargados y pendientes (Disponible + Error) por solicitud, en
+// una sola consulta agrupada; eliminados excluidos; Vencido no es pendiente.
+void TestServiciosPersistidos::listarConteaPaquetesPorEstado()
+{
+    using ED = EstadoDescarga;
+    Entorno e;
+    const SolicitudId ninguno = e.sembrar(EstadoLocal::Enviada, EstadoSolicitudSat::Terminada,
+                                          {ED::Disponible, ED::Disponible, ED::Error});
+    const SolicitudId dosDeTres = e.sembrar(EstadoLocal::Enviada, EstadoSolicitudSat::Terminada,
+                                            {ED::Descargado, ED::Descargado, ED::Disponible});
+    const SolicitudId todos = e.sembrar(EstadoLocal::Enviada, EstadoSolicitudSat::Terminada,
+                                        {ED::Descargado, ED::Descargado, ED::Descargado});
+    const SolicitudId vencidos = e.sembrar(EstadoLocal::Enviada, EstadoSolicitudSat::Terminada,
+                                           {ED::Vencido, ED::Descargando, ED::Descargado, ED::Error});
+    const SolicitudId sinPaquetes = e.sembrar(EstadoLocal::Creada, {}, {});
+    // El ultimo paquete de `vencidos` (Error) esta eliminado: no cuenta.
+    e.almacen.paquetes.last().eliminadoEn = kAhora;
+    const qsizetype eventosAntes = e.almacen.eventos.size();
+
+    const auto lista = esperar(e.servicio.listar());
+    QVERIFY(lista && lista->esExito());
+    QHash<SolicitudId, SolicitudResumen> filas;
+    for (const SolicitudResumen& r : lista->valor()) {
+        filas.insert(r.id, r);
+    }
+    auto conteo = [&](const SolicitudId& id) {
+        const SolicitudResumen& r = filas[id];
+        return QList<int>{r.totalPaquetes, r.paquetesDescargados, r.paquetesPendientesDescarga};
+    };
+    QCOMPARE(conteo(ninguno), (QList<int>{3, 0, 3}));
+    QCOMPARE(conteo(dosDeTres), (QList<int>{3, 2, 1}));
+    QCOMPARE(conteo(todos), (QList<int>{3, 3, 0}));
+    QCOMPARE(conteo(vencidos), (QList<int>{3, 1, 0})); // Error eliminado; Vencido/Descargando no pendientes
+    QCOMPARE(conteo(sinPaquetes), (QList<int>{0, 0, 0}));
+    // Sin N+1: una sola lectura agregada de paquetes.
+    const QStringList eventos = e.almacen.eventos.mid(eventosAntes);
+    QCOMPARE(eventos.count(QStringLiteral("contarPaquetesPorEstado")), 1);
+    QCOMPARE(eventos.count(QStringLiteral("listarPaquetes")), 0);
+
+    // El detalle trae los mismos conteos.
+    const auto detalle = esperar(e.servicio.obtener(dosDeTres));
+    QVERIFY(detalle && detalle->esExito());
+    QCOMPARE(detalle->valor().resumen.paquetesDescargados, 2);
+    QCOMPARE(detalle->valor().resumen.paquetesPendientesDescarga, 1);
+}
+
 void TestServiciosPersistidos::obtenerInexistenteOEliminadaEsNoEncontrada()
 {
     Entorno e;

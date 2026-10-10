@@ -320,10 +320,10 @@ TestCase {
         const s = crear(solicitudComp, { estado: "Terminada", rfc: "XAXX010101000", nombrePerfil: "Contribuyente de ejemplo",
                                          tipoDescarga: "Recibidos", fechaInicial: "2026-09-03", fechaFinal: "2026-09-03",
                                          totalPaquetes: 3, creadaEn: creada })
-        compare(s.Accessible.name, "Terminada, XAXX010101000 Contribuyente de ejemplo, Recibidos, 3 sep 2026, 3 paquetes, creada "
+        compare(s.Accessible.name, "Terminada, XAXX010101000 Contribuyente de ejemplo, Recibidos, 3 sep 2026, 3 paquetes, 0 de 3 descargados, creada "
                 + FormatoFechas.fechaHora(creada).replace(",", ""))
         compare(findChild(s, "periodoFila").text, "3 sep 2026")
-        compare(findChild(s, "paquetesFila").text, "3")
+        compare(findChild(s, "paquetesFila").text, "0/3")
         verify(s.height >= Theme.altoFila)
         compare(s.background.color, Theme.superficie)
         s.seleccionada = true
@@ -334,6 +334,111 @@ TestCase {
         s.fechaFinal = "2026-09-30"
         compare(findChild(s, "periodoFila").text, "1–30 sep 2026")
     }
+
+    // T014.1 D2: conteo de paquetes con barra, check y "Pendiente de descarga".
+    function test_filaSolicitudProgreso_data() { return temas() }
+    function test_filaSolicitudProgreso(fila) {
+        Theme.oscuro = fila.oscuro
+        const s = crear(solicitudComp, { estado: "Terminada", rfc: "XAXX010101000", tipoDescarga: "Emitidos",
+                                         fechaInicial: "2026-09-01", fechaFinal: "2026-09-30", totalPaquetes: 3,
+                                         paquetesDescargados: 0, paquetesPendientes: 0 })
+        const texto = findChild(s, "paquetesFila")
+        const barra = findChild(s, "barraPaquetesFila")
+        const check = findChild(s, "checkPaquetesFila")
+        const pendiente = findChild(s, "pendienteFila")
+        // 0/3 sin paquetes Disponible ni Error (p. ej. Descargando o Vencido).
+        compare(texto.text, "0/3")
+        verify(barra.visible)
+        compare(barra.children[0].width, 0)
+        verify(!check.visible)
+        verify(!pendiente.visible)
+        // 2/3 con uno Disponible o Error.
+        s.paquetesDescargados = 2
+        s.paquetesPendientes = 1
+        compare(texto.text, "2/3")
+        verify(barra.visible)
+        fuzzyCompare(barra.children[0].width, barra.width * 2 / 3, 0.5)
+        verify(!check.visible)
+        verify(pendiente.visible)
+        verify(s.Accessible.name.indexOf("Terminada, Pendiente de descarga,") === 0)
+        verify(s.Accessible.name.indexOf("3 paquetes, 2 de 3 descargados") > 0)
+        // 3/3: check en lugar de barra.
+        s.paquetesDescargados = 3
+        s.paquetesPendientes = 0
+        compare(texto.text, "3")
+        verify(!barra.visible)
+        verify(check.visible)
+        verify(!pendiente.visible)
+        verify(s.Accessible.name.indexOf("todos descargados") > 0)
+        // Sin paquetes y sin terminar: guion.
+        s.totalPaquetes = 0
+        s.paquetesDescargados = 0
+        s.estado = "EnProceso"
+        compare(texto.text, "—")
+        verify(!barra.visible)
+        verify(!check.visible)
+    }
+
+    // ---- BotonCopiar (T014.1 D6) ---------------------------------------
+    Component { id: copiarComp; BotonCopiar { } }
+    function test_botonCopiar_data() { return temas() }
+    function test_botonCopiar(fila) {
+        Theme.oscuro = fila.oscuro
+        const b = crear(copiarComp, { valor: "4e3b2a1c-0000-4000-8000-000000000001",
+                                      descripcionValor: "Id de solicitud SAT" })
+        verify(b.visible)
+        compare(b.Accessible.name, "Copiar Id de solicitud SAT")
+        compare(b.icono, "doc-on-doc")
+        espia.target = b
+        espia.signalName = "copiadoSolicitado"
+        espia.clear()
+        mouseClick(b)
+        compare(espia.count, 1)
+        compare(espia.signalArguments[0][0], true)
+        verify(b.copiado)
+        compare(b.icono, "checkmark")
+        compare(b.Accessible.name, "Copiado")
+        compare(b.textoConfirmacion, "Id de solicitud SAT copiado al portapapeles.")
+        tryVerify(() => !b.copiado, 3000)
+        compare(b.Accessible.name, "Copiar Id de solicitud SAT")
+        b.valor = ""
+        verify(!b.visible)
+    }
+
+    // ---- DialogoConfirmacion con alternativa (T014.1 D4) ---------------
+    function test_dialogoAlternativa_data() { return temas() }
+    function test_dialogoAlternativa(fila) {
+        Theme.oscuro = fila.oscuro
+        const d = crear(dialogoComp, { textoAlternativa: "Ver solicitud existente" })
+        d.open()
+        tryVerify(() => d.opened)
+        const alternativa = findChild(d.contentItem, "dlgAlternativa")
+        verify(alternativa.visible)
+        compare(alternativa.Accessible.name, "Ver solicitud existente")
+        tryVerify(() => findChild(d.contentItem, "dlgCancelar").activeFocus)
+        // Tab recorre Cancelar -> Confirmar -> Ver solicitud existente -> Cancelar.
+        keyClick(Qt.Key_Tab)
+        verify(findChild(d.contentItem, "dlgConfirmar").activeFocus)
+        keyClick(Qt.Key_Tab)
+        verify(alternativa.activeFocus)
+        keyClick(Qt.Key_Tab)
+        verify(findChild(d.contentItem, "dlgCancelar").activeFocus)
+        const confirmado = createTemporaryObject(spyComp, caso, { target: d, signalName: "confirmado" })
+        const cancelado = createTemporaryObject(spyComp, caso, { target: d, signalName: "cancelado" })
+        const alterno = createTemporaryObject(spyComp, caso, { target: d, signalName: "alternativaSolicitada" })
+        mouseClick(alternativa)
+        compare(alterno.count, 1)
+        tryVerify(() => !d.visible)
+        compare(confirmado.count, 0)
+        compare(cancelado.count, 0)
+
+        const sin = crear(dialogoComp)
+        sin.open()
+        tryVerify(() => sin.opened)
+        verify(!findChild(sin.contentItem, "dlgAlternativa").visible)
+        sin.close()
+    }
+    Component { id: spyComp; SignalSpy { } }
 
     // ---- ResumenEstado -------------------------------------------------
     function test_resumenEstado_data() { return temas() }

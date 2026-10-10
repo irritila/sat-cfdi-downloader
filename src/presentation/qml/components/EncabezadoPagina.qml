@@ -16,6 +16,8 @@ ToolBar {
     property bool mostrarRegresar: false
     property string textoRegresar: qsTr("Regresar")
     property string descripcionRegresar: qsTr("Regresar a la lista de solicitudes (Escape)")
+    // T014.1 D5: ⌘1 regresa a Solicitudes (lo atiende Main.qml); se muestra en el ToolTip.
+    property string atajoRegresar: "⌘1"
     // Primer elemento enfocable del encabezado (boton de regreso).
     readonly property alias botonRegresar: regresar
     default property alias acciones: contenedorAcciones.data
@@ -53,6 +55,7 @@ ToolBar {
             variante: "navegacion"
             text: encabezado.textoRegresar
             descripcion: encabezado.descripcionRegresar
+            atajo: encabezado.atajoRegresar
             onClicked: encabezado.regresarSolicitado()
         }
         ColumnLayout {

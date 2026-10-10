@@ -13,9 +13,14 @@ import QtQuick.Layouts
 //   Contribuyente, Tipo, Periodo, Paquetes, Creada); bajo 960 se oculta Creada.
 // - Estados: cargando (BusyIndicator tras 300 ms), vacia y error (EstadoVacio,
 //   este ultimo con Reintentar enfocado).
-// Teclado: orden de foco por las acciones del encabezado y la lista; foco
-// inicial en la lista (primera fila); flechas para moverse; Enter/Return/
-// Espacio abre el detalle por id.
+// - T014.1 D1: busqueda (RFC o nombre) y filtros Estado, Tipo y Mes sobre un
+//   SolicitudesFiltroModel local (no cambia la consulta ni el orden). Los
+//   filtros viven en AppViewModel (se conservan durante la sesion). Sin
+//   coincidencias: EstadoVacio con "Limpiar filtros".
+// Teclado: orden de foco por las acciones del encabezado, la busqueda, los
+// filtros y la lista; foco inicial en la lista (primera fila); flechas para
+// moverse; Enter/Return/Espacio abre el detalle por id. ⌘F (Main.qml) enfoca
+// la busqueda; Flecha abajo pasa de la busqueda a la lista y Escape la vacia.
 Page {
     id: pagina
     objectName: "paginaSolicitudes"
@@ -24,6 +29,31 @@ Page {
     required property SolicitudesListModel modelo
 
     readonly property bool anchoAmplio: pagina.width >= 960
+    readonly property bool conDatos: pagina.modelo.estado === SolicitudesListModel.ConDatos
+    // T014.1 D5: la lista no abre dialogos propios.
+    readonly property bool dialogoAbierto: false
+    readonly property bool puedeBuscar: pagina.conDatos
+    readonly property alias campoBusqueda: busqueda
+
+    // T014.1 D1: filtro local enlazado al estado de sesion de AppViewModel.
+    SolicitudesFiltroModel {
+        id: filtro
+        fuente: pagina.modelo
+        texto: pagina.app.filtroTexto
+        estado: pagina.app.filtroEstado
+        tipo: pagina.app.filtroTipo
+        mes: pagina.app.filtroMes
+    }
+    readonly property SolicitudesFiltroModel filtroModelo: filtro
+
+    // Meses del selector: los de los periodos y, si ya no aparece, el elegido.
+    readonly property var opcionesMes: {
+        const meses = filtro.mesesDisponibles.slice()
+        if (pagina.app.filtroMes.length > 0 && meses.indexOf(pagina.app.filtroMes) < 0)
+            meses.unshift(pagina.app.filtroMes)
+        return [{ clave: "", texto: qsTr("Todos los meses") }].concat(
+                    meses.map(m => ({ clave: m, texto: FormatoFechas.mesAnio(m) })))
+    }
 
     focus: true
     Accessible.role: Accessible.Pane
@@ -34,7 +64,10 @@ Page {
     }
 
     // Foco inicial diferido: la pagina ya esta en la ventana.
-    Component.onCompleted: Qt.callLater(pagina.enfocarInicial)
+    Component.onCompleted: {
+        pagina.estadoAnterior = pagina.modelo.estado
+        Qt.callLater(pagina.enfocarInicial)
+    }
 
     function enfocarInicial() {
         if (lista.visible && lista.count > 0)
@@ -47,16 +80,36 @@ Page {
 
     // Si la primera carga termina despues del foco inicial, el foco pasa a la
     // lista (solo desde el estado Cargando, para no mover el foco del usuario).
-    property int estadoAnterior: pagina.modelo.estado
+    // Valor previo sin binding (un binding se actualizaria antes del manejador).
+    property int estadoAnterior: -1
     Connections {
         target: pagina.modelo
         function onEstadoChanged() {
             if (pagina.estadoAnterior === SolicitudesListModel.Cargando
                     && pagina.modelo.estado === SolicitudesListModel.ConDatos
                     && botonNueva.activeFocus)
-                lista.forceActiveFocus(Qt.OtherFocusReason)
+                Qt.callLater(pagina.enfocarListaTrasCarga)
             pagina.estadoAnterior = pagina.modelo.estado
         }
+    }
+
+    // Diferido: la lista filtrada se hace visible cuando el proxy ya tiene filas.
+    function enfocarListaTrasCarga() {
+        if (lista.visible && botonNueva.activeFocus)
+            lista.forceActiveFocus(Qt.OtherFocusReason)
+    }
+
+    function enfocarBusqueda() {
+        if (!pagina.puedeBuscar)
+            return false
+        busqueda.forceActiveFocus(Qt.ShortcutFocusReason)
+        busqueda.selectAll()
+        return true
+    }
+
+    function limpiarFiltros() {
+        pagina.app.limpiarFiltros()
+        busqueda.forceActiveFocus(Qt.OtherFocusReason)
     }
 
     function abrir(id) {
@@ -66,7 +119,9 @@ Page {
 
     header: EncabezadoPagina {
         titulo: qsTr("Solicitudes")
-        contador: pagina.modelo.estado === SolicitudesListModel.ConDatos ? String(pagina.modelo.count) : ""
+        contador: !pagina.conDatos ? ""
+                  : filtro.hayFiltros ? qsTr("%1 de %2").arg(filtro.count).arg(pagina.modelo.count)
+                  : String(pagina.modelo.count)
 
         // T009.1 D1: abre la carpeta de paquetes en Finder (no la crea).
         BotonAccion {
@@ -84,6 +139,7 @@ Page {
             icono: "person-card"
             text: qsTr("Perfiles SAT")
             descripcion: qsTr("Administrar perfiles SAT y su e.firma")
+            atajo: "⌘2"
             onClicked: pagina.app.mostrarPerfiles()
         }
         BotonAccion {
@@ -93,6 +149,7 @@ Page {
             icono: "plus"
             text: qsTr("Nueva solicitud")
             descripcion: qsTr("Abrir el formulario de nueva solicitud")
+            atajo: "⌘N"
             onClicked: pagina.app.mostrarNueva()
         }
     }
@@ -143,6 +200,156 @@ Page {
             }
         }
 
+        // ---- Busqueda y filtros (T014.1 D1) ----
+        Rectangle {
+            objectName: "barraFiltros"
+            visible: pagina.conDatos
+            color: Theme.superficie
+            Layout.fillWidth: true
+            implicitHeight: filtros.implicitHeight + 2 * Theme.espacioM
+
+            RowLayout {
+                id: filtros
+                anchors.fill: parent
+                anchors.leftMargin: Theme.espacioL
+                anchors.rightMargin: Theme.espacioL
+                spacing: Theme.espacioS
+
+                CampoTexto {
+                    id: busqueda
+                    objectName: "campoBusqueda"
+                    Layout.fillWidth: true
+                    Layout.minimumWidth: 160
+                    Layout.maximumWidth: 320
+                    leftPadding: 28
+                    rightPadding: limpiarBusqueda.visible ? 28 : 8
+                    text: pagina.app.filtroTexto
+                    placeholderText: qsTr("Buscar por RFC o nombre")
+                    onTextEdited: pagina.app.filtroTexto = text
+                    Accessible.name: qsTr("Buscar solicitudes por RFC o nombre del perfil")
+                    Accessible.description: qsTr("Atajo: %1").arg("⌘F")
+                    ToolTip.visible: busqueda.hovered && !busqueda.activeFocus
+                    ToolTip.text: qsTr("Buscar (%1)").arg("⌘F")
+                    ToolTip.delay: 600
+                    Keys.onDownPressed: (evento) => {
+                        if (lista.visible) {
+                            lista.forceActiveFocus(Qt.TabFocusReason)
+                            evento.accepted = true
+                        } else {
+                            evento.accepted = false
+                        }
+                    }
+                    Keys.onEscapePressed: (evento) => {
+                        if (busqueda.text.length > 0) {
+                            pagina.app.filtroTexto = ""
+                            evento.accepted = true
+                        } else {
+                            evento.accepted = false
+                        }
+                    }
+
+                    Icono {
+                        nombre: "magnifyingglass"
+                        color: Theme.textoSecundario
+                        tamano: 14
+                        anchors.left: parent.left
+                        anchors.leftMargin: 9
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    BotonAccion {
+                        id: limpiarBusqueda
+                        objectName: "botonLimpiarBusqueda"
+                        visible: busqueda.text.length > 0
+                        variante: "icono"
+                        compacto: true
+                        icono: "xmark"
+                        nombreAccesible: qsTr("Borrar búsqueda")
+                        focusPolicy: Qt.NoFocus
+                        anchors.right: parent.right
+                        anchors.rightMargin: 2
+                        anchors.verticalCenter: parent.verticalCenter
+                        onClicked: {
+                            pagina.app.filtroTexto = ""
+                            busqueda.forceActiveFocus(Qt.OtherFocusReason)
+                        }
+                    }
+                }
+                CampoCombo {
+                    id: filtroEstado
+                    objectName: "filtroEstado"
+                    Layout.preferredWidth: 176
+                    focusPolicy: Qt.StrongFocus
+                    textRole: "texto"
+                    valueRole: "clave"
+                    model: [
+                        { clave: "", texto: qsTr("Todos los estados") },
+                        { clave: "Creada", texto: qsTr("Creada") },
+                        { clave: "Enviando", texto: qsTr("Enviando") },
+                        { clave: "Enviada", texto: qsTr("Enviada") },
+                        { clave: "EnvioFallido", texto: qsTr("Envío fallido") },
+                        { clave: "EnvioIncierto", texto: qsTr("Envío incierto") },
+                        { clave: "Aceptada", texto: qsTr("Aceptada por SAT") },
+                        { clave: "EnProceso", texto: qsTr("En proceso SAT") },
+                        { clave: "Terminada", texto: qsTr("Terminada") },
+                        { clave: "ErrorSat", texto: qsTr("Error SAT") },
+                        { clave: "Rechazada", texto: qsTr("Rechazada por SAT") },
+                        { clave: "Vencida", texto: qsTr("Vencida") }
+                    ]
+                    currentIndex: count > 0 ? indexOfValue(pagina.app.filtroEstado) : -1
+                    onActivated: (indice) => { pagina.app.filtroEstado = valueAt(indice) }
+                    Accessible.name: qsTr("Filtrar por estado")
+                    Accessible.description: displayText
+                }
+                CampoCombo {
+                    id: filtroTipo
+                    objectName: "filtroTipo"
+                    Layout.preferredWidth: 140
+                    focusPolicy: Qt.StrongFocus
+                    textRole: "texto"
+                    valueRole: "clave"
+                    model: [
+                        { clave: "", texto: qsTr("Todos los tipos") },
+                        { clave: "Emitidos", texto: qsTr("Emitidos") },
+                        { clave: "Recibidos", texto: qsTr("Recibidos") }
+                    ]
+                    currentIndex: count > 0 ? indexOfValue(pagina.app.filtroTipo) : -1
+                    onActivated: (indice) => { pagina.app.filtroTipo = valueAt(indice) }
+                    Accessible.name: qsTr("Filtrar por tipo de descarga")
+                    Accessible.description: displayText
+                }
+                CampoCombo {
+                    id: filtroMes
+                    objectName: "filtroMes"
+                    Layout.preferredWidth: 150
+                    focusPolicy: Qt.StrongFocus
+                    textRole: "texto"
+                    valueRole: "clave"
+                    model: pagina.opcionesMes
+                    currentIndex: count > 0 ? indexOfValue(pagina.app.filtroMes) : -1
+                    onActivated: (indice) => { pagina.app.filtroMes = valueAt(indice) }
+                    Accessible.name: qsTr("Filtrar por mes del periodo")
+                    Accessible.description: displayText
+                }
+                BotonAccion {
+                    id: botonLimpiarFiltros
+                    objectName: "botonLimpiarFiltros"
+                    visible: filtro.hayFiltros
+                    variante: "secundario"
+                    text: qsTr("Limpiar filtros")
+                    descripcion: qsTr("Quitar la búsqueda y los filtros")
+                    onClicked: pagina.limpiarFiltros()
+                }
+                Item { Layout.fillWidth: true }
+            }
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: 1
+                color: Theme.separador
+            }
+        }
+
         // ---- Tabla ----
         Item {
             Layout.fillWidth: true
@@ -153,22 +360,26 @@ Page {
                 objectName: "listaSolicitudes"
                 anchors.fill: parent
                 clip: true
-                visible: pagina.modelo.estado === SolicitudesListModel.ConDatos
-                model: pagina.modelo
+                visible: pagina.conDatos && filtro.count > 0
+                model: filtro
                 currentIndex: count > 0 ? 0 : -1
                 activeFocusOnTab: true
                 keyNavigationEnabled: true
                 boundsBehavior: Flickable.StopAtBounds
                 headerPositioning: ListView.OverlayHeader
+                // T014.1 D1: sin delegados incubados fuera de pantalla; el filtro
+                // local quita filas mientras se crean (evita solicitudes de
+                // indices que ya no existen en el modelo filtrado).
+                cacheBuffer: 0
 
                 Accessible.role: Accessible.List
                 Accessible.name: qsTr("Lista de solicitudes, %n elemento(s)", "", count)
 
                 ScrollBar.vertical: ScrollBar { }
 
-                Keys.onReturnPressed: pagina.abrir(pagina.modelo.idEn(lista.currentIndex))
-                Keys.onEnterPressed: pagina.abrir(pagina.modelo.idEn(lista.currentIndex))
-                Keys.onSpacePressed: pagina.abrir(pagina.modelo.idEn(lista.currentIndex))
+                Keys.onReturnPressed: pagina.abrir(filtro.idEn(lista.currentIndex))
+                Keys.onEnterPressed: pagina.abrir(filtro.idEn(lista.currentIndex))
+                Keys.onSpacePressed: pagina.abrir(filtro.idEn(lista.currentIndex))
 
                 header: Rectangle {
                     objectName: "encabezadosColumnas"
@@ -234,6 +445,8 @@ Page {
                     fechaInicial: model.fechaInicial
                     fechaFinal: model.fechaFinal
                     totalPaquetes: model.totalPaquetes
+                    paquetesDescargados: model.paquetesDescargados
+                    paquetesPendientes: model.paquetesPendientesDescarga
                     creadaEn: model.creadaEn
                     mostrarCreada: pagina.anchoAmplio
                     seleccionada: ListView.isCurrentItem
@@ -260,6 +473,22 @@ Page {
                 accionPrimaria: true
                 objectNameAccion: "botonNuevaSolicitudVacia"
                 onAccionSolicitada: pagina.app.mostrarNueva()
+            }
+
+            // T014.1 D1: hay solicitudes, pero ninguna coincide con los filtros.
+            EstadoVacio {
+                id: sinCoincidencias
+                objectName: "estadoSinCoincidencias"
+                anchors.centerIn: parent
+                width: Math.min(parent.width - 2 * Theme.espacioXxl, 420)
+                visible: pagina.conDatos && filtro.count === 0
+                variante: "vacio"
+                titulo: qsTr("Ninguna solicitud coincide con la búsqueda")
+                descripcion: qsTr("Cambia la búsqueda o los filtros, o límpialos para ver todas las solicitudes.")
+                textoAccion: qsTr("Limpiar filtros")
+                objectNameTitulo: "tituloSinCoincidencias"
+                objectNameAccion: "botonLimpiarFiltrosVacio"
+                onAccionSolicitada: pagina.limpiarFiltros()
             }
 
             // Estado: cargando (solo si tarda mas de 300 ms)

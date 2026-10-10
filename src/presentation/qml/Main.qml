@@ -74,6 +74,116 @@ ApplicationWindow {
         function onPaginaChanged() { Qt.callLater(ventana.actualizarPagina) }
     }
 
+    // ---- T014.1 D5: atajos de teclado ----
+    // Cada atajo es una Action: el menu de la app (solo cocoa) muestra las
+    // mismas acciones, sin registrar el atajo dos veces. Reglas:
+    // - con un dialogo abierto no actua ninguno (Escape lo atiende el dialogo);
+    // - con un campo editable enfocado no actua ninguno (Escape sigue siendo
+    //   de la pagina o del campo);
+    // - ⌘R tampoco actua con foco en texto de solo lectura;
+    // - ⌘⌫ solo abre la confirmacion de eliminar (nunca elimina).
+    readonly property SolicitudesPage paginaLista: paginaActual.item as SolicitudesPage
+    readonly property NuevaSolicitudPage paginaNueva: paginaActual.item as NuevaSolicitudPage
+    readonly property DetalleSolicitudPage paginaDetalle: paginaActual.item as DetalleSolicitudPage
+    readonly property PerfilesSatPage paginaPerfiles: paginaActual.item as PerfilesSatPage
+
+    readonly property bool dialogoAbierto: (ventana.paginaNueva !== null && ventana.paginaNueva.dialogoAbierto)
+                                           || (ventana.paginaDetalle !== null && ventana.paginaDetalle.dialogoAbierto)
+                                           || (ventana.paginaPerfiles !== null && ventana.paginaPerfiles.dialogoAbierto)
+    // Campos de texto con foco: TextInput (incluye TextField) o TextEdit.
+    readonly property TextInput entradaConFoco: ventana.activeFocusItem as TextInput
+    readonly property TextEdit edicionConFoco: ventana.activeFocusItem as TextEdit
+    readonly property bool textoConFoco: ventana.entradaConFoco !== null || ventana.edicionConFoco !== null
+    readonly property bool campoEditableConFoco: (ventana.entradaConFoco !== null && !ventana.entradaConFoco.readOnly)
+                                                 || (ventana.edicionConFoco !== null && !ventana.edicionConFoco.readOnly)
+    readonly property bool atajosActivos: !ventana.dialogoAbierto && !ventana.campoEditableConFoco
+
+    function regresarDePagina() {
+        if (ventana.paginaNueva !== null)
+            ventana.paginaNueva.regresar()
+        else if (ventana.paginaDetalle !== null)
+            ventana.paginaDetalle.regresar()
+        else if (ventana.paginaPerfiles !== null)
+            ventana.paginaPerfiles.regresar()
+    }
+
+    Action {
+        id: accionNueva
+        objectName: "atajoNuevaSolicitud"
+        text: qsTr("Nueva solicitud")
+        shortcut: "Ctrl+N"
+        enabled: ventana.atajosActivos && ventana.paginaNueva === null && paginaActual.item !== null
+        onTriggered: ventana.appViewModel.mostrarNueva()
+    }
+    Action {
+        id: accionBuscar
+        objectName: "atajoBuscar"
+        text: qsTr("Buscar")
+        shortcut: "Ctrl+F"
+        enabled: ventana.atajosActivos && ventana.paginaLista !== null && ventana.paginaLista.puedeBuscar
+        onTriggered: ventana.paginaLista.enfocarBusqueda()
+    }
+    Action {
+        id: accionPrincipal
+        objectName: "atajoAccionPrincipal"
+        text: ventana.paginaDetalle !== null ? ventana.paginaDetalle.textoAccionPrincipal : qsTr("Verificar ahora")
+        shortcut: "Ctrl+R"
+        enabled: !ventana.dialogoAbierto && !ventana.textoConFoco && ventana.paginaDetalle !== null
+                 && ventana.paginaDetalle.puedeAccionPrincipal
+        onTriggered: ventana.paginaDetalle.accionPrincipal()
+    }
+    Action {
+        id: accionEliminar
+        objectName: "atajoEliminar"
+        text: qsTr("Eliminar…")
+        shortcut: "Ctrl+Backspace"
+        enabled: ventana.atajosActivos && ventana.paginaDetalle !== null && ventana.paginaDetalle.puedePedirEliminar
+        onTriggered: ventana.paginaDetalle.pedirEliminar()
+    }
+    Action {
+        id: accionPerfiles
+        objectName: "atajoPerfiles"
+        text: qsTr("Perfiles SAT")
+        shortcut: "Ctrl+2"
+        enabled: ventana.atajosActivos && ventana.paginaPerfiles === null && paginaActual.item !== null
+        onTriggered: ventana.appViewModel.mostrarPerfiles()
+    }
+    Action {
+        id: accionRegresar
+        objectName: "atajoRegresar"
+        text: qsTr("Solicitudes")
+        shortcut: "Ctrl+1"
+        enabled: ventana.atajosActivos && paginaActual.item !== null && ventana.paginaLista === null
+        onTriggered: ventana.regresarDePagina()
+    }
+
+    // Menu de la app con los atajos: solo con el menu nativo de macOS (en
+    // otras plataformas o en pruebas offscreen no ocupa espacio en la ventana).
+    Component {
+        id: barraMenuComponente
+        MenuBar {
+            Menu {
+                title: qsTr("Solicitud")
+                MenuItem { action: accionNueva }
+                MenuItem { action: accionBuscar }
+                MenuSeparator { }
+                MenuItem { action: accionPrincipal }
+                MenuItem { action: accionEliminar }
+            }
+            Menu {
+                title: qsTr("Ir")
+                // ⌘1 y ⌘2 (no ⌘[ ni ⌘,: en cocoa, ⌘, choca con el "Preferencias…"
+                // oculto de Qt y ⌘[ cambia con el teclado latinoamericano).
+                MenuItem { action: accionRegresar }
+                MenuItem { action: accionPerfiles }
+            }
+        }
+    }
+    Component.onCompleted: {
+        if (Qt.platform.pluginName === "cocoa")
+            ventana.menuBar = barraMenuComponente.createObject(ventana)
+    }
+
     Loader {
         id: paginaActual
         objectName: "paginaActual"

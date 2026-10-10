@@ -129,6 +129,14 @@ solicitudesRepresentativas(const QList<PerfilResumen>& perfiles)
             d.paquetes.append(paquete(n, int(p) + 1, s.paquetes.at(p)));
         }
         d.resumen.totalPaquetes = int(d.paquetes.size());
+        // T014.1 D2: mismos conteos que SolicitudesServicePersistido.
+        for (const PaqueteResumen& paq : d.paquetes) {
+            if (paq.estadoDescarga == EstadoDescarga::Descargado) {
+                ++d.resumen.paquetesDescargados;
+            } else if (paq.estadoDescarga == EstadoDescarga::Disponible || paq.estadoDescarga == EstadoDescarga::Error) {
+                ++d.resumen.paquetesPendientesDescarga;
+            }
+        }
         d.logs.append(logUsuario(TipoEventoLog::SolicitudCreada, d.resumen.creadaEn));
         r.dedupKey = canonica.dedupKey();
         resultado.prepend(std::move(r)); // mas recientes primero

@@ -74,6 +74,37 @@ Page {
         encabezado.botonRegresar.forceActiveFocus(Qt.TabFocusReason)
     }
 
+    // T014.1 D5: ⌘R ejecuta la accion principal aplicable (Reintentar descarga
+    // o Verificar ahora); ⌘⌫ solo abre la confirmacion de eliminar.
+    readonly property bool puedeAccionPrincipal: pagina.conDatos
+        && (pagina.detalle.puedeReintentarDescarga || pagina.detalle.puedeVerificar)
+    readonly property bool puedePedirEliminar: pagina.conDatos && !pagina.detalle.eliminando
+    readonly property string textoAccionPrincipal: pagina.conDatos && pagina.detalle.puedeReintentarDescarga
+                                                   ? qsTr("Reintentar descarga") : qsTr("Verificar ahora")
+    // Con un dialogo abierto no actua ningun atajo (Main.qml).
+    readonly property bool dialogoAbierto: dialogoEliminar.visible
+
+    function accionPrincipal() {
+        if (!pagina.conDatos)
+            return false
+        if (pagina.detalle.puedeReintentarDescarga) {
+            pagina.detalle.reintentarDescarga()
+            return true
+        }
+        if (pagina.detalle.puedeVerificar) {
+            pagina.detalle.verificarAhora()
+            return true
+        }
+        return false
+    }
+
+    function pedirEliminar() {
+        if (!pagina.puedePedirEliminar || dialogoEliminar.opened)
+            return false
+        dialogoEliminar.open()
+        return true
+    }
+
     function regresar() {
         pagina.app.mostrarLista()
     }
@@ -164,6 +195,7 @@ Page {
             icono: "trash"
             text: qsTr("Eliminar…")
             descripcion: qsTr("Eliminar la solicitud de este equipo; no modifica nada en el SAT")
+            atajo: "⌘⌫"
             Accessible.name: qsTr("Eliminar solicitud")
             onClicked: dialogoEliminar.open()
         }
@@ -291,6 +323,7 @@ Page {
                 visible: pagina.detalle.puedeReintentarDescarga
                 variante: "primario"
                 text: qsTr("Reintentar descarga")
+                atajo: "⌘R"
                 descripcion: qsTr("Descargar de nuevo los paquetes disponibles o con error; si el monitoreo está pausado, queda pendiente")
                 onClicked: pagina.detalle.reintentarDescarga()
             }
@@ -298,6 +331,7 @@ Page {
                 objectName: "botonVerificarAhora"
                 visible: pagina.detalle.puedeVerificar
                 text: qsTr("Verificar ahora")
+                atajo: pagina.detalle.puedeReintentarDescarga ? "" : "⌘R"
                 descripcion: qsTr("Consultar ahora el estado de la solicitud en el SAT; si el monitoreo está pausado, queda pendiente")
                 onClicked: pagina.detalle.verificarAhora()
             }
@@ -386,6 +420,7 @@ Page {
                                 metadatos: pagina.metadatosPaquete(modelData)
                                 mensaje: pagina.mensajePaquete(modelData)
                                 tonoMensaje: pagina.tonoPaquete(modelData)
+                                objectNameCopiar: "botonCopiarPaquete_" + modelData.idPaqueteSat
                                 // T008 D11 / T009 D10: existencia del ZIP o mensaje del paquete.
                                 objectNameMensaje: modelData.estadoDescarga === "Descargado"
                                                    ? "existenciaPaquete_" + modelData.idPaqueteSat
@@ -487,7 +522,15 @@ Page {
 
                         // SAT
                         EncabezadoSeccion { texto: qsTr("SAT") }
-                        CampoDetalle { etiqueta: qsTr("Id solicitud SAT"); valor: pagina.detalle.idSolicitudSat; mono: true; primero: true }
+                        CampoDetalle {
+                            objectName: "campoIdSolicitudSat"
+                            etiqueta: qsTr("Id solicitud SAT")
+                            valor: pagina.detalle.idSolicitudSat
+                            mono: true
+                            primero: true
+                            copiable: true
+                            descripcionCopia: qsTr("Id de solicitud SAT")
+                        }
                         CampoDetalle {
                             objectName: "campoCodigoSolicitud"
                             etiqueta: qsTr("Código de solicitud SAT")

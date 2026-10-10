@@ -57,6 +57,10 @@ QVariant SolicitudesListModel::data(const QModelIndex& index, int role) const
         return s.totalPaquetes;
     case PerfilNombreRole:
         return s.perfilNombre;
+    case PaquetesDescargadosRole:
+        return s.paquetesDescargados;
+    case PaquetesPendientesDescargaRole:
+        return s.paquetesPendientesDescarga;
     default:
         return {};
     }
@@ -77,6 +81,8 @@ QHash<int, QByteArray> SolicitudesListModel::roleNames() const
         {CreadaEnRole, "creadaEn"},
         {TotalPaquetesRole, "totalPaquetes"},
         {PerfilNombreRole, "perfilNombre"},
+        {PaquetesDescargadosRole, "paquetesDescargados"},
+        {PaquetesPendientesDescargaRole, "paquetesPendientesDescarga"},
     };
 }
 

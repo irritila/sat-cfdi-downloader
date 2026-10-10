@@ -14,6 +14,11 @@ Item {
     property string valor: ""
     property bool mono: false
     property bool primero: false
+    // T014.1 D6: boton "Copiar" junto al valor (con `descripcionCopia` para
+    // su nombre accesible, p. ej. "Id de solicitud SAT").
+    property bool copiable: false
+    property string descripcionCopia: campo.etiqueta
+    readonly property alias botonCopiar: copiar
 
     readonly property bool vacio: campo.valor.length === 0
 
@@ -49,7 +54,7 @@ Item {
         id: valorTexto
         x: 200
         y: 7
-        width: campo.width - 200 - Theme.espacioL
+        width: campo.width - 200 - Theme.espacioL - (copiar.visible ? copiar.width + Theme.espacioS : 0)
         text: campo.vacio ? "—" : campo.valor
         readOnly: true
         selectByMouse: true
@@ -62,5 +67,15 @@ Item {
         font.family: campo.mono ? Theme.familiaMono : Theme.familia
         font.pixelSize: campo.mono ? Theme.mono.size : Theme.cuerpo.size
         Accessible.ignored: true
+    }
+    BotonCopiar {
+        id: copiar
+        objectName: "botonCopiar"
+        visible: campo.copiable && !campo.vacio
+        valor: campo.valor
+        descripcionValor: campo.descripcionCopia
+        anchors.right: parent.right
+        anchors.rightMargin: Theme.espacioL
+        y: 4
     }
 }

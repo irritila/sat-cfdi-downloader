@@ -65,6 +65,7 @@ public:
     Resultado<QList<PaquetePersistido>, ErrorPersistencia>
     listarVisiblesPorSolicitud(const SolicitudId& solicitudId) override;
     Resultado<QHash<SolicitudId, int>, ErrorPersistencia> contarVisiblesPorSolicitud() override;
+    Resultado<QHash<SolicitudId, ConteoPaquetes>, ErrorPersistencia> contarVisiblesPorSolicitudYEstado() override;
     Resultado<int, ErrorPersistencia>
     marcarEliminadosPorSolicitud(const SolicitudId& solicitudId,
                                  const QDateTime& eliminadoEn) override;

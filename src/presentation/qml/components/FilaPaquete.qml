@@ -23,6 +23,9 @@ Item {
     property string objectNameFinder: ""
     // objectName del texto del mensaje (para pruebas, D10).
     property string objectNameMensaje: "mensajePaquete"
+    // T014.1 D6: objectName del boton "Copiar" del nombre del paquete.
+    property string objectNameCopiar: "botonCopiarPaquete"
+    readonly property alias botonCopiar: copiar
     readonly property alias botonFinder: finder
 
     signal mostrarEnFinder()
@@ -74,21 +77,33 @@ Item {
             spacing: 2
             Layout.fillWidth: true
 
-            TextEdit {
-                objectName: "nombrePaquete"
-                text: fila.idPaquete
-                readOnly: true
-                selectByMouse: true
-                activeFocusOnTab: false
-                color: Theme.texto
-                selectionColor: Theme.seleccion
-                selectedTextColor: Theme.texto
-                font.family: Theme.familiaMono
-                font.pixelSize: Theme.mono.size
-                font.weight: Font.Medium
-                wrapMode: TextEdit.WrapAnywhere
+            RowLayout {
+                spacing: Theme.espacioXs
                 Layout.fillWidth: true
-                Accessible.ignored: true
+                TextEdit {
+                    objectName: "nombrePaquete"
+                    text: fila.idPaquete
+                    readOnly: true
+                    selectByMouse: true
+                    activeFocusOnTab: false
+                    color: Theme.texto
+                    selectionColor: Theme.seleccion
+                    selectedTextColor: Theme.texto
+                    font.family: Theme.familiaMono
+                    font.pixelSize: Theme.mono.size
+                    font.weight: Font.Medium
+                    wrapMode: TextEdit.WrapAnywhere
+                    Layout.fillWidth: true
+                    Layout.maximumWidth: implicitWidth
+                    Accessible.ignored: true
+                }
+                BotonCopiar {
+                    id: copiar
+                    objectName: fila.objectNameCopiar
+                    valor: fila.idPaquete
+                    descripcionValor: qsTr("Nombre del paquete")
+                }
+                Item { Layout.fillWidth: true }
             }
             Label {
                 objectName: "metadatosPaquete"
