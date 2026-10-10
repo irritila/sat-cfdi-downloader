@@ -345,6 +345,35 @@ void TestServiciosPersistidos::listarConteaPaquetesPorEstado()
     QCOMPARE(detalle->valor().resumen.paquetesPendientesDescarga, 1);
 }
 
+// T014.2: puedeReintentar (Error sin 5008) y reintentoPendiente por paquete.
+void TestServiciosPersistidos::detalleExponeReintentoPorPaquete()
+{
+    using ED = EstadoDescarga;
+    Entorno e;
+    const SolicitudId id = e.sembrar(EstadoLocal::Enviada, EstadoSolicitudSat::Terminada,
+                                     {ED::Error, ED::Error, ED::Disponible, ED::Descargado});
+    QList<PaquetePersistido*> paquetes;
+    for (PaquetePersistido& p : e.almacen.paquetes) {
+        if (p.solicitudMasivaId == id) {
+            paquetes.append(&p);
+        }
+    }
+    paquetes.at(1)->codigoDescargaSat = u"5008"_s;
+    paquetes.at(0)->reintentoPendienteEn = kAhora;
+    const auto detalle = esperar(e.servicio.obtener(id));
+    QVERIFY(detalle && detalle->esExito());
+    QHash<QString, PaqueteResumen> porId;
+    for (const PaqueteResumen& r : detalle->valor().paquetes) {
+        porId.insert(r.idPaqueteSat, r);
+    }
+    QVERIFY(porId[u"PAQ_1"_s].puedeReintentar);
+    QVERIFY(porId[u"PAQ_1"_s].reintentoPendiente);
+    QVERIFY(!porId[u"PAQ_2"_s].puedeReintentar); // 5008
+    QVERIFY(!porId[u"PAQ_3"_s].puedeReintentar); // Disponible: se descarga automatico
+    QVERIFY(!porId[u"PAQ_4"_s].puedeReintentar);
+    QVERIFY(!porId[u"PAQ_2"_s].reintentoPendiente);
+}
+
 void TestServiciosPersistidos::obtenerInexistenteOEliminadaEsNoEncontrada()
 {
     Entorno e;

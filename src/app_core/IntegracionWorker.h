@@ -48,6 +48,7 @@ public:
     void enviar(const SolicitudId& id) override;
     void verificarAhora(const SolicitudId& id) override;
     void reintentarDescarga(const SolicitudId& id) override;
+    void reintentarDescargaPaquete(const SolicitudId& id, const QString& idPaqueteSat) override;
 
 private:
     WorkerLocal& m_worker;

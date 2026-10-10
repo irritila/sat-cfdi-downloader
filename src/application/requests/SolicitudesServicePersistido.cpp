@@ -3,6 +3,7 @@
 #include "application/persistence/PersistenceDispatcher.h"
 #include "application/requests/PreparacionSolicitud.h"
 #include "domain/common/UuidCanonico.h"
+#include "domain/operaciones/PoliticasOperacion.h"
 #include "ports/LogSanitizer.h"
 #include "ports/repositories/LogSolicitudRepository.h"
 #include "ports/repositories/PaqueteSolicitudRepository.h"
@@ -60,6 +61,8 @@ PaqueteResumen aPaquete(const PaquetePersistido& p)
     r.descargadoEn = p.descargadoEn;
     r.vencidoEn = p.vencidoEn;
     r.codigoDescargaSat = p.codigoDescargaSat;
+    r.puedeReintentar = politicas::puedeReintentarManual(p);
+    r.reintentoPendiente = p.reintentoPendienteEn.has_value();
     return r;
 }
 

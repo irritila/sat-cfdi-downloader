@@ -323,6 +323,10 @@ struct AccionesEspia final : AccionesSolicitud {
     {
         llamadas.append(QStringLiteral("descargar:") + id.texto());
     }
+    void reintentarDescargaPaquete(const SolicitudId& id, const QString& idPaqueteSat) override
+    {
+        llamadas.append(QStringLiteral("descargarPaquete:") + id.texto() + QLatin1Char('/') + idPaqueteSat);
+    }
 };
 
 // T008: consulta de existencia con promesas que resuelve la prueba.
@@ -439,6 +443,9 @@ private slots:
     void verSolicitudExistenteDesdeDuplicado();
     void atajosDeTeclado();
     void copiarIdentificadores();
+
+    // T014.2: reintento por paquete
+    void reintentoPorPaquete();
 };
 
 void TestPresentacion::init()
@@ -2462,4 +2469,78 @@ void TestPresentacion::copiarIdentificadores()
     QCOMPARE(copiar->property("textoConfirmacion").toString(),
              QStringLiteral("Id de solicitud SAT copiado al portapapeles."));
     QCOMPARE(nombreAccesible(copiar), QStringLiteral("Copiado"));
+}
+
+// ---------------------------------------------------------------------------
+// T014.2: reintento por paquete
+
+void TestPresentacion::reintentoPorPaquete()
+{
+    EscenarioAsincrono e;
+    AccionesEspia acciones;
+    e.vms.setAccionesSolicitud(&acciones);
+    QVERIFY(e.cargar());
+    QVERIFY(e.activar());
+    e.solicitudes.lista.resolver(0, ResultadoListaSol::exito({}));
+    SolicitudDetailViewModel* d = e.vms.detalle();
+    const SolicitudId id = SolicitudId::generar();
+    QVERIFY(e.vms.app()->abrirDetalle(id.texto()));
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaDetalleSolicitud"));
+
+    // PAQ_01 Error reintentable, PAQ_02 Error con 5008, PAQ_03 Descargado.
+    SolicitudDetalle detalle = detalleDePrueba(id);
+    PaqueteResumen error = detalle.paquetes.first();
+    error.estadoDescarga = EstadoDescarga::Error;
+    error.codigoDescargaSat = QStringLiteral("5004");
+    error.puedeReintentar = true;
+    PaqueteResumen maximo = error;
+    maximo.idPaqueteSat = QStringLiteral("PAQ_02");
+    maximo.codigoDescargaSat = QStringLiteral("5008");
+    maximo.puedeReintentar = false; // regla del DTO: Error con 5008
+    PaqueteResumen descargado = error;
+    descargado.idPaqueteSat = QStringLiteral("PAQ_03");
+    descargado.estadoDescarga = EstadoDescarga::Descargado;
+    descargado.codigoDescargaSat.reset();
+    descargado.descargadoEn = detalle.resumen.creadaEn;
+    descargado.puedeReintentar = false;
+    detalle.paquetes = {error, maximo, descargado};
+    e.solicitudes.detalle.resolver(0, SolicitudesService::ResultadoDetalle::exito(detalle));
+    QTRY_VERIFY(d->cargada());
+    QMetaObject::invokeMethod(e.pagina(), "mostrarPestana", Q_ARG(QVariant, QStringLiteral("paquetes")));
+
+    QQuickItem* reintentar = nullptr;
+    QTRY_VERIFY((reintentar = e.item(QStringLiteral("botonReintentarPaquete_PAQ_01"))) && reintentar->isVisible());
+    QCOMPARE(nombreAccesible(reintentar), QStringLiteral("Reintentar paquete PAQ_01"));
+    QCOMPARE(d->paquetes().at(0).toMap().value(QStringLiteral("puedeReintentar")).toBool(), true);
+    // 5008 nunca ofrece reintento; Descargado tampoco.
+    QVERIFY(!e.item(QStringLiteral("botonReintentarPaquete_PAQ_02"))->isVisible());
+    QVERIFY(!e.item(QStringLiteral("botonReintentarPaquete_PAQ_03"))->isVisible());
+    QCOMPARE(d->paquetes().at(1).toMap().value(QStringLiteral("puedeReintentar")).toBool(), false);
+    QVERIFY(!e.item(QStringLiteral("reintentoPendiente_PAQ_01"))->isVisible());
+    // "Reintentar descarga" de la solicitud se mantiene.
+    QVERIFY(e.item(QStringLiteral("botonReintentarDescarga"))->isVisible());
+
+    // Solo ese paquete, con el id de la solicitud.
+    QMetaObject::invokeMethod(reintentar, "click");
+    QCOMPARE(acciones.llamadas,
+             QStringList{QStringLiteral("descargarPaquete:") + id.texto() + QStringLiteral("/PAQ_01")});
+    QVERIFY(d->accionSolicitada().contains(QStringLiteral("queda pendiente")));
+    QTRY_VERIFY(e.item(QStringLiteral("accionSolicitada"))->isVisible());
+    d->reintentarDescargaPaquete(QStringLiteral("PAQ_02"));
+    d->reintentarDescargaPaquete(QStringLiteral("PAQ_03"));
+    d->reintentarDescargaPaquete(QStringLiteral("NO_EXISTE"));
+    QCOMPARE(acciones.llamadas.size(), 1);
+
+    // Monitoreo en pausa: el paquete queda pendiente y se ve como tal.
+    detalle.paquetes[0].reintentoPendiente = true;
+    d->recargar();
+    QTRY_COMPARE(e.solicitudes.detalle.size(), 2);
+    e.solicitudes.detalle.resolver(1, SolicitudesService::ResultadoDetalle::exito(detalle));
+    QTRY_VERIFY(d->paquetes().at(0).toMap().value(QStringLiteral("reintentoPendiente")).toBool());
+    QTRY_VERIFY(e.item(QStringLiteral("reintentoPendiente_PAQ_01"))->isVisible());
+    QVERIFY(!e.item(QStringLiteral("botonReintentarPaquete_PAQ_01"))->isVisible());
+    QVERIFY(nombreAccesible(e.item(QStringLiteral("filaPaquete_PAQ_01"))).contains(QStringLiteral("Reintento pendiente")));
+    e.vms.setAccionesSolicitud(nullptr);
+    // Sin acciones no se ofrece reintento aunque el DTO lo permita.
+    QVERIFY(!d->paquetes().at(0).toMap().value(QStringLiteral("puedeReintentar")).toBool());
 }

@@ -20,4 +20,14 @@ private slots:
     void enviarSeEjecutaAunEnPausa();
     void manualAntesQueAutomaticoEnUnCiclo();
     void instantaneasDeEstadoYPendientes();
+    // T014.2: reintento por paquete.
+    void reintentoPorPaqueteActivoSoloEsePaquete();
+    void reintentoPorPaquete5008SinTrafico();
+    void reintentoPorPaqueteEnPausaSobreviveReinicio();
+    void intencionPaqueteObsoletaSeDescartaConLog();
+    void intencionesSolicitudYPaqueteEnOrdenSinDuplicar();
+    void recuperacionConservaIntencionPorPaquete();
+    void intencionPaqueteDeSolicitudEliminadaSeLimpiaSinLog();
+    void reintentoPorPaqueteCon5008QuedaErrorSaneado();
+    void intencionPaqueteRespetaGateDeCredencial();
 };

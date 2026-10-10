@@ -40,7 +40,8 @@ public:
     // --- Seleccion acotada (D9). `limite` > 0. Solo filas visibles. ---------
 
     // Perfiles con algun trabajo SAT pendiente: verificaciones debidas en
-    // `ahoraUtc`, descargas automaticas o intenciones pendientes. Sirve para
+    // `ahoraUtc`, descargas automaticas o intenciones pendientes (de solicitud
+    // o, desde T014.2, por paquete). Sirve para
     // consultar el estado de credencial UNA vez por perfil (gate D9).
     virtual Resultado<QList<PerfilId>, ErrorPersistencia> listarPerfilesConTrabajo(const QDateTime& ahoraUtc) = 0;
 
@@ -140,6 +141,25 @@ public:
     // solicitud esta eliminada: la intencion sigue pendiente.
     virtual Resultado<bool, ErrorPersistencia> consumirIntencion(const SolicitudId& solicitudId, TipoIntencion tipo,
                                                                  const QDateTime& capturadaEn) = 0;
+
+    // --- Intenciones por paquete (T014.2 D2, ADR 0007 enmendado) ---------------
+
+    // Fija reintento_pendiente_en = `ahoraUtc` (la mas reciente prevalece) SOLO
+    // si el paquete es visible, de solicitud visible, esta en Error o
+    // Disponible y no tiene codigo_descarga_sat 5008. false si no aplica.
+    virtual Resultado<bool, ErrorPersistencia> registrarIntencionPaquete(const QString& paqueteId,
+                                                                         const QDateTime& ahoraUtc) = 0;
+
+    // Limpia reintento_pendiente_en SOLO si conserva `capturadaEn` (D13).
+    // false si cambio o ya estaba limpia.
+    virtual Resultado<bool, ErrorPersistencia> consumirIntencionPaquete(const QString& paqueteId,
+                                                                        const QDateTime& capturadaEn) = 0;
+
+    // Intenciones por paquete (paquete y solicitud visibles) de los `perfiles`,
+    // reintento_pendiente_en ASC. No filtra por estado: el ejecutor revalida y
+    // descarta con log las que ya no aplican (D3).
+    virtual Resultado<QList<IntencionPaquete>, ErrorPersistencia>
+    listarIntencionesPaquete(const QList<PerfilId>& perfiles, int limite) = 0;
 };
 
 } // namespace satcfdi

@@ -161,6 +161,12 @@ public:
                                                           const QDateTime& ahoraUtc) override;
     Resultado<bool, ErrorPersistencia> consumirIntencion(const SolicitudId& solicitudId, TipoIntencion tipo,
                                                          const QDateTime& capturadaEn) override;
+    Resultado<bool, ErrorPersistencia> registrarIntencionPaquete(const QString& paqueteId,
+                                                                 const QDateTime& ahoraUtc) override;
+    Resultado<bool, ErrorPersistencia> consumirIntencionPaquete(const QString& paqueteId,
+                                                                const QDateTime& capturadaEn) override;
+    Resultado<QList<IntencionPaquete>, ErrorPersistencia> listarIntencionesPaquete(const QList<PerfilId>& perfiles,
+                                                                                   int limite) override;
 
 private:
     SqliteConnectionProvider& m_proveedor;

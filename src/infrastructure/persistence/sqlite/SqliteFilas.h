@@ -22,9 +22,9 @@ Resultado<SolicitudPersistida, ErrorPersistencia> leerSolicitud(const QSqlQuery&
 
 // Columnas de paquete_solicitud que lee leerPaquete(), en orden y opcionalmente
 // prefijadas con `alias` (p. ej. "p" -> "p.id, p.solicitud_masiva_id, ...").
-// La lectura es POSICIONAL a partir de la columna `desde` (17 columnas).
+// La lectura es POSICIONAL a partir de la columna `desde` (18 columnas; reintento_pendiente_en desde la migracion 004).
 QString columnasPaquete(QStringView alias = {});
-inline constexpr int kNumColumnasPaquete = 17;
+inline constexpr int kNumColumnasPaquete = 18;
 Resultado<PaquetePersistido, ErrorPersistencia> leerPaquete(const QSqlQuery& q, int desde = 0);
 
 } // namespace satcfdi::sqlite

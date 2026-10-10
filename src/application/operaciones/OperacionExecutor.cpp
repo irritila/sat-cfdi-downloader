@@ -36,6 +36,15 @@ using R = ResultadoOperacion;
 using Desenlace = ResultadoOperacion::Desenlace;
 using RB = Resultado<bool, ErrorPersistencia>;
 
+// T014.2: `intencionPaquete` es el reintento_pendiente_en capturado de una
+// intencion por paquete; `soloReintentable` exige esReintentablePorPaquete
+// (Error/Disponible, nunca 5008) ANTES de marcar: sin trafico si no aplica.
+struct OpcionesDescarga {
+    std::optional<QDateTime> intencionSolicitud;
+    std::optional<QDateTime> intencionPaquete;
+    bool soloReintentable = false;
+};
+
 PrioridadOperacion prioridadDe(OrigenLog origen)
 {
     switch (origen) {
@@ -331,6 +340,24 @@ struct OperacionExecutor::Impl {
                            tipo == TipoIntencion::Verificacion ? QStringLiteral("Verificacion pendiente ya no aplica")
                                                                : QStringLiteral("Descarga pendiente ya no aplica"),
                            {}, std::nullopt});
+        }
+        return std::nullopt;
+    }
+
+    // T014.2: limpia la intencion por paquete (D13) y, si ya no aplica, deja
+    // el log accion_pendiente_descartada con el IdPaquete.
+    std::optional<ErrorPersistencia> consumirPaquete(const PaqueteDescargable& paq, const QDateTime& capturada,
+                                                     bool descartarConLog)
+    {
+        auto c = p.operaciones.consumirIntencionPaquete(paq.paquete.id, capturada);
+        if (!c) {
+            return std::move(c).error();
+        }
+        if (c.valor() && descartarConLog) {
+            return log(paq.paquete.solicitudMasivaId,
+                       {TipoEventoLog::AccionPendienteDescartada, OrigenLog::Usuario, std::nullopt, std::nullopt,
+                        std::nullopt, QStringLiteral("Reintento de paquete pendiente ya no aplica"), {},
+                        paq.paquete.idPaqueteSat});
         }
         return std::nullopt;
     }
@@ -728,9 +755,10 @@ struct OperacionExecutor::Impl {
     // --- Descarga (D6, D14) ------------------------------------------------------
 
     R ejecutarDescarga(const QString& paqueteId, OrigenLog origen, std::optional<QDateTime> intencion,
-                       const SenalCancelacion& cancelacion)
+                       const SenalCancelacion& cancelacion, OpcionesDescarga opciones = OpcionesDescarga())
     {
         constexpr auto tipo = TipoOperacion::Descarga;
+        opciones.intencionSolicitud = intencion;
         std::optional<PaqueteDescargable> paquete;
         bool noAplica = false;
         RB marcado = enTransaccion([&]() -> RB {
@@ -739,10 +767,24 @@ struct OperacionExecutor::Impl {
                 return RB::fallo(std::move(leido).error());
             }
             if (!leido.valor()) {
+                // Paquete o solicitud ya no visibles: una intencion por paquete
+                // se limpia sin log (no hay solicitud visible donde escribirlo).
+                // T007 D5: sin solicitud visible no se escribe log.
+                if (opciones.intencionPaquete) {
+                    noAplica = true;
+                    auto c = p.operaciones.consumirIntencionPaquete(paqueteId, *opciones.intencionPaquete);
+                    if (!c) {
+                        return RB::fallo(std::move(c).error());
+                    }
+                    return RB::exito(c.valor());
+                }
                 return RB::exito(false);
             }
             paquete = *leido.valor();
-            auto m = p.operaciones.marcarDescargando(paqueteId, reloj(), origen == OrigenLog::Usuario);
+            RB m = RB::exito(false);
+            if (!opciones.soloReintentable || politicas::esReintentablePorPaquete(paquete->paquete)) {
+                m = p.operaciones.marcarDescargando(paqueteId, reloj(), origen == OrigenLog::Usuario);
+            }
             if (!m) {
                 return m;
             }
@@ -750,11 +792,19 @@ struct OperacionExecutor::Impl {
                 // Ya no aplica: si venia de una intencion, se descarta con log
                 // (se confirma esa limpieza, pero la descarga no se ejecuta).
                 noAplica = true;
-                if (!intencion) {
+                if (!opciones.intencionSolicitud && !opciones.intencionPaquete) {
                     return RB::exito(false);
                 }
-                if (auto e = consumir(paquete->paquete.solicitudMasivaId, TipoIntencion::Descarga, *intencion, true)) {
-                    return RB::fallo(*e);
+                if (opciones.intencionSolicitud) {
+                    if (auto e = consumir(paquete->paquete.solicitudMasivaId, TipoIntencion::Descarga,
+                                          *opciones.intencionSolicitud, true)) {
+                        return RB::fallo(*e);
+                    }
+                }
+                if (opciones.intencionPaquete) {
+                    if (auto e = consumirPaquete(*paquete, *opciones.intencionPaquete, true)) {
+                        return RB::fallo(*e);
+                    }
                 }
                 return RB::exito(true);
             }
@@ -771,7 +821,7 @@ struct OperacionExecutor::Impl {
             return errorLocal(tipo, origen, sid, paqueteId);
         }
         if (!marcado.valor() || noAplica) {
-            if (noAplica && marcado.valor()) {
+            if (noAplica && marcado.valor() && sid) {
                 emit q->solicitudActualizada(*sid);
             }
             return resultado(tipo, origen, Desenlace::Descartada, sid, paqueteId);
@@ -834,6 +884,11 @@ struct OperacionExecutor::Impl {
                     return RB::fallo(*e);
                 }
             }
+            if (opciones.intencionPaquete) {
+                if (auto e = consumirPaquete(*paquete, *opciones.intencionPaquete, false)) {
+                    return RB::fallo(*e);
+                }
+            }
             return RB::exito(true);
         });
         if (!aplicado) {
@@ -850,6 +905,75 @@ struct OperacionExecutor::Impl {
     }
 
     // --- Intenciones, vencimiento y recuperacion ---------------------------------
+
+    // --- Reintento por paquete (T014.2) -------------------------------------------
+
+    // Paquete reintentable (Disponible/Error, solicitud visible) por IdPaquete SAT.
+    std::optional<PaqueteDescargable> reintentablePorIdSat(const SolicitudId& solicitudId, const QString& idPaqueteSat)
+    {
+        auto r = p.operaciones.listarPaquetesReintentables(solicitudId);
+        if (!r) {
+            return std::nullopt;
+        }
+        for (const PaqueteDescargable& d : r.valor()) {
+            if (d.paquete.idPaqueteSat == idPaqueteSat) {
+                return d;
+            }
+        }
+        return std::nullopt;
+    }
+
+    R ejecutarReintentoPaquete(const SolicitudId& solicitudId, const QString& idPaqueteSat,
+                               const SenalCancelacion& cancelacion)
+    {
+        const auto paq = reintentablePorIdSat(solicitudId, idPaqueteSat);
+        if (!paq) {
+            return resultado(TipoOperacion::Descarga, OrigenLog::Usuario, Desenlace::Descartada, solicitudId);
+        }
+        OpcionesDescarga opciones;
+        opciones.soloReintentable = true;
+        return ejecutarDescarga(paq->paquete.id, OrigenLog::Usuario, std::nullopt, cancelacion, opciones);
+    }
+
+    R ejecutarIntencionPaquete(const QString& paqueteId, const QDateTime& capturada, const SenalCancelacion& cancelacion)
+    {
+        OpcionesDescarga opciones;
+        opciones.soloReintentable = true;
+        opciones.intencionPaquete = capturada;
+        return ejecutarDescarga(paqueteId, OrigenLog::Usuario, std::nullopt, cancelacion, opciones);
+    }
+
+    R ejecutarRegistroIntencionPaquete(const SolicitudId& solicitudId, const QString& idPaqueteSat)
+    {
+        constexpr auto tipo = TipoOperacion::RegistroIntencion;
+        std::optional<PaqueteDescargable> paq;
+        RB r = enTransaccion([&]() -> RB {
+            paq = reintentablePorIdSat(solicitudId, idPaqueteSat);
+            if (!paq) {
+                return RB::exito(false);
+            }
+            auto reg = p.operaciones.registrarIntencionPaquete(paq->paquete.id, reloj());
+            if (!reg || !reg.valor()) {
+                return reg;
+            }
+            if (auto e = log(solicitudId, {TipoEventoLog::AccionPendienteRegistrada, OrigenLog::Usuario, std::nullopt,
+                                           std::nullopt, std::nullopt,
+                                           QStringLiteral("Reintento de paquete pendiente por pausa"), {},
+                                           paq->paquete.idPaqueteSat})) {
+                return RB::fallo(*e);
+            }
+            return RB::exito(true);
+        });
+        const std::optional<QString> paqueteId = paq ? std::optional(paq->paquete.id) : std::nullopt;
+        if (!r) {
+            return errorLocal(tipo, OrigenLog::Usuario, solicitudId, paqueteId);
+        }
+        if (r.valor()) {
+            emit q->solicitudActualizada(solicitudId);
+        }
+        return resultado(tipo, OrigenLog::Usuario, r.valor() ? Desenlace::Aplicada : Desenlace::Descartada, solicitudId,
+                         paqueteId);
+    }
 
     R ejecutarRegistroIntencion(const SolicitudId& id, TipoIntencion tipoIntencion)
     {
@@ -1327,6 +1451,33 @@ QFuture<ResultadoOperacion> OperacionExecutor::registrarIntencion(const Solicitu
     return m_impl->encolarOperacion(TipoOperacion::RegistroIntencion, OrigenLog::Usuario, solicitudId, std::nullopt,
                                     [this, solicitudId, tipo](const SenalCancelacion&) {
                                         return m_impl->ejecutarRegistroIntencion(solicitudId, tipo);
+                                    });
+}
+
+QFuture<ResultadoOperacion> OperacionExecutor::reintentarDescargaPaquete(const SolicitudId& solicitudId,
+                                                                         const QString& idPaqueteSat)
+{
+    return m_impl->encolarOperacion(TipoOperacion::Descarga, OrigenLog::Usuario, solicitudId, std::nullopt,
+                                    [this, solicitudId, idPaqueteSat](const SenalCancelacion& c) {
+                                        return m_impl->ejecutarReintentoPaquete(solicitudId, idPaqueteSat, c);
+                                    });
+}
+
+QFuture<ResultadoOperacion> OperacionExecutor::registrarIntencionPaquete(const SolicitudId& solicitudId,
+                                                                         const QString& idPaqueteSat)
+{
+    return m_impl->encolarOperacion(TipoOperacion::RegistroIntencion, OrigenLog::Usuario, solicitudId, std::nullopt,
+                                    [this, solicitudId, idPaqueteSat](const SenalCancelacion&) {
+                                        return m_impl->ejecutarRegistroIntencionPaquete(solicitudId, idPaqueteSat);
+                                    });
+}
+
+QFuture<ResultadoOperacion> OperacionExecutor::descargarIntencionPaquete(const QString& paqueteId,
+                                                                         const QDateTime& capturadaEn)
+{
+    return m_impl->encolarOperacion(TipoOperacion::Descarga, OrigenLog::Usuario, std::nullopt, paqueteId,
+                                    [this, paqueteId, capturadaEn](const SenalCancelacion& c) {
+                                        return m_impl->ejecutarIntencionPaquete(paqueteId, capturadaEn, c);
                                     });
 }
 

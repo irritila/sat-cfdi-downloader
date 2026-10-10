@@ -36,6 +36,18 @@ struct IntencionPendiente {
     QDateTime accionPendienteEn;
 };
 
+// Intencion manual de reintento de UN paquete (T014.2 D2, ADR 0007
+// enmendado): paquete_solicitud.reintento_pendiente_en. `reintentoPendienteEn`
+// es el valor capturado: consumirIntencionPaquete() solo limpia si la columna
+// lo conserva (misma regla D13).
+struct IntencionPaquete {
+    QString paqueteId;
+    SolicitudId solicitudId;
+    PerfilId perfilSatId;
+    QString idPaqueteSat;
+    QDateTime reintentoPendienteEn;
+};
+
 enum class TipoIntencion {
     Verificacion, // verificacion_pendiente
     Descarga,     // descarga_pendiente (reintenta paquetes en Error/Disponible de la solicitud)

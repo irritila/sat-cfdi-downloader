@@ -144,4 +144,9 @@ void AccionesWorker::reintentarDescarga(const SolicitudId& id)
     m_worker.reintentarDescarga(id);
 }
 
+void AccionesWorker::reintentarDescargaPaquete(const SolicitudId& id, const QString& idPaqueteSat)
+{
+    m_worker.reintentarDescargaPaquete(id, idPaqueteSat);
+}
+
 } // namespace satcfdi

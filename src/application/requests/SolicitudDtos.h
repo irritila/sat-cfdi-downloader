@@ -47,6 +47,10 @@ struct PaqueteResumen {
     std::optional<QDateTime> descargadoEn; // solo si Descargado
     std::optional<QDateTime> vencidoEn;    // solo si Vencido
     std::optional<QString> codigoDescargaSat;
+    // T014.2 D1/D2: "Reintentar" por paquete (Error reintentable, nunca 5008)
+    // y reintento pendiente por pausa (reintento_pendiente_en).
+    bool puedeReintentar = false;
+    bool reintentoPendiente = false;
 };
 
 // Evento visible del detalle (log_solicitud saneado). Sin payload crudo.

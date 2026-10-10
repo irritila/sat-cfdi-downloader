@@ -171,7 +171,13 @@ QString sqlPerfilesConTrabajo()
                             "SELECT s.perfil_sat_id FROM paquete_solicitud p "
                             "JOIN solicitud_masiva s ON s.id = p.solicitud_masiva_id "
                             "WHERE p.eliminado_en IS NULL AND p.estado_descarga = 'Disponible' "
-                            "AND s.eliminado_en IS NULL AND s.estado_solicitud_sat = 'Terminada'"
+                            "AND s.eliminado_en IS NULL AND s.estado_solicitud_sat = 'Terminada' "
+                            // T014.2: intenciones por paquete (indice parcial de 004).
+                            "UNION ALL "
+                            "SELECT s.perfil_sat_id FROM paquete_solicitud p "
+                            "JOIN solicitud_masiva s ON s.id = p.solicitud_masiva_id "
+                            "WHERE p.reintento_pendiente_en IS NOT NULL AND p.eliminado_en IS NULL "
+                            "AND s.eliminado_en IS NULL"
                             ") ORDER BY perfil_sat_id");
 }
 
@@ -800,6 +806,82 @@ Resultado<bool, ErrorPersistencia> SqliteOperacionesSolicitudRepository::consumi
                                            "AND accion_pendiente_en = :capturada"),
                       {{":id", sqlite::texto(solicitudId.texto())}, {":capturada", sqlite::instante(capturadaEn)}},
                       u"operaciones.consumir_intencion");
+}
+
+// --- Intenciones por paquete (T014.2) ---------------------------------------------
+
+Resultado<bool, ErrorPersistencia> SqliteOperacionesSolicitudRepository::registrarIntencionPaquete(
+    const QString& paqueteId, const QDateTime& ahoraUtc)
+{
+    return actualizar(m_proveedor,
+                      QStringLiteral("UPDATE paquete_solicitud SET reintento_pendiente_en = :ahora "
+                                     "WHERE id = :id AND eliminado_en IS NULL "
+                                     "AND estado_descarga IN ('Disponible', 'Error') "
+                                     "AND (codigo_descarga_sat IS NULL OR trim(codigo_descarga_sat) <> '5008') AND ")
+                          + kSolicitudPadreVisible,
+                      {{":ahora", sqlite::instante(ahoraUtc)}, {":id", sqlite::texto(paqueteId)}},
+                      u"operaciones.registrar_intencion_paquete");
+}
+
+Resultado<bool, ErrorPersistencia> SqliteOperacionesSolicitudRepository::consumirIntencionPaquete(
+    const QString& paqueteId, const QDateTime& capturadaEn)
+{
+    return actualizar(m_proveedor,
+                      QStringLiteral("UPDATE paquete_solicitud SET reintento_pendiente_en = NULL "
+                                     "WHERE id = :id AND reintento_pendiente_en = :capturada"),
+                      {{":id", sqlite::texto(paqueteId)}, {":capturada", sqlite::instante(capturadaEn)}},
+                      u"operaciones.consumir_intencion_paquete");
+}
+
+Resultado<QList<IntencionPaquete>, ErrorPersistencia>
+SqliteOperacionesSolicitudRepository::listarIntencionesPaquete(const QList<PerfilId>& perfiles, int limite)
+{
+    using R = Resultado<QList<IntencionPaquete>, ErrorPersistencia>;
+    constexpr QStringView kContexto = u"operaciones.intenciones_paquete";
+    if (limite <= 0) {
+        return R::fallo(argumentoInvalido(kContexto, "limite"));
+    }
+    if (perfiles.isEmpty()) {
+        return R::exito({});
+    }
+    auto conexion = sqlite::conexionLectura(m_proveedor);
+    if (!conexion) {
+        return R::fallo(std::move(conexion).error());
+    }
+    QSqlDatabase db = conexion.valor();
+    QSqlQuery q(db);
+    q.setForwardOnly(true);
+    if (auto r = correr(q,
+                        QStringLiteral("SELECT p.id, p.solicitud_masiva_id, s.perfil_sat_id, p.id_paquete_sat, "
+                                       "p.reintento_pendiente_en FROM paquete_solicitud p "
+                                       "JOIN solicitud_masiva s ON s.id = p.solicitud_masiva_id "
+                                       "WHERE p.eliminado_en IS NULL AND s.eliminado_en IS NULL "
+                                       "AND p.reintento_pendiente_en IS NOT NULL "
+                                       "AND s.perfil_sat_id IN (SELECT value FROM json_each(:perfiles)) "
+                                       "ORDER BY p.reintento_pendiente_en ASC, p.id ASC LIMIT :limite"),
+                        {{":perfiles", perfilesJson(perfiles)}, {":limite", sqlite::entero(limite)}}, kContexto);
+        !r) {
+        return R::fallo(std::move(r).error());
+    }
+    QList<IntencionPaquete> lista;
+    while (q.next()) {
+        IntencionPaquete i;
+        i.paqueteId = q.value(0).toString();
+        const auto solicitud = SolicitudId::desdeTexto(q.value(1).toString());
+        const auto perfil = PerfilId::desdeTexto(q.value(2).toString());
+        if (!solicitud || !perfil) {
+            return R::fallo(sqlite::filaIlegible(u"paquete_solicitud", !solicitud ? u"solicitud_masiva_id"
+                                                                                  : u"perfil_sat_id"));
+        }
+        i.solicitudId = *solicitud;
+        i.perfilSatId = *perfil;
+        i.idPaqueteSat = q.value(3).toString();
+        if (!sqlite::leerInstante(q.value(4), i.reintentoPendienteEn)) {
+            return R::fallo(sqlite::filaIlegible(u"paquete_solicitud", u"reintento_pendiente_en"));
+        }
+        lista.append(std::move(i));
+    }
+    return R::exito(std::move(lista));
 }
 
 } // namespace satcfdi

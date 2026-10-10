@@ -96,6 +96,18 @@ public:
     // Registra una intencion manual con el monitoreo pausado (sin puerto).
     QFuture<ResultadoOperacion> registrarIntencion(const SolicitudId& solicitudId, TipoIntencion tipo);
 
+    // --- T014.2: reintento por paquete (D1, D2, ADR 0007 enmendado) -----------
+    // Prioridad Manual (origen Usuario). Un paquete no reintentable (no
+    // Disponible/Error, 5008, eliminado) se descarta SIN trafico SAT.
+    // Descarga de SOLO ese paquete (monitoreo activo); reutiliza la descarga.
+    QFuture<ResultadoOperacion> reintentarDescargaPaquete(const SolicitudId& solicitudId, const QString& idPaqueteSat);
+    // Con el monitoreo pausado: reintento_pendiente_en + log
+    // accion_pendiente_registrada. Descartada si el paquete no es reintentable.
+    QFuture<ResultadoOperacion> registrarIntencionPaquete(const SolicitudId& solicitudId, const QString& idPaqueteSat);
+    // Al reanudar: consume la intencion capturada (D13) con la descarga; si ya
+    // no aplica (Descargado, Vencido, 5008...), la descarta con log y sin red.
+    QFuture<ResultadoOperacion> descargarIntencionPaquete(const QString& paqueteId, const QDateTime& capturadaEn);
+
     // Descarta una intencion que ya no aplica (D13: solo si accion_pendiente_en
     // sigue igual a `capturadaEn`), con log accion_pendiente_descartada. La usa
     // WorkerLocal cuando una intencion de descarga no tiene paquetes

@@ -14,6 +14,7 @@ private slots:
     void listarYObtenerMapeanFilas();
     void listarIncluyeNombreDelPerfil();
     void listarConteaPaquetesPorEstado();
+    void detalleExponeReintentoPorPaquete();
     void obtenerInexistenteOEliminadaEsNoEncontrada();
     void matrizDuplicados_data();
     void matrizDuplicados();

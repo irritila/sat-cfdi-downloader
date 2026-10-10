@@ -184,7 +184,7 @@ SolicitudDetalle solicitudConIncidencia()
     d.codigoEstadoSolicitud = QStringLiteral("5000");
     d.ultimaVerificacionEn = kAhora.addSecs(35 * 60);
     PaqueteResumen error = paquete(5, 1, EstadoDescarga::Error);
-    error.codigoDescargaSat = QStringLiteral("5000");
+    error.puedeReintentar = true; // como politicas::puedeReintentarManual: Error sin 5008
     d.paquetes = {error, paquete(5, 2, EstadoDescarga::Descargado)};
     contarPaquetes(d);
     d.logs.append(log(TipoEventoLog::VerificacionRealizada, OrigenLog::Worker, 35));

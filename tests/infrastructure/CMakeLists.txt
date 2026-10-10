@@ -34,6 +34,7 @@ target_compile_definitions(satcfdi_infrastructure_tests PRIVATE
     SATCFDI_MIGRACION_001_FUENTE="${CMAKE_CURRENT_SOURCE_DIR}/../../src/infrastructure/persistence/migrations/001_initial_schema.sql"
     SATCFDI_MIGRACION_002_FUENTE="${CMAKE_CURRENT_SOURCE_DIR}/../../src/infrastructure/persistence/migrations/002_credencial_metadata.sql"
     SATCFDI_MIGRACION_003_FUENTE="${CMAKE_CURRENT_SOURCE_DIR}/../../src/infrastructure/persistence/migrations/003_worker_ejecutor.sql"
+    SATCFDI_MIGRACION_004_FUENTE="${CMAKE_CURRENT_SOURCE_DIR}/../../src/infrastructure/persistence/migrations/004_reintento_paquete.sql"
 )
 
 # Permite #include "fakes/FakeSecretStore.h" (T005).

@@ -121,4 +121,16 @@ QDateTime vencimientoEstimado(const QDateTime& primeraObservacionUtc)
     return primeraObservacionUtc.addSecs(std::chrono::duration_cast<std::chrono::seconds>(kVidaEstimadaPaquete).count());
 }
 
+bool esReintentablePorPaquete(const PaquetePersistido& paquete)
+{
+    return !paquete.eliminadoEn
+           && (paquete.estadoDescarga == EstadoDescarga::Error || paquete.estadoDescarga == EstadoDescarga::Disponible)
+           && paquete.codigoDescargaSat.value_or(QString()).trimmed() != QStringLiteral("5008");
+}
+
+bool puedeReintentarManual(const PaquetePersistido& paquete)
+{
+    return paquete.estadoDescarga == EstadoDescarga::Error && esReintentablePorPaquete(paquete);
+}
+
 } // namespace satcfdi::politicas

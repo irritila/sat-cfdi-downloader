@@ -11,6 +11,9 @@ import "Etiquetas.js" as Etiquetas
 // Descargando se muestra una barra indeterminada en lugar del mensaje. A la
 // derecha, "Mostrar en Finder" (BotonAccion sm) solo en Descargado; se habilita
 // con `finderHabilitado`.
+// T014.2 D1: "Reintentar" (BotonAccion sm) solo con `puedeReintentar` (el view
+// model lo niega con 5008); con `reintentoPendiente` (monitoreo en pausa, D2)
+// se muestra "Reintento pendiente" en lugar del boton.
 Item {
     id: fila
 
@@ -21,14 +24,20 @@ Item {
     property string tonoMensaje: "neutro"
     property bool finderHabilitado: false
     property string objectNameFinder: ""
+    property bool puedeReintentar: false
+    property bool reintentoPendiente: false
+    property string objectNameReintentar: "botonReintentarPaquete"
+    property string objectNamePendiente: "reintentoPendientePaquete"
     // objectName del texto del mensaje (para pruebas, D10).
     property string objectNameMensaje: "mensajePaquete"
     // T014.1 D6: objectName del boton "Copiar" del nombre del paquete.
     property string objectNameCopiar: "botonCopiarPaquete"
     readonly property alias botonCopiar: copiar
     readonly property alias botonFinder: finder
+    readonly property alias botonReintentar: reintentar
 
     signal mostrarEnFinder()
+    signal reintentarSolicitado()
 
     readonly property string textoEstado: Etiquetas.estadoDescarga(fila.estado)
     readonly property string sufijo: {
@@ -45,11 +54,13 @@ Item {
     }
 
     Layout.fillWidth: true
-    implicitWidth: 150 + centro.implicitWidth + finder.implicitWidth + 2 * Theme.espacioL + 2 * Theme.espacioM
+    implicitWidth: 150 + centro.implicitWidth + Math.max(finder.implicitWidth, reintentar.implicitWidth)
+                   + 2 * Theme.espacioL + 2 * Theme.espacioM
     implicitHeight: Math.max(centro.implicitHeight, Theme.altoBadge) + 24
 
     Accessible.role: Accessible.ListItem
-    Accessible.name: [qsTr("Paquete %1").arg(fila.sufijo), fila.textoEstado, fila.mensaje]
+    Accessible.name: [qsTr("Paquete %1").arg(fila.sufijo), fila.textoEstado, fila.mensaje,
+                      fila.reintentoPendiente ? qsTr("Reintento pendiente") : ""]
                      .filter(t => t.length > 0).join(", ")
 
     RowLayout {
@@ -124,6 +135,28 @@ Item {
                 Layout.maximumWidth: 240
                 Accessible.name: qsTr("Descargando")
             }
+            // T014.2 D2: reintento pedido con el monitoreo en pausa.
+            RowLayout {
+                objectName: fila.objectNamePendiente
+                visible: fila.reintentoPendiente
+                spacing: Theme.espacioXs
+                Layout.fillWidth: true
+                Icono {
+                    nombre: "clock"
+                    color: Theme.textoSecundario
+                    tamano: 14
+                    Layout.alignment: Qt.AlignTop
+                }
+                Label {
+                    text: qsTr("Reintento pendiente: se descargará al reanudar el monitoreo.")
+                    color: Theme.textoSecundario
+                    font.family: Theme.familia
+                    font.pixelSize: Theme.leyenda.size
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
+                    Accessible.ignored: true
+                }
+            }
             RowLayout {
                 visible: fila.estado !== "Descargando" && fila.mensaje.length > 0
                 spacing: Theme.espacioXs
@@ -159,6 +192,18 @@ Item {
             descripcion: qsTr("Mostrar el archivo del paquete %1 en Finder").arg(fila.idPaquete)
             Layout.alignment: Qt.AlignTop
             onClicked: fila.mostrarEnFinder()
+        }
+        BotonAccion {
+            id: reintentar
+            objectName: fila.objectNameReintentar
+            visible: fila.puedeReintentar && !fila.reintentoPendiente
+            compacto: true
+            icono: "arrow-down-circle"
+            text: qsTr("Reintentar")
+            descripcion: qsTr("Descargar de nuevo solo este paquete; si el monitoreo está pausado, queda pendiente")
+            Accessible.name: qsTr("Reintentar paquete %1").arg(fila.idPaquete)
+            Layout.alignment: Qt.AlignTop
+            onClicked: fila.reintentarSolicitado()
         }
     }
     Rectangle {

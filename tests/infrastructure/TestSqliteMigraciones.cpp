@@ -89,7 +89,7 @@ void TestSqliteMigraciones::recursoEmbebidoIgualAlFuente()
 
     auto lista = migracionesSqliteEmbebidas();
     QVERIFY(lista);
-    QCOMPARE(lista.valor().size(), 3);
+    QCOMPARE(lista.valor().size(), 4);
     for (int i = 0; i < lista.valor().size(); ++i) {
         QCOMPARE(lista.valor().at(i).version, i + 1); // consecutivas desde 1
     }
@@ -104,6 +104,12 @@ void TestSqliteMigraciones::recursoEmbebidoIgualAlFuente()
     QVERIFY(!fuente003.isEmpty());
     QCOMPARE(lista.valor().at(2).nombre, QStringLiteral("003_worker_ejecutor"));
     QCOMPARE(lista.valor().at(2).sql.toUtf8(), fuente003);
+
+    // T014.2: 004 embebida igual al fuente.
+    const QByteArray fuente004 = leerArchivo(QStringLiteral(SATCFDI_MIGRACION_004_FUENTE));
+    QVERIFY(!fuente004.isEmpty());
+    QCOMPARE(lista.valor().at(3).nombre, QStringLiteral("004_reintento_paquete"));
+    QCOMPARE(lista.valor().at(3).sql.toUtf8(), fuente004);
 }
 
 void TestSqliteMigraciones::dividirSentenciasDm2()

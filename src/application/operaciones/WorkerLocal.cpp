@@ -47,10 +47,24 @@ struct SeleccionInicial {
 // Lectura de trabajo SAT de los perfiles listos (hilo del ejecutor).
 struct SeleccionSat {
     QList<IntencionPendiente> intenciones;
+    QList<IntencionPaquete> intencionesPaquete; // T014.2
     QHash<SolicitudId, QList<QString>> reintentables; // por intencion de descarga
     QList<SolicitudId> verificaciones;
     QList<QString> descargas;
 };
+
+// Intenciones pendientes: de solicitud y por paquete (T014.2).
+int contarIntenciones(OperacionesSolicitudRepository& repo, const QList<PerfilId>& perfiles)
+{
+    int n = 0;
+    if (auto i = repo.listarIntencionesPendientes(perfiles, 100000)) {
+        n += static_cast<int>(i.valor().size());
+    }
+    if (auto i = repo.listarIntencionesPaquete(perfiles, 100000)) {
+        n += static_cast<int>(i.valor().size());
+    }
+    return n;
+}
 
 } // namespace
 
@@ -152,9 +166,7 @@ struct WorkerLocal::Impl {
                         }
                     }
                 }
-                if (auto intenciones = repo.listarIntencionesPendientes(todos.valor(), 100000)) {
-                    sel->pendientes = static_cast<int>(intenciones.valor().size());
-                }
+                sel->pendientes = contarIntenciones(repo, todos.valor());
                 if (pausadoCiclo) {
                     return;
                 }
@@ -220,6 +232,9 @@ struct WorkerLocal::Impl {
                         }
                     }
                 }
+                if (auto ip = repo.listarIntencionesPaquete(listos, kLimite)) {
+                    sel->intencionesPaquete = ip.valor();
+                }
                 if (auto v = repo.listarVerificacionesDebidas(listos, ahora, kLimite)) {
                     for (const SolicitudPersistida& s : v.valor()) {
                         sel->verificaciones.append(s.id);
@@ -234,8 +249,24 @@ struct WorkerLocal::Impl {
             .then(q, [this, sel, encoladas, inicial]() mutable {
                 QSet<SolicitudId> verificadas;
                 QSet<QString> descargados;
-                // Intenciones (manuales): verificar y luego descargar (D13).
+                // Intenciones (manuales) de solicitud y por paquete, juntas en
+                // orden de registro (accion_pendiente_en / reintento_pendiente_en;
+                // a igual instante, la de solicitud primero). Una por paquete
+                // que coincide con una de su solicitud no descarga dos veces:
+                // el ejecutor revalida el estado y la descarta con log.
+                qsizetype ip = 0;
+                auto encolarPaquetesHasta = [&](const std::optional<QDateTime>& limite) {
+                    for (; ip < sel->intencionesPaquete.size(); ++ip) {
+                        const IntencionPaquete& in = sel->intencionesPaquete.at(ip);
+                        if (limite && !(in.reintentoPendienteEn < *limite)) {
+                            break;
+                        }
+                        descargados.insert(in.paqueteId);
+                        encoladas.append(ejecutor.descargarIntencionPaquete(in.paqueteId, in.reintentoPendienteEn));
+                    }
+                };
                 for (const IntencionPendiente& in : sel->intenciones) {
+                    encolarPaquetesHasta(in.accionPendienteEn);
                     if (in.verificacionPendiente) {
                         verificadas.insert(in.solicitudId);
                         encoladas.append(ejecutor.verificar(in.solicitudId, OrigenLog::Usuario, in.accionPendienteEn));
@@ -255,6 +286,7 @@ struct WorkerLocal::Impl {
                         }
                     }
                 }
+                encolarPaquetesHasta(std::nullopt);
                 // Verificaciones debidas, luego descargas automaticas.
                 for (const SolicitudId& s : sel->verificaciones) {
                     if (!verificadas.contains(s)) {
@@ -321,9 +353,7 @@ struct WorkerLocal::Impl {
                 if (!perfiles) {
                     return;
                 }
-                if (auto i = repo.listarIntencionesPendientes(perfiles.valor(), 100000)) {
-                    *cuenta = static_cast<int>(i.valor().size());
-                }
+                *cuenta = contarIntenciones(repo, perfiles.valor());
             })
             .then(q, [this, cuenta]() {
                 pendientes = *cuenta;
@@ -466,6 +496,21 @@ void WorkerLocal::reintentarDescarga(const SolicitudId& solicitudId)
                 m_impl->ejecutor.descargar(id, OrigenLog::Usuario);
             }
         });
+}
+
+void WorkerLocal::reintentarDescargaPaquete(const SolicitudId& solicitudId, const QString& idPaqueteSat)
+{
+    if (m_impl->deteniendo || m_impl->detenido) {
+        return;
+    }
+    if (m_impl->pausado) {
+        m_impl->ejecutor.registrarIntencionPaquete(solicitudId, idPaqueteSat)
+            .then(this, [this](const ResultadoOperacion&) { m_impl->actualizarPendientes(); });
+        return;
+    }
+    m_impl->ejecutor.reintentarDescargaPaquete(solicitudId, idPaqueteSat).then(this, [this](const ResultadoOperacion&) {
+        m_impl->reprogramarPronto();
+    });
 }
 
 void WorkerLocal::ejecutarCiclo()

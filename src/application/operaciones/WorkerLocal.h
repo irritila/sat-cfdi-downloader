@@ -68,6 +68,10 @@ public:
     void enviar(const SolicitudId& solicitudId);           // D4 (ver nota de pausa en el reporte de T007)
     void verificarAhora(const SolicitudId& solicitudId);   // tambien reanuda una verificacion suspendida
     void reintentarDescarga(const SolicitudId& solicitudId); // paquetes Error/Disponible de la solicitud
+    // T014.2: solo el paquete `idPaqueteSat` de la solicitud, si es
+    // reintentable (Error/Disponible, nunca 5008); prioridad Manual. Con la
+    // pausa queda como intencion persistida por paquete (D2).
+    void reintentarDescargaPaquete(const SolicitudId& solicitudId, const QString& idPaqueteSat);
 
     // Fuerza un ciclo ahora (p. ej. al reanudar); para pruebas y la UI.
     void ejecutarCiclo();

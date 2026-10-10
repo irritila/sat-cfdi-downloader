@@ -51,6 +51,9 @@ struct PaquetePersistido {
     std::optional<QString> mensajeDescargaSat;         // mensaje_descarga_sat
     std::optional<QString> ultimoError;                // ultimo_error
     std::optional<QDateTime> eliminadoEn;              // eliminado_en
+    // T014.2 D2 (migracion 004): intencion manual de reintento de ESTE paquete
+    // registrada con el monitoreo pausado; NULL sin intencion.
+    std::optional<QDateTime> reintentoPendienteEn;     // reintento_pendiente_en
 };
 
 } // namespace satcfdi

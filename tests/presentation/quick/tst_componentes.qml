@@ -285,6 +285,31 @@ TestCase {
         compare(findChild(p, "badgePaquete").texto, "Error de descarga")
     }
 
+    // T014.2: "Reintentar" por paquete y "Reintento pendiente".
+    function test_filaPaqueteReintento_data() { return temas() }
+    function test_filaPaqueteReintento(fila) {
+        Theme.oscuro = fila.oscuro
+        const p = crear(paqueteComp, { idPaquete: "ABC_01", estado: "Error", tonoMensaje: "error",
+                                       mensaje: "No se pudo descargar el paquete. Puedes reintentar." })
+        const boton = findChild(p, "botonReintentarPaquete")
+        const pendiente = findChild(p, "reintentoPendientePaquete")
+        verify(!boton.visible)
+        verify(!pendiente.visible)
+        p.puedeReintentar = true
+        verify(boton.visible)
+        compare(boton.Accessible.name, "Reintentar paquete ABC_01")
+        compare(boton.implicitHeight, 24)
+        espia.target = p
+        espia.signalName = "reintentarSolicitado"
+        espia.clear()
+        mouseClick(boton)
+        compare(espia.count, 1)
+        p.reintentoPendiente = true
+        verify(!boton.visible)
+        verify(pendiente.visible)
+        verify(p.Accessible.name.indexOf("Reintento pendiente") > 0)
+    }
+
     // ---- FilaPerfil ----------------------------------------------------
     function test_filaPerfil_data() { return temas() }
     function test_filaPerfil(fila) {

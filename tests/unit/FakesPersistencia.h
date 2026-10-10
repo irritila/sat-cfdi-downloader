@@ -476,6 +476,7 @@ public:
         for (PaquetePersistido& p : m_a.paquetes) {
             if (p.solicitudMasivaId == id && !p.eliminadoEn) {
                 p.eliminadoEn = en;
+                p.reintentoPendienteEn.reset(); // T014.2: intencion descartada sin log
                 ++n;
             }
         }
@@ -734,8 +735,10 @@ public:
         }
         for (const PaquetePersistido& p : m_a.paquetes) {
             const SolicitudPersistida* s = solicitud(p.solicitudMasivaId);
-            if (s && !p.eliminadoEn && p.estadoDescarga == EstadoDescarga::Disponible
-                && s->estadoSolicitudSat == EstadoSolicitudSat::Terminada) {
+            if (s && !p.eliminadoEn
+                && ((p.estadoDescarga == EstadoDescarga::Disponible
+                     && s->estadoSolicitudSat == EstadoSolicitudSat::Terminada)
+                    || p.reintentoPendienteEn)) {
                 agregar(s->perfilSatId);
             }
         }
@@ -1091,6 +1094,55 @@ public:
             }
             return true;
         });
+    }
+
+    // T014.2: intenciones por paquete (misma semantica que SQLite).
+    Resultado<bool, ErrorPersistencia> registrarIntencionPaquete(const QString& paqueteId,
+                                                                 const QDateTime& ahora) override
+    {
+        return escribir(QStringLiteral("registrarIntencionPaquete"), [&]() {
+            PaquetePersistido* p = paqueteMutable(paqueteId);
+            if (!p || !solicitud(p->solicitudMasivaId) || !politicas::esReintentablePorPaquete(*p)) {
+                return false;
+            }
+            p->reintentoPendienteEn = ahora;
+            return true;
+        });
+    }
+
+    Resultado<bool, ErrorPersistencia> consumirIntencionPaquete(const QString& paqueteId,
+                                                                const QDateTime& capturadaEn) override
+    {
+        return escribir(QStringLiteral("consumirIntencionPaquete"), [&]() {
+            for (PaquetePersistido& p : m_a.paquetes) {
+                if (p.id == paqueteId && p.reintentoPendienteEn == std::optional<QDateTime>(capturadaEn)) {
+                    p.reintentoPendienteEn.reset();
+                    return true;
+                }
+            }
+            return false;
+        });
+    }
+
+    Resultado<QList<IntencionPaquete>, ErrorPersistencia> listarIntencionesPaquete(const QList<PerfilId>& perfiles,
+                                                                                   int limite) override
+    {
+        using R = Resultado<QList<IntencionPaquete>, ErrorPersistencia>;
+        if (auto e = m_a.registrar(QStringLiteral("listarIntencionesPaquete"))) {
+            return R::fallo(*e);
+        }
+        QList<IntencionPaquete> r;
+        for (const PaquetePersistido& p : m_a.paquetes) {
+            const SolicitudPersistida* s = solicitud(p.solicitudMasivaId);
+            if (!p.eliminadoEn && p.reintentoPendienteEn && s && perfiles.contains(s->perfilSatId)) {
+                r.append(IntencionPaquete{p.id, p.solicitudMasivaId, s->perfilSatId, p.idPaqueteSat,
+                                          *p.reintentoPendienteEn});
+            }
+        }
+        std::stable_sort(r.begin(), r.end(), [](const IntencionPaquete& x, const IntencionPaquete& y) {
+            return x.reintentoPendienteEn < y.reintentoPendienteEn;
+        });
+        return R::exito(r.mid(0, limite));
     }
 
 private:

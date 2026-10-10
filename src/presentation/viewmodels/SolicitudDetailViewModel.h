@@ -203,6 +203,10 @@ public:
     QString accionSolicitada() const { return m_accionSolicitada; }
     Q_INVOKABLE void verificarAhora();
     Q_INVOKABLE void reintentarDescarga();
+    // T014.2 D1: reintenta solo ese paquete (prioridad Manual en el worker).
+    // Solo si paquetes()[i]["puedeReintentar"]; con el monitoreo pausado
+    // queda pendiente por paquete (D2) y se ve con "reintentoPendiente".
+    Q_INVOKABLE void reintentarDescargaPaquete(const QString& idPaqueteSat);
 
 signals:
     void solicitudIdChanged();

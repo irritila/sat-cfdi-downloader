@@ -413,6 +413,7 @@ Page {
                             model: pagina.detalle.paquetes
                             delegate: FilaPaquete {
                                 id: paquete
+                                objectName: "filaPaquete_" + modelData.idPaqueteSat
                                 required property var modelData
                                 Layout.fillWidth: true
                                 idPaquete: modelData.idPaqueteSat
@@ -429,6 +430,12 @@ Page {
                                 finderHabilitado: modelData.puedeMostrarFinder === true
                                 objectNameFinder: "botonMostrarFinder_" + modelData.idPaqueteSat
                                 onMostrarEnFinder: pagina.detalle.mostrarEnFinder(paquete.modelData.idPaqueteSat)
+                                // T014.2 D1/D2: reintento de solo este paquete.
+                                puedeReintentar: modelData.puedeReintentar === true
+                                reintentoPendiente: modelData.reintentoPendiente === true
+                                objectNameReintentar: "botonReintentarPaquete_" + modelData.idPaqueteSat
+                                objectNamePendiente: "reintentoPendiente_" + modelData.idPaqueteSat
+                                onReintentarSolicitado: pagina.detalle.reintentarDescargaPaquete(paquete.modelData.idPaqueteSat)
                             }
                         }
                     }

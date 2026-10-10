@@ -88,6 +88,12 @@ struct DesenlaceDescarga {
 DesenlaceDescarga desenlaceDescarga(const FallaOperacion& falla);
 
 // Paquete con vencimiento estimado alcanzado y aun no Descargado/Vencido.
+// T014.2 D1: un paquete admite reintento manual individual si es visible,
+// esta en Error o Disponible y no tiene CodEstatus 5008 (maximo de descargas).
+// La UI solo lo ofrece en Error (puedeReintentarManual).
+bool esReintentablePorPaquete(const PaquetePersistido& paquete);
+bool puedeReintentarManual(const PaquetePersistido& paquete);
+
 bool vencimientoEstimadoAlcanzado(const PaquetePersistido& paquete, const QDateTime& ahoraUtc);
 
 QDateTime vencimientoEstimado(const QDateTime& primeraObservacionUtc);

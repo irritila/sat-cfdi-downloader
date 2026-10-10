@@ -292,6 +292,83 @@ void TestSqliteOperaciones::migracion003SobreBase002ConDatos()
     QVERIFY(repetida.valor().migracion.aplicadas.isEmpty());
 }
 
+// T014.2: 004 sobre una base en 003 con datos: agrega reintento_pendiente_en
+// (NULL en filas previas) e indice parcial sin tocar el resto; idempotente.
+void TestSqliteOperaciones::migracion004SobreBase003ConDatos()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString ruta = rutaBase(dir);
+    auto embebidas = migracionesSqliteEmbebidas();
+    QVERIFY(embebidas);
+    QVERIFY(embebidas.valor().size() >= 4);
+    QVERIFY(inicializarBaseSqlite(ruta, embebidas.valor().mid(0, 3)));
+
+    const QString huellaSql = QStringLiteral(
+        "SELECT quote(id) || quote(solicitud_masiva_id) || quote(id_paquete_sat) || quote(estado_descarga) || "
+        "quote(ruta_local) || quote(disponible_en) || quote(descargado_en) || quote(codigo_descarga_sat) || "
+        "quote(ultimo_error) || quote(eliminado_en) FROM paquete_solicitud ORDER BY id");
+    const QString perfil = uuid::generarCanonico();
+    QStringList huellaAntes;
+    QString paqueteError;
+    {
+        SqliteConnectionProvider prov(ruta);
+        QCOMPARE(insertarPerfilFixture(prov, perfil, kRfcPerfil), QString());
+        const SolicitudFixture terminada = fixture(perfil, DedupKey::calcularV1("m004-a"), QStringLiteral("Enviada"),
+                                                   QStringLiteral("Terminada"));
+        QCOMPARE(insertarSolicitudFixture(prov, terminada), QString());
+        paqueteError = uuid::generarCanonico();
+        QCOMPARE(insertarPaqueteFixture(prov, paqueteError, terminada.id, QStringLiteral("PAQ_1"),
+                                        QStringLiteral("Error")),
+                 QString());
+        QCOMPARE(insertarPaqueteFixture(prov, uuid::generarCanonico(), terminada.id, QStringLiteral("PAQ_2"),
+                                        QStringLiteral("Descargado")),
+                 QString());
+        QCOMPARE(insertarPaqueteFixture(prov, uuid::generarCanonico(), terminada.id, QStringLiteral("PAQ_3"),
+                                        QStringLiteral("Disponible"), true),
+                 QString());
+        // Antes de 004 la columna no existe.
+        QVERIFY(!ejecutarSql(prov, QStringLiteral("SELECT reintento_pendiente_en FROM paquete_solicitud")).isEmpty());
+        huellaAntes = columna(prov, huellaSql);
+        QCOMPARE(huellaAntes.size(), 3);
+        prov.cerrarConexionDelHiloActual();
+    }
+
+    auto migrada = inicializarBaseSqlite(ruta);
+    QVERIFY2(migrada, migrada ? "" : qPrintable(migrada.error().mensaje));
+    QCOMPARE(migrada.valor().migracion.versionInicial, 3);
+    QCOMPARE(migrada.valor().migracion.aplicadas, QList<int>{4});
+    QCOMPARE(migrada.valor().migracion.versionFinal, embebidas.valor().last().version);
+
+    SqliteConnectionProvider prov(ruta);
+    QCOMPARE(columna(prov, huellaSql), huellaAntes); // filas previas intactas
+    QCOMPARE(columna(prov, QStringLiteral("SELECT count(*) FROM paquete_solicitud "
+                                          "WHERE reintento_pendiente_en IS NOT NULL")),
+             QStringList{QStringLiteral("0")});
+    QCOMPARE(columna(prov, QStringLiteral("SELECT tbl_name FROM sqlite_master "
+                                          "WHERE name = 'ix_paquete_solicitud_reintento_pendiente'")),
+             QStringList{QStringLiteral("paquete_solicitud")});
+    // La columna se escribe y su CHECK rechaza texto vacio.
+    QCOMPARE(ejecutarSql(prov, QStringLiteral("UPDATE paquete_solicitud SET reintento_pendiente_en = %1 WHERE id = %2")
+                                   .arg(citar(kAhora), citar(paqueteError))),
+             QString());
+    QVERIFY(ejecutarSql(prov, QStringLiteral("UPDATE paquete_solicitud SET reintento_pendiente_en = '  ' WHERE id = %1")
+                                  .arg(citar(paqueteError)))
+                .contains(QStringLiteral("CHECK")));
+    QVERIFY(consistente(prov));
+    prov.cerrarConexionDelHiloActual();
+
+    // Idempotente: una segunda apertura no aplica nada y conserva el dato.
+    auto repetida = inicializarBaseSqlite(ruta);
+    QVERIFY(repetida);
+    QVERIFY(repetida.valor().migracion.aplicadas.isEmpty());
+    SqliteConnectionProvider otra(ruta);
+    QCOMPARE(columna(otra, QStringLiteral("SELECT reintento_pendiente_en FROM paquete_solicitud WHERE id = %1")
+                               .arg(citar(paqueteError))),
+             QStringList{kAhora});
+    otra.cerrarConexionDelHiloActual();
+}
+
 // --- Transaccion requerida --------------------------------------------------------
 
 void TestSqliteOperaciones::escriturasExigenTransaccion()
@@ -1260,6 +1337,72 @@ void TestSqliteOperaciones::vencimientoEstimado()
     }
     QCOMPARE(despues, antes);
     QVERIFY(consistente(e.prov()));
+}
+
+// --- Intenciones por paquete (T014.2) ----------------------------------------------
+
+void TestSqliteOperaciones::intencionesPorPaquete()
+{
+    Entorno e;
+    QVERIFY(e.preparar());
+    const QString a = e.perfil(kRfcPerfil);
+    const QString b = e.perfil(QStringLiteral("BBB010101BBB"));
+    auto& o = e.ops();
+    const QString s = e.solicitud(a, QStringLiteral("Enviada"), QStringLiteral("Terminada"));
+    const QString error = e.paquete(s, QStringLiteral("Error"));
+    const QString maximo = e.paquete(s, QStringLiteral("Error"));
+    QCOMPARE(e.set(QStringLiteral("paquete_solicitud"), maximo, QStringLiteral("codigo_descarga_sat = '5008'")),
+             QString());
+    const QString descargado = e.paquete(s, QStringLiteral("Descargado"));
+    const QString eliminado = e.paquete(s, QStringLiteral("Error"), true);
+    const QString otra = e.solicitud(b, QStringLiteral("Enviada"), QStringLiteral("Terminada"));
+    const QString deB = e.paquete(otra, QStringLiteral("Error"));
+    auto pendiente = [&](const QString& id) { return e.pq(QStringLiteral("ifnull(reintento_pendiente_en, '-')"), id); };
+
+    // Registro: solo Error/Disponible visibles sin 5008.
+    QVERIFY(e.tx([&] { return o.registrarIntencionPaquete(error, en(2)); }).valor());
+    QCOMPARE(pendiente(error), ts(2));
+    for (const QString& id : {maximo, descargado, eliminado}) {
+        auto r = e.tx([&] { return o.registrarIntencionPaquete(id, en(2)); });
+        QVERIFY(r && !r.valor());
+        QCOMPARE(pendiente(id), QStringLiteral("-"));
+    }
+    QVERIFY(e.tx([&] { return o.registrarIntencionPaquete(deB, en(1)); }).valor());
+
+    // Perfiles con trabajo incluyen los de intenciones por paquete (B solo
+    // tiene un paquete en Error con intencion).
+    auto perfiles = o.listarPerfilesConTrabajo(en(0));
+    QVERIFY(perfiles);
+    QVERIFY(perfiles.valor().contains(pid(b)));
+
+    // Listado en orden de registro y filtrado por perfil.
+    auto todas = o.listarIntencionesPaquete({pid(a), pid(b)}, 10);
+    QVERIFY(todas);
+    QCOMPARE(todas.valor().size(), 2);
+    QCOMPARE(todas.valor().at(0).paqueteId, deB);
+    QCOMPARE(todas.valor().at(1).paqueteId, error);
+    QCOMPARE(todas.valor().at(1).reintentoPendienteEn, en(2));
+    QCOMPARE(todas.valor().at(1).solicitudId, sid(s));
+    QCOMPARE(todas.valor().at(1).perfilSatId, pid(a));
+    QCOMPARE(o.listarIntencionesPaquete({pid(a)}, 10).valor().size(), 1);
+    QCOMPARE(o.listarIntencionesPaquete({pid(a), pid(b)}, 1).valor().size(), 1);
+
+    // Consumo condicional (D13): la mas reciente prevalece.
+    QVERIFY(e.tx([&] { return o.registrarIntencionPaquete(error, en(3)); }).valor());
+    auto vieja = e.tx([&] { return o.consumirIntencionPaquete(error, en(2)); });
+    QVERIFY(vieja && !vieja.valor());
+    QCOMPARE(pendiente(error), ts(3));
+    QVERIFY(e.tx([&] { return o.consumirIntencionPaquete(error, en(3)); }).valor());
+    QCOMPARE(pendiente(error), QStringLiteral("-"));
+    const auto esTx = [](const auto& r) { return !r && r.error().tipo == ErrorPersistencia::Tipo::Transaccion; };
+    QVERIFY(esTx(o.registrarIntencionPaquete(deB, en(4))));
+    QVERIFY(esTx(o.consumirIntencionPaquete(deB, en(1))));
+    QVERIFY(consistente(e.prov()));
+
+    // obtenerPaquete expone la columna.
+    auto leido = o.obtenerPaquete(deB);
+    QVERIFY(leido && leido.valor());
+    QCOMPARE(leido.valor()->paquete.reintentoPendienteEn, std::optional<QDateTime>(en(1)));
 }
 
 // --- Intenciones (D13) ----------------------------------------------------------------

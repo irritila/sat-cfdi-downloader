@@ -48,7 +48,8 @@ public:
     contarVisiblesPorSolicitudYEstado() = 0;
 
     // UPDATE eliminado_en = `eliminadoEn` de los paquetes visibles de la
-    // solicitud. Devuelve filas afectadas (0 es valido). Tx: requerida.
+    // solicitud. T014.2: limpia tambien reintento_pendiente_en (la intencion
+    // por paquete se descarta sin log, T007 D5). Devuelve filas afectadas (0 es valido). Tx: requerida.
     // Errores: Ocupado, Almacenamiento.
     virtual Resultado<int, ErrorPersistencia>
     marcarEliminadosPorSolicitud(const SolicitudId& solicitudId, const QDateTime& eliminadoEn) = 0;

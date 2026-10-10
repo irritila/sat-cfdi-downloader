@@ -129,6 +129,7 @@ public:
     void enviar(const SolicitudId&) override {}
     void verificarAhora(const SolicitudId&) override {}
     void reintentarDescarga(const SolicitudId&) override {}
+    void reintentarDescargaPaquete(const SolicitudId&, const QString&) override {}
     QFuture<ResultadoAccionFinder> mostrarPaquete(const SolicitudId&, const QString&) override
     {
         return listo(ResultadoAccionFinder{ResultadoAccionFinder::Estado::Mostrado, {}});

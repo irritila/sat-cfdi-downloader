@@ -12,6 +12,7 @@
 #include <QFuture>
 #include <QVariantMap>
 
+#include <algorithm>
 #include <utility>
 
 namespace satcfdi {
@@ -212,6 +213,10 @@ QVariantList SolicitudDetailViewModel::paquetes() const
         mapa.insert(QStringLiteral("existencia"), m_existencias.value(p.idPaqueteSat));
         mapa.insert(QStringLiteral("mensaje"), catalogo::mensajePaquete(p));
         mapa.insert(QStringLiteral("maximoDescargas"), catalogo::esMaximoDescargas(p));
+        // T014.2: la regla vive en el DTO (Error sin 5008); aqui solo se exige
+        // que haya acciones. reintentoPendiente: intencion en pausa (D2).
+        mapa.insert(QStringLiteral("puedeReintentar"), m_acciones != nullptr && p.puedeReintentar);
+        mapa.insert(QStringLiteral("reintentoPendiente"), p.reintentoPendiente);
         mapa.insert(QStringLiteral("puedeMostrarFinder"),
                     m_finder != nullptr && p.estadoDescarga == EstadoDescarga::Descargado
                         && m_existencias.value(p.idPaqueteSat) == QLatin1String("Presente"));
@@ -657,6 +662,21 @@ void SolicitudDetailViewModel::reintentarDescarga()
     }
     m_acciones->reintentarDescarga(m_detalle->resumen.id);
     m_accionSolicitada = tr("Descarga solicitada. Si el monitoreo está pausado, queda pendiente.");
+    emit accionSolicitadaChanged();
+}
+
+void SolicitudDetailViewModel::reintentarDescargaPaquete(const QString& idPaqueteSat)
+{
+    if (!m_acciones || !m_detalle) {
+        return;
+    }
+    const auto it = std::find_if(m_detalle->paquetes.cbegin(), m_detalle->paquetes.cend(),
+                                 [&](const PaqueteResumen& p) { return p.idPaqueteSat == idPaqueteSat; });
+    if (it == m_detalle->paquetes.cend() || !it->puedeReintentar) {
+        return;
+    }
+    m_acciones->reintentarDescargaPaquete(m_detalle->resumen.id, idPaqueteSat);
+    m_accionSolicitada = tr("Descarga del paquete solicitada. Si el monitoreo está pausado, queda pendiente.");
     emit accionSolicitadaChanged();
 }
 

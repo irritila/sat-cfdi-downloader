@@ -137,7 +137,7 @@ const QString kColumnasPaqueteTexto = QStringLiteral(
     "id, solicitud_masiva_id, id_paquete_sat, estado_descarga, ruta_local, disponible_en, "
     "descarga_iniciada_en, descargado_en, vencimiento_estimado_en, vencido_en, "
     "motivo_vencimiento, origen_vencimiento, reconciliado_en, codigo_descarga_sat, "
-    "mensaje_descarga_sat, ultimo_error, eliminado_en");
+    "mensaje_descarga_sat, ultimo_error, eliminado_en, reintento_pendiente_en");
 
 } // namespace
 
@@ -197,6 +197,9 @@ Resultado<PaquetePersistido, ErrorPersistencia> leerPaquete(const QSqlQuery& q, 
     p.ultimoError = sqlite::leerTextoOpcional(q.value(desde + 15));
     if (!sqlite::leerInstanteOpcional(q.value(desde + 16), p.eliminadoEn)) {
         return ilegible(u"eliminado_en");
+    }
+    if (!sqlite::leerInstanteOpcional(q.value(desde + 17), p.reintentoPendienteEn)) {
+        return ilegible(u"reintento_pendiente_en");
     }
     return R::exito(std::move(p));
 }

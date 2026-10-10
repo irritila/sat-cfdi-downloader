@@ -136,7 +136,8 @@ SqlitePaqueteSolicitudRepository::marcarEliminadosPorSolicitud(const SolicitudId
     QSqlQuery q(db);
     if (auto r = sqlite::preparar(q,
                                   QStringLiteral("UPDATE paquete_solicitud SET eliminado_en = "
-                                                 ":eliminado_en WHERE solicitud_masiva_id = :id "
+                                                 ":eliminado_en, reintento_pendiente_en = NULL "
+                                                 "WHERE solicitud_masiva_id = :id "
                                                  "AND eliminado_en IS NULL"),
                                   kContexto);
         !r) {
