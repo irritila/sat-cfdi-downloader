@@ -35,6 +35,7 @@ Hoy el bundle depende del Qt y del OpenSSL de Homebrew y se firma de forma ad-ho
 - Verificacion de ausencia de rutas de Homebrew (`otool -L` recursivo sobre `Contents/`) y de carga en ejecucion (`QT_DEBUG_PLUGINS`, `DYLD_PRINT_LIBRARIES`).
 - Instalacion en `/Applications` y limpieza de copias de build en Launch Services (`lsregister -u`; nunca `resetbtm`).
 - Cierre de las pruebas que T004 dejo pendientes de un bundle firmado: notificacion con permiso concedido y Login Item real.
+- Modulo Qt Svg (T013) y, si T015 ya esta integrada, `libzip`, Qt Pdf, `QtPdfQuick` y la libreria de QR (T015 D12).
 
 ### No incluye
 

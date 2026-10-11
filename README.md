@@ -40,6 +40,7 @@ El sistema debe permitir a un usuario unico, actuando como contador, gestionar p
 ## Milestones
 
 - [#1](docs/milestones/m1-app-desktop.md) App escritorio distribuible.
+- [#2](docs/milestones/m2-explorador-cfdi.md) Explorador de CFDI (posterior al MVP).
 
 ## Documentos del proyecto
 
