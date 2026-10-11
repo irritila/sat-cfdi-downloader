@@ -251,3 +251,43 @@ target_link_libraries(satcfdi_sat
 satcfdi_enable_warnings(satcfdi_sat)
 
 # Las pruebas sin red del spike (tests/sat) las registra el CMake raiz.
+
+# --- T015.1 corte A (plataforma): lector de paquetes ZIP de CFDI ------------
+# satcfdi_cfdi_zip: LectorZipLibzip (puerto CfdiArchiveReader) con libzip
+# (T015 D4). libzip es PRIVATE: sus tipos no salen de este target. Lo buscan
+# el CMake raiz (find_package(libzip)). Sin SQL, red ni escritura en disco.
+qt_add_library(satcfdi_cfdi_zip STATIC
+    cfdi/zip/LimitesLectorZip.h
+    cfdi/zip/LectorZipLibzip.h
+    cfdi/zip/LectorZipLibzip.cpp
+)
+target_include_directories(satcfdi_cfdi_zip PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+target_link_libraries(satcfdi_cfdi_zip
+    PUBLIC
+        satcfdi_domain
+        satcfdi_ports
+        Qt6::Core
+    PRIVATE
+        libzip::zip
+)
+satcfdi_enable_warnings(satcfdi_cfdi_zip)
+
+# --- T015.1 corte B (core): parser de CFDI ----------------------------------
+# satcfdi_cfdi_xml: parsearCfdi (QXmlStreamReader, T015 D5/D6). Funcion pura,
+# solo Qt Core: sin SQL, red, archivos ni logs. Target propio para que las
+# pruebas unitarias (satcfdi_tests) lo enlacen sin arrastrar SQLite ni libzip.
+qt_add_library(satcfdi_cfdi_xml STATIC
+    cfdi/xml/ParserCfdi.h
+    cfdi/xml/ParserCfdi.cpp
+)
+target_include_directories(satcfdi_cfdi_xml PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+target_link_libraries(satcfdi_cfdi_xml
+    PUBLIC
+        satcfdi_domain
+        Qt6::Core
+)
+satcfdi_enable_warnings(satcfdi_cfdi_xml)

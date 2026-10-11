@@ -20,6 +20,8 @@
 #include "TestAccesoPaquetes.h"
 #include "TestVencimientoEFirma.h"
 #include "TestEstadoAgregado.h"
+#include "TestCfdiDominio.h"
+#include "TestParserCfdi.h"
 
 #include <QCoreApplication>
 #include <QTest>
@@ -52,5 +54,7 @@ int main(int argc, char* argv[])
     ejecutar(TestAccesoPaquetes());           // T009.1
     ejecutar(TestVencimientoEFirma());        // T014.3
     ejecutar(TestEstadoAgregado());           // T014.4
+    ejecutar(TestCfdiDominio());              // T015.1
+    ejecutar(TestParserCfdi());               // T015.1
     return fallos == 0 ? 0 : 1;
 }

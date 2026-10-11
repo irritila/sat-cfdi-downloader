@@ -93,6 +93,20 @@ if(APPLE AND NOT OPENSSL_ROOT_DIR)
 endif()
 find_package(OpenSSL 3 REQUIRED COMPONENTS Crypto)
 
+# libzip (T015.1, T015 D4): lector de paquetes ZIP de CFDI (QZipReader es
+# privado). Config CMake de Homebrew (`brew install libzip`), target
+# libzip::zip. Solo lo enlaza satcfdi_cfdi_zip (PRIVATE) y sus pruebas.
+# Empaquetado y firma de libzip.dylib en el bundle: T011 o sucesora (T015 D12).
+if(APPLE AND NOT libzip_DIR)
+    foreach(_satcfdi_libzip_dir /opt/homebrew/opt/libzip /usr/local/opt/libzip)
+        if(EXISTS "${_satcfdi_libzip_dir}/lib/cmake/libzip/libzip-config.cmake")
+            list(APPEND CMAKE_PREFIX_PATH "${_satcfdi_libzip_dir}")
+            break()
+        endif()
+    endforeach()
+endif()
+find_package(libzip REQUIRED)
+
 # Capas en orden de dependencia.
 add_subdirectory(src/domain)
 add_subdirectory(src/ports)

@@ -57,3 +57,22 @@ add_test(NAME satcfdi_infrastructure_tests COMMAND satcfdi_infrastructure_tests)
 set_tests_properties(satcfdi_infrastructure_tests PROPERTIES LABELS infrastructure)
 
 satcfdi_enable_warnings(satcfdi_infrastructure_tests)
+
+# T015.1: LectorZipLibzip (puerto CfdiArchiveReader) con ZIP generados en la
+# prueba con libzip sobre QTemporaryDir. Ejecutable propio: no enlaza SQL y
+# es el unico target de pruebas que usa libzip directamente.
+qt_add_executable(satcfdi_cfdi_zip_tests
+    TestLectorZipLibzip.cpp
+    ../fakes/FakeCfdiArchiveReader.h
+)
+target_include_directories(satcfdi_cfdi_zip_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
+target_link_libraries(satcfdi_cfdi_zip_tests PRIVATE
+    satcfdi_cfdi_zip
+    satcfdi_ports
+    satcfdi_domain
+    libzip::zip
+    Qt6::Test
+)
+add_test(NAME satcfdi_cfdi_zip_tests COMMAND satcfdi_cfdi_zip_tests)
+set_tests_properties(satcfdi_cfdi_zip_tests PROPERTIES LABELS infrastructure)
+satcfdi_enable_warnings(satcfdi_cfdi_zip_tests)

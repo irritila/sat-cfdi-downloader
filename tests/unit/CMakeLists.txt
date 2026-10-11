@@ -51,6 +51,11 @@ qt_add_executable(satcfdi_tests
     TestVencimientoEFirma.cpp
     TestEstadoAgregado.h
     TestEstadoAgregado.cpp
+    # T015.1: dominio CFDI y parser (satcfdi_cfdi_xml).
+    TestCfdiDominio.h
+    TestCfdiDominio.cpp
+    TestParserCfdi.h
+    TestParserCfdi.cpp
     # Fakes compartidos header-only (T004); listados aqui para AUTOMOC.
     ../fakes/FakeOSIntegration.h
     ../fakes/FakeConfiguracionAppService.h
@@ -74,6 +79,7 @@ target_link_libraries(satcfdi_tests PRIVATE
     satcfdi_domain
     satcfdi_ports
     satcfdi_application
+    satcfdi_cfdi_xml
     Qt6::Test
 )
 

@@ -44,6 +44,31 @@ cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt \
 
 Empaquetar `libcrypto` dentro del bundle queda para la distribucion.
 
+## libzip (T015.1)
+
+El lector de paquetes ZIP de CFDI (`satcfdi_cfdi_zip`, puerto
+`CfdiArchiveReader`) usa `libzip` (API publica; `QZipReader` de Qt es privado)
+como dependencia directa (`find_package(libzip REQUIRED)`, target
+`libzip::zip`). Probado con libzip 1.11.4 de Homebrew:
+
+```bash
+brew install libzip
+```
+
+En macOS, si no se indica `libzip_DIR`, la configuracion agrega
+`/opt/homebrew/opt/libzip` (o `/usr/local/opt/libzip` en Intel) a la busqueda.
+Para otra instalacion:
+
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt \
+      -Dlibzip_DIR=/ruta/a/libzip/lib/cmake/libzip
+```
+
+Un build dir configurado antes de T015.1 debe reconfigurarse
+(`cmake -S . -B build`) para encontrarla. Solo `satcfdi_cfdi_zip` (PRIVATE) y
+`satcfdi_cfdi_zip_tests` la enlazan. Empaquetar y firmar `libzip.dylib` dentro
+del bundle queda para la distribucion (T011 o sucesora, T015 D12).
+
 ## Encontrar Qt (`CMAKE_PREFIX_PATH`)
 
 Qt de Homebrew no esta en las rutas de busqueda por defecto de CMake. Indicarlo

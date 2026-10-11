@@ -23,6 +23,8 @@ qt_add_library(satcfdi_ports STATIC
     repositories/ConfiguracionAppRepository.h
     repositories/AvisoVencimientoRepository.h
     repositories/UnitOfWork.h
+    # T015.1: lector de paquetes ZIP de CFDI (implementacion con libzip).
+    cfdi/CfdiArchiveReader.h
 )
 
 set_target_properties(satcfdi_ports PROPERTIES AUTOMOC ON)

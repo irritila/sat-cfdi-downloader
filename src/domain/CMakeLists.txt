@@ -44,6 +44,16 @@ qt_add_library(satcfdi_domain STATIC
     operaciones/PoliticasOperacion.h
     operaciones/PoliticasOperacion.cpp
     operaciones/TransicionNotificable.h
+    # T015.1: CFDI (resumen, detalle, decimal exacto, UUID).
+    cfdi/ImporteCfdi.h
+    cfdi/ImporteCfdi.cpp
+    cfdi/UuidCfdi.h
+    cfdi/UuidCfdi.cpp
+    cfdi/TipoComprobante.h
+    cfdi/TipoComprobante.cpp
+    cfdi/ResumenCfdi.h
+    cfdi/DetalleCfdi.h
+    cfdi/ResultadoParseoCfdi.h
 )
 
 # Convencion de includes: rutas relativas a src/, por ejemplo
