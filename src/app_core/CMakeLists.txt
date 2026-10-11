@@ -47,6 +47,10 @@ target_link_libraries(satcfdi_app_core
         # T009: SatGatewayProductivo (lo usa el adaptador OperacionesSat
         # productivo en el hilo del ejecutor; nunca desde el hilo grafico).
         satcfdi_sat
+        # T015.2: lector ZIP (libzip; el bundle pasa a depender de libzip.dylib,
+        # empaquetado y firma en T011 o sucesora, T015 D12) y parser de CFDI.
+        satcfdi_cfdi_zip
+        satcfdi_cfdi_xml
         satcfdi_domain
         satcfdi_ports
         Qt6::Core

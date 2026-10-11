@@ -67,7 +67,9 @@ const char* nombreMotivo(MotivoOmision motivo)
 
 ResultadoLectura fallo(ErrorPaqueteZip::Tipo tipo, ErrorPaqueteZip::Causa causa)
 {
-    qCWarning(lcLectorZip).noquote() << "paquete ZIP rechazado; causa:" << nombreCausa(causa);
+    // Info (no Warning): un ZIP ausente o corrupto es una condicion de datos
+    // que el indice registra como estado del paquete (T015.2), no un fallo de la app.
+    qCInfo(lcLectorZip).noquote() << "paquete ZIP rechazado; causa:" << nombreCausa(causa);
     return ResultadoLectura::fallo(ErrorPaqueteZip{tipo, causa});
 }
 

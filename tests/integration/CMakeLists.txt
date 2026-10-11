@@ -17,6 +17,10 @@ qt_add_executable(satcfdi_integration_tests
     TestPaquetes.cpp
     TestFlujoSat.cpp
     TestNotificacionesAccionables.cpp
+    # T015.2: indice de CFDI con ZIP sinteticos (libzip).
+    TestIndiceCfdi.cpp
+    ../fakes/LectorCfdiCompuerta.h
+    ../fakes/ZipCfdiSintetico.h
     ../fakes/FakeSatGateway.h
     ../fakes/FakePackageStorage.h
     ../fakes/FakeOperacionesSat.h
@@ -30,6 +34,8 @@ target_include_directories(satcfdi_integration_tests PRIVATE
 
 target_link_libraries(satcfdi_integration_tests PRIVATE
     satcfdi_app_core
+    # T015.2: genera ZIP sinteticos en la prueba (fakes/ZipCfdiSintetico.h).
+    libzip::zip
     Qt6::Gui
     Qt6::Test
 )

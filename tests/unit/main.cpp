@@ -22,6 +22,7 @@
 #include "TestEstadoAgregado.h"
 #include "TestCfdiDominio.h"
 #include "TestParserCfdi.h"
+#include "TestIndiceCfdi.h"
 
 #include <QCoreApplication>
 #include <QTest>
@@ -56,5 +57,6 @@ int main(int argc, char* argv[])
     ejecutar(TestEstadoAgregado());           // T014.4
     ejecutar(TestCfdiDominio());              // T015.1
     ejecutar(TestParserCfdi());               // T015.1
+    ejecutar(TestIndiceCfdi());               // T015.2
     return fallos == 0 ? 0 : 1;
 }

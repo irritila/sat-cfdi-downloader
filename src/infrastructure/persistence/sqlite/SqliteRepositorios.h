@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ports/repositories/AvisoVencimientoRepository.h"
+#include "ports/repositories/CfdiCatalogRepository.h"
 #include "ports/repositories/ConfiguracionAppRepository.h"
 #include "ports/repositories/CredencialSatRepository.h"
 #include "ports/repositories/LogSolicitudRepository.h"
@@ -98,6 +99,28 @@ public:
 
     Resultado<bool, ErrorPersistencia> registrarSiNuevo(const PerfilId& perfil, const QDateTime& vigenteHasta,
                                                         int umbralDias, const QDateTime& avisadoEn) override;
+
+private:
+    SqliteConnectionProvider& m_proveedor;
+};
+
+// T015.2: catalogo de CFDI (migracion 006). Hilo: el del llamador (tareas del
+// PersistenceDispatcher). reemplazarIndicePaquete y actualizarMetadatosHuella
+// exigen SqliteUnitOfWork activo; reemplazarIndicePaquete hace todo lo del
+// paquete (revalidar, borrar derivados, estado+huella, CFDI) en ESA transaccion.
+class SqliteCfdiCatalogRepository final : public CfdiCatalogRepository {
+public:
+    explicit SqliteCfdiCatalogRepository(SqliteConnectionProvider& proveedor);
+
+    Resultado<QList<PaqueteIndexable>, ErrorPersistencia>
+    listarPaquetesIndexables(const std::optional<SolicitudId>& solicitud) override;
+    Resultado<bool, ErrorPersistencia> reemplazarIndicePaquete(const IndicePaquete& indice) override;
+    Resultado<bool, ErrorPersistencia> actualizarMetadatosHuella(const QString& paqueteId, const HuellaZip& huella,
+                                                                 const QDateTime& actualizadoEn) override;
+    Resultado<QList<CfdiListado>, ErrorPersistencia> listarCfdi(const SolicitudId& solicitud,
+                                                               const FiltroListaCfdi& filtro) override;
+    Resultado<ResumenIndiceSolicitud, ErrorPersistencia> resumirSolicitud(const SolicitudId& solicitud,
+                                                                          int versionParser) override;
 
 private:
     SqliteConnectionProvider& m_proveedor;

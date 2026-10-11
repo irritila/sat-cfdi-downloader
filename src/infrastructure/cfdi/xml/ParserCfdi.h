@@ -27,6 +27,11 @@ struct LimitesParserCfdi {
     static constexpr int kMaxCamposInvalidos = 64;
 };
 
+// Version del parser (T015.2, T015 D2): se guarda con el indice de cada
+// paquete; al cambiarla, los paquetes indexados con otra version se
+// reindexan al arrancar. Incrementarla cuando cambie lo que produce el resumen.
+inline constexpr int kVersionParserCfdi = 1;
+
 // Parsea un CFDI con QXmlStreamReader. Funcion pura y reentrante: sin estado
 // global, sin E/S y sin logs (D11); segura desde cualquier hilo.
 //

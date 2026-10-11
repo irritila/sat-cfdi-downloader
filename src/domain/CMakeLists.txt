@@ -54,6 +54,9 @@ qt_add_library(satcfdi_domain STATIC
     cfdi/ResumenCfdi.h
     cfdi/DetalleCfdi.h
     cfdi/ResultadoParseoCfdi.h
+    # T015.2: estado de indice, huella y texto de busqueda.
+    cfdi/IndiceCfdi.h
+    cfdi/IndiceCfdi.cpp
 )
 
 # Convencion de includes: rutas relativas a src/, por ejemplo

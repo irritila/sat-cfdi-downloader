@@ -143,6 +143,14 @@ if(SATCFDI_BUILD_MANUAL_CAPTURAS)
     add_subdirectory(tools/capturas-manual)
 endif()
 
+# T015.2 (criterio de rendimiento): benchmark del indice de CFDI (10,000 CFDI
+# sinteticos, p50/p95 de lista y busqueda). Fuera de la app y de ctest.
+# Target benchmark_cfdi.
+option(SATCFDI_BUILD_BENCHMARK_CFDI "Compilar el benchmark del indice de CFDI (tools/benchmark-cfdi)" OFF)
+if(SATCFDI_BUILD_BENCHMARK_CFDI)
+    add_subdirectory(tools/benchmark-cfdi)
+endif()
+
 # T006 criterio 8 / T009: desde T009 satcfdi_app SI enlaza satcfdi_sat (el
 # SatGateway productivo vive ahi), pero nunca la CLI del spike
 # (satcfdi_sat_spike_core, tools/sat_spike). Se comprueba al configurar.

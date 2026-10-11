@@ -1,3 +1,4 @@
+#include "TestSqliteCatalogoCfdi.h"
 #include "TestSqliteCentinelas.h"
 #include "TestSqliteConexion.h"
 #include "TestSqliteConfiguracion.h"
@@ -30,6 +31,7 @@ int main(int argc, char* argv[])
     ejecutar(TestSqliteCredenciales());
     ejecutar(TestSqlitePerfiles());
     ejecutar(TestSqliteOperaciones()); // T007
+    ejecutar(TestSqliteCatalogoCfdi()); // T015.2
     ejecutar(TestPackageStorageFs());  // T008
     ejecutar(TestPackageStorageRevelable()); // T009.1
     return fallos == 0 ? 0 : 1;

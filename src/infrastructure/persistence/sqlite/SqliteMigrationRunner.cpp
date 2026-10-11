@@ -26,6 +26,7 @@ const std::pair<int, QString> kMigracionesEmbebidas[] = {
     {3, QStringLiteral("003_worker_ejecutor")},     // T007
     {4, QStringLiteral("004_reintento_paquete")},   // T014.2
     {5, QStringLiteral("005_aviso_vencimiento_efirma")}, // T014.3
+    {6, QStringLiteral("006_indice_cfdi")},              // T015.2
 };
 
 ErrorPersistencia errorMigracion(const QString& mensaje)

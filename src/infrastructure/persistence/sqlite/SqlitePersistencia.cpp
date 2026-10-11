@@ -81,6 +81,7 @@ struct SqlitePersistencia::Impl {
         , configuracion(proveedor)
         , credenciales(proveedor)
         , avisosVencimiento(proveedor)
+        , catalogoCfdi(proveedor)
         , operaciones(proveedor)
         , unidadDeTrabajo(proveedor)
     {
@@ -96,6 +97,7 @@ struct SqlitePersistencia::Impl {
     SqliteConfiguracionAppRepository configuracion;
     SqliteCredencialSatRepository credenciales;
     SqliteAvisoVencimientoRepository avisosVencimiento;
+    SqliteCfdiCatalogRepository catalogoCfdi;
     SqliteOperacionesSolicitudRepository operaciones;
     SqliteUnitOfWork unidadDeTrabajo;
 };
@@ -114,6 +116,7 @@ LogSolicitudRepository& SqlitePersistencia::logs() noexcept { return m_impl->log
 ConfiguracionAppRepository& SqlitePersistencia::configuracion() noexcept { return m_impl->configuracion; }
 CredencialSatRepository& SqlitePersistencia::credenciales() noexcept { return m_impl->credenciales; }
 AvisoVencimientoRepository& SqlitePersistencia::avisosVencimiento() noexcept { return m_impl->avisosVencimiento; }
+CfdiCatalogRepository& SqlitePersistencia::catalogoCfdi() noexcept { return m_impl->catalogoCfdi; }
 OperacionesSolicitudRepository& SqlitePersistencia::operaciones() noexcept { return m_impl->operaciones; }
 UnitOfWork& SqlitePersistencia::unidadDeTrabajo() noexcept { return m_impl->unidadDeTrabajo; }
 

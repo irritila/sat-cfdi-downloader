@@ -404,7 +404,8 @@ void TestSqliteOperaciones::migracion005SobreBase004ConDatosYDedupe()
         prov.cerrarConexionDelHiloActual();
     }
 
-    auto migrada = inicializarBaseSqlite(ruta);
+    // Hasta 005 (T015.2 agrega 006, probada en TestSqliteCatalogoCfdi).
+    auto migrada = inicializarBaseSqlite(ruta, embebidas.valor().mid(0, 5));
     QVERIFY2(migrada, migrada ? "" : qPrintable(migrada.error().mensaje));
     QCOMPARE(migrada.valor().migracion.versionInicial, 4);
     QCOMPARE(migrada.valor().migracion.aplicadas, QList<int>{5});
@@ -422,7 +423,7 @@ void TestSqliteOperaciones::migracion005SobreBase004ConDatosYDedupe()
         QVERIFY(consistente(prov));
         prov.cerrarConexionDelHiloActual();
     }
-    auto repetida = inicializarBaseSqlite(ruta);
+    auto repetida = inicializarBaseSqlite(ruta, embebidas.valor().mid(0, 5));
     QVERIFY(repetida);
     QVERIFY(repetida.valor().migracion.aplicadas.isEmpty());
 

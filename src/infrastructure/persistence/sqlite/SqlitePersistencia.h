@@ -19,6 +19,7 @@ class LogSolicitudRepository;
 class ConfiguracionAppRepository;
 class CredencialSatRepository;
 class AvisoVencimientoRepository;
+class CfdiCatalogRepository;
 class OperacionesSolicitudRepository;
 class UnitOfWork;
 
@@ -40,12 +41,12 @@ inicializarBaseSqlite(const QString& rutaBase, const QList<MigracionSql>& migrac
                       OpcionesConexionSqlite opciones = {});
 
 // Igual, con las migraciones embebidas (`:/migrations/001_initial_schema.sql`,
-// `:/migrations/002_credencial_metadata.sql` y
-// `:/migrations/003_worker_ejecutor.sql`).
+// `:/migrations/002_credencial_metadata.sql` ...
+// `:/migrations/006_indice_cfdi.sql`).
 Resultado<InformeInicializacionSqlite, ErrorPersistencia>
 inicializarBaseSqlite(const QString& rutaBase);
 
-// Migraciones embebidas como recurso Qt, en orden (001, 002 y 003).
+// Migraciones embebidas como recurso Qt, en orden (001 a 006).
 Resultado<QList<MigracionSql>, ErrorPersistencia> migracionesSqliteEmbebidas();
 
 // Grafo de persistencia SQLite de trabajo: proveedor de conexiones por hilo +
@@ -74,6 +75,7 @@ public:
     ConfiguracionAppRepository& configuracion() noexcept;
     CredencialSatRepository& credenciales() noexcept; // T005
     AvisoVencimientoRepository& avisosVencimiento() noexcept; // T014.3
+    CfdiCatalogRepository& catalogoCfdi() noexcept; // T015.2 (migracion 006)
     // T007: operaciones del OperacionExecutor. Mismo proveedor (conexion por
     // hilo): usado desde el hilo del ejecutor obtiene SU propia conexion,
     // distinta de la del PersistenceDispatcher. Sus escrituras usan

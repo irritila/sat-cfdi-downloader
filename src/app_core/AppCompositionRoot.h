@@ -16,6 +16,10 @@ class QQmlApplicationEngine;
 namespace satcfdi {
 
 class AccionesWorker;
+class ArchivosZipCfdi;
+class CatalogoCfdiService;
+class CfdiArchiveReader;
+class IndexadorCfdi;
 class AccesoFinder;
 class AccesoPaquetesEjecutor;
 class NotificadorOS;
@@ -66,6 +70,11 @@ class SqlitePersistencia;
 // cargada; OSIntegration y SingleInstanceCoordinator los posee main y deben
 // vivir mas que este objeto.
 //
+// T015.2: IndexadorCfdi (hilo propio, nunca la cola del ejecutor) y
+// CatalogoCfdiService. iniciarMonitoreo() lanza la pasada inicial; cada
+// solicitudActualizada del ejecutor sincroniza esa solicitud; la salida lo
+// detiene (salidaIniciada) y el destructor une su hilo antes del dispatcher.
+//
 // T007: OperacionExecutor (hilo y conexion SQLite propios), WorkerLocal y
 // el puerto OperacionesSat (nulo hasta T009). La salida explicita los detiene
 // antes (ExtensionWorker); el destructor lo garantiza en cualquier caso.
@@ -96,6 +105,12 @@ struct OpcionesMonitoreo {
     // T014.3: programador del aviso de vencimiento de e.firma (cada 24 h).
     // Nulo = ProgramadorQt propio con `reloj`.
     Programador* programadorVencimiento = nullptr;
+    // T015.2: lector de ZIP del indice de CFDI. Nulo = LectorZipLibzip propio.
+    // Las pruebas inyectan lectores con compuertas o contadores (debe ser
+    // seguro desde el hilo del indexador).
+    CfdiArchiveReader* lectorCfdi = nullptr;
+    // T015.2: version del parser guardada con el indice. 0 = kVersionParserCfdi.
+    int versionParserCfdi = 0;
 };
 
 class AppCompositionRoot {
@@ -151,6 +166,9 @@ public:
     // T014.4 D2: estado agregado del icono del menu bar (se inicia en
     // iniciarCicloDeVida()).
     MonitorEstadoAgregado& estadoAgregado() const { return *m_estadoAgregado; }
+    // T015.2: indexador (hilo propio) y API de consulta del indice para T015.3.
+    IndexadorCfdi& indexadorCfdi() const { return *m_indexadorCfdi; }
+    CatalogoCfdiService& catalogoCfdi() const { return *m_catalogoCfdi; }
     QQmlApplicationEngine* engine() const { return m_engine.get(); }
 
 private:
@@ -180,6 +198,11 @@ private:
     std::unique_ptr<AvisoVencimientoEFirma> m_avisoVencimiento;
     // T014.4 D2 (se destruye antes que las consultas y servicios que usa).
     std::unique_ptr<MonitorEstadoAgregado> m_estadoAgregado;
+    // T015.2 (se destruyen antes que el dispatcher; el indexador une su hilo).
+    std::unique_ptr<CfdiArchiveReader> m_lectorCfdiPropio;
+    std::unique_ptr<ArchivosZipCfdi> m_archivosCfdi;
+    std::unique_ptr<IndexadorCfdi> m_indexadorCfdi;
+    std::unique_ptr<CatalogoCfdiService> m_catalogoCfdi;
     PackageStorage* m_packageStorage = nullptr;
     QString m_raizPaquetes;
     std::unique_ptr<Programador> m_programadorEjecutorPropio;

@@ -23,6 +23,9 @@ qt_add_executable(satcfdi_infrastructure_tests
     TestSqlitePerfiles.cpp
     TestSqliteOperaciones.h
     TestSqliteOperaciones.cpp
+    # T015.2: migracion 006 y catalogo de CFDI.
+    TestSqliteCatalogoCfdi.h
+    TestSqliteCatalogoCfdi.cpp
     TestPackageStorageFs.h
     TestPackageStorageFs.cpp
     TestPackageStorageRevelable.h
@@ -36,6 +39,7 @@ target_compile_definitions(satcfdi_infrastructure_tests PRIVATE
     SATCFDI_MIGRACION_003_FUENTE="${CMAKE_CURRENT_SOURCE_DIR}/../../src/infrastructure/persistence/migrations/003_worker_ejecutor.sql"
     SATCFDI_MIGRACION_005_FUENTE="${CMAKE_CURRENT_SOURCE_DIR}/../../src/infrastructure/persistence/migrations/005_aviso_vencimiento_efirma.sql"
     SATCFDI_MIGRACION_004_FUENTE="${CMAKE_CURRENT_SOURCE_DIR}/../../src/infrastructure/persistence/migrations/004_reintento_paquete.sql"
+    SATCFDI_MIGRACION_006_FUENTE="${CMAKE_CURRENT_SOURCE_DIR}/../../src/infrastructure/persistence/migrations/006_indice_cfdi.sql"
 )
 
 # Permite #include "fakes/FakeSecretStore.h" (T005).

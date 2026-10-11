@@ -1,11 +1,19 @@
 # satcfdi_application: contratos funcionales consumidos por presentacion,
 # DTOs, servicios (demo y persistidos), PersistenceDispatcher y
 # RegexLogSanitizer y, desde T007, OperacionExecutor/WorkerLocal (hilo propio
-# del ejecutor). Sin SQL, red, archivos ni timers (el Programador de
+# del ejecutor) y, desde T015.2, IndexadorCfdi (hilo propio del indice de
+# CFDI; archivos y ZIP solo por puertos). Sin SQL, red, archivos ni timers (el Programador de
 # produccion vive en app_core/ProgramadorQt). Unico hilo permitido:
 # el QThread de PersistenceDispatcher (DA4). Los servicios Demo* y *Persistido
 # solo se instancian en el composition root (o en pruebas).
 qt_add_library(satcfdi_application STATIC
+    # T015.2: indice de CFDI (hilo propio del indexador, consultas para T015.3).
+    cfdi/CalculoIndicePaquete.h
+    cfdi/CalculoIndicePaquete.cpp
+    cfdi/IndexadorCfdi.h
+    cfdi/IndexadorCfdi.cpp
+    cfdi/CatalogoCfdiService.h
+    cfdi/CatalogoCfdiService.cpp
     common/Errores.h
     common/FechasLegibles.h
     common/FechasLegibles.cpp

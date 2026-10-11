@@ -89,7 +89,7 @@ void TestSqliteMigraciones::recursoEmbebidoIgualAlFuente()
 
     auto lista = migracionesSqliteEmbebidas();
     QVERIFY(lista);
-    QCOMPARE(lista.valor().size(), 5);
+    QCOMPARE(lista.valor().size(), 6);
     for (int i = 0; i < lista.valor().size(); ++i) {
         QCOMPARE(lista.valor().at(i).version, i + 1); // consecutivas desde 1
     }
@@ -116,6 +116,12 @@ void TestSqliteMigraciones::recursoEmbebidoIgualAlFuente()
     QVERIFY(!fuente005.isEmpty());
     QCOMPARE(lista.valor().at(4).nombre, QStringLiteral("005_aviso_vencimiento_efirma"));
     QCOMPARE(lista.valor().at(4).sql.toUtf8(), fuente005);
+
+    // T015.2: 006 embebida igual al fuente.
+    const QByteArray fuente006 = leerArchivo(QStringLiteral(SATCFDI_MIGRACION_006_FUENTE));
+    QVERIFY(!fuente006.isEmpty());
+    QCOMPARE(lista.valor().at(5).nombre, QStringLiteral("006_indice_cfdi"));
+    QCOMPARE(lista.valor().at(5).sql.toUtf8(), fuente006);
 }
 
 void TestSqliteMigraciones::dividirSentenciasDm2()
@@ -182,7 +188,9 @@ void TestSqliteMigraciones::migraBaseVacia()
         proveedor, QStringLiteral("SELECT name FROM sqlite_master WHERE type = 'table' "
                                   "AND name NOT LIKE 'sqlite_%' ORDER BY name"));
     QCOMPARE(tablas, (QStringList{QStringLiteral("aviso_vencimiento_efirma"), // T014.3
+                                  QStringLiteral("cfdi_indexado"), // T015.2
                                   QStringLiteral("configuracion_app"), QStringLiteral("credencial_sat"),
+                                  QStringLiteral("indice_cfdi_paquete"), // T015.2
                                   QStringLiteral("log_solicitud"), QStringLiteral("paquete_solicitud"),
                                   QStringLiteral("perfil_sat"), QStringLiteral("schema_migrations"),
                                   QStringLiteral("solicitud_masiva")}));

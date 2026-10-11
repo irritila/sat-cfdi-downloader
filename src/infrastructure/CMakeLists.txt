@@ -20,6 +20,8 @@ qt_add_library(satcfdi_infrastructure STATIC
     persistence/sqlite/SqliteLogSolicitudRepository.cpp
     persistence/sqlite/SqliteConfiguracionAppRepository.cpp
     persistence/sqlite/SqliteCredencialSatRepository.cpp
+    # T015.2: catalogo de CFDI (migracion 006).
+    persistence/sqlite/SqliteCfdiCatalogRepository.cpp
     persistence/sqlite/SqliteFilas.h
     persistence/sqlite/SqliteFilas.cpp
     persistence/sqlite/SqliteOperacionesConsultas.h
@@ -38,6 +40,7 @@ qt_add_resources(satcfdi_infrastructure "satcfdi_migrations"
         persistence/migrations/003_worker_ejecutor.sql
         persistence/migrations/004_reintento_paquete.sql
         persistence/migrations/005_aviso_vencimiento_efirma.sql
+        persistence/migrations/006_indice_cfdi.sql
 )
 
 target_include_directories(satcfdi_infrastructure PUBLIC
@@ -260,6 +263,10 @@ qt_add_library(satcfdi_cfdi_zip STATIC
     cfdi/zip/LimitesLectorZip.h
     cfdi/zip/LectorZipLibzip.h
     cfdi/zip/LectorZipLibzip.cpp
+    # T015.2: resolucion y huella del ZIP bajo la raiz de paquetes (puerto
+    # ArchivosZipCfdi); solo lectura, sin libzip.
+    cfdi/zip/ArchivosZipCfdiFs.h
+    cfdi/zip/ArchivosZipCfdiFs.cpp
 )
 target_include_directories(satcfdi_cfdi_zip PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/..

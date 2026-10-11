@@ -56,6 +56,9 @@ qt_add_executable(satcfdi_tests
     TestCfdiDominio.cpp
     TestParserCfdi.h
     TestParserCfdi.cpp
+    # T015.2: indice de CFDI (regla por paquete e IndexadorCfdi).
+    TestIndiceCfdi.h
+    TestIndiceCfdi.cpp
     # Fakes compartidos header-only (T004); listados aqui para AUTOMOC.
     ../fakes/FakeOSIntegration.h
     ../fakes/FakeConfiguracionAppService.h
@@ -70,6 +73,9 @@ qt_add_executable(satcfdi_tests
     ../fakes/FakeAccesoCredencialSat.h
     ../fakes/FakeAvisoVencimientoRepository.h
     ../fakes/FakeOperacionesSatConEventLoop.h
+    ../fakes/FakeCfdiArchiveReader.h
+    ../fakes/FakeArchivosZipCfdi.h
+    ../fakes/LectorCfdiCompuerta.h
 )
 
 # Permite #include "fakes/FakeOSIntegration.h".

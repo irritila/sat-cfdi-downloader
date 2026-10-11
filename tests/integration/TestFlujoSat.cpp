@@ -9,6 +9,7 @@
 #include "app_core/AccesoFinder.h"
 #include "app_core/AppCompositionRoot.h"
 
+#include "application/cfdi/IndexadorCfdi.h"
 #include "application/operaciones/OperacionExecutor.h"
 #include "application/operaciones/WorkerLocal.h"
 #include "application/profiles/ConsultaPreparacionPerfiles.h"
@@ -290,6 +291,10 @@ void TestFlujoSat::finderDestinosExactosYSinCambios()
     }
     QVERIFY2(!zip.isEmpty(), qPrintable(idSat));
     const QString rutaBase = QDir(f.tmp.path()).filePath(QStringLiteral("satcfdi.sqlite3"));
+    // T015.2: el indice de CFDI termino de escribir (los ZIP del fake son
+    // ilegibles) antes de tomar la referencia de solo lectura.
+    QTest::qWait(20);
+    QTRY_VERIFY(!f.root->indexadorCfdi().ocupado());
     const QByteArray antes = volcado(rutaBase);
     QVERIFY(!antes.isEmpty());
 

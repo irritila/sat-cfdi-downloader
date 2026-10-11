@@ -5,6 +5,8 @@
 #include "IntegracionWorker.h"
 #include "ProgramadorQt.h"
 #include "SingleInstanceCoordinator.h"
+#include "application/cfdi/CatalogoCfdiService.h"
+#include "application/cfdi/IndexadorCfdi.h"
 #include "application/configuration/ConfiguracionAppServicePersistido.h"
 #include "application/logging/RegexLogSanitizer.h"
 #include "application/operaciones/OperacionExecutor.h"
@@ -21,6 +23,9 @@
 #include "application/persistence/PuertosPersistencia.h"
 #include "application/profiles/PerfilesSatServicePersistido.h"
 #include "application/requests/SolicitudesServicePersistido.h"
+#include "infrastructure/cfdi/xml/ParserCfdi.h"
+#include "infrastructure/cfdi/zip/ArchivosZipCfdiFs.h"
+#include "infrastructure/cfdi/zip/LectorZipLibzip.h"
 #include "infrastructure/persistence/sqlite/SqlitePersistencia.h"
 #include "infrastructure/storage/FilesystemPackageStorage.h"
 #include "infrastructure/sat/SatGatewayProductivo.h"
@@ -159,6 +164,45 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
     QObject::connect(m_ejecutor.get(), &OperacionExecutor::estadoCredencialCambiado,
                      m_servicioNotificaciones.get(), &ServicioNotificaciones::alCambiarEstadoCredencial);
 
+    // T015.2: indice de CFDI. Calculo (stat, SHA-256, ZIP y parseo) en el
+    // hilo propio del indexador; lecturas y escrituras por el dispatcher (una
+    // transaccion por paquete). Raiz: la de paquetes (o la de por defecto si
+    // se inyecto el almacenamiento).
+    {
+        CfdiArchiveReader* lector = monitoreo.lectorCfdi;
+        if (!lector) {
+            m_lectorCfdiPropio = std::make_unique<LectorZipLibzip>();
+            lector = m_lectorCfdiPropio.get();
+        }
+        const QString raizIndice =
+            !m_raizPaquetes.isEmpty() ? m_raizPaquetes
+            : !monitoreo.raizPaquetes.isEmpty()
+                ? monitoreo.raizPaquetes
+                : QDir(QFileInfo(rutaBase).absolutePath()).filePath(QStringLiteral("paquetes"));
+        m_archivosCfdi = std::make_unique<ArchivosZipCfdiFs>(raizIndice);
+        PuertosIndexadorCfdi puertosIndice{*m_dispatcher,
+                                           p.catalogoCfdi(),
+                                           p.unidadDeTrabajo(),
+                                           *lector,
+                                           *m_archivosCfdi,
+                                           [](QByteArrayView xml) { return parsearCfdi(xml); },
+                                           monitoreo.versionParserCfdi > 0 ? monitoreo.versionParserCfdi
+                                                                           : kVersionParserCfdi,
+                                           reloj};
+        m_indexadorCfdi = std::make_unique<IndexadorCfdi>(std::move(puertosIndice));
+        m_catalogoCfdi = std::make_unique<CatalogoCfdiService>(*m_dispatcher, p.catalogoCfdi(), *m_indexadorCfdi);
+        // (b) Tras cada commit del ejecutor (incluida la descarga de un
+        // paquete) se sincroniza el indice de esa solicitud.
+        IndexadorCfdi* indexador = m_indexadorCfdi.get();
+        QObject::connect(m_ejecutor.get(), &OperacionExecutor::solicitudActualizada, indexador,
+                         [indexador](const SolicitudId& id) { indexador->sincronizarSolicitud(id); });
+        // Eliminar una solicitud borra su indice en la misma transaccion
+        // (trigger de 006): se anuncia para recargar el explorador.
+        CatalogoCfdiService* catalogo = m_catalogoCfdi.get();
+        QObject::connect(m_solicitudesService.get(), &SolicitudesService::solicitudEliminada, catalogo,
+                         [catalogo](const SolicitudId& id) { emit catalogo->indiceCambiado(id); });
+    }
+
     // T014.3 D1: primer uso (lectura en el dispatcher). D2/D3: aviso de
     // vencimiento de e.firma; arranca con iniciarMonitoreo() y reevalua al
     // cambiar una credencial (un reemplazo reinicia el dedupe).
@@ -229,6 +273,12 @@ AppCompositionRoot::~AppCompositionRoot()
     // T007: el ejecutor termina antes que el dispatcher (y su hilo cierra su
     // propia conexion). Si la salida explicita ya lo detuvo, es inmediato.
     m_estadoAgregado.reset(); // T014.4: antes que sus consultas y servicios
+    // T015.2: el indexador cancela su paquete en curso (sin escribirlo) y une
+    // su hilo; sus escrituras ya encoladas se completan en dispatcher.cerrar().
+    m_catalogoCfdi.reset();
+    m_indexadorCfdi.reset();
+    m_archivosCfdi.reset();
+    m_lectorCfdiPropio.reset();
     m_avisoVencimiento.reset(); // cancela su programacion; antes que notificaciones
     m_programadorVencimientoPropio.reset();
     m_consultaVencimiento.reset();
@@ -286,6 +336,7 @@ void AppCompositionRoot::iniciarMonitoreo()
     m_monitoreoIniciado = true;
     m_worker->iniciar(); // recuperacion (D9) y primer ciclo
     m_avisoVencimiento->iniciar(); // T014.3: al arrancar y cada 24 h
+    m_indexadorCfdi->iniciar();    // T015.2 (a)+(d): pasada inicial del indice
 }
 
 ConsultaPrimerUso& AppCompositionRoot::consultaPrimerUso() const
@@ -350,6 +401,9 @@ AppLifecycleController& AppCompositionRoot::iniciarCicloDeVida(OSIntegration& os
                      [&os](EstadoAgregado estado) { os.reflejarEstadoIcono(estadoIconoDe(estado)); });
     QObject::connect(controlador, &AppLifecycleController::salidaIniciada, monitor,
                      &MonitorEstadoAgregado::detener);
+    // T015.2: la salida detiene el indexador (el paquete en curso no se escribe).
+    QObject::connect(controlador, &AppLifecycleController::salidaIniciada, m_indexadorCfdi.get(),
+                     &IndexadorCfdi::detener);
     monitor->alCambiarWorker(m_worker->instantanea());
     monitor->iniciar();
 

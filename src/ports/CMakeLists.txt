@@ -25,6 +25,9 @@ qt_add_library(satcfdi_ports STATIC
     repositories/UnitOfWork.h
     # T015.1: lector de paquetes ZIP de CFDI (implementacion con libzip).
     cfdi/CfdiArchiveReader.h
+    # T015.2: indice de CFDI (catalogo SQLite y archivos ZIP locales).
+    cfdi/ArchivosZipCfdi.h
+    repositories/CfdiCatalogRepository.h
 )
 
 set_target_properties(satcfdi_ports PROPERTIES AUTOMOC ON)

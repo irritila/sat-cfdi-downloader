@@ -10,6 +10,7 @@
 
 #include "app_core/AppBootstrapper.h"
 #include "app_core/AppCompositionRoot.h"
+#include "application/cfdi/IndexadorCfdi.h"
 #include "app_core/AppLifecycleController.h"
 #include "app_core/ExtensionCicloDeVida.h"
 #include "app_core/IntegracionWorker.h"
@@ -503,6 +504,7 @@ void TestNotificacionesAccionables::notificacionesDelRootSonAccionables()
     // Acciones sobre la notificacion: solo lectura (base, reintentos y SAT
     // sin cambios), con permiso concedido o denegado.
     QTRY_VERIFY(!f.root->estadoAgregado().consultando());
+    QTRY_VERIFY(!f.root->indexadorCfdi().ocupado()); // T015.2: indice escrito
     const QString rutaBase = QDir(f.tmp.path()).filePath(QStringLiteral("satcfdi.sqlite3"));
     const QByteArray antes = volcado(rutaBase);
     QVERIFY(!antes.isEmpty());
@@ -538,7 +540,10 @@ void TestNotificacionesAccionables::iconoSigueEstadoAgregado()
     // Estado inicial (sin perfiles ni solicitudes).
     QCOMPARE(f.os.estadosIcono.value(0), Icono::Normal);
     QTRY_VERIFY(!f.root->estadoAgregado().consultando());
-    QCOMPARE(f.os.estadoIcono, std::optional(Icono::Normal));
+    // La recuperacion inicial del worker (Trabajando) puede seguir en curso
+    // cuando terminan las consultas: se espera a que vuelva a Normal (la
+    // carrera ya existia antes de T015.2; ver evidencia).
+    QTRY_COMPARE(f.os.estadoIcono, std::optional(Icono::Normal));
 
     // Perfil activo sin e.firma -> Atencion; con e.firma Lista -> Normal.
     const auto perfil = f.crearPerfil();
