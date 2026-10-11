@@ -14,16 +14,24 @@
 //   hilo) con el estado programado, o quedan pendientes si
 //   `responderInmediato == false` hasta llamar completar*().
 // - emitir*() simula cada intencion del menu bar/SO.
+// - T014.4: simularActivacionNotificacion() simula pulsar una notificacion
+//   (o un boton). Antes de inicializar() se encola como el adaptador real y
+//   se emite en cola (QueuedConnection: requiere procesar eventos) despues de
+//   inicializar(); despues de inicializar() se emite de inmediato; tras
+//   prepararSalida() se descarta. reflejarEstadoIcono() guarda el historial en
+//   estadosIcono/estadoIcono (no en `comandos`).
 // Sin AppKit, permisos reales, timers ni sleeps.
 
 #include "ports/OSIntegration.h"
 
 #include <QList>
+#include <QMetaObject>
 #include <QPair>
 #include <QString>
 #include <QStringList>
 
 #include <optional>
+#include <utility>
 
 namespace fakes {
 
@@ -80,6 +88,31 @@ public:
     void emitirSalir() { emit salirSolicitado(); }
     void emitirActivarVentana() { emit activarVentanaSolicitada(); }
 
+    // T014.4: respuesta del usuario a una notificacion.
+    void simularActivacionNotificacion(const DestinoNotificacion& destino,
+                                       AccionNotificacion accion = AccionNotificacion::Abrir)
+    {
+        if (salidaPreparada) {
+            return;
+        }
+        if (!inicializado) {
+            activacionesEncoladas.append({destino, accion});
+            return;
+        }
+        emit notificacionActivada(destino, accion);
+    }
+    // Atajos para destinos validos.
+    static DestinoNotificacion destinoSolicitud(const QString& id)
+    {
+        return DestinoNotificacion{DestinoNotificacion::Tipo::Solicitud, id};
+    }
+    static DestinoNotificacion destinoPerfil(const QString& id)
+    {
+        return DestinoNotificacion{DestinoNotificacion::Tipo::Perfil, id};
+    }
+    // Activaciones recibidas antes de inicializar() aun no emitidas.
+    QList<QPair<DestinoNotificacion, AccionNotificacion>> activacionesEncoladas;
+
     // --- Registro observable. ---
     QStringList comandos;
     QList<QPair<QString, QString>> notificacionesEnviadas; // (titulo, cuerpo) con resultado Sent
@@ -92,6 +125,9 @@ public:
     std::optional<bool> monitoreoPausadoReflejado;
     // T007: historial de estados del worker reflejados (en orden).
     QList<EstadoMonitoreo> estadosMonitoreo;
+    // T014.4: historial de estados del icono reflejados (en orden) y el ultimo.
+    QList<EstadoIcono> estadosIcono;
+    std::optional<EstadoIcono> estadoIcono;
 
     int pendientesLoginItem() const { return int(m_pendientesLoginItem.size()); }
     int pendientesPermiso() const { return m_pendientesPermiso; }
@@ -124,6 +160,19 @@ public:
     {
         comandos.append(QStringLiteral("inicializar"));
         inicializado = true;
+        // T014.4: como el adaptador real, las activaciones previas se emiten
+        // en orden y en cola, despues de que inicializar() retorne.
+        const auto pendientes = std::exchange(activacionesEncoladas, {});
+        for (const auto& p : pendientes) {
+            QMetaObject::invokeMethod(
+                this,
+                [this, p] {
+                    if (!salidaPreparada) {
+                        emit notificacionActivada(p.first, p.second);
+                    }
+                },
+                Qt::QueuedConnection);
+        }
     }
 
     LaunchContext launchContext() const override { return m_launchContext; }
@@ -224,6 +273,14 @@ public:
     {
         comandos.append(QStringLiteral("reflejarEstadoMonitoreo"));
         estadosMonitoreo.append(estado);
+    }
+
+    void reflejarEstadoIcono(EstadoIcono estado) override
+    {
+        // No se registra en `comandos` (cambia con cada recalculo y romperia
+        // las comparaciones exactas de comandos); ver estadosIcono.
+        estadosIcono.append(estado);
+        estadoIcono = estado;
     }
 
     void prepararSalida() override

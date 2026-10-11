@@ -68,6 +68,8 @@ if(APPLE)
     qt_add_library(satcfdi_os_macos STATIC
         os/macos/MacOSMapeos.h
         os/macos/MacOSMapeos.cpp
+        os/macos/IconoMenuBar.h
+        os/macos/IconoMenuBar.cpp
         os/macos/MacOSIntegration.h
         os/macos/MacOSIntegration.mm
     )
@@ -103,6 +105,7 @@ if(APPLE)
     )
     target_link_libraries(satcfdi_os_macos_tests PRIVATE
         satcfdi_os_macos
+        Qt6::Gui
         Qt6::Test
     )
     add_test(NAME satcfdi_os_macos_tests COMMAND satcfdi_os_macos_tests)

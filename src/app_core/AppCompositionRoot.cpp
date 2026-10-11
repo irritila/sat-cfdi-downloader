@@ -9,6 +9,7 @@
 #include "application/logging/RegexLogSanitizer.h"
 #include "application/operaciones/OperacionExecutor.h"
 #include "application/notificaciones/ServicioNotificaciones.h"
+#include "application/estadoagregado/MonitorEstadoAgregado.h"
 #include "application/operaciones/OperacionesSatProductivo.h"
 #include "application/paquetes/AccesoPaquetesService.h"
 #include "application/primeruso/ConsultaPrimerUsoPersistida.h"
@@ -177,6 +178,33 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
     QObject::connect(m_credencialesService.get(), &CredencialesSatService::credencialCambio, m_avisoVencimiento.get(),
                      &AvisoVencimientoEFirma::alCambiarCredencial);
 
+    // T014.4 D2: estado agregado del icono. Consultas de solo lectura (una
+    // tarea del dispatcher para solicitudes/paquetes; preparacion de perfiles
+    // por metadata). Recalcula al cambiar el worker, la lista de solicitudes
+    // (creacion, transiciones confirmadas del ejecutor, eliminacion), los
+    // perfiles o una credencial. Se inicia en iniciarCicloDeVida().
+    {
+        PersistenceDispatcher* dispatcher = m_dispatcher.get();
+        SolicitudMasivaRepository* repoSolicitudes = &p.solicitudes();
+        PaqueteSolicitudRepository* repoPaquetes = &p.paquetes();
+        m_estadoAgregado = std::make_unique<MonitorEstadoAgregado>(
+            [dispatcher, repoSolicitudes, repoPaquetes] {
+                return consultarAtencionSolicitudes(*dispatcher, *repoSolicitudes, *repoPaquetes);
+            },
+            [consultaVencimiento] { return consultarAtencionPerfiles(*consultaVencimiento); });
+        MonitorEstadoAgregado* monitor = m_estadoAgregado.get();
+        QObject::connect(m_worker.get(), &WorkerLocal::instantaneaCambiada, monitor,
+                         &MonitorEstadoAgregado::alCambiarWorker);
+        QObject::connect(m_solicitudesService.get(), &SolicitudesService::listaCambiada, monitor,
+                         &MonitorEstadoAgregado::refrescarSolicitudes);
+        QObject::connect(m_solicitudesService.get(), &SolicitudesService::solicitudEliminada, monitor,
+                         &MonitorEstadoAgregado::refrescarSolicitudes);
+        QObject::connect(m_perfilesService.get(), &PerfilesSatService::perfilesCambiaron, monitor,
+                         &MonitorEstadoAgregado::refrescarPerfiles);
+        QObject::connect(m_credencialesService.get(), &CredencialesSatService::credencialCambio, monitor,
+                         &MonitorEstadoAgregado::refrescarPerfiles);
+    }
+
     m_viewModels = std::make_unique<PresentacionViewModels>(
         m_solicitudesService.get(), m_perfilesService.get(), m_credencialesService.get(), nullptr,
         reloj); // T014.3: mismo reloj que AvisoVencimientoEFirma (badge = aviso)
@@ -200,6 +228,7 @@ AppCompositionRoot::~AppCompositionRoot()
 
     // T007: el ejecutor termina antes que el dispatcher (y su hilo cierra su
     // propia conexion). Si la salida explicita ya lo detuvo, es inmediato.
+    m_estadoAgregado.reset(); // T014.4: antes que sus consultas y servicios
     m_avisoVencimiento.reset(); // cancela su programacion; antes que notificaciones
     m_programadorVencimientoPropio.reset();
     m_consultaVencimiento.reset();
@@ -313,6 +342,16 @@ AppLifecycleController& AppCompositionRoot::iniciarCicloDeVida(OSIntegration& os
             }
         });
     });
+
+    // T014.4 D2: estado agregado -> icono, solo cuando cambia (la primera
+    // publicacion fija el estado inicial). En la salida deja de publicar.
+    MonitorEstadoAgregado* monitor = m_estadoAgregado.get();
+    QObject::connect(monitor, &MonitorEstadoAgregado::estadoCambiado, &os,
+                     [&os](EstadoAgregado estado) { os.reflejarEstadoIcono(estadoIconoDe(estado)); });
+    QObject::connect(controlador, &AppLifecycleController::salidaIniciada, monitor,
+                     &MonitorEstadoAgregado::detener);
+    monitor->alCambiarWorker(m_worker->instantanea());
+    monitor->iniciar();
 
     m_controlador->iniciar();
     os.reflejarEstadoMonitoreo(estadoMonitoreoDe(m_worker->instantanea()));

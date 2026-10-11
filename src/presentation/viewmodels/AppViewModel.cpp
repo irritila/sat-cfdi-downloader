@@ -9,6 +9,9 @@
 
 #include "domain/solicitudes/SolicitudId.h"
 
+#include <optional>
+#include <utility>
+
 namespace satcfdi {
 
 AppViewModel::AppViewModel(NuevaSolicitudViewModel* nuevaSolicitud,
@@ -31,6 +34,7 @@ AppViewModel::AppViewModel(NuevaSolicitudViewModel* nuevaSolicitud,
     // Tras eliminar desde el detalle se regresa a la lista (T003 2c).
     connect(detalle, &SolicitudDetailViewModel::eliminada, this,
             [this](const QString&) { mostrarLista(); });
+    connect(detalle, &SolicitudDetailViewModel::estadoChanged, this, &AppViewModel::alCambiarEstadoDetalle);
 }
 
 void AppViewModel::abrirCarpetaPaquetes()
@@ -65,6 +69,9 @@ bool AppViewModel::abrirDetalle(const QString& id)
     if (!SolicitudId::desdeTexto(id)) {
         return false;
     }
+    // Una navegacion explicita sustituye cualquier respaldo de notificacion.
+    m_detalleConRespaldoLista.clear();
+    m_avisoFinderPendiente.clear();
     if (m_solicitudSeleccionadaId != id) {
         m_solicitudSeleccionadaId = id;
         emit solicitudSeleccionadaIdChanged();
@@ -74,6 +81,77 @@ bool AppViewModel::abrirDetalle(const QString& id)
     }
     setPagina(Pagina::Detalle);
     return true;
+}
+
+void AppViewModel::abrirDetalleONavegarLista(const QString& id)
+{
+    navegarADetalleOLista(id, QString());
+}
+
+void AppViewModel::navegarADetalleOLista(const QString& id, const QString& avisoFinder)
+{
+    if (!abrirDetalle(id)) {
+        mostrarLista();
+        if (!avisoFinder.isEmpty()) {
+            setMensajeFinder(avisoFinder);
+        }
+        return;
+    }
+    if (!avisoFinder.isEmpty() && m_detalle) {
+        m_detalle->mostrarAvisoFinder(avisoFinder);
+    }
+    m_detalleConRespaldoLista = id;
+    m_avisoFinderPendiente = avisoFinder;
+    alCambiarEstadoDetalle(); // la carga pudo resolverse sin esperar
+}
+
+void AppViewModel::alCambiarEstadoDetalle()
+{
+    if (m_detalleConRespaldoLista.isEmpty() || !m_detalle) {
+        return;
+    }
+    using Estado = SolicitudDetailViewModel::Estado;
+    const Estado estado = m_detalle->estado();
+    if (estado == Estado::Cargando || estado == Estado::Ninguno) {
+        return;
+    }
+    const QString id = std::exchange(m_detalleConRespaldoLista, QString());
+    const QString aviso = std::exchange(m_avisoFinderPendiente, QString());
+    if (estado != Estado::NoEncontrada || m_pagina != Pagina::Detalle || m_solicitudSeleccionadaId != id
+        || m_detalle->solicitudId() != id) {
+        return; // cargo (o fallo la lectura) o el usuario ya navego a otro lado
+    }
+    mostrarLista();
+    if (!aviso.isEmpty()) {
+        setMensajeFinder(aviso);
+    }
+}
+
+void AppViewModel::mostrarPerfilSeleccionado(const QString& perfilId)
+{
+    if (m_pagina == Pagina::Perfiles && m_eFirma) {
+        m_eFirma->abandonar(); // la captura en curso era de otra seleccion
+    }
+    mostrarPerfiles();
+    if (m_perfiles) {
+        m_perfiles->seleccionarAlCargar(perfilId);
+    }
+}
+
+void AppViewModel::mostrarCarpetaSolicitudEnFinder(const QString& id)
+{
+    const std::optional<SolicitudId> solicitud = SolicitudId::desdeTexto(id);
+    if (!solicitud || !m_finder) {
+        return;
+    }
+    const quint64 generacion = ++m_genFinderSolicitud;
+    m_finder->abrirCarpetaSolicitud(*solicitud).then(this, [this, generacion, id](const ResultadoAccionFinder& r) {
+        if (generacion != m_genFinderSolicitud || r.estado == ResultadoAccionFinder::Estado::Mostrado) {
+            return;
+        }
+        navegarADetalleOLista(id, r.mensaje);
+        emit avisoFinderSolicitudPresentado();
+    });
 }
 
 void AppViewModel::mostrarPerfiles()

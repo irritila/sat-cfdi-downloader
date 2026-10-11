@@ -2,6 +2,8 @@
 
 #include "ExtensionCicloDeVida.h"
 #include "application/configuration/ConfiguracionAppService.h"
+#include "domain/perfiles/PerfilId.h"
+#include "domain/solicitudes/SolicitudId.h"
 #include "presentation/viewmodels/AppViewModel.h"
 
 #include <QCoreApplication>
@@ -9,11 +11,37 @@
 #include <QFuture>
 #include <QLoggingCategory>
 
+#include <utility>
+
 namespace satcfdi {
 
 namespace {
 Q_LOGGING_CATEGORY(lcCiclo, "satcfdi.ciclovida")
 } // namespace
+
+RutaNotificacion rutaDeNotificacion(const OSIntegration::DestinoNotificacion& destino,
+                                    OSIntegration::AccionNotificacion accion)
+{
+    using Destino = OSIntegration::DestinoNotificacion::Tipo;
+    using Tipo = RutaNotificacion::Tipo;
+    switch (destino.tipo) {
+    case Destino::Ninguno:
+        break;
+    case Destino::Solicitud:
+        if (!SolicitudId::desdeTexto(destino.id)) {
+            break;
+        }
+        return RutaNotificacion{accion == OSIntegration::AccionNotificacion::MostrarEnFinder ? Tipo::FinderSolicitud
+                                                                                             : Tipo::DetalleSolicitud,
+                                destino.id};
+    case Destino::Perfil:
+        if (!PerfilId::desdeTexto(destino.id)) {
+            break;
+        }
+        return RutaNotificacion{Tipo::PerfilSeleccionado, destino.id};
+    }
+    return RutaNotificacion{};
+}
 
 AppLifecycleController::AppLifecycleController(OSIntegration& os,
                                                ConfiguracionAppService& configuracion,
@@ -79,6 +107,12 @@ void AppLifecycleController::iniciar()
     });
     connect(&m_os, &OSIntegration::salirSolicitado, this,
             &AppLifecycleController::solicitarSalida);
+    // T014.4 D1: acciones de notificacion. Un aviso de Finder (la carpeta no
+    // se pudo mostrar) trae la ventana al frente con el aviso visible.
+    connect(&m_os, &OSIntegration::notificacionActivada, this,
+            &AppLifecycleController::activarNotificacion);
+    connect(&m_appViewModel, &AppViewModel::avisoFinderSolicitudPresentado, this,
+            &AppLifecycleController::mostrarVentana);
 
     connect(&m_os, &OSIntegration::loginItemStatusChanged, this,
             [this](OSIntegration::LoginItemStatus estado) {
@@ -109,6 +143,50 @@ void AppLifecycleController::iniciar()
     if (m_os.launchContext() == OSIntegration::LaunchContext::Manual) {
         mostrarVentana();
     }
+
+    // T014.4: la UI ya esta cargada y conectada; se entregan las activaciones
+    // de notificacion recibidas durante el arranque, en orden.
+    m_uiLista = true;
+    const auto pendientes = std::exchange(m_activacionesPendientes, {});
+    for (const auto& p : pendientes) {
+        activarNotificacion(p.first, p.second);
+    }
+}
+
+void AppLifecycleController::activarNotificacion(const OSIntegration::DestinoNotificacion& destino,
+                                                 OSIntegration::AccionNotificacion accion)
+{
+    if (m_saliendo) {
+        return;
+    }
+    if (!m_uiLista) {
+        m_activacionesPendientes.append({destino, accion});
+        return;
+    }
+    enrutar(rutaDeNotificacion(destino, accion));
+}
+
+void AppLifecycleController::enrutar(const RutaNotificacion& ruta)
+{
+    using Tipo = RutaNotificacion::Tipo;
+    switch (ruta.tipo) {
+    case Tipo::SoloVentana:
+        mostrarVentana();
+        break;
+    case Tipo::DetalleSolicitud:
+        mostrarVentana();
+        m_appViewModel.abrirDetalleONavegarLista(ruta.id);
+        break;
+    case Tipo::FinderSolicitud:
+        // Finder pasa al frente; la ventana solo si hay aviso (senal del VM).
+        m_appViewModel.mostrarCarpetaSolicitudEnFinder(ruta.id);
+        break;
+    case Tipo::PerfilSeleccionado:
+        mostrarVentana();
+        m_appViewModel.mostrarPerfilSeleccionado(ruta.id);
+        break;
+    }
+    emit notificacionEnrutada(ruta);
 }
 
 void AppLifecycleController::mostrarVentana()
@@ -208,6 +286,7 @@ void AppLifecycleController::solicitarSalida()
         return;
     }
     m_saliendo = true;
+    m_activacionesPendientes.clear();
     emit salidaIniciada();
     // D1: primero el worker/ejecutor (hasta su plazo), luego el ultimo cierre
     // (dispatcher) y al final el menu bar. Nada bloquea el hilo grafico.

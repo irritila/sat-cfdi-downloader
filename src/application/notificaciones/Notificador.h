@@ -4,8 +4,23 @@
 
 namespace satcfdi {
 
+// T014.4 D1: destino interno de una notificacion, en vocabulario de
+// application. `id` es el UUID canonico interno (SolicitudId/PerfilId); nunca
+// RFC, rutas ni datos SAT. El composition root lo traduce a
+// OSIntegration::DestinoNotificacion.
+// - Solicitud: terminada, descarga_completa, error_sat, rechazada, vencida.
+// - Perfil: credencial, efirma_por_vencer.
+struct DestinoNotificacion {
+    enum class Tipo { Ninguno, Solicitud, Perfil };
+    Tipo tipo = Tipo::Ninguno;
+    QString id;
+
+    friend bool operator==(const DestinoNotificacion&, const DestinoNotificacion&) = default;
+};
+
 // Notificacion local decidida por la aplicacion (T009 D1, D9). Mismos campos
-// que OSIntegration::NotificacionLocal; el composition root adapta una a otra.
+// que OSIntegration::NotificacionLocal (salvo accionesExtra, que decide el
+// composition root por `tipo`); el root adapta una a otra.
 // - id: clave de dedupe ("<solicitud>:<tipo>" o "credencial:<perfil>:<estado>");
 //   el SO reemplaza una notificacion con el mismo id.
 // - tipo: "terminada", "descarga_completa", "error_sat", "rechazada",
@@ -17,6 +32,7 @@ struct Notificacion {
     QString tipo;
     QString titulo;
     QString cuerpo;
+    DestinoNotificacion destino; // T014.4 D1
 
     friend bool operator==(const Notificacion&, const Notificacion&) = default;
 };

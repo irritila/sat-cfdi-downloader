@@ -3,7 +3,9 @@
 #include "domain/configuracion/ConfiguracionApp.h"
 #include "ports/OSIntegration.h"
 
+#include <QList>
 #include <QObject>
+#include <QPair>
 #include <QPointer>
 #include <QString>
 #include <QWindow>
@@ -30,9 +32,33 @@ class ExtensionCicloDeVida;
 //   registrarUltimoCierre() confirmado (o fallido, registrado en log) ->
 //   os.prepararSalida() -> salida().
 //
+// - T014.4 D1: notificacionActivada del adaptador se enruta con
+//   rutaDeNotificacion(): Solicitud+Abrir -> ventana y detalle (lista sin
+//   error si ya no existe); Solicitud+MostrarEnFinder -> flujo T009.1 de la
+//   carpeta de la solicitud (la ventana solo se trae al frente si se presento
+//   un aviso); Perfil+Abrir/AbrirPerfiles -> ventana y Perfiles SAT con ese
+//   perfil seleccionado; Ninguno o id no canonico -> solo mostrar la ventana.
+//   Las activaciones que llegan antes de que iniciar() termine se encolan y
+//   se entregan en orden al final de iniciar(); durante la salida se
+//   descartan (y la cola se vacia). No toca estados, logs ni reintentos.
+//
 // Ownership/hilo: hilo grafico. No posee nada; os, configuracion y
 // appViewModel deben vivir mas que el controlador. La ventana es no
 // propietaria (QPointer).
+// T014.4 D1: destino de navegacion decidido para una notificacion pulsada.
+struct RutaNotificacion {
+    enum class Tipo { SoloVentana, DetalleSolicitud, FinderSolicitud, PerfilSeleccionado };
+    Tipo tipo = Tipo::SoloVentana;
+    QString id; // UUID canonico; vacio en SoloVentana
+
+    friend bool operator==(const RutaNotificacion&, const RutaNotificacion&) = default;
+};
+
+// Funcion pura. Combinaciones incoherentes (p. ej. AbrirPerfiles con destino
+// Solicitud) se tratan como Abrir del destino; id no canonico -> SoloVentana.
+RutaNotificacion rutaDeNotificacion(const OSIntegration::DestinoNotificacion& destino,
+                                    OSIntegration::AccionNotificacion accion);
+
 class AppLifecycleController final : public QObject {
     Q_OBJECT
 
@@ -70,6 +96,9 @@ public slots:
     void enfocarVentana();
     void nuevaSolicitud();
     void solicitarSalida();
+    // T014.4 D1 (conectado a OSIntegration::notificacionActivada).
+    void activarNotificacion(const satcfdi::OSIntegration::DestinoNotificacion& destino,
+                             satcfdi::OSIntegration::AccionNotificacion accion);
 
 signals:
     // Una escritura de configuracion fallo; el adaptador conserva el ultimo
@@ -81,6 +110,8 @@ signals:
     void notificationStatusChanged(satcfdi::OSIntegration::NotificationStatus estado);
     void notificacionPruebaTerminada(satcfdi::OSIntegration::NotificationSendResult resultado);
     void salidaIniciada();
+    // T014.4: una activacion de notificacion se enruto (pruebas/diagnostico).
+    void notificacionEnrutada(const satcfdi::RutaNotificacion& ruta);
 
 protected:
     bool eventFilter(QObject* objeto, QEvent* evento) override;
@@ -91,6 +122,7 @@ private:
     void reflejar(const ConfiguracionApp& configuracion);
     void registrarCierreYTerminar();
     void terminarSalida();
+    void enrutar(const RutaNotificacion& ruta);
 
     OSIntegration& m_os;
     ConfiguracionAppService& m_configuracion;
@@ -104,6 +136,11 @@ private:
     OSIntegration::NotificationStatus m_notificationStatus;
     bool m_iniciado = false;
     bool m_saliendo = false;
+    // T014.4: true al terminar iniciar(); antes, las activaciones se encolan.
+    bool m_uiLista = false;
+    QList<QPair<OSIntegration::DestinoNotificacion, OSIntegration::AccionNotificacion>> m_activacionesPendientes;
 };
 
 } // namespace satcfdi
+
+Q_DECLARE_METATYPE(satcfdi::RutaNotificacion)

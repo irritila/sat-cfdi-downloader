@@ -19,6 +19,7 @@
 #include "TestNotificaciones.h"
 #include "TestAccesoPaquetes.h"
 #include "TestVencimientoEFirma.h"
+#include "TestEstadoAgregado.h"
 
 #include <QCoreApplication>
 #include <QTest>
@@ -50,5 +51,6 @@ int main(int argc, char* argv[])
     ejecutar(TestNotificaciones());           // T009
     ejecutar(TestAccesoPaquetes());           // T009.1
     ejecutar(TestVencimientoEFirma());        // T014.3
+    ejecutar(TestEstadoAgregado());           // T014.4
     return fallos == 0 ? 0 : 1;
 }

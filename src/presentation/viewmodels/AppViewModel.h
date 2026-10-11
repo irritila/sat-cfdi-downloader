@@ -28,6 +28,18 @@ class SolicitudDetailViewModel;
 //   privadas incluidas) y el formulario de perfil.
 // mostrarLista(), mostrarNueva() y mostrarPerfiles() son publicas e
 // invocables desde C++ (AppLifecycleController, menu bar) y QML.
+//
+// T014.4 (acciones de notificacion, desde AppLifecycleController):
+// - abrirDetalleONavegarLista(id): abre el detalle; si el id no es canonico o
+//   la carga termina en NoEncontrada, queda en la lista sin error. Un error de
+//   lectura se muestra en el detalle como siempre.
+// - mostrarPerfilSeleccionado(perfilId): Perfiles SAT con ese perfil
+//   seleccionado al terminar la carga; si no existe, sin seleccion ni error.
+// - mostrarCarpetaSolicitudEnFinder(id): flujo de T009.1 (abrirCarpetaSolicitud,
+//   sin crear carpetas ni abrir ZIP). Si Finder lo muestra no navega; si no,
+//   abre el detalle con el aviso D7 (o la lista con el aviso si la solicitud
+//   ya no existe) y emite avisoFinderSolicitudPresentado() para que el
+//   controlador traiga la ventana al frente.
 class AppViewModel : public QObject {
     Q_OBJECT
     QML_ELEMENT
@@ -131,6 +143,11 @@ public:
     // Devuelve false (sin navegar) si `id` no es un UUID canonico.
     Q_INVOKABLE bool abrirDetalle(const QString& id);
 
+    // T014.4: ver la descripcion de la clase.
+    void abrirDetalleONavegarLista(const QString& id);
+    void mostrarPerfilSeleccionado(const QString& perfilId);
+    void mostrarCarpetaSolicitudEnFinder(const QString& id);
+
 signals:
     void paginaChanged();
     void solicitudSeleccionadaIdChanged();
@@ -138,9 +155,14 @@ signals:
     void mensajeFinderChanged();
     void filtrosChanged();
     void primerUsoChanged();
+    // T014.4: el resultado de mostrarCarpetaSolicitudEnFinder no fue Mostrado
+    // y el aviso ya esta visible en el detalle o en la lista.
+    void avisoFinderSolicitudPresentado();
 
 private:
     void setPagina(Pagina pagina);
+    void navegarADetalleOLista(const QString& id, const QString& avisoFinder);
+    void alCambiarEstadoDetalle();
     void cambiarFiltro(QString& campo, const QString& valor)
     {
         if (campo != valor) {
@@ -159,6 +181,11 @@ private:
     AccionesFinder* m_finder = nullptr;
     QString m_mensajeFinder;
     quint64 m_genFinder = 0;
+    // T014.4: detalle abierto por una notificacion; si la carga termina en
+    // NoEncontrada se regresa a la lista (con el aviso de Finder, si hay).
+    QString m_detalleConRespaldoLista;
+    QString m_avisoFinderPendiente;
+    quint64 m_genFinderSolicitud = 0;
     QString m_filtroTexto;
     QString m_filtroEstado;
     QString m_filtroTipo;

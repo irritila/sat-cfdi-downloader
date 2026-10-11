@@ -23,6 +23,10 @@ qt_add_library(satcfdi_application STATIC
     operaciones/SaneamientoOperacion.h
     operaciones/SaneamientoOperacion.cpp
     notificaciones/Notificador.h
+    estadoagregado/EstadoAgregado.h
+    estadoagregado/EstadoAgregado.cpp
+    estadoagregado/MonitorEstadoAgregado.h
+    estadoagregado/MonitorEstadoAgregado.cpp
     notificaciones/ServicioNotificaciones.h
     notificaciones/ServicioNotificaciones.cpp
     operaciones/SenalCancelacion.h

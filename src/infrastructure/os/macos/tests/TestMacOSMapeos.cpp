@@ -1,9 +1,11 @@
 // Pruebas de los mapeos puros de MacOSIntegration (T004, corte C). Sin
 // AppKit, permisos, bundle firmado ni sesion grafica.
 
+#include "infrastructure/os/macos/IconoMenuBar.h"
 #include "infrastructure/os/macos/MacOSMapeos.h"
 #include "infrastructure/os/MenuBarDefinicion.h"
 
+#include <QImage>
 #include <QTest>
 
 using namespace satcfdi::macos;
@@ -233,6 +235,140 @@ private slots:
         QVERIFY(!texto(E::Fase::Detenido).isEmpty());
         QCOMPARE(textoPendientes(0), QString());
         QCOMPARE(textoPendientes(3), QStringLiteral("Pendientes: 3"));
+    }
+
+    // --- T014.4 D1: notificaciones accionables ---------------------------
+
+    void uuidCanonico()
+    {
+        QVERIFY(esUuidCanonico(QStringLiteral("0f8fad5b-d9cb-469f-a165-70867728950e")));
+        QVERIFY(!esUuidCanonico(QString()));
+        QVERIFY(!esUuidCanonico(QStringLiteral("0F8FAD5B-D9CB-469F-A165-70867728950E"))); // mayusculas
+        QVERIFY(!esUuidCanonico(QStringLiteral("{0f8fad5b-d9cb-469f-a165-70867728950e}"))); // llaves
+        QVERIFY(!esUuidCanonico(QStringLiteral("0f8fad5bd9cb469fa16570867728950e")));       // sin guiones
+        QVERIFY(!esUuidCanonico(QStringLiteral("0f8fad5b-d9cb-469f-a165-70867728950g")));   // no hex
+        QVERIFY(!esUuidCanonico(QStringLiteral("0f8fad5b-d9cb-469f-a165-70867728950e ")));  // espacio
+        QVERIFY(!esUuidCanonico(QStringLiteral("XAXX010101000")));                         // RFC
+        QVERIFY(!esUuidCanonico(QStringLiteral("/Users/x/paquetes/a.zip")));                // ruta
+    }
+
+    void destinoDeUserInfo()
+    {
+        using D = satcfdi::OSIntegration::DestinoNotificacion;
+        const QString id = QStringLiteral("0f8fad5b-d9cb-469f-a165-70867728950e");
+        QCOMPARE(destinoDesdeUserInfo(QStringLiteral("solicitud"), id), (D{D::Tipo::Solicitud, id}));
+        QCOMPARE(destinoDesdeUserInfo(QStringLiteral("perfil"), id), (D{D::Tipo::Perfil, id}));
+        QCOMPARE(destinoDesdeUserInfo(QStringLiteral("rfc"), id), D{});
+        QCOMPARE(destinoDesdeUserInfo(QStringLiteral("Solicitud"), id), D{});
+        QCOMPARE(destinoDesdeUserInfo(QString(), id), D{});
+        QCOMPARE(destinoDesdeUserInfo(QStringLiteral("solicitud"), QStringLiteral("XAXX010101000")), D{});
+        QCOMPARE(destinoDesdeUserInfo(QStringLiteral("perfil"), QString()), D{});
+
+        // Ida y vuelta.
+        for (D::Tipo t : {D::Tipo::Solicitud, D::Tipo::Perfil}) {
+            const D d{t, id};
+            QVERIFY(destinoTransportable(d));
+            QCOMPARE(destinoDesdeUserInfo(claveTipoDestino(t), id), d);
+        }
+        QVERIFY(!destinoTransportable(D{}));
+        QVERIFY(!destinoTransportable(D{D::Tipo::Ninguno, id}));
+        QVERIFY(!destinoTransportable(D{D::Tipo::Solicitud, QStringLiteral("{") + id + QStringLiteral("}")}));
+        QVERIFY(claveTipoDestino(D::Tipo::Ninguno).isEmpty());
+    }
+
+    void categoriaPorAcciones()
+    {
+        using D = satcfdi::OSIntegration::DestinoNotificacion;
+        using A = satcfdi::OSIntegration::AccionNotificacion;
+        const QString id = QStringLiteral("0f8fad5b-d9cb-469f-a165-70867728950e");
+        const D solicitud{D::Tipo::Solicitud, id};
+        const D perfil{D::Tipo::Perfil, id};
+        QCOMPARE(categoriaNotificacion(solicitud, {A::MostrarEnFinder}), QLatin1String(kCategoriaMostrarEnFinder));
+        QCOMPARE(categoriaNotificacion(perfil, {A::AbrirPerfiles}), QLatin1String(kCategoriaAbrirPerfiles));
+        QVERIFY(categoriaNotificacion(solicitud, {}).isEmpty());
+        QVERIFY(categoriaNotificacion(perfil, {}).isEmpty());
+        // Accion que no corresponde al destino o destino no transportable.
+        QVERIFY(categoriaNotificacion(perfil, {A::MostrarEnFinder}).isEmpty());
+        QVERIFY(categoriaNotificacion(solicitud, {A::AbrirPerfiles}).isEmpty());
+        QVERIFY(categoriaNotificacion(D{}, {A::MostrarEnFinder}).isEmpty());
+        QVERIFY(categoriaNotificacion(D{D::Tipo::Solicitud, QStringLiteral("x")}, {A::MostrarEnFinder}).isEmpty());
+        QCOMPARE(textoAccionNotificacion(A::MostrarEnFinder), QStringLiteral("Mostrar en Finder"));
+        QCOMPARE(textoAccionNotificacion(A::AbrirPerfiles), QStringLiteral("Abrir Perfiles SAT"));
+        QVERIFY(textoAccionNotificacion(A::Abrir).isEmpty());
+    }
+
+    void respuestaANotificacion()
+    {
+        using D = satcfdi::OSIntegration::DestinoNotificacion;
+        using A = satcfdi::OSIntegration::AccionNotificacion;
+        const QString id = QStringLiteral("0f8fad5b-d9cb-469f-a165-70867728950e");
+        const QString sol = QStringLiteral("solicitud");
+        const QString per = QStringLiteral("perfil");
+        const QString finder = QLatin1String(kAccionMostrarEnFinder);
+        const QString perfiles = QLatin1String(kAccionAbrirPerfiles);
+        using R = ActivacionNotificacion;
+
+        // Pulsar el cuerpo -> Abrir (el identificador se ignora).
+        QCOMPARE(activacionDesdeRespuesta(sol, id, true, QStringLiteral("x")), (R{D{D::Tipo::Solicitud, id}, A::Abrir}));
+        QCOMPARE(activacionDesdeRespuesta(per, id, true, QString()), (R{D{D::Tipo::Perfil, id}, A::Abrir}));
+        // Botones.
+        QCOMPARE(activacionDesdeRespuesta(sol, id, false, finder), (R{D{D::Tipo::Solicitud, id}, A::MostrarEnFinder}));
+        QCOMPARE(activacionDesdeRespuesta(per, id, false, perfiles), (R{D{D::Tipo::Perfil, id}, A::AbrirPerfiles}));
+        // Boton que no corresponde al destino -> Abrir con ese destino.
+        QCOMPARE(activacionDesdeRespuesta(per, id, false, finder), (R{D{D::Tipo::Perfil, id}, A::Abrir}));
+        QCOMPARE(activacionDesdeRespuesta(sol, id, false, perfiles), (R{D{D::Tipo::Solicitud, id}, A::Abrir}));
+        // Destino invalido o ausente -> Ninguno + Abrir, sea cual sea el boton.
+        QCOMPARE(activacionDesdeRespuesta(QString(), QString(), true, QString()), (R{D{}, A::Abrir}));
+        QCOMPARE(activacionDesdeRespuesta(sol, QStringLiteral("XAXX010101000"), false, finder), (R{D{}, A::Abrir}));
+        QCOMPARE(activacionDesdeRespuesta(QStringLiteral("otro"), id, false, perfiles), (R{D{}, A::Abrir}));
+        // Descartar / desconocido -> nada.
+        QVERIFY(!activacionDesdeRespuesta(sol, id, false, QStringLiteral("com.apple.UNNotificationDismissActionIdentifier")));
+        QVERIFY(!activacionDesdeRespuesta(sol, id, false, QString()));
+        QVERIFY(!activacionDesdeRespuesta(sol, id, false, QStringLiteral("mx.adenium.satcfdi.accion.otra")));
+    }
+
+    // --- T014.4 D2: icono del menu bar -----------------------------------
+
+    void textosIcono()
+    {
+        using E = satcfdi::OSIntegration::EstadoIcono;
+        QCOMPARE(textoEstadoIcono(E::Normal), QStringLiteral("SAT CFDI Downloader"));
+        QCOMPARE(textoEstadoIcono(E::Trabajando), QStringLiteral("SAT CFDI Downloader: trabajando"));
+        QCOMPARE(textoEstadoIcono(E::Pausado), QStringLiteral("SAT CFDI Downloader: en pausa"));
+        QCOMPARE(textoEstadoIcono(E::Atencion), QStringLiteral("SAT CFDI Downloader: requiere atención"));
+    }
+
+    void variantesIcono()
+    {
+        using E = satcfdi::OSIntegration::EstadoIcono;
+        const QList<E> estados{E::Normal, E::Pausado, E::Trabajando, E::Atencion};
+        for (const int lado : {18, 36}) {
+            QList<QImage> imagenes;
+            for (E e : estados) {
+                const QImage img = dibujarIconoMenuBar(e, lado);
+                QCOMPARE(img.size(), QSize(lado, lado));
+                QVERIFY(img.hasAlphaChannel());
+                // Plantilla: solo negro con alfa (el color lo pone macOS) y no vacia.
+                bool tieneTinta = false;
+                for (int y = 0; y < lado; ++y) {
+                    for (int x = 0; x < lado; ++x) {
+                        const QColor c = img.pixelColor(x, y);
+                        if (c.alpha() > 0) {
+                            tieneTinta = true;
+                            QCOMPARE(c.red() + c.green() + c.blue(), 0);
+                        }
+                    }
+                }
+                QVERIFY(tieneTinta);
+                imagenes.append(img);
+            }
+            // Las cuatro variantes son distinguibles entre si.
+            for (int i = 0; i < imagenes.size(); ++i) {
+                for (int j = i + 1; j < imagenes.size(); ++j) {
+                    QVERIFY2(imagenes.at(i) != imagenes.at(j), qPrintable(QStringLiteral("%1 vs %2").arg(i).arg(j)));
+                }
+            }
+        }
     }
 };
 

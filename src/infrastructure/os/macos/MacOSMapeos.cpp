@@ -1,6 +1,7 @@
 #include "infrastructure/os/macos/MacOSMapeos.h"
 
 #include <QCoreApplication>
+#include <QLatin1StringView>
 
 namespace satcfdi::macos {
 
@@ -166,6 +167,137 @@ QString textoEstadoMonitoreo(const OSIntegration::EstadoMonitoreo& estado)
 QString textoPendientes(int pendientes)
 {
     return pendientes > 0 ? tr("Pendientes: %1").arg(pendientes) : QString();
+}
+
+// --- T014.4 ----------------------------------------------------------------
+
+using Destino = OSIntegration::DestinoNotificacion;
+using AccionNotificacion = OSIntegration::AccionNotificacion;
+
+namespace {
+constexpr QLatin1StringView kTipoSolicitud("solicitud");
+constexpr QLatin1StringView kTipoPerfil("perfil");
+} // namespace
+
+bool esUuidCanonico(const QString& id)
+{
+    if (id.size() != 36) {
+        return false;
+    }
+    for (qsizetype i = 0; i < id.size(); ++i) {
+        const QChar c = id.at(i);
+        if (i == 8 || i == 13 || i == 18 || i == 23) {
+            if (c != QLatin1Char('-')) {
+                return false;
+            }
+        } else if (!((c >= QLatin1Char('0') && c <= QLatin1Char('9'))
+                     || (c >= QLatin1Char('a') && c <= QLatin1Char('f')))) {
+            return false;
+        }
+    }
+    return true;
+}
+
+QString claveTipoDestino(Destino::Tipo tipo)
+{
+    switch (tipo) {
+    case Destino::Tipo::Solicitud:
+        return kTipoSolicitud;
+    case Destino::Tipo::Perfil:
+        return kTipoPerfil;
+    case Destino::Tipo::Ninguno:
+        break;
+    }
+    return {};
+}
+
+bool destinoTransportable(const Destino& destino)
+{
+    return destino.tipo != Destino::Tipo::Ninguno && esUuidCanonico(destino.id);
+}
+
+Destino destinoDesdeUserInfo(const QString& tipo, const QString& id)
+{
+    if (!esUuidCanonico(id)) {
+        return {};
+    }
+    if (tipo == kTipoSolicitud) {
+        return Destino{Destino::Tipo::Solicitud, id};
+    }
+    if (tipo == kTipoPerfil) {
+        return Destino{Destino::Tipo::Perfil, id};
+    }
+    return {};
+}
+
+QString categoriaNotificacion(const Destino& destino, const QList<AccionNotificacion>& acciones)
+{
+    if (!destinoTransportable(destino)) {
+        return {};
+    }
+    if (destino.tipo == Destino::Tipo::Solicitud && acciones.contains(AccionNotificacion::MostrarEnFinder)) {
+        return QString::fromLatin1(kCategoriaMostrarEnFinder);
+    }
+    if (destino.tipo == Destino::Tipo::Perfil && acciones.contains(AccionNotificacion::AbrirPerfiles)) {
+        return QString::fromLatin1(kCategoriaAbrirPerfiles);
+    }
+    return {};
+}
+
+QString textoAccionNotificacion(AccionNotificacion accion)
+{
+    switch (accion) {
+    case AccionNotificacion::MostrarEnFinder:
+        return tr("Mostrar en Finder");
+    case AccionNotificacion::AbrirPerfiles:
+        return tr("Abrir Perfiles SAT");
+    case AccionNotificacion::Abrir:
+        break;
+    }
+    return {};
+}
+
+std::optional<ActivacionNotificacion> activacionDesdeRespuesta(const QString& tipoDestino,
+                                                                const QString& idDestino,
+                                                                bool esAccionPorDefecto,
+                                                                const QString& identificadorAccion)
+{
+    AccionNotificacion accion = AccionNotificacion::Abrir;
+    if (esAccionPorDefecto) {
+        accion = AccionNotificacion::Abrir;
+    } else if (identificadorAccion == QLatin1StringView(kAccionMostrarEnFinder)) {
+        accion = AccionNotificacion::MostrarEnFinder;
+    } else if (identificadorAccion == QLatin1StringView(kAccionAbrirPerfiles)) {
+        accion = AccionNotificacion::AbrirPerfiles;
+    } else {
+        return std::nullopt;
+    }
+
+    const Destino destino = destinoDesdeUserInfo(tipoDestino, idDestino);
+    if (destino.tipo == Destino::Tipo::Ninguno) {
+        return ActivacionNotificacion{Destino{}, AccionNotificacion::Abrir};
+    }
+    if ((accion == AccionNotificacion::MostrarEnFinder && destino.tipo != Destino::Tipo::Solicitud)
+        || (accion == AccionNotificacion::AbrirPerfiles && destino.tipo != Destino::Tipo::Perfil)) {
+        accion = AccionNotificacion::Abrir;
+    }
+    return ActivacionNotificacion{destino, accion};
+}
+
+QString textoEstadoIcono(OSIntegration::EstadoIcono estado)
+{
+    using E = OSIntegration::EstadoIcono;
+    switch (estado) {
+    case E::Trabajando:
+        return tr("SAT CFDI Downloader: trabajando");
+    case E::Pausado:
+        return tr("SAT CFDI Downloader: en pausa");
+    case E::Atencion:
+        return tr("SAT CFDI Downloader: requiere atención");
+    case E::Normal:
+        break;
+    }
+    return tr("SAT CFDI Downloader");
 }
 
 } // namespace satcfdi::macos

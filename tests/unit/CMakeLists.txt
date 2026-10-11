@@ -49,6 +49,8 @@ qt_add_executable(satcfdi_tests
     TestAccesoPaquetes.cpp
     TestVencimientoEFirma.h
     TestVencimientoEFirma.cpp
+    TestEstadoAgregado.h
+    TestEstadoAgregado.cpp
     # Fakes compartidos header-only (T004); listados aqui para AUTOMOC.
     ../fakes/FakeOSIntegration.h
     ../fakes/FakeConfiguracionAppService.h

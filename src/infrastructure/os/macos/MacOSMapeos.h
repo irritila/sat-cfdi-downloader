@@ -10,7 +10,10 @@
 
 #include <QString>
 
+#include <QList>
+
 #include <cstdint>
+#include <optional>
 
 namespace satcfdi::macos {
 
@@ -79,5 +82,70 @@ QString textoAccionMonitoreo(bool pausado);
 // T007 D2: linea de estado del worker y de pendientes (vacia si 0).
 QString textoEstadoMonitoreo(const OSIntegration::EstadoMonitoreo& estado);
 QString textoPendientes(int pendientes);
+
+// --- T014.4 D1: notificaciones accionables --------------------------------
+
+// Claves de userInfo. Solo viajan el tipo de destino y el UUID interno.
+inline constexpr char kClaveTipoDestino[] = "satcfdi.destino.tipo";
+inline constexpr char kClaveIdDestino[] = "satcfdi.destino.id";
+
+// Identificadores de categoria (UNNotificationCategory) y de accion.
+inline constexpr char kCategoriaMostrarEnFinder[] = "mx.adenium.satcfdi.categoria.mostrar-en-finder";
+inline constexpr char kCategoriaAbrirPerfiles[] = "mx.adenium.satcfdi.categoria.abrir-perfiles";
+inline constexpr char kAccionMostrarEnFinder[] = "mx.adenium.satcfdi.accion.mostrar-en-finder";
+inline constexpr char kAccionAbrirPerfiles[] = "mx.adenium.satcfdi.accion.abrir-perfiles";
+
+// true si `id` es un UUID canonico interno: 36 caracteres, hexadecimal en
+// minusculas con guiones, sin llaves (formato de QUuid::WithoutBraces).
+bool esUuidCanonico(const QString& id);
+
+// Valor de kClaveTipoDestino para un tipo ("solicitud", "perfil"; vacio
+// para Ninguno).
+QString claveTipoDestino(OSIntegration::DestinoNotificacion::Tipo tipo);
+
+// true si el destino puede viajar en userInfo (tipo distinto de Ninguno y
+// UUID canonico). Si no, la notificacion se entrega sin destino.
+bool destinoTransportable(const OSIntegration::DestinoNotificacion& destino);
+
+// Reconstruye y valida el destino leido de userInfo (cadenas vacias si la
+// clave falta o no es texto). Tipo desconocido o id no canonico -> Ninguno.
+OSIntegration::DestinoNotificacion destinoDesdeUserInfo(const QString& tipo, const QString& id);
+
+// Categoria para una notificacion: kCategoriaMostrarEnFinder si pide
+// MostrarEnFinder con destino Solicitud; kCategoriaAbrirPerfiles si pide
+// AbrirPerfiles con destino Perfil; vacio en el resto (sin botones).
+QString categoriaNotificacion(const OSIntegration::DestinoNotificacion& destino,
+                              const QList<OSIntegration::AccionNotificacion>& acciones);
+
+// Texto del boton de cada accion extra ("Mostrar en Finder",
+// "Abrir Perfiles SAT"); vacio para Abrir.
+QString textoAccionNotificacion(OSIntegration::AccionNotificacion accion);
+
+// Respuesta reconstruida de una notificacion pulsada.
+struct ActivacionNotificacion {
+    OSIntegration::DestinoNotificacion destino;
+    OSIntegration::AccionNotificacion accion = OSIntegration::AccionNotificacion::Abrir;
+
+    friend bool operator==(const ActivacionNotificacion&, const ActivacionNotificacion&) = default;
+};
+
+// Traduce una UNNotificationResponse. `esAccionPorDefecto`: el identificador
+// es UNNotificationDefaultActionIdentifier (pulsar el cuerpo); en ese caso
+// `identificadorAccion` se ignora. Reglas:
+// - Accion por defecto -> Abrir. kAccionMostrarEnFinder -> MostrarEnFinder;
+//   kAccionAbrirPerfiles -> AbrirPerfiles. Cualquier otro identificador
+//   (descartar, desconocido) -> nullopt: no se emite nada.
+// - Destino invalido -> Ninguno con Abrir (solo activar la app).
+// - Accion que no corresponde al tipo de destino (Finder sin Solicitud,
+//   Perfiles sin Perfil) -> Abrir con ese destino.
+std::optional<ActivacionNotificacion> activacionDesdeRespuesta(const QString& tipoDestino,
+                                                                const QString& idDestino,
+                                                                bool esAccionPorDefecto,
+                                                                const QString& identificadorAccion);
+
+// --- T014.4 D2: icono del menu bar ----------------------------------------
+
+// Tooltip y nombre accesible del icono para cada estado.
+QString textoEstadoIcono(OSIntegration::EstadoIcono estado);
 
 } // namespace satcfdi::macos

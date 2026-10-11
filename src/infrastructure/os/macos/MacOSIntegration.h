@@ -37,6 +37,10 @@ namespace satcfdi {
 //   salirSolicitado(); la terminacion se cancela hasta prepararSalida().
 // - Sin bundle (binario suelto) o macOS < 13: Login Item y notificaciones
 //   Unavailable, sin crashear.
+// - T014.4: el delegado de UNUserNotificationCenter se asigna en el
+//   constructor (antes de terminar el arranque de AppKit) para recibir la
+//   respuesta que lanza la app; las respuestas previas a inicializar() se
+//   encolan. Las categorias con botones se registran en inicializar().
 class MacOSIntegration final : public OSIntegration {
     Q_OBJECT
 
@@ -60,6 +64,7 @@ public:
     void reflejarPreferenciaLoginItem(bool habilitado) override;
     void reflejarMonitoreoPausado(bool pausado) override;
     void reflejarEstadoMonitoreo(const EstadoMonitoreo& estado) override;
+    void reflejarEstadoIcono(EstadoIcono estado) override;
 
     void prepararSalida() override;
 
@@ -74,9 +79,17 @@ private:
     void refrescarEstadosDelSistema();
     // Entrega comun de notificacion de prueba y notificar(): sin pedir permiso;
     // `alTerminar` se invoca en el hilo grafico con el resultado.
+    // T014.4: `destino` solo viaja en userInfo si es transportable; `categoria`
+    // vacia = sin botones.
     void entregarNotificacion(const QString& identificador, const QString& hilo, const QString& titulo,
-                              const QString& cuerpo,
+                              const QString& cuerpo, const DestinoNotificacion& destino, const QString& categoria,
                               std::function<void(MacOSIntegration*, NotificationSendResult)> alTerminar);
+    // T014.4: respuesta ya validada, en el hilo grafico (encola si aun no se
+    // inicializo; descarta durante la salida).
+    void recibirActivacion(const DestinoNotificacion& destino, AccionNotificacion accion);
+    void emitirActivacionEnCola(const DestinoNotificacion& destino, AccionNotificacion accion);
+    void registrarCategoriasNotificacion();
+    void aplicarEstadoIcono();
     void actualizarMenu();
     menubar::EstadoMenu estadoMenu() const;
     void asegurarModoRegular();

@@ -198,6 +198,10 @@ public:
     QString mensajeFinder() const { return m_mensajeFinder; }
     Q_INVOKABLE void mostrarEnFinder(const QString& idPaqueteSat);
     Q_INVOKABLE void abrirCarpetaSolicitud();
+    // T014.4: aviso D7 de un "Mostrar en Finder" pedido fuera del detalle
+    // (accion de notificacion). Invalida una accion de Finder en curso. Se
+    // limpia, como el resto, al cargar otra solicitud.
+    void mostrarAvisoFinder(const QString& mensaje);
     bool puedeVerificar() const;
     bool puedeReintentarDescarga() const;
     QString accionSolicitada() const { return m_accionSolicitada; }

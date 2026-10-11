@@ -131,6 +131,12 @@ public:
     Q_INVOKABLE void cargar();
     // Edita el perfil `id` (UUID texto). false si no esta en la lista.
     Q_INVOKABLE bool seleccionar(const QString& id);
+    // T014.4: selecciona `id` en cuanto la lista este cargada (de inmediato si
+    // ya lo esta y no hay una carga en curso; si no, al terminar la siguiente
+    // carga exitosa). Si el perfil no existe queda sin seleccion y sin error;
+    // si la carga falla, la seleccion pendiente se descarta. seleccionar(),
+    // nuevo() y cerrarFormulario() descartan la seleccion pendiente.
+    void seleccionarAlCargar(const QString& id);
     Q_INVOKABLE void nuevo();
     Q_INVOKABLE void guardar();
     // Nuevo -> Ninguno; Edicion -> restaura el nombre guardado.
@@ -153,6 +159,7 @@ private:
     void limpiarErrores();
     void abrirEdicion(const PerfilResumen& perfil);
     void aplicarError(const QString& clave, const QString& mensaje, const QString& campo);
+    void aplicarSeleccionPendiente(const QString& id);
 
     QPointer<PerfilesSatService> m_perfilesServicio;
     ConsultaPreparacionPerfiles* m_consulta;
@@ -173,6 +180,7 @@ private:
     QString m_errorMessage;
     QString m_campoConError;
     bool m_guardando = false;
+    QString m_seleccionPendiente; // T014.4: se aplica al terminar la carga
 
     // Generaciones (DA4).
     quint64 m_genCarga = 0;

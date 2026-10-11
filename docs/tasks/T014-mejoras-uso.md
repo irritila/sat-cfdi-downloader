@@ -2,7 +2,7 @@
 
 ## Estado
 
-Pendiente (refinada 2026-10-09). Epica dividida en T014.1-T014.4.
+Completada (2026-10-11). Epica dividida en T014.1-T014.4, todas completadas.
 
 ## Objetivo
 
@@ -33,7 +33,8 @@ Origen: `docs/design/ui-ux-v2/traspaso.md` (`## Sugerencias`) y `docs/meetings/U
 
 ## Resultado
 
-Pendiente.
+Las once sugerencias aceptadas quedaron implementadas en T014.1 (mejoras de pantalla), T014.2 (reintento por paquete), T014.3 (primer uso
+y vencimiento de e.firma) y T014.4 (notificaciones accionables e icono con estado).
 
 ## Referencias
 

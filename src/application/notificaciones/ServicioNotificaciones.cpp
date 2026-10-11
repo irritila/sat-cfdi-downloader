@@ -52,6 +52,7 @@ Notificacion ServicioNotificaciones::componer(const TransicionNotificable& t)
     Notificacion n;
     n.tipo = claveEstable(t.tipo);
     n.id = t.solicitudId.texto() + QLatin1Char(':') + n.tipo;
+    n.destino = DestinoNotificacion{DestinoNotificacion::Tipo::Solicitud, t.solicitudId.texto()};
     QString resultado;
     switch (t.tipo) {
     case TipoTransicionNotificable::Terminada:
@@ -101,6 +102,7 @@ std::optional<Notificacion> ServicioNotificaciones::componerCredencial(const Per
     Notificacion n;
     n.tipo = QStringLiteral("credencial");
     n.id = QStringLiteral("credencial:") + perfil.texto() + QLatin1Char(':') + claveEstable(estado);
+    n.destino = DestinoNotificacion{DestinoNotificacion::Tipo::Perfil, perfil.texto()};
     n.titulo = QStringLiteral("e.firma no disponible");
     n.cuerpo = dosLineas(causa + QStringLiteral(". El monitoreo de ese perfil está en pausa."), accion);
     return n;
@@ -114,6 +116,7 @@ Notificacion ServicioNotificaciones::componerVencimiento(const PerfilId& perfil,
     n.id = QStringLiteral("vencimiento:%1:%2:%3")
                .arg(perfil.texto(), vigenteHasta.toUTC().toString(Qt::ISODate))
                .arg(umbral);
+    n.destino = DestinoNotificacion{DestinoNotificacion::Tipo::Perfil, perfil.texto()};
     n.titulo = QStringLiteral("e.firma por vencer");
     const QString fecha = fechaslegibles::fecha(vigenteHasta.toLocalTime().date());
     QString resultado;

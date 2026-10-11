@@ -42,6 +42,7 @@ public:
     void reflejarPreferenciaLoginItem(bool) override {}
     void reflejarMonitoreoPausado(bool) override {}
     void reflejarEstadoMonitoreo(const EstadoMonitoreo&) override {}
+    void reflejarEstadoIcono(EstadoIcono) override {}
     void prepararSalida() override {}
 };
 

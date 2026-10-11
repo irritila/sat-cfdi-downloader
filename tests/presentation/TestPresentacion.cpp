@@ -457,6 +457,14 @@ private slots:
     void badgeVencimientoEnPerfiles();
     void guiaPrimerUsoRefrescoFallidoLaOculta();
     void badgeConElMismoRelojQueElAviso();
+
+    // T014.4: destinos de acciones de notificacion
+    void notificacionAbreDetalleExistente();
+    void notificacionSolicitudInexistenteAbreLista();
+    void notificacionIdNoCanonicoAbreLista();
+    void notificacionPerfilSeleccionadoTrasCarga();
+    void notificacionPerfilInexistenteSinSeleccion();
+    void notificacionMostrarCarpetaSolicitudEnFinder();
 };
 
 void TestPresentacion::init()
@@ -2836,4 +2844,238 @@ void TestPresentacion::badgeVencimientoEnPerfiles()
     QCOMPARE(grupo->property("texto").toString(), esperado);
     QVERIFY(p->seleccionar(vigente.id.texto()));
     QTRY_VERIFY(!e.item(QStringLiteral("badgeVencimientoSeleccion"))->isVisible());
+}
+
+// ---------------------------------------------------------------------------
+// T014.4: destinos de acciones de notificacion
+
+void TestPresentacion::notificacionAbreDetalleExistente()
+{
+    EscenarioAsincrono e;
+    QVERIFY(e.cargar());
+    e.solicitudes.lista.resolver(0, ResultadoListaSol::exito({}));
+    AppViewModel* app = e.vms.app();
+    SolicitudDetailViewModel* d = e.vms.detalle();
+    const SolicitudId id = SolicitudId::generar();
+
+    app->abrirDetalleONavegarLista(id.texto());
+    QCOMPARE(app->pagina(), Pagina::Detalle);
+    QCOMPARE(app->solicitudSeleccionadaId(), id.texto());
+    QCOMPARE(d->estado(), EstadoDetalle::Cargando);
+    e.solicitudes.detalle.resolver(0, SolicitudesService::ResultadoDetalle::exito(detalleDePrueba(id)));
+    QTRY_COMPARE(d->estado(), EstadoDetalle::ConDatos);
+    QCOMPARE(app->pagina(), Pagina::Detalle);
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaDetalleSolicitud"));
+
+    // Ya cargada: una eliminacion posterior se ve en el detalle como siempre
+    // (el respaldo a la lista solo aplica a la carga de la notificacion).
+    emit e.solicitudes.solicitudEliminada(id);
+    QCOMPARE(d->estado(), EstadoDetalle::NoEncontrada);
+    QCOMPARE(app->pagina(), Pagina::Detalle);
+
+    // Un error de lectura se muestra en el detalle (no es "no existe").
+    const SolicitudId otra = SolicitudId::generar();
+    app->abrirDetalleONavegarLista(otra.texto());
+    ErrorObtener fallo;
+    fallo.tipo = ErrorObtener::Tipo::Persistencia;
+    e.solicitudes.detalle.resolver(1, SolicitudesService::ResultadoDetalle::fallo(fallo));
+    QTRY_COMPARE(d->estado(), EstadoDetalle::Error);
+    QCOMPARE(app->pagina(), Pagina::Detalle);
+}
+
+void TestPresentacion::notificacionSolicitudInexistenteAbreLista()
+{
+    EscenarioAsincrono e;
+    QVERIFY(e.cargar());
+    e.solicitudes.lista.resolver(0, ResultadoListaSol::exito({}));
+    AppViewModel* app = e.vms.app();
+    SolicitudDetailViewModel* d = e.vms.detalle();
+    ErrorObtener noEncontrada;
+    noEncontrada.tipo = ErrorObtener::Tipo::NoEncontrada;
+
+    app->abrirDetalleONavegarLista(SolicitudId::generar().texto());
+    QCOMPARE(app->pagina(), Pagina::Detalle);
+    e.solicitudes.detalle.resolver(0, SolicitudesService::ResultadoDetalle::fallo(noEncontrada));
+    QTRY_COMPARE(d->estado(), EstadoDetalle::NoEncontrada);
+    QCOMPARE(app->pagina(), Pagina::Lista);
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
+    QVERIFY(app->mensajeFinder().isEmpty()); // sin error
+    QVERIFY(e.item(QStringLiteral("mensajeFinderLista")));
+    QVERIFY(!e.item(QStringLiteral("mensajeFinderLista"))->isVisible());
+
+    // Si el usuario navega antes de que termine la carga, no se le mueve.
+    app->abrirDetalleONavegarLista(SolicitudId::generar().texto());
+    app->mostrarNueva();
+    e.solicitudes.detalle.resolver(1, SolicitudesService::ResultadoDetalle::fallo(noEncontrada));
+    QTRY_COMPARE(d->estado(), EstadoDetalle::NoEncontrada);
+    QCOMPARE(app->pagina(), Pagina::Nueva);
+
+    // Una navegacion explicita al detalle sustituye el respaldo: NoEncontrada
+    // se muestra en el detalle como en T003.
+    app->abrirDetalleONavegarLista(SolicitudId::generar().texto());
+    const SolicitudId explicita = SolicitudId::generar();
+    QVERIFY(app->abrirDetalle(explicita.texto()));
+    e.solicitudes.detalle.resolver(3, SolicitudesService::ResultadoDetalle::fallo(noEncontrada));
+    QTRY_COMPARE(d->estado(), EstadoDetalle::NoEncontrada);
+    QCOMPARE(app->pagina(), Pagina::Detalle);
+}
+
+void TestPresentacion::notificacionIdNoCanonicoAbreLista()
+{
+    EscenarioAsincrono e;
+    QVERIFY(e.cargar());
+    e.solicitudes.lista.resolver(0, ResultadoListaSol::exito({}));
+    AppViewModel* app = e.vms.app();
+    app->mostrarNueva();
+    const QString mayusculas = SolicitudId::generar().texto().toUpper();
+    for (const QString& id : {QString(), QStringLiteral("no-es-uuid"), mayusculas,
+                              QStringLiteral("{") + SolicitudId::generar().texto() + QStringLiteral("}")}) {
+        app->mostrarNueva();
+        app->abrirDetalleONavegarLista(id);
+        QCOMPARE(app->pagina(), Pagina::Lista);
+    }
+    QCOMPARE(e.solicitudes.detalle.size(), 0); // no se consulto nada
+    QVERIFY(app->solicitudSeleccionadaId().isEmpty());
+    QVERIFY(app->mensajeFinder().isEmpty());
+}
+
+void TestPresentacion::notificacionPerfilSeleccionadoTrasCarga()
+{
+    EscenarioAsincrono e;
+    QVERIFY(e.cargar());
+    e.solicitudes.lista.resolver(0, ResultadoListaSol::exito({}));
+    AppViewModel* app = e.vms.app();
+    PerfilesSatViewModel* p = e.vms.perfiles();
+    const PerfilResumen uno = fakes::FakePerfilesSatService::perfil("AAA010101AAA", "Uno");
+    const PerfilResumen dos = fakes::FakePerfilesSatService::perfil("BBB010101BBB", "Dos");
+
+    // Seleccionar antes de que la lista cargue: se aplica al terminar.
+    app->mostrarPerfilSeleccionado(dos.id.texto());
+    QCOMPARE(app->pagina(), Pagina::Perfiles);
+    QCOMPARE(p->modo(), PerfilesSatViewModel::Modo::Ninguno);
+    QTRY_COMPARE(e.perfiles.listas.size(), 1);
+    e.perfiles.listas.resolver(0, ResultadoListaPerfiles::exito({uno, dos}));
+    QTRY_COMPARE(p->modo(), PerfilesSatViewModel::Modo::Edicion);
+    QCOMPARE(p->perfilId(), dos.id.texto());
+    QCOMPARE(p->rfc(), QStringLiteral("BBB010101BBB"));
+    QVERIFY(p->errorListaMessage().isEmpty());
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaPerfilesSat"));
+
+    // Ya en Perfiles: otra notificacion recarga y cambia la seleccion; una
+    // carga tardia anterior no la pisa.
+    app->mostrarPerfilSeleccionado(uno.id.texto());
+    QTRY_COMPARE(e.perfiles.listas.size(), 2);
+    QCOMPARE(p->perfilId(), dos.id.texto()); // aun no cargo
+    e.perfiles.listas.resolver(1, ResultadoListaPerfiles::exito({uno, dos}));
+    QTRY_COMPARE(p->perfilId(), uno.id.texto());
+
+    // Una seleccion del usuario antes de terminar la carga gana.
+    app->mostrarPerfilSeleccionado(dos.id.texto());
+    QTRY_COMPARE(e.perfiles.listas.size(), 3);
+    p->nuevo();
+    e.perfiles.listas.resolver(2, ResultadoListaPerfiles::exito({uno, dos}));
+    procesarEventos();
+    QCOMPARE(p->modo(), PerfilesSatViewModel::Modo::Nuevo);
+
+    // Una carga fallida descarta la seleccion pendiente.
+    app->mostrarLista();
+    app->mostrarPerfilSeleccionado(dos.id.texto());
+    QTRY_COMPARE(e.perfiles.listas.size(), 4);
+    e.perfiles.listas.resolver(3, ResultadoListaPerfiles::fallo(ErrorPersistencia::de(ErrorPersistencia::Tipo::Almacenamiento, QStringLiteral("fake"))));
+    QTRY_VERIFY(!p->errorListaMessage().isEmpty());
+    QCOMPARE(p->modo(), PerfilesSatViewModel::Modo::Ninguno);
+}
+
+void TestPresentacion::notificacionPerfilInexistenteSinSeleccion()
+{
+    EscenarioAsincrono e;
+    QVERIFY(e.cargar());
+    e.solicitudes.lista.resolver(0, ResultadoListaSol::exito({}));
+    AppViewModel* app = e.vms.app();
+    PerfilesSatViewModel* p = e.vms.perfiles();
+    const PerfilResumen uno = fakes::FakePerfilesSatService::perfil("AAA010101AAA", "Uno");
+
+    // Estando en Perfiles con otro perfil seleccionado.
+    app->mostrarPerfiles();
+    QTRY_COMPARE(e.perfiles.listas.size(), 1);
+    e.perfiles.listas.resolver(0, ResultadoListaPerfiles::exito({uno}));
+    QTRY_VERIFY(p->seleccionar(uno.id.texto()));
+
+    app->mostrarPerfilSeleccionado(PerfilId::generar().texto());
+    QTRY_COMPARE(e.perfiles.listas.size(), 2);
+    e.perfiles.listas.resolver(1, ResultadoListaPerfiles::exito({uno}));
+    QTRY_COMPARE(p->modo(), PerfilesSatViewModel::Modo::Ninguno);
+    QVERIFY(p->perfilId().isEmpty());
+    QVERIFY(p->errorListaMessage().isEmpty());
+    QCOMPARE(p->estadoLista(), PerfilesSatViewModel::EstadoLista::ConDatos);
+    QCOMPARE(app->pagina(), Pagina::Perfiles);
+
+    // Id que no es UUID: igual, sin seleccion ni error.
+    app->mostrarPerfilSeleccionado(QStringLiteral("no-es-uuid"));
+    QTRY_COMPARE(e.perfiles.listas.size(), 3);
+    e.perfiles.listas.resolver(2, ResultadoListaPerfiles::exito({uno}));
+    QTRY_VERIFY(!p->cargando());
+    QCOMPARE(p->modo(), PerfilesSatViewModel::Modo::Ninguno);
+    QVERIFY(p->errorListaMessage().isEmpty());
+}
+
+void TestPresentacion::notificacionMostrarCarpetaSolicitudEnFinder()
+{
+    EscenarioAsincrono e;
+    FinderEspia finder;
+    e.vms.setAccionesFinder(&finder);
+    QVERIFY(e.cargar());
+    e.solicitudes.lista.resolver(0, ResultadoListaSol::exito({}));
+    AppViewModel* app = e.vms.app();
+    SolicitudDetailViewModel* d = e.vms.detalle();
+    QSignalSpy aviso(app, &AppViewModel::avisoFinderSolicitudPresentado);
+    const SolicitudId id = SolicitudId::generar();
+
+    // Id no canonico: nada.
+    app->mostrarCarpetaSolicitudEnFinder(QStringLiteral("no-es-uuid"));
+    QVERIFY(finder.llamadas.isEmpty());
+
+    // Finder la muestra: no se navega ni se avisa.
+    app->mostrarCarpetaSolicitudEnFinder(id.texto());
+    QCOMPARE(finder.llamadas, QStringList{QStringLiteral("solicitud")});
+    finder.resolver(0, ResultadoAccionFinder::Estado::Mostrado);
+    procesarEventos();
+    QCOMPARE(app->pagina(), Pagina::Lista);
+    QCOMPARE(aviso.count(), 0);
+    QCOMPARE(e.solicitudes.detalle.size(), 0);
+
+    // Finder fallido: detalle de la solicitud con el aviso D7.
+    app->mostrarCarpetaSolicitudEnFinder(id.texto());
+    finder.resolver(1, ResultadoAccionFinder::Estado::Fallido, QStringLiteral("No se pudo abrir Finder"));
+    QTRY_COMPARE(aviso.count(), 1);
+    QCOMPARE(app->pagina(), Pagina::Detalle);
+    QCOMPARE(d->mensajeFinder(), QStringLiteral("No se pudo abrir Finder"));
+    e.solicitudes.detalle.resolver(0, SolicitudesService::ResultadoDetalle::exito(detalleDePrueba(id)));
+    QTRY_COMPARE(d->estado(), EstadoDetalle::ConDatos);
+    QCOMPARE(d->mensajeFinder(), QStringLiteral("No se pudo abrir Finder"));
+    QTRY_VERIFY(e.item(QStringLiteral("mensajeFinder")) && e.item(QStringLiteral("mensajeFinder"))->isVisible());
+
+    // La solicitud ya no existe: la lista con el aviso, sin error de detalle.
+    const SolicitudId borrada = SolicitudId::generar();
+    app->mostrarCarpetaSolicitudEnFinder(borrada.texto());
+    finder.resolver(2, ResultadoAccionFinder::Estado::NoEncontrado, QStringLiteral("Carpeta no encontrada"));
+    QTRY_COMPARE(aviso.count(), 2);
+    ErrorObtener noEncontrada;
+    noEncontrada.tipo = ErrorObtener::Tipo::NoEncontrada;
+    e.solicitudes.detalle.resolver(1, SolicitudesService::ResultadoDetalle::fallo(noEncontrada));
+    QTRY_COMPARE(app->pagina(), Pagina::Lista);
+    QCOMPARE(app->mensajeFinder(), QStringLiteral("Carpeta no encontrada"));
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
+    QTRY_VERIFY(e.item(QStringLiteral("mensajeFinderLista")) && e.item(QStringLiteral("mensajeFinderLista"))->isVisible());
+
+    // Solo la ultima peticion cuenta.
+    app->mostrarCarpetaSolicitudEnFinder(id.texto());
+    app->mostrarCarpetaSolicitudEnFinder(id.texto());
+    finder.resolver(3, ResultadoAccionFinder::Estado::Fallido, QStringLiteral("viejo"));
+    procesarEventos();
+    QCOMPARE(aviso.count(), 2);
+    finder.resolver(4, ResultadoAccionFinder::Estado::Mostrado);
+    procesarEventos();
+    QCOMPARE(aviso.count(), 2);
+    e.vms.setAccionesFinder(nullptr);
 }

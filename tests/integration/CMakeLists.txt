@@ -16,6 +16,7 @@ qt_add_executable(satcfdi_integration_tests
     TestMonitoreo.cpp
     TestPaquetes.cpp
     TestFlujoSat.cpp
+    TestNotificacionesAccionables.cpp
     ../fakes/FakeSatGateway.h
     ../fakes/FakePackageStorage.h
     ../fakes/FakeOperacionesSat.h

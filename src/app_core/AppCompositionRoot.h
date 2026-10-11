@@ -20,6 +20,7 @@ class AccesoFinder;
 class AccesoPaquetesEjecutor;
 class NotificadorOS;
 class ServicioNotificaciones;
+class MonitorEstadoAgregado;
 class AvisoVencimientoEFirma;
 class ConsultaPrimerUso;
 class ConsultaPreparacionPerfiles;
@@ -147,6 +148,9 @@ public:
     // vencimiento (D2), que iniciarMonitoreo() arranca.
     ConsultaPrimerUso& consultaPrimerUso() const;
     AvisoVencimientoEFirma& avisoVencimiento() const { return *m_avisoVencimiento; }
+    // T014.4 D2: estado agregado del icono del menu bar (se inicia en
+    // iniciarCicloDeVida()).
+    MonitorEstadoAgregado& estadoAgregado() const { return *m_estadoAgregado; }
     QQmlApplicationEngine* engine() const { return m_engine.get(); }
 
 private:
@@ -174,6 +178,8 @@ private:
     std::unique_ptr<ConsultaPreparacionPerfiles> m_consultaVencimiento;
     std::unique_ptr<Programador> m_programadorVencimientoPropio;
     std::unique_ptr<AvisoVencimientoEFirma> m_avisoVencimiento;
+    // T014.4 D2 (se destruye antes que las consultas y servicios que usa).
+    std::unique_ptr<MonitorEstadoAgregado> m_estadoAgregado;
     PackageStorage* m_packageStorage = nullptr;
     QString m_raizPaquetes;
     std::unique_ptr<Programador> m_programadorEjecutorPropio;

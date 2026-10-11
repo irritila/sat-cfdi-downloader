@@ -1,5 +1,7 @@
 #pragma once
 
+#include <QList>
+#include <QMetaType>
 #include <QObject>
 #include <QString>
 
@@ -71,6 +73,28 @@ public:
     enum class ResultadoFinder { Mostrado, NoEncontrado, Fallido };
     Q_ENUM(ResultadoFinder)
 
+    // T014.4 D1: accion elegida al responder una notificacion. Abrir = pulsar
+    // el cuerpo; MostrarEnFinder / AbrirPerfiles = botones de la notificacion.
+    enum class AccionNotificacion { Abrir, MostrarEnFinder, AbrirPerfiles };
+    Q_ENUM(AccionNotificacion)
+
+    // T014.4 D1: destino interno de una notificacion. `id` es SOLO el UUID
+    // canonico interno (minusculas, sin llaves) de la solicitud o del perfil;
+    // nunca RFC, rutas, tokens ni datos SAT. Ninguno = solo activar la app.
+    struct DestinoNotificacion {
+        enum class Tipo { Ninguno, Solicitud, Perfil };
+        Tipo tipo = Tipo::Ninguno;
+        QString id;
+
+        friend bool operator==(const DestinoNotificacion&, const DestinoNotificacion&) = default;
+    };
+
+    // T014.4 D2: estado visual agregado del icono del menu bar (estado de
+    // presentacion; no es el estado del worker). Prioridad decidida por
+    // app_core: Atencion > Trabajando > Pausado > Normal.
+    enum class EstadoIcono { Normal, Trabajando, Pausado, Atencion };
+    Q_ENUM(EstadoIcono)
+
     // Notificacion local (T009 D1, D9). `id`: clave estable de dedupe que
     // decide el servicio de aplicacion (p. ej. "<solicitud>:terminada"); el SO
     // reemplaza una notificacion con el mismo id en lugar de duplicarla.
@@ -78,11 +102,18 @@ public:
     // "error_sat", "rechazada", "vencida", "credencial"). Titulo y cuerpo ya
     // vienen del catalogo D10: sin RFC completo, Ids, token, rutas ni Mensaje
     // SAT crudo.
+    // T014.4 D1: `destino` viaja en la notificacion (userInfo) y vuelve en
+    // notificacionActivada(). `accionesExtra`: [MostrarEnFinder] para
+    // "descarga_completa"; [AbrirPerfiles] para "credencial" y
+    // "efirma_por_vencer"; vacio en el resto. El adaptador solo muestra
+    // MostrarEnFinder con destino Solicitud y AbrirPerfiles con destino Perfil.
     struct NotificacionLocal {
         QString id;
         QString tipo;
         QString titulo;
         QString cuerpo;
+        DestinoNotificacion destino;
+        QList<AccionNotificacion> accionesExtra;
 
         friend bool operator==(const NotificacionLocal&, const NotificacionLocal&) = default;
     };
@@ -150,6 +181,13 @@ public:
     // cuando N > 0. Sin errores detallados. No emite intenciones.
     virtual void reflejarEstadoMonitoreo(const EstadoMonitoreo& estado) = 0;
 
+    // T014.4 D2: cambia SOLO el icono plantilla del menu bar y su
+    // tooltip/nombre accesible ("SAT CFDI Downloader", "...: trabajando",
+    // "...: en pausa", "...: requiere atención"). No emite intenciones ni
+    // cambia el menu. Puede llamarse antes de inicializar() (se aplica al
+    // crear el icono).
+    virtual void reflejarEstadoIcono(EstadoIcono estado) = 0;
+
     // Retira el menu bar y deja de emitir intenciones antes de terminar el
     // proceso. Idempotente. Despues solo se permite destruir el adaptador.
     virtual void prepararSalida() = 0;
@@ -175,6 +213,16 @@ signals:
     void salirSolicitado();
     // Reapertura (kAEReopenApplication) o ActivateWindow de segunda instancia.
     void activarVentanaSolicitada();
+    // T014.4 D1: el usuario respondio a una notificacion. Pulsar el cuerpo
+    // -> Abrir; botones -> MostrarEnFinder / AbrirPerfiles. Siempre en el
+    // hilo grafico. El destino se reconstruye desde la notificacion y se
+    // valida (tipo conocido + UUID canonico); si no es valido llega
+    // Destino Ninguno con Abrir (solo activar la app). Respuestas recibidas
+    // antes de inicializar() (arranque por notificacion) se encolan y se
+    // emiten, en orden y de forma diferida (en cola, no dentro de la llamada),
+    // despues de inicializar(). Tras prepararSalida() no se emite.
+    void notificacionActivada(const satcfdi::OSIntegration::DestinoNotificacion& destino,
+                              satcfdi::OSIntegration::AccionNotificacion accion);
 
     // --- Estado observable. ---
     void loginItemStatusChanged(satcfdi::OSIntegration::LoginItemStatus estado);
@@ -191,3 +239,6 @@ signals:
 };
 
 } // namespace satcfdi
+
+// Para conexiones en cola y QSignalSpy (los enums Q_ENUM ya se registran).
+Q_DECLARE_METATYPE(satcfdi::OSIntegration::DestinoNotificacion)

@@ -3,6 +3,7 @@
 #include "ExtensionCicloDeVida.h"
 #include "presentation/viewmodels/AccionesSolicitud.h"
 #include "presentation/viewmodels/ConsultaExistenciaPaquetes.h"
+#include "application/estadoagregado/EstadoAgregado.h"
 #include "application/notificaciones/Notificador.h"
 #include "ports/OSIntegration.h"
 
@@ -19,6 +20,16 @@ struct InstantaneaWorker;
 // Traduce el estado del worker (application) al vocabulario del puerto
 // OSIntegration (D2, D11).
 OSIntegration::EstadoMonitoreo estadoMonitoreoDe(const InstantaneaWorker& instantanea);
+
+// T014.4 D2: EstadoAgregado (application) -> EstadoIcono (puerto), 1:1.
+OSIntegration::EstadoIcono estadoIconoDe(EstadoAgregado estado);
+
+// T014.4 D1: Notificacion (application) -> NotificacionLocal (puerto). El
+// destino se copia tal cual (tipo + UUID interno); accionesExtra por tipo:
+// [MostrarEnFinder] para "descarga_completa" con destino Solicitud;
+// [AbrirPerfiles] para "credencial" y "efirma_por_vencer" con destino Perfil;
+// vacio en el resto.
+OSIntegration::NotificacionLocal notificacionLocalDe(const Notificacion& notificacion);
 
 // ExtensionCicloDeVida sobre WorkerLocal + OperacionExecutor (T007 D1).
 // - aplicarMonitoreoPausado: el worker ya observa la configuracion confirmada
@@ -82,7 +93,7 @@ public:
     void notificar(const Notificacion& n) override
     {
         if (m_os) {
-            m_os->notificar(OSIntegration::NotificacionLocal{n.id, n.tipo, n.titulo, n.cuerpo});
+            m_os->notificar(notificacionLocalDe(n));
         }
     }
 

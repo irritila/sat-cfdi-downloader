@@ -53,6 +53,44 @@ OSIntegration::EstadoMonitoreo estadoMonitoreoDe(const InstantaneaWorker& instan
     return e;
 }
 
+OSIntegration::EstadoIcono estadoIconoDe(EstadoAgregado estado)
+{
+    switch (estado) {
+    case EstadoAgregado::Normal: return OSIntegration::EstadoIcono::Normal;
+    case EstadoAgregado::Trabajando: return OSIntegration::EstadoIcono::Trabajando;
+    case EstadoAgregado::Pausado: return OSIntegration::EstadoIcono::Pausado;
+    case EstadoAgregado::Atencion: return OSIntegration::EstadoIcono::Atencion;
+    }
+    return OSIntegration::EstadoIcono::Normal;
+}
+
+OSIntegration::NotificacionLocal notificacionLocalDe(const Notificacion& n)
+{
+    using DestinoOS = OSIntegration::DestinoNotificacion;
+    OSIntegration::NotificacionLocal local;
+    local.id = n.id;
+    local.tipo = n.tipo;
+    local.titulo = n.titulo;
+    local.cuerpo = n.cuerpo;
+    switch (n.destino.tipo) {
+    case DestinoNotificacion::Tipo::Ninguno:
+        break;
+    case DestinoNotificacion::Tipo::Solicitud:
+        local.destino = DestinoOS{DestinoOS::Tipo::Solicitud, n.destino.id};
+        if (n.tipo == QLatin1String("descarga_completa")) {
+            local.accionesExtra = {OSIntegration::AccionNotificacion::MostrarEnFinder};
+        }
+        break;
+    case DestinoNotificacion::Tipo::Perfil:
+        local.destino = DestinoOS{DestinoOS::Tipo::Perfil, n.destino.id};
+        if (n.tipo == QLatin1String("credencial") || n.tipo == QLatin1String("efirma_por_vencer")) {
+            local.accionesExtra = {OSIntegration::AccionNotificacion::AbrirPerfiles};
+        }
+        break;
+    }
+    return local;
+}
+
 ExtensionWorker::ExtensionWorker(WorkerLocal& worker, OperacionExecutor& ejecutor)
     : m_worker(worker)
     , m_ejecutor(ejecutor)

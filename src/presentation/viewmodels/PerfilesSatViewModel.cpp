@@ -212,6 +212,7 @@ void PerfilesSatViewModel::cargar()
                 return; // llego (o llegara) una carga mas reciente
             }
             m_cargando = false;
+            const QString pendiente = std::exchange(m_seleccionPendiente, QString());
             if (!r.esExito()) {
                 m_errorLista = tr("No se pudieron cargar los perfiles SAT.");
                 emit listaChanged();
@@ -236,6 +237,9 @@ void PerfilesSatViewModel::cargar()
                 }
             }
             emit seleccionChanged();
+            if (!pendiente.isEmpty()) {
+                aplicarSeleccionPendiente(pendiente);
+            }
 
             for (const PerfilConPreparacion& p : lista) {
                 verificarPerfil(p.perfil);
@@ -289,8 +293,25 @@ void PerfilesSatViewModel::abrirEdicion(const PerfilResumen& perfil)
     m_nombreGuardado = perfil.nombre;
 }
 
+void PerfilesSatViewModel::seleccionarAlCargar(const QString& id)
+{
+    if (m_cargado && !m_cargando) {
+        aplicarSeleccionPendiente(id);
+        return;
+    }
+    m_seleccionPendiente = id;
+}
+
+void PerfilesSatViewModel::aplicarSeleccionPendiente(const QString& id)
+{
+    if (!seleccionar(id) && m_modo != Modo::Ninguno) {
+        cerrarFormulario(); // perfil inexistente: Perfiles sin seleccion
+    }
+}
+
 bool PerfilesSatViewModel::seleccionar(const QString& id)
 {
+    m_seleccionPendiente.clear();
     const auto p = m_modelo->perfil(id);
     if (!p) {
         return false;
@@ -306,6 +327,7 @@ bool PerfilesSatViewModel::seleccionar(const QString& id)
 
 void PerfilesSatViewModel::nuevo()
 {
+    m_seleccionPendiente.clear();
     ++m_genFormulario;
     m_guardando = false;
     limpiarErrores();
@@ -336,6 +358,7 @@ void PerfilesSatViewModel::descartar()
 
 void PerfilesSatViewModel::cerrarFormulario()
 {
+    m_seleccionPendiente.clear();
     ++m_genFormulario;
     m_guardando = false;
     limpiarErrores();

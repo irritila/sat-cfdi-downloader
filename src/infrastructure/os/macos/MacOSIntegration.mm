@@ -6,6 +6,7 @@
 #import <ServiceManagement/ServiceManagement.h>
 #import <UserNotifications/UserNotifications.h>
 
+#include "infrastructure/os/macos/IconoMenuBar.h"
 #include "infrastructure/os/macos/MacOSIntegration.h"
 #include "infrastructure/os/macos/MacOSMapeos.h"
 #include "infrastructure/os/MenuBarDefinicion.h"
@@ -22,8 +23,9 @@
 #include <QIcon>
 #include <QLoggingCategory>
 #include <QMenu>
-#include <QPainter>
-#include <QPainterPath>
+#include <QImage>
+#include <QList>
+#include <QPair>
 #include <QPixmap>
 #include <QPointer>
 #include <QSystemTrayIcon>
@@ -59,9 +61,15 @@ Q_LOGGING_CATEGORY(lcMacOS, "satcfdi.os.macos")
 // --- Objetos Objective-C auxiliares --------------------------------------
 
 // Recibe kAEReopenApplication y actua como delegado de
-// UNUserNotificationCenter (presentar notificaciones con la app al frente).
+// UNUserNotificationCenter (presentar notificaciones con la app al frente y
+// recibir la respuesta del usuario, T014.4).
 @interface SatCfdiManejadorNativo : NSObject <UNUserNotificationCenterDelegate>
 @property (nonatomic, copy) void (^alReabrir)(void);
+// T014.4: tipo e id de destino leidos de userInfo (vacios si faltan o no son
+// texto), si es la accion por defecto y el identificador de accion. Puede
+// invocarse en cualquier hilo; el bloque reencamina al hilo grafico.
+@property (atomic, copy) void (^alResponder)(NSString* tipo, NSString* identificador, BOOL porDefecto,
+                                             NSString* accion);
 - (void)manejarReapertura:(NSAppleEventDescriptor*)evento respuesta:(NSAppleEventDescriptor*)respuesta;
 @end
 
@@ -92,7 +100,18 @@ Q_LOGGING_CATEGORY(lcMacOS, "satcfdi.os.macos")
              withCompletionHandler:(void (^)(void))completionHandler
 {
     (void)center;
-    (void)response;
+    // Solo se leen las dos claves propias; nunca se registra userInfo.
+    NSDictionary* info = response.notification.request.content.userInfo;
+    id tipo = info[@(satcfdi::macos::kClaveTipoDestino)];
+    id identificador = info[@(satcfdi::macos::kClaveIdDestino)];
+    NSString* accion = response.actionIdentifier;
+    const BOOL porDefecto = [accion isEqualToString:UNNotificationDefaultActionIdentifier];
+    void (^alResponder)(NSString*, NSString*, BOOL, NSString*) = self.alResponder;
+    if (alResponder != nil) {
+        alResponder([tipo isKindOfClass:[NSString class]] ? (NSString*)tipo : @"",
+                    [identificador isKindOfClass:[NSString class]] ? (NSString*)identificador : @"", porDefecto,
+                    accion != nil ? accion : @"");
+    }
     completionHandler();
 }
 
@@ -273,40 +292,72 @@ bool esNotificacionNoPermitida(NSError* error)
         && error.code == UNErrorCodeNotificationsNotAllowed;
 }
 
-// Icono plantilla monocromo (documento con flecha de descarga). isMask ->
-// NSImage template: macOS lo tine segun apariencia clara/oscura.
-QIcon crearIconoPlantilla()
+// Icono plantilla monocromo (documento con flecha de descarga y, T014.4 D2,
+// insignia de estado). isMask -> NSImage template: macOS lo tine segun
+// apariencia clara/oscura.
+QIcon crearIconoPlantilla(OSIntegration::EstadoIcono estado)
 {
     QIcon icono;
     for (const int lado : {18, 36}) {
-        QPixmap mapa(lado, lado);
-        mapa.fill(Qt::transparent);
-        QPainter pintor(&mapa);
-        pintor.setRenderHint(QPainter::Antialiasing);
-        const qreal e = lado / 18.0;
-        QPen pluma(Qt::black, 1.4 * e);
-        pluma.setJoinStyle(Qt::RoundJoin);
-        pluma.setCapStyle(Qt::RoundCap);
-        pintor.setPen(pluma);
-        // Contorno del documento con esquina doblada.
-        QPainterPath hoja;
-        hoja.moveTo(4 * e, 2 * e);
-        hoja.lineTo(11 * e, 2 * e);
-        hoja.lineTo(14.5 * e, 5.5 * e);
-        hoja.lineTo(14.5 * e, 16 * e);
-        hoja.lineTo(4 * e, 16 * e);
-        hoja.closeSubpath();
-        pintor.drawPath(hoja);
-        // Flecha de descarga.
-        pintor.drawLine(QPointF(9.25 * e, 6 * e), QPointF(9.25 * e, 12.5 * e));
-        pintor.drawLine(QPointF(6.75 * e, 10 * e), QPointF(9.25 * e, 12.5 * e));
-        pintor.drawLine(QPointF(11.75 * e, 10 * e), QPointF(9.25 * e, 12.5 * e));
-        pintor.end();
+        QPixmap mapa = QPixmap::fromImage(mapeos::dibujarIconoMenuBar(estado, lado));
         mapa.setDevicePixelRatio(lado / 18.0);
         icono.addPixmap(mapa);
     }
     icono.setIsMask(true);
     return icono;
+}
+
+// Nombre accesible del boton del status item. QSystemTrayIcon solo expone el
+// tooltip (accessibilityHelp); se busca el boton del NSStatusItem en las
+// ventanas del proceso (NSStatusBarWindow) y se le fija accessibilityLabel.
+// Mejor esfuerzo: si AppKit cambia esa estructura, queda solo el tooltip.
+void fijarNombreAccesibleStatusItem(const QString& nombre)
+{
+    if (NSApp == nil) {
+        return;
+    }
+    NSString* etiqueta = nombre.toNSString();
+    for (NSWindow* ventana in NSApp.windows) {
+        if (![NSStringFromClass([ventana class]) isEqualToString:@"NSStatusBarWindow"]) {
+            continue;
+        }
+        NSView* contenido = ventana.contentView;
+        if ([contenido isKindOfClass:[NSButton class]]) {
+            contenido.accessibilityLabel = etiqueta;
+            continue;
+        }
+        for (NSView* vista in contenido.subviews) {
+            if ([vista isKindOfClass:[NSButton class]]) {
+                vista.accessibilityLabel = etiqueta;
+            }
+        }
+    }
+}
+
+// T014.4 D1: categorias con botones. Abrir Perfiles SAT trae la app al
+// frente; Mostrar en Finder no (Finder pasa al frente por si mismo).
+NSSet<UNNotificationCategory*>* categoriasNotificacion()
+{
+    using Accion = OSIntegration::AccionNotificacion;
+    UNNotificationAction* finder =
+        [UNNotificationAction actionWithIdentifier:@(mapeos::kAccionMostrarEnFinder)
+                                             title:mapeos::textoAccionNotificacion(Accion::MostrarEnFinder).toNSString()
+                                           options:UNNotificationActionOptionNone];
+    UNNotificationAction* perfiles =
+        [UNNotificationAction actionWithIdentifier:@(mapeos::kAccionAbrirPerfiles)
+                                             title:mapeos::textoAccionNotificacion(Accion::AbrirPerfiles).toNSString()
+                                           options:UNNotificationActionOptionForeground];
+    UNNotificationCategory* categoriaFinder =
+        [UNNotificationCategory categoryWithIdentifier:@(mapeos::kCategoriaMostrarEnFinder)
+                                               actions:@[finder]
+                                     intentIdentifiers:@[]
+                                               options:UNNotificationCategoryOptionNone];
+    UNNotificationCategory* categoriaPerfiles =
+        [UNNotificationCategory categoryWithIdentifier:@(mapeos::kCategoriaAbrirPerfiles)
+                                               actions:@[perfiles]
+                                     intentIdentifiers:@[]
+                                               options:UNNotificationCategoryOptionNone];
+    return [NSSet setWithObjects:categoriaFinder, categoriaPerfiles, nil];
 }
 
 } // namespace
@@ -334,6 +385,10 @@ struct MacOSIntegration::Impl {
     QAction* estadoMonitoreo = nullptr;    // T007: linea no seleccionable
     QAction* pendientesMonitoreo = nullptr; // "Pendientes: N" (oculta si 0)
     OSIntegration::EstadoMonitoreo monitoreo;
+    // T014.4 D2: estado visual del icono (reflejado por el controlador).
+    OSIntegration::EstadoIcono estadoIcono = OSIntegration::EstadoIcono::Normal;
+    // T014.4 D1: respuestas recibidas antes de inicializar().
+    QList<QPair<OSIntegration::DestinoNotificacion, OSIntegration::AccionNotificacion>> activacionesPendientes;
     QAction* accionInicioAutomatico = nullptr;
     QAction* estadoLoginItem = nullptr;
     QAction* abrirAjustesLoginItem = nullptr;
@@ -357,6 +412,25 @@ MacOSIntegration::MacOSIntegration(QObject* parent)
     d->hayBundle = hayBundleIdentificado();
     d->manejador = [[SatCfdiManejadorNativo alloc] init];
     d->colaLoginItem = dispatch_queue_create("mx.adenium.satcfdi.loginitem", DISPATCH_QUEUE_SERIAL);
+
+    // T014.4: el delegado debe existir antes de que AppKit termine de arrancar
+    // (determinarLaunchContext) para recibir la respuesta que lanzo la app.
+    {
+        const QPointer<MacOSIntegration> guardia(this);
+        d->manejador.alResponder = ^(NSString* tipo, NSString* identificador, BOOL porDefecto, NSString* accion) {
+            const auto activacion = mapeos::activacionDesdeRespuesta(
+                QString::fromNSString(tipo), QString::fromNSString(identificador), porDefecto,
+                QString::fromNSString(accion));
+            if (!activacion) {
+                return; // descartar o accion desconocida
+            }
+            const mapeos::ActivacionNotificacion copia = *activacion;
+            enHiloGrafico(guardia, [copia](MacOSIntegration* a) { a->recibirActivacion(copia.destino, copia.accion); });
+        };
+        if (UNUserNotificationCenter* centro = centroNotificaciones(d->hayBundle)) {
+            centro.delegate = d->manejador; // referencia debil: d->manejador la retiene
+        }
+    }
 
     d->launchContext = determinarLaunchContext();
     if (d->launchContext == LaunchContext::LoginItem && NSApp != nil) {
@@ -516,10 +590,11 @@ void MacOSIntegration::inicializar()
     if (!QSystemTrayIcon::isSystemTrayAvailable()) {
         qCWarning(lcMacOS) << "QSystemTrayIcon no disponible";
     }
-    d->bandeja = new QSystemTrayIcon(crearIconoPlantilla(), this);
-    d->bandeja->setToolTip(QCoreApplication::applicationName());
+    d->bandeja = new QSystemTrayIcon(this);
     d->bandeja->setContextMenu(menu);
+    aplicarEstadoIcono();
     d->bandeja->show();
+    fijarNombreAccesibleStatusItem(mapeos::textoEstadoIcono(d->estadoIcono));
 
     // Reapertura: clic en el Dock o abrir el bundle con el proceso vivo.
     // Se registra despues de finishLaunching para reemplazar el de AppKit.
@@ -536,9 +611,7 @@ void MacOSIntegration::inicializar()
                                                         andEventID:kAEReopenApplication];
     d->manejadorReaperturaInstalado = true;
 
-    if (UNUserNotificationCenter* centro = centroNotificaciones(d->hayBundle)) {
-        centro.delegate = d->manejador; // referencia debil: d->manejador la retiene
-    }
+    registrarCategoriasNotificacion();
 
     // El usuario puede aprobar/rechazar en Ajustes del Sistema: refrescar al
     // volver a la app.
@@ -551,6 +624,70 @@ void MacOSIntegration::inicializar()
                         adaptador->refrescarEstadosDelSistema();
                     }
                 }];
+
+    // T014.4: respuestas encoladas antes de inicializar() (arranque por
+    // notificacion), en orden y despues de que inicializar() retorne.
+    const auto pendientes = std::exchange(d->activacionesPendientes, {});
+    for (const auto& p : pendientes) {
+        emitirActivacionEnCola(p.first, p.second);
+    }
+}
+
+void MacOSIntegration::registrarCategoriasNotificacion()
+{
+    if (UNUserNotificationCenter* centro = centroNotificaciones(d->hayBundle)) {
+        [centro setNotificationCategories:categoriasNotificacion()];
+    }
+}
+
+void MacOSIntegration::recibirActivacion(const DestinoNotificacion& destino, AccionNotificacion accion)
+{
+    if (d->saliendo) {
+        return;
+    }
+    // Sin el id: solo tipo de destino y accion.
+    qCInfo(lcMacOS) << "Respuesta a notificacion: accion" << accion << "destino"
+                    << mapeos::claveTipoDestino(destino.tipo);
+    if (!d->inicializado) {
+        d->activacionesPendientes.append({destino, accion});
+        return;
+    }
+    emit notificacionActivada(destino, accion);
+}
+
+void MacOSIntegration::emitirActivacionEnCola(const DestinoNotificacion& destino, AccionNotificacion accion)
+{
+    const QPointer<MacOSIntegration> guardia(this);
+    QMetaObject::invokeMethod(
+        this,
+        [guardia, destino, accion] {
+            if (guardia && !guardia->d->saliendo) {
+                emit guardia->notificacionActivada(destino, accion);
+            }
+        },
+        Qt::QueuedConnection);
+}
+
+void MacOSIntegration::aplicarEstadoIcono()
+{
+    if (d->bandeja == nullptr) {
+        return;
+    }
+    const QString nombre = mapeos::textoEstadoIcono(d->estadoIcono);
+    d->bandeja->setIcon(crearIconoPlantilla(d->estadoIcono));
+    d->bandeja->setToolTip(nombre);
+    if (d->bandeja->isVisible()) {
+        fijarNombreAccesibleStatusItem(nombre);
+    }
+}
+
+void MacOSIntegration::reflejarEstadoIcono(EstadoIcono estado)
+{
+    if (d->estadoIcono == estado) {
+        return;
+    }
+    d->estadoIcono = estado;
+    aplicarEstadoIcono();
 }
 
 menubar::EstadoMenu MacOSIntegration::estadoMenu() const
@@ -760,7 +897,7 @@ void MacOSIntegration::solicitarPermisoNotificaciones()
 void MacOSIntegration::enviarNotificacionPrueba(const QString& titulo, const QString& cuerpo)
 {
     entregarNotificacion(QStringLiteral("mx.adenium.satcfdi.prueba.") + QUuid::createUuid().toString(QUuid::WithoutBraces),
-                         QStringLiteral("prueba"), titulo, cuerpo,
+                         QStringLiteral("prueba"), titulo, cuerpo, DestinoNotificacion{}, QString(),
                          [](MacOSIntegration* a, NotificationSendResult r) { emit a->notificacionPruebaTerminada(r); });
 }
 
@@ -768,12 +905,17 @@ void MacOSIntegration::notificar(const NotificacionLocal& n)
 {
     const QString id = n.id;
     // Mismo identificador -> el SO reemplaza (dedupe adicional al del servicio).
-    entregarNotificacion(QStringLiteral("mx.adenium.satcfdi.") + n.id, n.tipo, n.titulo, n.cuerpo,
+    if (n.destino.tipo != DestinoNotificacion::Tipo::Ninguno && !mapeos::destinoTransportable(n.destino)) {
+        qCWarning(lcMacOS) << "Destino de notificacion no valido; se entrega sin destino. tipo" << n.tipo;
+    }
+    entregarNotificacion(QStringLiteral("mx.adenium.satcfdi.") + n.id, n.tipo, n.titulo, n.cuerpo, n.destino,
+                         mapeos::categoriaNotificacion(n.destino, n.accionesExtra),
                          [id](MacOSIntegration* a, NotificationSendResult r) { emit a->notificacionTerminada(id, r); });
 }
 
 void MacOSIntegration::entregarNotificacion(const QString& identificadorQt, const QString& hilo, const QString& titulo,
-                                            const QString& cuerpo,
+                                            const QString& cuerpo, const DestinoNotificacion& destino,
+                                            const QString& categoria,
                                             std::function<void(MacOSIntegration*, NotificationSendResult)> alTerminar)
 {
     const QPointer<MacOSIntegration> guardia(this);
@@ -787,6 +929,14 @@ void MacOSIntegration::entregarNotificacion(const QString& identificadorQt, cons
     NSString* cuerpoNativo = cuerpo.toNSString();
     NSString* identificador = identificadorQt.toNSString();
     NSString* hiloNativo = hilo.toNSString();
+    // T014.4 D1: solo tipo de destino y UUID interno.
+    NSDictionary* userInfo = mapeos::destinoTransportable(destino)
+        ? @{
+              @(mapeos::kClaveTipoDestino) : mapeos::claveTipoDestino(destino.tipo).toNSString(),
+              @(mapeos::kClaveIdDestino) : destino.id.toNSString(),
+          }
+        : @{};
+    NSString* categoriaNativa = categoria.toNSString();
     // Nunca solicita permiso: decide con el estado vigente del SO.
     [centro getNotificationSettingsWithCompletionHandler:^(UNNotificationSettings* ajustes) {
         const long leido = static_cast<long>(ajustes.authorizationStatus);
@@ -804,6 +954,10 @@ void MacOSIntegration::entregarNotificacion(const QString& identificadorQt, cons
         contenido.body = cuerpoNativo;
         contenido.threadIdentifier = hiloNativo;
         contenido.sound = [UNNotificationSound defaultSound];
+        contenido.userInfo = userInfo;
+        if (categoriaNativa.length > 0) {
+            contenido.categoryIdentifier = categoriaNativa;
+        }
         UNNotificationRequest* peticion = [UNNotificationRequest requestWithIdentifier:identificador
                                                                               content:contenido
                                                                               trigger:nil];
@@ -961,6 +1115,8 @@ void MacOSIntegration::prepararSalida()
         d->manejadorReaperturaInstalado = false;
     }
     d->manejador.alReabrir = nil;
+    d->manejador.alResponder = nil;
+    d->activacionesPendientes.clear();
     if (d->observadorActivacion != nil) {
         [[NSNotificationCenter defaultCenter] removeObserver:d->observadorActivacion];
         d->observadorActivacion = nil;

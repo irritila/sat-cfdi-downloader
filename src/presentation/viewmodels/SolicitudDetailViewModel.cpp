@@ -478,6 +478,12 @@ void SolicitudDetailViewModel::mostrarEnFinder(const QString& idPaqueteSat)
     }
 }
 
+void SolicitudDetailViewModel::mostrarAvisoFinder(const QString& mensaje)
+{
+    ++m_genFinder; // una accion de Finder en curso ya no aplica
+    setMensajeFinder(mensaje);
+}
+
 void SolicitudDetailViewModel::abrirCarpetaSolicitud()
 {
     if (puedeAbrirCarpeta()) {

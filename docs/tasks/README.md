@@ -29,11 +29,11 @@ Ejemplo: `T001-modelo-fisico-sqlite.md`.
 | [T009.1](T009.1-acceso-paquetes.md) | Completada | Acceso a paquetes descargados |
 | [T012](T012-manual-usuario.md) | Completada | Manual de usuario con capturas |
 | [T013](T013-rediseno-visual.md) | Completada | Rediseno visual de la UI |
-| [T014](T014-mejoras-uso.md) | Pendiente | Mejoras de uso (sugerencias de Claude Design) |
+| [T014](T014-mejoras-uso.md) | Completada | Mejoras de uso (sugerencias de Claude Design) |
 | [T014.1](T014.1-mejoras-pantalla.md) | Completada | Mejoras de pantalla |
 | [T014.2](T014.2-reintento-por-paquete.md) | Completada | Reintento por paquete |
 | [T014.3](T014.3-primer-uso-vencimiento-efirma.md) | Completada | Primer uso guiado y vencimiento de e.firma |
-| [T014.4](T014.4-notificaciones-accionables-icono.md) | Pendiente | Notificaciones accionables e icono con estado |
+| [T014.4](T014.4-notificaciones-accionables-icono.md) | Completada | Notificaciones accionables e icono con estado |
 | [T011](T011-empaquetado-firma-local.md) | Pendiente | Empaquetado y firma local (previa a T010) |
 | [T010](T010-pruebas-aceptacion-mvp.md) | Pendiente | Pruebas de aceptacion del MVP |
 
