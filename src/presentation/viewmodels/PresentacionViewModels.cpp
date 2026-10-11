@@ -6,6 +6,7 @@
 
 #include "AppViewModel.h"
 #include "EFirmaFormViewModel.h"
+#include "ExploradorCfdiViewModel.h"
 #include "NuevaSolicitudViewModel.h"
 #include "PerfilesSatViewModel.h"
 #include "SolicitudDetailViewModel.h"
@@ -23,6 +24,7 @@ PresentacionViewModels::PresentacionViewModels(SolicitudesService* solicitudes,
     , m_detalle(new SolicitudDetailViewModel(solicitudes, this))
     , m_perfiles(new PerfilesSatViewModel(perfiles, credenciales, this, reloj))
     , m_eFirma(new EFirmaFormViewModel(credenciales, this))
+    , m_explorador(new ExploradorCfdiViewModel(this))
     , m_app(new AppViewModel(m_nuevaSolicitud, m_detalle, m_perfiles, m_eFirma, this))
 {
     // Tras registrar/reemplazar (exito o fallo) se reverifica el estado real
@@ -64,12 +66,20 @@ void PresentacionViewModels::setConsultaExistencia(ConsultaExistenciaPaquetes* c
 void PresentacionViewModels::setAccionesFinder(AccionesFinder* acciones)
 {
     m_detalle->setAccionesFinder(acciones);
+    m_explorador->setAccionesFinder(acciones);
     m_app->setAccionesFinder(acciones);
 }
 
 void PresentacionViewModels::setConsultaPrimerUso(ConsultaPrimerUso* consulta)
 {
     m_app->setConsultaPrimerUso(consulta);
+}
+
+void PresentacionViewModels::setConsultaCatalogo(ConsultaCatalogoCfdi* consulta)
+{
+    m_explorador->setConsulta(consulta);
+    m_detalle->setConsultaCatalogo(consulta);
+    m_app->setExplorador(consulta ? m_explorador : nullptr);
 }
 
 QVariantMap PresentacionViewModels::initialProperties() const
@@ -81,6 +91,7 @@ QVariantMap PresentacionViewModels::initialProperties() const
         {QStringLiteral("detalleViewModel"), QVariant::fromValue(m_detalle)},
         {QStringLiteral("perfilesViewModel"), QVariant::fromValue(m_perfiles)},
         {QStringLiteral("eFirmaViewModel"), QVariant::fromValue(m_eFirma)},
+        {QStringLiteral("exploradorViewModel"), QVariant::fromValue(m_explorador)},
     };
 }
 

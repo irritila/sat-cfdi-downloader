@@ -17,6 +17,7 @@ namespace satcfdi {
 
 class AccionesWorker;
 class ArchivosZipCfdi;
+class AdaptadorCatalogoCfdi;
 class CatalogoCfdiService;
 class CfdiArchiveReader;
 class IndexadorCfdi;
@@ -203,6 +204,9 @@ private:
     std::unique_ptr<ArchivosZipCfdi> m_archivosCfdi;
     std::unique_ptr<IndexadorCfdi> m_indexadorCfdi;
     std::unique_ptr<CatalogoCfdiService> m_catalogoCfdi;
+    // T015.3: ConsultaCatalogoCfdi de la presentacion sobre m_catalogoCfdi
+    // (se destruye antes que el, despues de los view models).
+    std::unique_ptr<AdaptadorCatalogoCfdi> m_adaptadorCatalogo;
     PackageStorage* m_packageStorage = nullptr;
     QString m_raizPaquetes;
     std::unique_ptr<Programador> m_programadorEjecutorPropio;

@@ -14,6 +14,7 @@
 #include "application/notificaciones/ServicioNotificaciones.h"
 #include "infrastructure/os/MenuBarDefinicion.h"
 #include "presentation/viewmodels/AppViewModel.h"
+#include "presentation/viewmodels/ExploradorCfdiViewModel.h"
 #include "presentation/viewmodels/EFirmaFormViewModel.h"
 #include "presentation/viewmodels/NuevaSolicitudViewModel.h"
 #include "presentation/viewmodels/PerfilesSatViewModel.h"
@@ -200,6 +201,70 @@ QList<SolicitudDetalle> solicitudesLista()
             solicitudTerminada(), solicitud(4, EstadoLocal::Enviada, EstadoSolicitudSat::Error, 4)};
 }
 
+// T015.3: CFDI sinteticos de la solicitud Terminada (Recibidos): RFC
+// genericos y nombres inventados; montos tal cual el texto del XML.
+CfdiListado cfdiFijo(int posicion, TipoComprobante tipo, const QString& fecha, const QString& serie,
+                     const QString& folio, const QString& emisor, const QString& total, const QString& metodo,
+                     EstadoParseo estado = EstadoParseo::Completo)
+{
+    CfdiListado c;
+    c.paqueteId = idPaquete(3, 1);
+    c.posicion = posicion;
+    ResumenCfdi& r = c.resumen;
+    r.estado = estado;
+    r.version = QStringLiteral("4.0");
+    r.tipo = tipo;
+    r.fecha = fecha;
+    r.serie = serie;
+    r.folio = folio;
+    r.emisor.rfc = kRfcOtro;
+    r.emisor.nombre = emisor;
+    r.receptor.rfc = kRfcPerfil;
+    r.receptor.nombre = perfilListo().nombre;
+    if (!total.isEmpty()) {
+        r.total = ImporteCfdi::desdeTexto(total);
+    }
+    // Pago 2.0: Total 0 y Moneda XXX en el comprobante (montos en el complemento).
+    r.moneda = total.isEmpty() ? QString() : (tipo == TipoComprobante::Pago ? QStringLiteral("XXX") : QStringLiteral("MXN"));
+    r.metodoPago = metodo;
+    r.uuid = QStringLiteral("5F2B%1-4D5E-4F60-8A7B-0C1D2E3F4A5B")
+                 .arg(QString::number(0x1A30 + posicion * 0x111, 16).toUpper());
+    return c;
+}
+
+void llenarCatalogo(CatalogoFijo& catalogo)
+{
+    catalogo.cfdis = {
+        cfdiFijo(0, TipoComprobante::Ingreso, QStringLiteral("2026-09-03T18:42:10"), QStringLiteral("A"),
+                 QStringLiteral("1187"), QStringLiteral("Papelería Ejemplo"), QStringLiteral("1160.00"),
+                 QStringLiteral("PUE")),
+        cfdiFijo(1, TipoComprobante::Pago, QStringLiteral("2026-09-03T16:05:44"), QStringLiteral("P"),
+                 QStringLiteral("204"), QStringLiteral("Servicios Demo"), QStringLiteral("0"), QString()),
+        cfdiFijo(2, TipoComprobante::Ingreso, QStringLiteral("2026-09-03T13:20:01"), QString(),
+                 QStringLiteral("88341"), QStringLiteral("Transportes Ficticios"), QStringLiteral("2436.50"),
+                 QStringLiteral("PPD")),
+        cfdiFijo(3, TipoComprobante::Egreso, QStringLiteral("2026-09-03T11:47:30"), QStringLiteral("NC"),
+                 QStringLiteral("17"), QStringLiteral("Papelería Ejemplo"), QStringLiteral("116.00"),
+                 QStringLiteral("PUE")),
+        cfdiFijo(4, TipoComprobante::Ingreso, QStringLiteral("2026-09-03T10:02:15"), QStringLiteral("F"),
+                 QStringLiteral("5521"), QStringLiteral("Comercializadora Imaginaria"), QStringLiteral("8352.00"),
+                 QStringLiteral("PUE"), EstadoParseo::Parcial),
+        cfdiFijo(5, TipoComprobante::Ingreso, QStringLiteral("2026-09-03T08:31:59"), QStringLiteral("B"),
+                 QStringLiteral("903"), QStringLiteral("Servicios Demo"), QStringLiteral("580.00"),
+                 QStringLiteral("PUE")),
+        cfdiFijo(6, TipoComprobante::Desconocido, QString(), QString(), QString(), QString(), QString(), QString(),
+                 EstadoParseo::Ilegible),
+    };
+    catalogo.cfdis[6].resumen.emisor = {};
+    catalogo.cfdis[6].resumen.receptor = {};
+    catalogo.cfdis[6].resumen.uuid.clear();
+    ResumenIndiceSolicitud& r = catalogo.resumenIndice;
+    r.paquetesDescargados = 1;
+    r.paquetesIndexados = 1;
+    r.cfdiTotal = int(catalogo.cfdis.size());
+    r.cfdiIlegibles = 1;
+}
+
 // --- Render -----------------------------------------------------------------
 
 void esperar(int ms)
@@ -252,6 +317,7 @@ struct Grafo {
     CredencialesFijas credenciales;
     AccionesNulas acciones;
     ExistenciaFija existencia;
+    CatalogoFijo catalogo; // T015.3
     std::unique_ptr<PresentacionViewModels> vms;
     std::unique_ptr<QQmlApplicationEngine> engine;
 
@@ -259,6 +325,7 @@ struct Grafo {
     {
         perfiles.perfiles = {perfilListo(), perfilSinEFirma()};
         credenciales.resumenes.insert(perfilListo().id.texto(), credencialLista());
+        llenarCatalogo(catalogo);
     }
 
     QQuickWindow* cargar()
@@ -267,6 +334,7 @@ struct Grafo {
         vms->setAccionesSolicitud(&acciones);
         vms->setAccionesFinder(&acciones);
         vms->setConsultaExistencia(&existencia);
+        vms->setConsultaCatalogo(&catalogo);
         engine = std::make_unique<QQmlApplicationEngine>();
         if (gTemaOscuro) {
             QObject* tema = engine->singletonInstance<QObject*>("SatCfdiDownloader", "Theme");
@@ -568,6 +636,23 @@ QList<Escenario> escenarios()
              }
              return ilustracion(r, QStringLiteral("IlustracionNotificacion"),
                                 {{QStringLiteral("titulo"), n->titulo}, {QStringLiteral("cuerpo"), n->cuerpo}});
+         }},
+        // T015.3: explorador de facturas de la solicitud Terminada.
+        {QStringLiteral("13-explorador-facturas.png"), QStringLiteral("Captura"),
+         [](const QString& r) {
+             return capturaApp(r, [](Grafo& g, QQuickWindow*) {
+                 g.solicitudes.detalles = {solicitudTerminada()};
+                 if (!g.vms->app()->abrirDetalle(solicitudId(3).texto())) {
+                     return false;
+                 }
+                 esperar(300);
+                 if (!g.vms->app()->abrirFacturas(solicitudId(3).texto())) {
+                     std::fprintf(stderr, "13: no se pudo abrir el explorador\n");
+                     return false;
+                 }
+                 esperar(500);
+                 return g.vms->explorador()->vista() == QStringLiteral("lista");
+             });
          }},
     };
 }

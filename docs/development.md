@@ -486,7 +486,7 @@ Finder, menu bar, notificacion) se alimentan de `menubar::entradas` y de
 
 ```bash
 cmake -S . -B build -G Ninja -DSATCFDI_BUILD_MANUAL_CAPTURAS=ON
-cmake --build build --target manual_capturas      # regenera las 12 imagenes (claro)
+cmake --build build --target manual_capturas      # regenera las 13 imagenes (claro)
 cmake --build build --target manual_capturas_oscuro  # evidencia en oscuro: build/capturas-oscuro
 # Una sola imagen o a otro directorio:
 QT_QPA_PLATFORM=cocoa ./build/tools/capturas-manual/satcfdi_manual_capturas \

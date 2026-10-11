@@ -21,6 +21,7 @@ class AccionesSolicitud;
 class ConsultaExistenciaPaquetes;
 class ConsultaPreparacionPerfiles;
 class AccionesFinder;
+class ConsultaCatalogoCfdi;
 
 class SolicitudesService;
 
@@ -120,6 +121,15 @@ class SolicitudDetailViewModel : public QObject {
     Q_PROPERTY(bool puedeAbrirCarpeta READ puedeAbrirCarpeta NOTIFY datosChanged)
     Q_PROPERTY(QString mensajeFinder READ mensajeFinder NOTIFY mensajeFinderChanged)
 
+    // T015.3: "Ver facturas (N)". puedeVerFacturas: hay consulta del indice y
+    // algun paquete Descargado. totalFacturas: CFDI indexados (cfdiTotal) o
+    // null mientras no se conoce (o si fallo la lectura); indexandoFacturas:
+    // el indice de la solicitud se esta construyendo. Se reconsulta con
+    // indiceCambiado de la solicitud y con la actividad del indexador.
+    Q_PROPERTY(bool puedeVerFacturas READ puedeVerFacturas NOTIFY datosChanged)
+    Q_PROPERTY(QVariant totalFacturas READ totalFacturas NOTIFY facturasChanged)
+    Q_PROPERTY(bool indexandoFacturas READ indexandoFacturas NOTIFY facturasChanged)
+
 public:
     enum class Estado {
         Ninguno,
@@ -212,6 +222,13 @@ public:
     // queda pendiente por paquete (D2) y se ve con "reintentoPendiente".
     Q_INVOKABLE void reintentarDescargaPaquete(const QString& idPaqueteSat);
 
+    // T015.3: consulta del indice de CFDI. No propietaria; nullptr = sin
+    // "Ver facturas".
+    void setConsultaCatalogo(ConsultaCatalogoCfdi* consulta);
+    bool puedeVerFacturas() const;
+    QVariant totalFacturas() const;
+    bool indexandoFacturas() const { return m_indexandoFacturas; }
+
 signals:
     void solicitudIdChanged();
     void estadoChanged();
@@ -219,6 +236,7 @@ signals:
     void eliminacionChanged();
     void accionSolicitadaChanged();
     void mensajeFinderChanged();
+    void facturasChanged();
     // La eliminacion pedida desde este view model termino con exito
     // (incluye cambio=false: ya no existia).
     void eliminada(const QString& id);
@@ -253,6 +271,13 @@ private:
     quint64 m_genExistencia = 0;
     void consultarExistencias();
     QString m_accionSolicitada;
+    QPointer<ConsultaCatalogoCfdi> m_catalogo;
+    std::optional<int> m_totalFacturas;
+    bool m_indexandoFacturas = false;
+    quint64 m_genFacturas = 0;
+    QString m_ultimaSolicitudFacturas;
+    void consultarFacturas();
+    void setFacturas(std::optional<int> total, bool indexando);
 };
 
 } // namespace satcfdi

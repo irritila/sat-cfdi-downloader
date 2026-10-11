@@ -11,6 +11,7 @@
 #include "application/requests/SolicitudesService.h"
 #include "presentation/viewmodels/AccionesFinder.h"
 #include "presentation/viewmodels/AccionesSolicitud.h"
+#include "presentation/viewmodels/ConsultaCatalogoCfdi.h"
 #include "presentation/viewmodels/ConsultaExistenciaPaquetes.h"
 
 #include <QHash>
@@ -151,6 +152,38 @@ public:
     {
         return listo(porPaquete.value(idPaqueteSat, ExistenciaPaquete::Presente));
     }
+};
+
+// T015.3: indice de CFDI fijo. listar aplica el texto (subcadena sin
+// mayusculas en RFC, nombres, UUID, serie y folio) y el tipo como la app.
+class CatalogoFijo final : public ConsultaCatalogoCfdi {
+public:
+    QList<CfdiListado> cfdis;
+    ResumenIndiceSolicitud resumenIndice;
+
+    QFuture<ResultadoLista> listar(const SolicitudId&, const FiltroListaCfdi& filtro) override
+    {
+        QList<CfdiListado> r;
+        for (const CfdiListado& c : cfdis) {
+            const ResumenCfdi& x = c.resumen;
+            if (filtro.tipo && x.tipo != *filtro.tipo) {
+                continue;
+            }
+            const QString texto = QStringList{x.emisor.rfc, x.emisor.nombre, x.receptor.rfc, x.receptor.nombre, x.uuid,
+                                              x.serie, x.folio}
+                                      .join(QLatin1Char(' '));
+            if (!filtro.texto.isEmpty() && !texto.contains(filtro.texto, Qt::CaseInsensitive)) {
+                continue;
+            }
+            r.append(c);
+        }
+        return listo(ResultadoLista::exito(r));
+    }
+    QFuture<ResultadoResumen> resumen(const SolicitudId&) override
+    {
+        return listo(ResultadoResumen::exito(resumenIndice));
+    }
+    QFuture<void> revisarSolicitud(const SolicitudId&) override { return QtFuture::makeReadyVoidFuture(); }
 };
 
 } // namespace capturas

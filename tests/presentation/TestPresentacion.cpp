@@ -1004,7 +1004,7 @@ void TestPresentacion::qmlSinImportsProhibidos()
                  qPrintable(archivo.fileName() + QStringLiteral(": ") + termino.captured(0)));
         ++archivos;
     }
-    QCOMPARE(archivos, 28); // 27 .qml (Theme, Icono, componentes T013 y BotonCopiar) + Etiquetas.js
+    QCOMPARE(archivos, 30); // 29 .qml (Theme, Icono, componentes T013, BotonCopiar y T015.3) + Etiquetas.js
 }
 
 // ---------------------------------------------------------------------------

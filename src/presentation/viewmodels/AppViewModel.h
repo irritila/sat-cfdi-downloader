@@ -12,6 +12,7 @@ class AccionesFinder;
 class ConsultaPrimerUso;
 
 class EFirmaFormViewModel;
+class ExploradorCfdiViewModel;
 class NuevaSolicitudViewModel;
 class PerfilesSatViewModel;
 class SolicitudDetailViewModel;
@@ -40,6 +41,12 @@ class SolicitudDetailViewModel;
 //   abre el detalle con el aviso D7 (o la lista con el aviso si la solicitud
 //   ya no existe) y emite avisoFinderSolicitudPresentado() para que el
 //   controlador traiga la ventana al frente.
+//
+// T015.3: abrirFacturas(id) abre el explorador de CFDI de la solicitud
+// (pagina Facturas) y regresarDeFacturas() vuelve a su detalle. Al salir de
+// Facturas el explorador se desactiva (deja de recargar). Si la solicitud
+// deja de existir mientras el explorador esta abierto, se muestra el detalle
+// "no encontrada".
 class AppViewModel : public QObject {
     Q_OBJECT
     QML_ELEMENT
@@ -79,6 +86,7 @@ public:
         Nueva,
         Detalle,
         Perfiles,
+        Facturas,
     };
     Q_ENUM(Pagina)
 
@@ -140,6 +148,11 @@ public:
     Q_INVOKABLE void mostrarLista();
     Q_INVOKABLE void mostrarNueva();
     Q_INVOKABLE void mostrarPerfiles();
+    // T015.3: no propietario; nullptr = sin explorador (abrirFacturas no navega).
+    void setExplorador(ExploradorCfdiViewModel* explorador);
+    // false (sin navegar) si no hay explorador o `id` no es canonico.
+    Q_INVOKABLE bool abrirFacturas(const QString& id);
+    Q_INVOKABLE void regresarDeFacturas();
     // Devuelve false (sin navegar) si `id` no es un UUID canonico.
     Q_INVOKABLE bool abrirDetalle(const QString& id);
 
@@ -175,6 +188,7 @@ private:
     QPointer<SolicitudDetailViewModel> m_detalle;
     QPointer<PerfilesSatViewModel> m_perfiles;
     QPointer<EFirmaFormViewModel> m_eFirma;
+    QPointer<ExploradorCfdiViewModel> m_explorador;
     Pagina m_pagina = Pagina::Lista;
     QString m_solicitudSeleccionadaId;
     bool m_notificacionesDeshabilitadas = false;

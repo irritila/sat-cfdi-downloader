@@ -31,6 +31,7 @@
 #include "infrastructure/sat/SatGatewayProductivo.h"
 #include "presentation/viewmodels/AppViewModel.h"
 #include "presentation/viewmodels/CatalogoMensajes.h"
+#include "presentation/viewmodels/ConsultaCatalogoCfdi.h"
 #include "presentation/viewmodels/PresentacionViewModels.h"
 
 #include <QDir>
@@ -47,6 +48,37 @@ namespace {
 Q_LOGGING_CATEGORY(lcMonitoreo, "satcfdi.monitoreo")
 
 } // namespace
+
+// T015.3: la presentacion consulta el indice de CFDI por su propia interfaz
+// (ConsultaCatalogoCfdi); este adaptador la implementa sobre
+// CatalogoCfdiService y reemite sus senales. Solo lectura (y revisarSolicitud).
+class AdaptadorCatalogoCfdi final : public ConsultaCatalogoCfdi {
+public:
+    explicit AdaptadorCatalogoCfdi(CatalogoCfdiService& catalogo)
+        : m_catalogo(catalogo)
+    {
+        QObject::connect(&catalogo, &CatalogoCfdiService::indiceCambiado, this,
+                         &ConsultaCatalogoCfdi::indiceCambiado);
+        QObject::connect(&catalogo, &CatalogoCfdiService::actividadCambiada, this,
+                         &ConsultaCatalogoCfdi::actividadCambiada);
+    }
+
+    QFuture<ResultadoLista> listar(const SolicitudId& solicitud, const FiltroListaCfdi& filtro) override
+    {
+        return m_catalogo.listar(solicitud, filtro);
+    }
+    QFuture<ResultadoResumen> resumen(const SolicitudId& solicitud) override
+    {
+        return m_catalogo.resumen(solicitud);
+    }
+    QFuture<void> revisarSolicitud(const SolicitudId& solicitud) override
+    {
+        return m_catalogo.revisarSolicitud(solicitud);
+    }
+
+private:
+    CatalogoCfdiService& m_catalogo;
+};
 
 AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& secretStore,
                                        OpcionesMonitoreo monitoreo)
@@ -256,6 +288,8 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
     m_viewModels->setConsultaExistencia(m_consultaExistencia.get());
     m_viewModels->setAccionesFinder(m_accesoFinder.get());
     m_viewModels->setConsultaPrimerUso(m_consultaPrimerUso.get()); // T014.3 D1
+    m_adaptadorCatalogo = std::make_unique<AdaptadorCatalogoCfdi>(*m_catalogoCfdi);
+    m_viewModels->setConsultaCatalogo(m_adaptadorCatalogo.get()); // T015.3
 
     // Primera tarea del dispatcher serial: limpia generaciones huerfanas del
     // SecretStore (residuos de fallos previos). No se espera aqui; las
@@ -275,6 +309,7 @@ AppCompositionRoot::~AppCompositionRoot()
     m_estadoAgregado.reset(); // T014.4: antes que sus consultas y servicios
     // T015.2: el indexador cancela su paquete en curso (sin escribirlo) y une
     // su hilo; sus escrituras ya encoladas se completan en dispatcher.cerrar().
+    m_adaptadorCatalogo.reset(); // T015.3: sus consumidores (view models) ya no existen
     m_catalogoCfdi.reset();
     m_indexadorCfdi.reset();
     m_archivosCfdi.reset();

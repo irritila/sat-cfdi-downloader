@@ -3,6 +3,7 @@
 #include "AccionesSolicitud.h"
 #include "AccionesFinder.h"
 #include "CatalogoMensajes.h"
+#include "ConsultaCatalogoCfdi.h"
 #include "ConsultaExistenciaPaquetes.h"
 #include "application/profiles/ConsultaPreparacionPerfiles.h"
 #include "application/requests/SolicitudesService.h"
@@ -686,12 +687,86 @@ void SolicitudDetailViewModel::reintentarDescargaPaquete(const QString& idPaquet
     emit accionSolicitadaChanged();
 }
 
+void SolicitudDetailViewModel::setConsultaCatalogo(ConsultaCatalogoCfdi* consulta)
+{
+    if (m_catalogo) {
+        disconnect(m_catalogo, nullptr, this, nullptr);
+    }
+    m_catalogo = consulta;
+    if (consulta) {
+        connect(consulta, &ConsultaCatalogoCfdi::indiceCambiado, this, [this](const SolicitudId& id) {
+            if (m_detalle && m_detalle->resumen.id == id) {
+                consultarFacturas();
+            }
+        });
+        connect(consulta, &ConsultaCatalogoCfdi::actividadCambiada, this, [this] {
+            if (puedeVerFacturas()) {
+                consultarFacturas();
+            }
+        });
+    }
+    consultarFacturas();
+    emit datosChanged();
+}
+
+bool SolicitudDetailViewModel::puedeVerFacturas() const
+{
+    if (!m_catalogo || !m_detalle) {
+        return false;
+    }
+    return std::any_of(m_detalle->paquetes.cbegin(), m_detalle->paquetes.cend(),
+                       [](const PaqueteResumen& p) { return p.estadoDescarga == EstadoDescarga::Descargado; });
+}
+
+QVariant SolicitudDetailViewModel::totalFacturas() const
+{
+    return m_totalFacturas ? QVariant(*m_totalFacturas) : QVariant();
+}
+
+void SolicitudDetailViewModel::setFacturas(std::optional<int> total, bool indexando)
+{
+    if (m_totalFacturas != total || m_indexandoFacturas != indexando) {
+        m_totalFacturas = total;
+        m_indexandoFacturas = indexando;
+        emit facturasChanged();
+    }
+}
+
+void SolicitudDetailViewModel::consultarFacturas()
+{
+    const quint64 generacion = ++m_genFacturas;
+    if (!puedeVerFacturas()) {
+        setFacturas(std::nullopt, false);
+        return;
+    }
+    const SolicitudId solicitud = m_detalle->resumen.id;
+    if (m_totalFacturas && m_ultimaSolicitudFacturas != solicitud.texto()) {
+        setFacturas(std::nullopt, false); // el conteo era de otra solicitud
+    }
+    m_ultimaSolicitudFacturas = solicitud.texto();
+    auto aplicar = [this, generacion](const std::optional<ConsultaCatalogoCfdi::ResultadoResumen>& r) {
+        if (generacion != m_genFacturas) {
+            return;
+        }
+        if (r && r->esExito()) {
+            setFacturas(r->valor().cfdiTotal, r->valor().indexando);
+        } else {
+            setFacturas(std::nullopt, false); // "Ver facturas" sin numero
+        }
+    };
+    m_catalogo->resumen(solicitud)
+        .then(this, [aplicar](const ConsultaCatalogoCfdi::ResultadoResumen& r) { aplicar(r); })
+        .onCanceled(this, [aplicar] { aplicar(std::nullopt); })
+        .onFailed(this, [aplicar] { aplicar(std::nullopt); });
+}
+
 void SolicitudDetailViewModel::setDetalle(std::optional<SolicitudDetalle> detalle)
 {
     if (!detalle && !m_detalle) {
         return;
     }
     m_detalle = std::move(detalle);
+    consultarFacturas();
     consultarExistencias();
     recalcularPreparacion();
     emit datosChanged();

@@ -59,6 +59,32 @@ set_tests_properties(satcfdi_perfiles_vm_tests PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )
 
+# satcfdi_explorador_tests (T015.3): ExploradorCfdiViewModel, CfdiListModel,
+# "Ver facturas" del detalle y navegacion, con ConsultaCatalogoFake.
+qt_add_executable(satcfdi_explorador_tests
+    TestExploradorCfdi.cpp
+    EstiloPruebas.cpp
+    ConsultaCatalogoFake.h
+    ServiciosAsincronosFake.h
+    ../fakes/PromesasPendientes.h
+    ../fakes/FakePerfilesSatService.h
+    ../fakes/FakeCredencialesSatService.h
+)
+target_include_directories(satcfdi_explorador_tests PRIVATE ${PROJECT_SOURCE_DIR}/tests)
+target_link_libraries(satcfdi_explorador_tests PRIVATE
+    satcfdi_presentation
+    satcfdi_application
+    satcfdi_domain
+    Qt6::Quick
+    Qt6::Test
+)
+satcfdi_enable_warnings(satcfdi_explorador_tests)
+add_test(NAME satcfdi_explorador_tests COMMAND satcfdi_explorador_tests)
+set_tests_properties(satcfdi_explorador_tests PROPERTIES
+    LABELS presentation
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
 # satcfdi_presentation_quicktests (T005.1, DA7): Qt Quick Test de
 # PerfilesSatPage y EFirmaDialogo sobre el modulo QML real. Los tst_*.qml se
 # leen de QUICK_TEST_SOURCE_DIR; FixturePerfiles expone view models sobre
@@ -68,6 +94,9 @@ qt_add_executable(satcfdi_presentation_quicktests
     EstiloPruebas.cpp
     quick/FixturePerfiles.h
     quick/FixturePerfiles.cpp
+    quick/FixtureExplorador.h
+    quick/FixtureExplorador.cpp
+    ConsultaCatalogoFake.h
     ServiciosAsincronosFake.h
     ../fakes/PromesasPendientes.h
     ../fakes/FakePerfilesSatService.h

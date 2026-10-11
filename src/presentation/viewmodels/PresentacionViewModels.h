@@ -9,11 +9,13 @@ namespace satcfdi {
 
 class AccionesSolicitud;
 class AccionesFinder;
+class ConsultaCatalogoCfdi;
 class ConsultaExistenciaPaquetes;
 class ConsultaPrimerUso;
 class AppViewModel;
 class CredencialesSatService;
 class EFirmaFormViewModel;
+class ExploradorCfdiViewModel;
 class NuevaSolicitudViewModel;
 class PerfilesSatService;
 class PerfilesSatViewModel;
@@ -47,9 +49,11 @@ public:
     SolicitudDetailViewModel* detalle() const { return m_detalle; }
     PerfilesSatViewModel* perfiles() const { return m_perfiles; }
     EFirmaFormViewModel* eFirma() const { return m_eFirma; }
+    ExploradorCfdiViewModel* explorador() const { return m_explorador; }
 
     // {"appViewModel", "solicitudesModel", "nuevaSolicitudViewModel",
-    //  "detalleViewModel", "perfilesViewModel", "eFirmaViewModel"} para
+    //  "detalleViewModel", "perfilesViewModel", "eFirmaViewModel",
+    //  "exploradorViewModel"} para
     //  QQmlApplicationEngine::setInitialProperties.
     QVariantMap initialProperties() const;
 
@@ -63,6 +67,9 @@ public:
     void setAccionesFinder(AccionesFinder* acciones);
     // T014.3 D1: guia de primer uso en la lista. No propietario; nullptr = sin guia.
     void setConsultaPrimerUso(ConsultaPrimerUso* consulta);
+    // T015.3: indice de CFDI ("Ver facturas" y explorador). No propietario;
+    // nullptr = sin explorador.
+    void setConsultaCatalogo(ConsultaCatalogoCfdi* consulta);
 
 private:
     void conectarPreparacionDetalle(PerfilesSatService* perfiles, CredencialesSatService* credenciales,
@@ -73,6 +80,7 @@ private:
     SolicitudDetailViewModel* m_detalle;
     PerfilesSatViewModel* m_perfiles;
     EFirmaFormViewModel* m_eFirma;
+    ExploradorCfdiViewModel* m_explorador;
     AppViewModel* m_app;
 };
 

@@ -10,6 +10,7 @@ set(_satcfdi_qml_files
     qml/screens/NuevaSolicitudPage.qml
     qml/screens/DetalleSolicitudPage.qml
     qml/screens/PerfilesSatPage.qml
+    qml/screens/ExploradorCfdiPage.qml
     qml/components/EFirmaDialogo.qml
     qml/components/EstadoBadge.qml
     qml/components/BotonAccion.qml
@@ -27,6 +28,7 @@ set(_satcfdi_qml_files
     qml/components/CampoTexto.qml
     qml/components/EstadoVacio.qml
     qml/components/EventoHistorial.qml
+    qml/components/FilaCfdi.qml
     qml/components/FilaPaquete.qml
     qml/components/FilaPerfil.qml
     qml/components/FilaSolicitud.qml
@@ -89,6 +91,11 @@ qt_add_qml_module(satcfdi_presentation
         viewmodels/CatalogoMensajes.h
         viewmodels/CatalogoMensajes.cpp
         viewmodels/ConsultaExistenciaPaquetes.h
+        viewmodels/ConsultaCatalogoCfdi.h
+        viewmodels/CfdiListModel.h
+        viewmodels/CfdiListModel.cpp
+        viewmodels/ExploradorCfdiViewModel.h
+        viewmodels/ExploradorCfdiViewModel.cpp
         estilo/EstiloVisual.h
         estilo/EstiloVisual.cpp
         componentes/IconoSvg.h

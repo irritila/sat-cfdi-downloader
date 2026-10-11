@@ -16,6 +16,8 @@ import "Etiquetas.js" as Etiquetas
 //   resultado debajo.
 // - Pestanas Paquetes N / Datos / Historial N (Paquetes por omision si hay
 //   paquetes). El estado local y el SAT solo aparecen en Datos (D7).
+// - T015.3: "Ver facturas (N)" en el encabezado abre el explorador de CFDI
+//   (solo con paquetes descargados).
 // Teclado: foco inicial en "Solicitudes"; Tab recorre encabezado, accion
 // principal, pestanas y contenido; Escape regresa.
 Page {
@@ -169,6 +171,21 @@ Page {
         mostrarRegresar: true
         textoRegresar: qsTr("Solicitudes")
         onRegresarSolicitado: pagina.regresar()
+
+        // T015.3: explorador de CFDI; solo con paquetes descargados. N = CFDI
+        // indexados (sin numero mientras no se conoce).
+        BotonAccion {
+            id: botonVerFacturas
+            objectName: "botonVerFacturas"
+            visible: pagina.conDatos && pagina.detalle.puedeVerFacturas
+            icono: "doc"
+            text: pagina.detalle.totalFacturas === null ? qsTr("Ver facturas")
+                                                        : qsTr("Ver facturas (%1)").arg(pagina.detalle.totalFacturas)
+            descripcion: pagina.detalle.indexandoFacturas
+                         ? qsTr("Ver los CFDI de los paquetes descargados; aún se están leyendo paquetes")
+                         : qsTr("Ver los CFDI de los paquetes descargados de esta solicitud")
+            onClicked: pagina.app.abrirFacturas(pagina.detalle.solicitudId)
+        }
 
         // T009.1 D1: abre la carpeta de la solicitud en Finder. Con todo
         // descargado pasa a ser la accion principal del resumen.

@@ -3,6 +3,7 @@
 #include "AccionesFinder.h"
 #include "application/primeruso/ConsultaPrimerUso.h"
 #include "EFirmaFormViewModel.h"
+#include "ExploradorCfdiViewModel.h"
 #include "NuevaSolicitudViewModel.h"
 #include "PerfilesSatViewModel.h"
 #include "SolicitudDetailViewModel.h"
@@ -83,6 +84,40 @@ bool AppViewModel::abrirDetalle(const QString& id)
     return true;
 }
 
+void AppViewModel::setExplorador(ExploradorCfdiViewModel* explorador)
+{
+    m_explorador = explorador;
+}
+
+bool AppViewModel::abrirFacturas(const QString& id)
+{
+    if (!m_explorador || !m_explorador->abrir(id)) {
+        return false;
+    }
+    m_detalleConRespaldoLista.clear();
+    m_avisoFinderPendiente.clear();
+    if (m_solicitudSeleccionadaId != id) {
+        m_solicitudSeleccionadaId = id;
+        emit solicitudSeleccionadaIdChanged();
+        if (m_detalle) {
+            m_detalle->cargar(id); // el regreso muestra el detalle de esta solicitud
+        }
+    }
+    setPagina(Pagina::Facturas);
+    return true;
+}
+
+void AppViewModel::regresarDeFacturas()
+{
+    if (m_pagina != Pagina::Facturas) {
+        return;
+    }
+    if (m_detalle && m_detalle->solicitudId() != m_solicitudSeleccionadaId) {
+        m_detalle->cargar(m_solicitudSeleccionadaId);
+    }
+    setPagina(Pagina::Detalle);
+}
+
 void AppViewModel::abrirDetalleONavegarLista(const QString& id)
 {
     navegarADetalleOLista(id, QString());
@@ -107,10 +142,15 @@ void AppViewModel::navegarADetalleOLista(const QString& id, const QString& aviso
 
 void AppViewModel::alCambiarEstadoDetalle()
 {
+    using Estado = SolicitudDetailViewModel::Estado;
+    // T015.3: la solicitud del explorador ya no existe -> detalle "no encontrada".
+    if (m_pagina == Pagina::Facturas && m_detalle && m_detalle->estado() == Estado::NoEncontrada
+        && m_detalle->solicitudId() == m_solicitudSeleccionadaId) {
+        setPagina(Pagina::Detalle);
+    }
     if (m_detalleConRespaldoLista.isEmpty() || !m_detalle) {
         return;
     }
-    using Estado = SolicitudDetailViewModel::Estado;
     const Estado estado = m_detalle->estado();
     if (estado == Estado::Cargando || estado == Estado::Ninguno) {
         return;
@@ -173,6 +213,9 @@ void AppViewModel::setPagina(Pagina pagina)
         if (m_perfiles) {
             m_perfiles->cerrarFormulario();
         }
+    }
+    if (m_pagina == Pagina::Facturas && pagina != Pagina::Facturas && m_explorador) {
+        m_explorador->desactivar();
     }
     if (m_pagina != pagina) {
         m_pagina = pagina;

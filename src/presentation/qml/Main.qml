@@ -20,6 +20,7 @@ ApplicationWindow {
     required property SolicitudDetailViewModel detalleViewModel
     required property PerfilesSatViewModel perfilesViewModel
     required property EFirmaFormViewModel eFirmaViewModel
+    required property ExploradorCfdiViewModel exploradorViewModel
 
     width: 960
     height: 640
@@ -58,6 +59,8 @@ ApplicationWindow {
             return detalleComponente
         case AppViewModel.Perfiles:
             return perfilesComponente
+        case AppViewModel.Facturas:
+            return facturasComponente
         default:
             return listaComponente
         }
@@ -86,6 +89,7 @@ ApplicationWindow {
     readonly property NuevaSolicitudPage paginaNueva: paginaActual.item as NuevaSolicitudPage
     readonly property DetalleSolicitudPage paginaDetalle: paginaActual.item as DetalleSolicitudPage
     readonly property PerfilesSatPage paginaPerfiles: paginaActual.item as PerfilesSatPage
+    readonly property ExploradorCfdiPage paginaFacturas: paginaActual.item as ExploradorCfdiPage
 
     readonly property bool dialogoAbierto: (ventana.paginaNueva !== null && ventana.paginaNueva.dialogoAbierto)
                                            || (ventana.paginaDetalle !== null && ventana.paginaDetalle.dialogoAbierto)
@@ -105,6 +109,8 @@ ApplicationWindow {
             ventana.paginaDetalle.regresar()
         else if (ventana.paginaPerfiles !== null)
             ventana.paginaPerfiles.regresar()
+        else if (ventana.paginaFacturas !== null)
+            ventana.appViewModel.mostrarLista() // ⌘1: Solicitudes (Escape regresa al detalle)
     }
 
     Action {
@@ -120,8 +126,15 @@ ApplicationWindow {
         objectName: "atajoBuscar"
         text: qsTr("Buscar")
         shortcut: "Ctrl+F"
-        enabled: ventana.atajosActivos && ventana.paginaLista !== null && ventana.paginaLista.puedeBuscar
-        onTriggered: ventana.paginaLista.enfocarBusqueda()
+        enabled: ventana.atajosActivos
+                 && ((ventana.paginaLista !== null && ventana.paginaLista.puedeBuscar)
+                     || (ventana.paginaFacturas !== null && ventana.paginaFacturas.puedeBuscar))
+        onTriggered: {
+            if (ventana.paginaFacturas !== null)
+                ventana.paginaFacturas.enfocarBusqueda()
+            else
+                ventana.paginaLista.enfocarBusqueda()
+        }
     }
     Action {
         id: accionPrincipal
@@ -210,6 +223,14 @@ ApplicationWindow {
         id: detalleComponente
         DetalleSolicitudPage {
             app: ventana.appViewModel
+            detalle: ventana.detalleViewModel
+        }
+    }
+    Component {
+        id: facturasComponente
+        ExploradorCfdiPage {
+            app: ventana.appViewModel
+            explorador: ventana.exploradorViewModel
             detalle: ventana.detalleViewModel
         }
     }

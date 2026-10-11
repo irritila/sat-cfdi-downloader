@@ -274,7 +274,9 @@ una solicitud termine o falle."
 
 El encabezado del detalle dice **Solicitud** con el RFC, el tipo y el periodo
 (por ejemplo "XAXX010101000 · Recibidos · 3 sep 2026"). Tiene **‹ Solicitudes**
-para volver, **Abrir carpeta de la solicitud** y, separado, **Eliminar…**.
+para volver, **Ver facturas (N)** cuando hay paquetes descargados (ver
+[Facturas de la solicitud](#facturas-de-la-solicitud)), **Abrir carpeta de la
+solicitud** y, separado, **Eliminar…**.
 
 Debajo, el **resumen** muestra un solo estado (el mismo de la lista) con un
 titular y una descripción, por ejemplo "El SAT terminó la solicitud" y "1 de 3
@@ -311,7 +313,7 @@ Bajo el resumen hay tres pestañas:
 - **Historial**: los eventos de la solicitud con fecha, descripción y origen
   (Usuario, Automático o Recuperación).
 
-![Detalle de una solicitud Terminada: resumen con El SAT terminó la solicitud, 1 de 3 paquetes descargados · 1 disponible · 1 vencido, 12 CFDI reportados y el botón Reintentar descarga; pestaña Paquetes con un paquete Descargado con Archivo local presente y Mostrar en Finder, uno Disponible con La app lo descargará automáticamente y uno Vencido con El paquete ya no existe en el SAT (vencido)](img/08-detalle-terminada.png)
+![Detalle de una solicitud Terminada: encabezado con Ver facturas (7) y Abrir carpeta de la solicitud; resumen con El SAT terminó la solicitud, 1 de 3 paquetes descargados · 1 disponible · 1 vencido, 12 CFDI reportados y el botón Reintentar descarga; pestaña Paquetes con un paquete Descargado con Archivo local presente y Mostrar en Finder, uno Disponible con La app lo descargará automáticamente y uno Vencido con El paquete ya no existe en el SAT (vencido)](img/08-detalle-terminada.png)
 
 Estados de un paquete:
 
@@ -336,6 +338,55 @@ descargados se quedan en su carpeta." **Cancelar** es el botón por omisión.
 Después de eliminarla vuelves a la lista. Si abres una solicitud que ya no
 existe, el detalle dice "Solicitud no encontrada" y "La solicitud no existe o
 fue eliminada."
+
+### Facturas de la solicitud
+
+**Ver facturas (N)** aparece en el encabezado del detalle solo si la solicitud
+tiene al menos un paquete descargado; N es el número de CFDI que la app ya leyó
+de sus ZIP. Mientras la app todavía lee paquetes, el número puede crecer (o
+verse solo **Ver facturas**). La app lee los XML dentro de los ZIP sin
+extraerlos ni modificarlos.
+
+La pantalla **Facturas** muestra los CFDI de esa solicitud, del más reciente al
+más antiguo, con estas columnas:
+
+- **Fecha**: fecha del CFDI y, debajo, el tipo (Ingreso, Egreso, Traslado,
+  Nómina o Pago) con la serie y el folio.
+- **Emisor** y **Receptor**: RFC y nombre. En ventanas angostas se oculta
+  Receptor.
+- **Total**: el importe tal como viene en el XML y, debajo, la moneda y el
+  método de pago.
+- **UUID**: los primeros 8 caracteres del folio fiscal, con un botón para
+  copiarlo completo, y el estado de lectura: Completo, Parcial (hay datos o
+  complementos que la app no representa), Versión no soportada o Ilegible.
+
+![Facturas de una solicitud Recibidos con 7 CFDI ficticios de XEXX010101000 para XAXX010101000: aviso 1 CFDI ilegible o no soportado con Abrir carpeta de la solicitud, búsqueda por RFC, nombre, UUID o folio, filtro Todos los tipos y la lista con Fecha, Emisor, Receptor, Total y UUID; una factura Parcial y una Ilegible](img/13-explorador-facturas.png)
+
+**Buscar** encuentra por RFC, nombre, UUID (completo o parcial) o serie y folio,
+sin importar mayúsculas ni acentos; la lista se actualiza al dejar de escribir.
+El filtro de tipo deja solo Ingreso, Egreso, Traslado, Nómina o Pago. Si nada
+coincide, la pantalla dice "Ninguna factura coincide con la búsqueda" con
+**Limpiar filtros**.
+
+Sobre la lista pueden aparecer avisos, en este orden; ninguno detiene la
+pantalla y la lista sigue mostrando las facturas ya leídas:
+
+| Aviso | Qué significa |
+| --- | --- |
+| Indexando N paquetes… | La app aún está leyendo esos paquetes; las facturas aparecen conforme termina. |
+| N paquetes no disponibles (ZIP faltante) | El ZIP se movió o se borró fuera de la app. |
+| N paquetes ilegibles | El ZIP está dañado o no se pudo leer. |
+| N CFDI ilegibles o no soportados | Algunos XML no se pudieron leer o son de una versión que la app no representa. |
+
+Los tres últimos avisos traen **Abrir carpeta de la solicitud** para revisar
+los ZIP en Finder. Si la solicitud no tiene facturas que mostrar, la pantalla
+dice "Sin facturas". Si la app no puede leer la lista, dice "No se pudo leer la
+lista de facturas." con **Reintentar**.
+
+Con el teclado: Tab pasa por la búsqueda, el filtro y la lista; las flechas
+mueven la selección; ⌘F lleva a la búsqueda; ⌘C copia el UUID de la factura
+seleccionada; Escape (o **‹ Solicitud**) regresa al detalle. Abrir la vista
+previa de una factura llegará en una versión posterior.
 
 ## 6. Paquetes en Finder
 

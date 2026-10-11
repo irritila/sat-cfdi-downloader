@@ -39,7 +39,7 @@ Ejemplo: `T001-modelo-fisico-sqlite.md`.
 | [T015](T015-explorador-cfdi.md) | Pendiente | Explorador de CFDI con previsualizacion PDF (M2, epica) |
 | [T015.1](T015.1-lector-zip-parser-cfdi.md) | Completada | Lector de ZIP seguro y parser de CFDI |
 | [T015.2](T015.2-indice-cfdi.md) | Completada | Indice SQLite de CFDI |
-| [T015.3](T015.3-explorador-por-solicitud.md) | Pendiente | Explorador de CFDI por solicitud |
+| [T015.3](T015.3-explorador-por-solicitud.md) | Completada | Explorador de CFDI por solicitud |
 | [T015.4](T015.4-pdf-qr-visor.md) | Pendiente | PDF con QR, visor y acciones |
 
 ## Estados

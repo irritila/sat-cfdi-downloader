@@ -3,6 +3,7 @@
 // sobre fakes de promesas manuales (FixturePerfiles, context property
 // "fixture"). Los tst_*.qml viven junto a este archivo.
 
+#include "FixtureExplorador.h"
 #include "FixturePerfiles.h"
 
 #include <QQmlContext>
@@ -16,6 +17,8 @@ public slots:
     void qmlEngineAvailable(QQmlEngine* engine)
     {
         engine->rootContext()->setContextProperty(QStringLiteral("fixture"), new FixturePerfiles(engine));
+        // T015.3: explorador de CFDI.
+        engine->rootContext()->setContextProperty(QStringLiteral("fixtureExplorador"), new FixtureExplorador(engine));
     }
 };
 
