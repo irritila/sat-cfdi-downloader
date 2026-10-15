@@ -12,7 +12,8 @@ Las imágenes de este manual usan solo datos ficticios: RFC genéricos del SAT
 `demo.cer` y `demo.key` y rutas bajo `/Users/usuario/...`. Las imágenes
 marcadas como **Ilustración** son dibujos simplificados de elementos de macOS
 (menu bar, notificaciones, Finder y selector de archivos). Muestran los mismos
-textos que la app, aunque su aspecto puede variar respecto de macOS.
+textos que la app y el icono del menu bar es el mismo dibujo, aunque su aspecto
+puede variar respecto de macOS.
 
 La app muestra las fechas en formato legible, por ejemplo "3 sep 2026" o
 "1 oct 2026, 10:35". Las fechas del formulario de nueva solicitud se escriben
@@ -42,7 +43,7 @@ La pantalla tiene dos paneles: a la izquierda la lista de perfiles y a la
 derecha el perfil seleccionado. Al abrirla queda seleccionado el primer perfil.
 Puedes cambiar el ancho de los paneles arrastrando la línea que los separa.
 
-![Pantalla Perfiles SAT con dos paneles: a la izquierda XAXX010101000 con la etiqueta e.firma lista, Disponible para solicitudes y Vigente hasta 2029-01-01, y XEXX010101000 con Sin e.firma y No disponible para solicitudes; a la derecha, el grupo Perfil con el RFC de solo lectura y el grupo e.firma con Lista para solicitudes y el botón Reemplazar e.firma…](img/01-perfiles.png)
+![Pantalla Perfiles SAT con dos paneles: a la izquierda XAXX010101000 con la etiqueta e.firma lista, Disponible para solicitudes, Vigente hasta 2026-10-22 y la etiqueta de advertencia Vence en 21 días, y XEXX010101000 con Sin e.firma y No disponible para solicitudes; a la derecha, el grupo Perfil con el RFC de solo lectura y el grupo e.firma con las etiquetas e.firma lista y Vence en 21 días, Lista para solicitudes · Vigente hasta 2026-10-22 y el botón Reemplazar e.firma…](img/01-perfiles.png)
 
 ### Crear o editar un perfil
 
@@ -83,10 +84,34 @@ solicitudes". Si la e.firma tiene vigencia conocida, también aparece "Vigente
 hasta AAAA-MM-DD".
 
 En el panel derecho, el grupo **e.firma** repite la etiqueta y explica el
-estado: "Lista para solicitudes · Vigente hasta 2029-01-01" o "Este perfil no
+estado: "Lista para solicitudes · Vigente hasta 2026-10-22" o "Este perfil no
 tiene e.firma registrada.", seguido de "La e.firma se guarda cifrada y su
 contraseña queda en el llavero de macOS." o "Regístrala para poder usar este
 perfil en solicitudes."
+
+### Aviso de vencimiento
+
+Cuando a una e.firma lista le quedan 30 días o menos de vigencia, la fila del
+perfil muestra junto a "Vigente hasta AAAA-MM-DD" la etiqueta de advertencia
+"Vence en N días"; con un día completo dice "Vence en 1 día" y, cuando faltan
+menos de 24 horas, "Vence hoy". El grupo **e.firma** del panel derecho repite
+la etiqueta junto a "e.firma lista". En la imagen anterior, la e.firma de
+XAXX010101000 vence en 21 días.
+
+La e.firma sigue lista y se puede usar en solicitudes hasta esa fecha. Para no
+quedarte sin ella, renuévala con el SAT y regístrala con **Reemplazar
+e.firma…** (ver [Reemplazar la e.firma](#reemplazar-la-efirma)). Si la nueva
+e.firma vence en más de 30 días, la etiqueta desaparece.
+
+Además, la app avisa con la notificación **e.firma por vencer** cuando faltan
+30 días y otra vez cuando faltan 7 (ver la [sección 8](#8-notificaciones-de-macos)).
+Si la app encuentra una e.firma a 7 días o menos sin haber avisado antes, solo
+envía el aviso de 7 días. La app revisa la vigencia al abrirse, cada 24 horas
+mientras está abierta y cuando registras o reemplazas una e.firma. Cada aviso
+llega una sola vez por e.firma; si la reemplazas, la nueva vuelve a avisar
+cuando le toque. Las e.firmas vencidas o que no están listas no generan este
+aviso: ya aparecen con su etiqueta y con la notificación **e.firma no
+disponible**.
 
 ### Registrar la e.firma
 
@@ -257,18 +282,38 @@ Estados que puede mostrar la etiqueta:
 | Rechazada por SAT | El SAT rechazó la solicitud. |
 | Vencida | La solicitud venció en el SAT. |
 
-Si no hay solicitudes, la lista dice "No hay solicitudes" y "Crea una solicitud
-para descargar del SAT los CFDI emitidos o recibidos de un contribuyente.", con
-el botón **Nueva solicitud**.
-
-![Lista vacía con el texto No hay solicitudes, la explicación Crea una solicitud para descargar del SAT los CFDI emitidos o recibidos de un contribuyente y el botón Nueva solicitud](img/07-lista-vacia.png)
-
 Si la lista no se puede leer, aparece "No se pudo cargar la lista de
 solicitudes.", "Tus solicitudes siguen guardadas en este equipo. Intenta
 cargarlas de nuevo." y el botón **Reintentar**. Si las notificaciones de macOS
 están desactivadas, sobre la tabla aparece el aviso "Las notificaciones están
 desactivadas." con "Actívalas en Ajustes del Sistema para recibir avisos cuando
 una solicitud termine o falle."
+
+### Primer uso: Empieza en tres pasos
+
+Si todavía no hay solicitudes, en lugar de la tabla aparece la guía **Empieza
+en tres pasos**: "Para descargar CFDI del SAT necesitas un perfil con su
+e.firma registrada." Cada paso indica si ya está hecho (con una marca) o
+pendiente, y tiene un botón que abre su pantalla:
+
+| Paso | Botón | Abre |
+| --- | --- | --- |
+| Paso 1: Crea un perfil SAT con el RFC del contribuyente | Perfiles SAT | Perfiles SAT ([sección 1](#1-perfiles-sat-y-efirma)). |
+| Paso 2: Registra la e.firma del perfil | Registrar e.firma | Perfiles SAT, donde registras la e.firma del perfil ([Registrar la e.firma](#registrar-la-efirma)). |
+| Paso 3: Crea tu primera solicitud de descarga | Nueva solicitud | Nueva solicitud ([sección 2](#2-crear-una-nueva-solicitud-y-resolver-duplicados)). |
+
+El botón del primer paso pendiente aparece resaltado y recibe el foco al abrir
+la lista. La app comprueba los pasos con lo que ya tienes guardado: el paso 1
+está hecho si existe algún perfil SAT (activo o inactivo), el paso 2 si algún
+perfil tiene la e.firma lista y el paso 3 si existe alguna solicitud. Por eso
+la guía desaparece en cuanto creas tu primera solicitud y vuelve a aparecer si
+eliminas todas. Los botones del encabezado siguen disponibles.
+
+![Lista Solicitudes vacía con la guía Empieza en tres pasos y el texto Para descargar CFDI del SAT necesitas un perfil con su e.firma registrada: Paso 1 Crea un perfil SAT con el RFC del contribuyente, marcado como hecho, con el botón Perfiles SAT; Paso 2 Registra la e.firma del perfil, pendiente, con el botón resaltado Registrar e.firma; y Paso 3 Crea tu primera solicitud de descarga, pendiente, con el botón Nueva solicitud](img/07-lista-vacia.png)
+
+Mientras la app comprueba los pasos, o si no pudo comprobarlos, la lista vacía
+dice "No hay solicitudes" y "Crea una solicitud para descargar del SAT los CFDI
+emitidos o recibidos de un contribuyente.", con el botón **Nueva solicitud**.
 
 ## 5. Detalle: resumen, paquetes, datos e historial
 
@@ -449,9 +494,11 @@ Finder". Estas acciones no cambian ningún estado.
 ## 7. Menu bar
 
 La app pone un icono en la barra de menús de macOS. Cerrar la ventana solo la
-oculta: la app y el monitoreo siguen activos.
+oculta: la app y el monitoreo siguen activos. Haz clic en el icono para abrir
+su menú; el icono también indica el estado de la app (ver [El icono y su
+estado](#el-icono-y-su-estado)).
 
-![Ilustración del menú de la app en la barra de menús con Mostrar ventana, Nueva solicitud…, Abrir carpeta de paquetes, Monitoreo activo, Pendientes: 1, Pausar monitoreo, Abrir al iniciar sesión marcado, Estado en macOS: habilitado, Notificaciones: permitidas, Enviar notificación de prueba y Salir de SAT CFDI Downloader](img/11-menu-bar.png)
+![Ilustración del menú de la app abierto desde su icono en la barra de menús (documento con flecha de descarga) con Mostrar ventana, Nueva solicitud…, Abrir carpeta de paquetes, Monitoreo activo, Pendientes: 1, Pausar monitoreo, Abrir al iniciar sesión marcado, Estado en macOS: habilitado, Notificaciones: permitidas, Enviar notificación de prueba y Salir de SAT CFDI Downloader](img/11-menu-bar.png)
 
 | Opción | Para qué sirve |
 | --- | --- |
@@ -465,6 +512,40 @@ oculta: la app y el monitoreo siguen activos.
 | Estado en macOS: … | Lo que macOS reporta para ese inicio automático: habilitado, deshabilitado, pendiente de aprobación, rechazado o no disponible. Si está pendiente o rechazado aparece **Abrir ajustes de inicio de sesión…** |
 | Notificaciones: … | Permiso de notificaciones: sin permiso solicitado, permitidas, deshabilitadas o no disponibles. Según el caso aparecen **Solicitar permiso de notificaciones**, **Enviar notificación de prueba** o **Abrir ajustes de notificaciones…** |
 | Salir de SAT CFDI Downloader | Termina la app de forma ordenada: espera la operación en curso y cierra. |
+
+### El icono y su estado
+
+El icono es un documento con una flecha de descarga. Es un icono monocromo de
+macOS, que se adapta a la apariencia clara u oscura, así que el estado se
+distingue por la insignia de la esquina inferior derecha y por el texto que
+aparece al pasar el cursor sobre el icono (VoiceOver lee el mismo texto):
+
+| Icono | Al pasar el cursor | Cuándo aparece |
+| --- | --- | --- |
+| Sin insignia | SAT CFDI Downloader | Normal: el monitoreo está activo, no hay trabajo en curso y nada requiere atención. |
+| Dos barras (pausa) | SAT CFDI Downloader: en pausa | El monitoreo está en pausa. |
+| Flecha circular | SAT CFDI Downloader: trabajando | La app está trabajando con el SAT: enviando, verificando o descargando. |
+| Punto sólido | SAT CFDI Downloader: requiere atención | Hay algo que debes revisar (ver la lista siguiente). |
+
+![Ilustración de las cuatro variantes del icono de la app en la barra de menús, ampliadas y a tamaño real, con el texto que aparece al pasar el cursor: SAT CFDI Downloader (documento con flecha de descarga, sin insignia), SAT CFDI Downloader: en pausa (insignia de dos barras), SAT CFDI Downloader: trabajando (insignia de flecha circular) y SAT CFDI Downloader: requiere atención (insignia de punto sólido)](img/15-icono-menu-bar.png)
+
+Si se cumplen varios estados a la vez, el icono muestra el de mayor prioridad:
+primero requiere atención, después trabajando, después en pausa y, por último,
+normal. Por ejemplo, con el monitoreo en pausa y una solicitud en Error SAT, el
+icono muestra el punto.
+
+Cuenta como "requiere atención":
+
+- una solicitud en Error SAT, Rechazada por SAT, Envío fallido o Envío incierto;
+- una solicitud con algún paquete en Error de descarga;
+- un perfil activo cuya e.firma no está lista: Sin e.firma, e.firma vencida,
+  e.firma aún no vigente, e.firma incompleta o dañada en el llavero, o Estado
+  no disponible.
+
+No cuentan una solicitud Vencida, un perfil inactivo, una e.firma lista con la
+etiqueta "Vence en N días" ni un perfil en "Verificando", que solo dura
+mientras la app comprueba la e.firma. Para encontrar lo que requiere atención,
+revisa los estados de la lista de solicitudes y de Perfiles SAT.
 
 ## 8. Notificaciones de macOS
 
@@ -481,12 +562,49 @@ cambios. Cada notificación tiene un título y un texto:
   texto explica la causa, termina con "El monitoreo de ese perfil está en
   pausa." y en otra línea indica qué hacer: "Reemplázala en Perfiles SAT." o
   "Regístrala en Perfiles SAT."
+- **e.firma por vencer**: a la e.firma de un perfil le quedan 30 días o menos
+  (ver [Aviso de vencimiento](#aviso-de-vencimiento)). Por ejemplo, "La e.firma
+  vence en 21 días (22 oct 2026)." y en otra línea "RFC \*\*\*000 ·
+  Reemplázala en Perfiles SAT." Si faltan menos de dos días, dice "La e.firma
+  vence en 1 día (…)." o "La e.firma vence hoy (…)."
 
 Las notificaciones de solicitudes agregan una segunda línea con el tipo de
 descarga, el periodo y el RFC abreviado a sus últimos tres caracteres, por
 ejemplo "Recibidos · 3 sep 2026 · RFC \*\*\*000".
 
-![Ilustración de una notificación de macOS con el título Descarga completa, el texto 1 de 1 paquetes descargados. y la segunda línea Recibidos · 3 sep 2026 · RFC ***000](img/12-notificacion.png)
+### Pulsar una notificación
+
+Al pulsar una notificación, la app pasa al frente y abre la pantalla
+relacionada:
+
+- **Solicitud terminada**, **Descarga completa**, **Error en el SAT**,
+  **Solicitud rechazada** y **Solicitud vencida** abren el detalle de esa
+  solicitud. Si la solicitud ya no existe (por ejemplo, porque la eliminaste),
+  abren la lista de solicitudes, sin mensaje de error.
+- **e.firma no disponible** y **e.firma por vencer** abren Perfiles SAT con ese
+  perfil seleccionado.
+
+Algunas notificaciones tienen además un botón de acción. macOS lo muestra en
+**Opciones** al pasar el cursor sobre la notificación, también en el Centro de
+notificaciones:
+
+- **Mostrar en Finder**, en **Descarga completa**: abre en Finder la carpeta de
+  la solicitud, igual que **Abrir carpeta de la solicitud** en el detalle. No
+  crea carpetas ni abre los ZIP. Si Finder no puede mostrar la carpeta, la app
+  abre el detalle de la solicitud (o la lista, si ya no existe) con el aviso
+  correspondiente.
+- **Abrir Perfiles SAT**, en **e.firma no disponible** y **e.firma por
+  vencer**: abre Perfiles SAT con ese perfil seleccionado.
+
+![Ilustración de dos notificaciones de macOS con el menú Opciones abierto: Descarga completa, con el texto 1 de 1 paquetes descargados. y la segunda línea Recibidos · 3 sep 2026 · RFC ***000, y la acción Mostrar en Finder; y e.firma por vencer, con el texto La e.firma vence en 21 días (22 oct 2026). y la segunda línea RFC ***000 · Reemplázala en Perfiles SAT., y la acción Abrir Perfiles SAT](img/12-notificacion.png)
+
+Esto funciona igual con la ventana abierta, con la ventana oculta o con la app
+cerrada: si la app no estaba abierta, macOS la abre y la app va a la pantalla
+correspondiente en cuanto termina de arrancar. Las notificaciones que recibiste
+con una versión anterior de la app no llevan esta información: al pulsarlas
+solo se muestra la ventana de la app.
+
+### Comprobar las notificaciones
 
 Para comprobar las notificaciones usa **Enviar notificación de prueba** en el
 menu bar. Si las desactivas en Ajustes del Sistema, la app sigue funcionando
@@ -547,6 +665,12 @@ contraseña.
 
 ### Otros
 
+- "Vence en N días" en Perfiles SAT o la notificación "e.firma por vencer":
+  renueva la e.firma con el SAT y usa **Reemplazar e.firma…** antes de esa
+  fecha (ver [Aviso de vencimiento](#aviso-de-vencimiento)).
+- El icono del menu bar muestra un punto ("SAT CFDI Downloader: requiere
+  atención"): revisa la lista de solicitudes y Perfiles SAT (ver [El icono y su
+  estado](#el-icono-y-su-estado)).
 - "No se pudo cargar la lista de solicitudes." o "No se pudo cargar la
   solicitud.": pulsa **Reintentar**.
 - "No se pudo eliminar la solicitud. Intenta de nuevo.": intenta eliminarla otra vez.

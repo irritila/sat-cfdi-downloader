@@ -6,6 +6,7 @@
 // datos sinteticos fijos. Sin SQLite, worker, SAT ni Keychain. Solo los usa
 // satcfdi_manual_capturas.
 
+#include "application/primeruso/ConsultaPrimerUso.h"
 #include "application/profiles/CredencialesSatService.h"
 #include "application/profiles/PerfilesSatService.h"
 #include "application/requests/SolicitudesService.h"
@@ -189,6 +190,15 @@ public:
         return listo(ResultadoResumen::exito(resumenIndice));
     }
     QFuture<void> revisarSolicitud(const SolicitudId&) override { return QtFuture::makeReadyVoidFuture(); }
+};
+
+// T014.3 D1 (T016): pasos fijos de la guia "Empieza en tres pasos". Solo se
+// conecta en la captura de la lista vacia; sin ella la app no muestra la guia.
+class PrimerUsoFijo final : public ConsultaPrimerUso {
+public:
+    EstadoPrimerUso estado;
+
+    QFuture<ResultadoPrimerUso> consultar() override { return listo(ResultadoPrimerUso::exito(estado)); }
 };
 
 // T015.4: PDF fijo (generado con el renderer real a partir de un XML

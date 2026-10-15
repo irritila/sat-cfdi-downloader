@@ -41,6 +41,7 @@ Ejemplo: `T001-modelo-fisico-sqlite.md`.
 | [T015.2](T015.2-indice-cfdi.md) | Completada | Indice SQLite de CFDI |
 | [T015.3](T015.3-explorador-por-solicitud.md) | Completada | Explorador de CFDI por solicitud |
 | [T015.4](T015.4-pdf-qr-visor.md) | Completada | PDF con QR, visor y acciones |
+| [T016](T016-manual-t014-3-t014-4.md) | Completada | Manual de usuario al dia con T014.3 y T014.4 |
 
 ## Estados
 

@@ -3,18 +3,22 @@
 // con PresentacionViewModels sobre servicios FIJOS (ServiciosFijos.h); los
 // elementos nativos (menu bar, notificacion, Finder, selector de archivos) son
 // ilustraciones QML (qml/) alimentadas por la definicion compartida del menu
-// bar y por ServicioNotificaciones. Sin SQLite, worker, SAT ni Keychain.
+// bar, por ServicioNotificaciones y (T016) por el dibujo real del icono del
+// menu bar y las acciones de notificacion. Sin SQLite, worker, SAT ni Keychain.
 //
 // Uso: satcfdi_manual_capturas --salida <dir> [--solo <archivo.png>]
 // Requiere sesion grafica (QT_QPA_PLATFORM=cocoa); no forma parte de ctest.
 
 #include "ServiciosFijos.h"
 
+#include "app_core/IntegracionWorker.h"
 #include "application/notificaciones/Notificador.h"
 #include "application/notificaciones/ServicioNotificaciones.h"
 #include "infrastructure/cfdi/pdf/RenderizadorPdfCfdi.h"
 #include "infrastructure/cfdi/xml/ParserCfdi.h"
 #include "infrastructure/os/MenuBarDefinicion.h"
+#include "infrastructure/os/macos/IconoMenuBar.h"
+#include "infrastructure/os/macos/MacOSMapeos.h"
 #include "presentation/viewmodels/AppViewModel.h"
 #include "presentation/viewmodels/ExploradorCfdiViewModel.h"
 #include "presentation/viewmodels/EFirmaFormViewModel.h"
@@ -100,6 +104,20 @@ ResumenCredencial credencialLista()
     r.estado = EstadoCredencial::Lista;
     r.vigenteDesde = QDateTime(QDate(2025, 1, 1), QTime(0, 0), QTimeZone::UTC);
     r.vigenteHasta = QDateTime(QDate(2029, 1, 1), QTime(0, 0), QTimeZone::UTC);
+    return r;
+}
+
+// T016 (T014.3 D2): e.firma Lista que vence dentro del umbral de 30 dias:
+// con el reloj fijo (kAhora) faltan 21 dias ("Vence en 21 días").
+const QDateTime kVenceEFirma(QDate(2026, 10, 22), QTime(12, 0), QTimeZone::UTC);
+constexpr int kDiasParaVencer = 21;
+constexpr int kUmbralVencimiento = 30;
+
+ResumenCredencial credencialPorVencer()
+{
+    ResumenCredencial r = credencialLista();
+    r.vigenteDesde = QDateTime(QDate(2022, 10, 22), QTime(12, 0), QTimeZone::UTC);
+    r.vigenteHasta = kVenceEFirma;
     return r;
 }
 
@@ -403,6 +421,7 @@ struct Grafo {
     ExistenciaFija existencia;
     CatalogoFijo catalogo; // T015.3
     PrevisualizacionFija previsualizacion; // T015.4
+    PrimerUsoFijo primerUso; // T016: solo lo conecta la lista vacia
     std::unique_ptr<PresentacionViewModels> vms;
     std::unique_ptr<QQmlApplicationEngine> engine;
 
@@ -415,7 +434,9 @@ struct Grafo {
 
     QQuickWindow* cargar()
     {
-        vms = std::make_unique<PresentacionViewModels>(&solicitudes, &perfiles, &credenciales);
+        // Reloj fijo (T016): el aviso "Vence en N días" se calcula con kAhora.
+        vms = std::make_unique<PresentacionViewModels>(&solicitudes, &perfiles, &credenciales, nullptr,
+                                                       [] { return kAhora; });
         vms->setAccionesSolicitud(&acciones);
         vms->setAccionesFinder(&acciones);
         vms->setConsultaExistencia(&existencia);
@@ -555,6 +576,44 @@ QVariantList entradasMenu()
     return r;
 }
 
+// T016 (T014.4 D2): variantes del icono del menu bar con el dibujo real
+// (IconoMenuBar) y el texto real al pasar el cursor (textoEstadoIcono). Los
+// PNG se escriben en `dir` (temporal) a 2x: `imagen` (18 pt) y `ampliada`
+// (48 pt, para que se distinga la insignia).
+QVariantMap varianteIcono(const QString& dir, OSIntegration::EstadoIcono estado, const QString& clave)
+{
+    QVariantMap v{{QStringLiteral("texto"), macos::textoEstadoIcono(estado)}};
+    const QList<QPair<QString, int>> tamanos{{QStringLiteral("imagen"), 18 * kEscala},
+                                             {QStringLiteral("ampliada"), 48 * kEscala}};
+    for (const auto& [propiedad, lado] : tamanos) {
+        const QString ruta = QDir(dir).filePath(QStringLiteral("icono-%1-%2.png").arg(clave).arg(lado));
+        if (!macos::dibujarIconoMenuBar(estado, lado).save(ruta, "png")) {
+            return {};
+        }
+        v.insert(propiedad, QUrl::fromLocalFile(ruta));
+    }
+    return v;
+}
+
+// Orden de la ilustracion: Normal, En pausa, Trabajando, Atencion.
+QVariantList variantesIcono(const QString& dir)
+{
+    using E = OSIntegration::EstadoIcono;
+    QVariantList r;
+    const QList<QPair<E, QString>> estados{{E::Normal, QStringLiteral("normal")},
+                                           {E::Pausado, QStringLiteral("pausado")},
+                                           {E::Trabajando, QStringLiteral("trabajando")},
+                                           {E::Atencion, QStringLiteral("atencion")}};
+    for (const auto& [estado, clave] : estados) {
+        const QVariantMap v = varianteIcono(dir, estado, clave);
+        if (v.isEmpty()) {
+            return {};
+        }
+        r.append(v);
+    }
+    return r;
+}
+
 // D6: texto de notificacion de ServicioNotificaciones con un Notificador fake.
 class NotificadorCaptura final : public Notificador {
 public:
@@ -582,6 +641,20 @@ std::optional<Notificacion> notificacionDescargaCompleta()
     return notificador.recibidas.constFirst();
 }
 
+// T016 (T014.4 D1): notificacion para la ilustracion, con las acciones que el
+// composition root agrega por tipo (notificacionLocalDe) y sus textos reales
+// (textoAccionNotificacion).
+QVariantMap notificacionIlustrada(const Notificacion& n)
+{
+    QStringList acciones;
+    for (const OSIntegration::AccionNotificacion a : notificacionLocalDe(n).accionesExtra) {
+        acciones.append(macos::textoAccionNotificacion(a));
+    }
+    return {{QStringLiteral("titulo"), n.titulo},
+            {QStringLiteral("cuerpo"), n.cuerpo},
+            {QStringLiteral("acciones"), acciones}};
+}
+
 // --- Tabla de escenarios ----------------------------------------------------
 
 struct Escenario {
@@ -598,9 +671,12 @@ QList<Escenario> escenarios()
         {QStringLiteral("01-perfiles.png"), QStringLiteral("Captura"),
          [](const QString& r) {
              return capturaApp(r, [](Grafo& g, QQuickWindow*) {
+                 // T016: la e.firma del perfil seleccionado vence en 21 dias.
+                 g.credenciales.resumenes.insert(perfilListo().id.texto(), credencialPorVencer());
                  g.vms->app()->mostrarPerfiles();
                  esperar(300);
-                 return g.vms->perfiles()->seleccionar(perfilListo().id.texto());
+                 return g.vms->perfiles()->seleccionar(perfilListo().id.texto())
+                        && g.vms->perfiles()->seleccionDiasParaVencer() == kDiasParaVencer;
              });
          }},
         {QStringLiteral("02-efirma.png"), QStringLiteral("Captura"),
@@ -677,7 +753,17 @@ QList<Escenario> escenarios()
              });
          }},
         {QStringLiteral("07-lista-vacia.png"), QStringLiteral("Captura"),
-         [](const QString& r) { return capturaApp(r, [](Grafo&, QQuickWindow*) { return true; }); }},
+         [](const QString& r) {
+             // T016 (T014.3 D1): guia de primer uso con el paso 1 hecho y la
+             // e.firma como siguiente paso.
+             return capturaApp(r, [](Grafo& g, QQuickWindow* v) {
+                 g.primerUso.estado = EstadoPrimerUso{true, false, false};
+                 g.vms->setConsultaPrimerUso(&g.primerUso);
+                 esperar(300);
+                 QQuickItem* guia = g.pagina(v, QStringLiteral("guiaPrimerUso"));
+                 return g.vms->app()->mostrarGuiaPrimerUso() && guia && guia->isVisible();
+             });
+         }},
         {QStringLiteral("08-detalle-terminada.png"), QStringLiteral("Captura"),
          [](const QString& r) {
              return capturaApp(r, [](Grafo& g, QQuickWindow* v) {
@@ -714,16 +800,34 @@ QList<Escenario> escenarios()
          }},
         {QStringLiteral("11-menu-bar.png"), QStringLiteral("Ilustracion"),
          [](const QString& r) {
-             return ilustracion(r, QStringLiteral("IlustracionMenuBar"), {{QStringLiteral("entradas"), entradasMenu()}});
+             // T016: el icono de la barra es el dibujo real (variante Normal).
+             QTemporaryDir dir;
+             const QVariantMap normal = dir.isValid()
+                                            ? varianteIcono(dir.path(), OSIntegration::EstadoIcono::Normal,
+                                                            QStringLiteral("normal"))
+                                            : QVariantMap{};
+             if (normal.isEmpty()) {
+                 std::fprintf(stderr, "11: no se pudo dibujar el icono\n");
+                 return false;
+             }
+             return ilustracion(r, QStringLiteral("IlustracionMenuBar"),
+                                {{QStringLiteral("entradas"), entradasMenu()},
+                                 {QStringLiteral("icono"), normal.value(QStringLiteral("imagen"))}});
          }},
         {QStringLiteral("12-notificacion.png"), QStringLiteral("Ilustracion"),
          [](const QString& r) {
+             // T016 (T014.4 D1): con "Opciones" abierto: "Descarga completa"
+             // con Mostrar en Finder y "e.firma por vencer" (T014.3) con Abrir
+             // Perfiles SAT.
              const auto n = notificacionDescargaCompleta();
              if (!n) {
                  return false;
              }
+             const Notificacion vence = ServicioNotificaciones::componerVencimiento(
+                 perfilListo().id, kRfcPerfil, kVenceEFirma, kUmbralVencimiento, kDiasParaVencer);
              return ilustracion(r, QStringLiteral("IlustracionNotificacion"),
-                                {{QStringLiteral("titulo"), n->titulo}, {QStringLiteral("cuerpo"), n->cuerpo}});
+                                {{QStringLiteral("notificaciones"),
+                                  QVariantList{notificacionIlustrada(*n), notificacionIlustrada(vence)}}});
          }},
         // T015.3: explorador de facturas de la solicitud Terminada.
         {QStringLiteral("13-explorador-facturas.png"), QStringLiteral("Captura"),
@@ -778,6 +882,18 @@ QList<Escenario> escenarios()
                  return g.vms->explorador()->visor()->estado() == VisorPdfCfdiViewModel::Estado::Listo && visor
                         && visor->property("documentoListo").toBool();
              });
+         }},
+        // T016 (T014.4 D2): las cuatro variantes del icono del menu bar.
+        {QStringLiteral("15-icono-menu-bar.png"), QStringLiteral("Ilustracion"),
+         [](const QString& r) {
+             QTemporaryDir dir;
+             const QVariantList variantes = dir.isValid() ? variantesIcono(dir.path()) : QVariantList{};
+             if (variantes.size() != 4) {
+                 std::fprintf(stderr, "15: no se pudieron dibujar las variantes\n");
+                 return false;
+             }
+             return ilustracion(r, QStringLiteral("IlustracionIconoMenuBar"),
+                                {{QStringLiteral("variantes"), variantes}});
          }},
     };
 }

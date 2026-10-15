@@ -481,12 +481,15 @@ solo datos sinteticos (RFC genericos `XAXX010101000`/`XEXX010101000`, rutas
 `/Users/usuario/...`, reloj fijo 2026-10-01 10:00 UTC). La herramienta fuerza
 tema claro, locale `es_MX`, zona UTC y ventana de 960x640; cada PNG se normaliza
 a 1920x1280 sin metadatos variables. Las ilustraciones (selector de archivos,
-Finder, menu bar, notificacion) se alimentan de `menubar::entradas` y de
-`ServicioNotificaciones`, asi que reflejan los textos reales.
+Finder, menu bar, notificaciones, variantes del icono del menu bar) se
+alimentan de `menubar::entradas`, de `ServicioNotificaciones`, de las acciones
+de notificacion (`notificacionLocalDe`, `textoAccionNotificacion`) y del dibujo
+del icono (`dibujarIconoMenuBar`, `textoEstadoIcono`), asi que reflejan los
+textos y dibujos reales.
 
 ```bash
 cmake -S . -B build -G Ninja -DSATCFDI_BUILD_MANUAL_CAPTURAS=ON
-cmake --build build --target manual_capturas      # regenera las 13 imagenes (claro)
+cmake --build build --target manual_capturas      # regenera las 15 imagenes (claro)
 cmake --build build --target manual_capturas_oscuro  # evidencia en oscuro: build/capturas-oscuro
 # Una sola imagen o a otro directorio:
 QT_QPA_PLATFORM=cocoa ./build/tools/capturas-manual/satcfdi_manual_capturas \
@@ -495,7 +498,7 @@ QT_QPA_PLATFORM=cocoa ./build/tools/capturas-manual/satcfdi_manual_capturas \
 
 - `--tema claro|oscuro` (claro por omision). En oscuro fija `Theme.oscuro = true`
   antes de cargar la app (T013 D9); las ilustraciones (selector de archivos,
-  Finder, menu bar, notificacion) imitan la interfaz de macOS y quedan en claro.
+  Finder, menu bar, notificaciones, icono del menu bar) imitan la interfaz de macOS y quedan en claro.
   Las capturas en oscuro son evidencia de revision: no se versionan y el manual
   sigue en claro.
 - Requiere una sesion grafica de macOS: abre ventanas cocoa breves. No forma

@@ -16,10 +16,13 @@ import SatCfdiDownloader
 // - separador: dibuja una linea y omite el resto de campos.
 // - habilitada (por omision true): deshabilitada se dibuja en gris.
 // - marcada (por omision false): muestra la marca de verificacion.
+// icono (T016): PNG del dibujo real del icono (IconoMenuBar, a 2x); vacio =
+// icono generico.
 Item {
     id: raiz
 
     property var entradas: []
+    property url icono: ""
 
     readonly property int anchoMenu: 320
     readonly property int altoEntrada: 24
@@ -70,7 +73,18 @@ Item {
                 height: 20
                 radius: 5
                 color: "#d9d9de"
+                // Icono plantilla: macOS lo tine oscuro en apariencia clara.
+                Image {
+                    visible: raiz.icono.toString().length > 0
+                    anchors.centerIn: parent
+                    width: 18
+                    height: 18
+                    source: raiz.icono
+                    smooth: true
+                    opacity: 0.85
+                }
                 Rectangle {
+                    visible: raiz.icono.toString().length === 0
                     anchors.centerIn: parent
                     width: 14
                     height: 12

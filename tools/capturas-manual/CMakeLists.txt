@@ -4,14 +4,19 @@
 qt_add_executable(satcfdi_manual_capturas
     main.cpp
     ServiciosFijos.h
-    # MacOSMapeos: textos variables del menu bar (MenuBarDefinicion, D6).
+    # MacOSMapeos: textos variables del menu bar (MenuBarDefinicion, D6), del
+    # icono y de las acciones de notificacion (T016).
     ${PROJECT_SOURCE_DIR}/src/infrastructure/os/macos/MacOSMapeos.cpp
+    # T016: dibujo real de las variantes del icono del menu bar (QPainter, sin AppKit).
+    ${PROJECT_SOURCE_DIR}/src/infrastructure/os/macos/IconoMenuBar.cpp
 )
 target_include_directories(satcfdi_manual_capturas PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_compile_definitions(satcfdi_manual_capturas PRIVATE
     SATCFDI_CAPTURAS_QML_DIR="${CMAKE_CURRENT_SOURCE_DIR}/qml"
 )
 target_link_libraries(satcfdi_manual_capturas PRIVATE
+    # T016: notificacionLocalDe (acciones de notificacion por tipo, T014.4 D1).
+    satcfdi_app_core
     satcfdi_presentation
     satcfdi_presentationplugin
     satcfdi_application
