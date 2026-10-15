@@ -1044,6 +1044,60 @@ void MacOSIntegration::abrirCarpetaEnFinder(const QString& peticionId, const QSt
     }, Qt::QueuedConnection);
 }
 
+// --- Vista Previa (T015.4) -------------------------------------------------
+
+namespace {
+
+constexpr char kBundleVistaPrevia[] = "com.apple.Preview";
+
+} // namespace
+
+void MacOSIntegration::abrirEnVistaPrevia(const QString& peticionId, const QString& rutaAbsoluta)
+{
+    const QPointer<MacOSIntegration> guardia(this);
+    // Emite siempre en el hilo grafico y en diferido (nunca reentrante); seguro
+    // desde la cola del completion handler (contexto qApp, QPointer validado
+    // ya en el hilo grafico).
+    auto emitir = [guardia, peticionId](ResultadoFinder resultado) {
+        enHiloGrafico(guardia, [peticionId, resultado](MacOSIntegration* adaptador) {
+            emit adaptador->finderTerminado(peticionId, resultado);
+        });
+    };
+    // Revalidacion (lstat): archivo regular, no enlace. Nunca se lee.
+    if (!destinoValido(rutaAbsoluta, false)) {
+        emitir(ResultadoFinder::NoEncontrado);
+        return;
+    }
+    @autoreleasepool {
+        NSWorkspace* ws = [NSWorkspace sharedWorkspace];
+        NSURL* url = [NSURL fileURLWithPath:rutaAbsoluta.toNSString() isDirectory:NO];
+        NSURL* app = ws != nil ? [ws URLForApplicationWithBundleIdentifier:@(kBundleVistaPrevia)] : nil;
+        if (ws == nil || url == nil || app == nil) {
+            // Sin AppKit o sin Vista Previa instalada/registrada. Sin ruta en el log.
+            qCWarning(lcMacOS) << "Vista Previa no disponible";
+            emitir(ResultadoFinder::Fallido);
+            return;
+        }
+        NSWorkspaceOpenConfiguration* configuracion = [NSWorkspaceOpenConfiguration configuration];
+        configuracion.activates = YES;
+        configuracion.promptsUserIfNeeded = NO;
+        // El completion handler llega en una cola arbitraria: se reencamina al
+        // hilo grafico con `emitir` (que solo captura QPointer y el id).
+        [ws openURLs:@[url]
+            withApplicationAtURL:app
+                   configuration:configuracion
+               completionHandler:^(NSRunningApplication* _Nullable, NSError* _Nullable error) {
+                   if (error != nil) {
+                       // Solo dominio y codigo: el mensaje puede incluir la ruta.
+                       qCWarning(lcMacOS).nospace() << "Vista Previa no abrio el PDF: "
+                                                    << QString::fromNSString(error.domain) << '/'
+                                                    << static_cast<long>(error.code);
+                   }
+                   emitir(error == nil ? ResultadoFinder::Mostrado : ResultadoFinder::Fallido);
+               }];
+    }
+}
+
 // --- Activacion y salida ---------------------------------------------------
 
 void MacOSIntegration::asegurarModoRegular()

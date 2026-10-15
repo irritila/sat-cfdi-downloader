@@ -94,6 +94,7 @@ ApplicationWindow {
     readonly property bool dialogoAbierto: (ventana.paginaNueva !== null && ventana.paginaNueva.dialogoAbierto)
                                            || (ventana.paginaDetalle !== null && ventana.paginaDetalle.dialogoAbierto)
                                            || (ventana.paginaPerfiles !== null && ventana.paginaPerfiles.dialogoAbierto)
+                                           || (ventana.paginaFacturas !== null && ventana.paginaFacturas.dialogoAbierto)
     // Campos de texto con foco: TextInput (incluye TextField) o TextEdit.
     readonly property TextInput entradaConFoco: ventana.activeFocusItem as TextInput
     readonly property TextEdit edicionConFoco: ventana.activeFocusItem as TextEdit

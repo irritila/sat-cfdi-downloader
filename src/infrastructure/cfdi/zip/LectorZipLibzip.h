@@ -26,6 +26,9 @@ public:
         const QString& rutaZip,
         const std::function<bool(const EntradaXmlCfdi&)>& alXml) override;
 
+    // T015.4: abre el ZIP y descomprime solo la entrada `indice`.
+    Resultado<std::optional<QByteArray>, ErrorPaqueteZip> leerEntrada(const QString& rutaZip, int indice) override;
+
     const LimitesLectorZip& limites() const noexcept { return m_limites; }
 
 private:

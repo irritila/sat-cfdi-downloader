@@ -29,6 +29,7 @@ set(_satcfdi_qml_files
     qml/components/EstadoVacio.qml
     qml/components/EventoHistorial.qml
     qml/components/FilaCfdi.qml
+    qml/components/VisorPdfCfdi.qml
     qml/components/FilaPaquete.qml
     qml/components/FilaPerfil.qml
     qml/components/FilaSolicitud.qml
@@ -96,6 +97,9 @@ qt_add_qml_module(satcfdi_presentation
         viewmodels/CfdiListModel.cpp
         viewmodels/ExploradorCfdiViewModel.h
         viewmodels/ExploradorCfdiViewModel.cpp
+        viewmodels/PrevisualizacionCfdi.h
+        viewmodels/VisorPdfCfdiViewModel.h
+        viewmodels/VisorPdfCfdiViewModel.cpp
         estilo/EstiloVisual.h
         estilo/EstiloVisual.cpp
         componentes/IconoSvg.h
@@ -117,6 +121,9 @@ target_include_directories(satcfdi_presentation
 
 # QSvgRenderer para IconoSvg (T013 D4).
 find_package(Qt6 REQUIRED COMPONENTS Svg)
+# T015.4 (T015 D7, D12): visor del PDF del CFDI con QtQuick.Pdf. Se enlaza
+# PdfQuick (y Pdf) para que el despliegue y la firma incluyan el modulo QML.
+find_package(Qt6 REQUIRED COMPONENTS Pdf PdfQuick)
 
 target_link_libraries(satcfdi_presentation
     PUBLIC
@@ -127,6 +134,8 @@ target_link_libraries(satcfdi_presentation
         Qt6::Quick
         Qt6::QuickControls2
         Qt6::Svg
+        Qt6::Pdf
+        Qt6::PdfQuick
 )
 
 satcfdi_enable_warnings(satcfdi_presentation)

@@ -66,7 +66,8 @@ public:
         friend bool operator==(const EstadoMonitoreo&, const EstadoMonitoreo&) = default;
     };
 
-    // T009.1 D5: resultado de mostrarEnFinder/abrirCarpetaEnFinder.
+    // T009.1 D5: resultado de mostrarEnFinder/abrirCarpetaEnFinder (y de
+    // abrirEnVistaPrevia, T015.4; Mostrado = Vista Previa acepto abrirlo).
     // NoEncontrado: el destino no existe (o no es del tipo esperado) al
     // revalidarlo justo antes de llamar a Finder; Fallido: Finder/NSWorkspace
     // reporto un fallo o la plataforma no lo soporta.
@@ -168,6 +169,14 @@ public:
     // T009.1 D5: abre en Finder la CARPETA `rutaAbsoluta`. Mismas reglas
     // (revalida que es un directorio, no enlace).
     virtual void abrirCarpetaEnFinder(const QString& peticionId, const QString& rutaAbsoluta) = 0;
+    // T015.4: abre el ARCHIVO `rutaAbsoluta` (PDF de la cache o temporal) con
+    // Vista Previa (com.apple.Preview), no con la app por defecto. Asincrono:
+    // emite SIEMPRE finderTerminado(peticionId, resultado). Revalida que existe
+    // y es un archivo regular (no enlace) -> si no, NoEncontrado; si Vista
+    // Previa no se encuentra o la apertura falla -> Fallido. Nunca lee el
+    // archivo ni registra la ruta. El llamador (AccesoFinder) ya restringio
+    // la ruta a los directorios permitidos.
+    virtual void abrirEnVistaPrevia(const QString& peticionId, const QString& rutaAbsoluta) = 0;
 
     // Refleja en el menu bar estado ya confirmado por persistencia (check de
     // preferencia de inicio automatico; Pausar/Reanudar). No emite
@@ -234,7 +243,8 @@ signals:
     void notificacionPruebaTerminada(satcfdi::OSIntegration::NotificationSendResult resultado);
     // Resultado de notificar() (uno por llamada).
     void notificacionTerminada(const QString& id, satcfdi::OSIntegration::NotificationSendResult resultado);
-    // Resultado de mostrarEnFinder()/abrirCarpetaEnFinder() (uno por llamada).
+    // Resultado de mostrarEnFinder()/abrirCarpetaEnFinder()/abrirEnVistaPrevia()
+    // (uno por llamada).
     void finderTerminado(const QString& peticionId, satcfdi::OSIntegration::ResultadoFinder resultado);
 };
 

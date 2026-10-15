@@ -60,6 +60,7 @@ public:
     void notificar(const NotificacionLocal& notificacion) override;
     void mostrarEnFinder(const QString& peticionId, const QString& rutaAbsoluta) override;
     void abrirCarpetaEnFinder(const QString& peticionId, const QString& rutaAbsoluta) override;
+    void abrirEnVistaPrevia(const QString& peticionId, const QString& rutaAbsoluta) override;
 
     void reflejarPreferenciaLoginItem(bool habilitado) override;
     void reflejarMonitoreoPausado(bool pausado) override;

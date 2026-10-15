@@ -6,7 +6,11 @@
 #include "domain/paquetes/PaquetePersistido.h"
 #include "ports/repositories/PaqueteSolicitudRepository.h"
 
+#include <QDir>
+#include <QFileInfo>
 #include <QUuid>
+
+#include <algorithm>
 
 namespace satcfdi {
 
@@ -15,6 +19,17 @@ namespace {
 ResultadoAccionFinder resultado(ResultadoAccionFinder::Estado estado, QString mensaje = {})
 {
     return ResultadoAccionFinder{estado, std::move(mensaje)};
+}
+
+// true si `ruta` esta ESTRICTAMENTE bajo el directorio `dir` (ambos absolutos
+// y limpios). Comparacion textual por componentes: "/a/bc" no esta bajo "/a/b".
+bool dentroDe(const QString& ruta, const QString& dir)
+{
+    if (ruta.isEmpty() || dir.isEmpty()) {
+        return false;
+    }
+    const QString prefijo = dir.endsWith(QLatin1Char('/')) ? dir : dir + QLatin1Char('/');
+    return ruta.size() > prefijo.size() && ruta.startsWith(prefijo);
 }
 
 } // namespace
@@ -31,7 +46,9 @@ AccesoFinder::AccesoFinder(AccesoPaquetesService& acceso, PersistenceDispatcher&
 AccesoFinder::~AccesoFinder()
 {
     for (auto& p : m_pendientes) {
-        p.promesa->addResult(resultado(ResultadoAccionFinder::Estado::Fallido, mensajeFinderFallido()));
+        p.promesa->addResult(resultado(ResultadoAccionFinder::Estado::Fallido,
+                                       p.destino == Destino::VistaPrevia ? mensajeVistaPreviaFallida()
+                                                                         : mensajeFinderFallido()));
         p.promesa->finish();
     }
 }
@@ -39,6 +56,78 @@ AccesoFinder::~AccesoFinder()
 QString AccesoFinder::mensajeFinderFallido()
 {
     return QStringLiteral("No se pudo abrir Finder");
+}
+
+QString AccesoFinder::mensajeVistaPreviaFallida()
+{
+    return QStringLiteral("No se pudo abrir Vista Previa");
+}
+
+QString AccesoFinder::mensajeVistaPreviaNoEncontrada()
+{
+    return QStringLiteral("PDF no encontrado");
+}
+
+void AccesoFinder::setDirectoriosVistaPrevia(const QStringList& directoriosAbsolutos)
+{
+    m_directoriosVistaPrevia.clear();
+    for (const QString& d : directoriosAbsolutos) {
+        if (!d.isEmpty() && QDir::isAbsolutePath(d)) {
+            m_directoriosVistaPrevia.append(QDir::cleanPath(d));
+        }
+    }
+}
+
+QFuture<ResultadoAccionFinder> AccesoFinder::abrirEnVistaPrevia(const QString& rutaAbsoluta)
+{
+    const auto fallido = [] {
+        return QtFuture::makeReadyValueFuture(
+            resultado(ResultadoAccionFinder::Estado::Fallido, mensajeVistaPreviaFallida()));
+    };
+    // 1. Forma: absoluta y ya limpia (sin `.`, `..`, `//` ni barra final).
+    if (rutaAbsoluta.isEmpty() || !QDir::isAbsolutePath(rutaAbsoluta)
+        || QDir::cleanPath(rutaAbsoluta) != rutaAbsoluta) {
+        return fallido();
+    }
+    // 2. Textualmente bajo un directorio permitido (tal cual o canonico).
+    QStringList canonicos;
+    bool textualmenteDentro = false;
+    for (const QString& d : std::as_const(m_directoriosVistaPrevia)) {
+        const QString canonico = QFileInfo(d).canonicalFilePath();
+        if (!canonico.isEmpty()) {
+            canonicos.append(canonico);
+        }
+        textualmenteDentro = textualmenteDentro || dentroDe(rutaAbsoluta, d) || dentroDe(rutaAbsoluta, canonico);
+    }
+    if (!textualmenteDentro) {
+        return fallido();
+    }
+    // 3. Existencia (un enlace roto cuenta como inexistente). Sin llamar al SO.
+    const QFileInfo info(rutaAbsoluta);
+    if (!info.exists()) {
+        return QtFuture::makeReadyValueFuture(
+            resultado(ResultadoAccionFinder::Estado::NoEncontrado, mensajeVistaPreviaNoEncontrada()));
+    }
+    // 4. Ruta canonica (enlaces resueltos) estrictamente dentro de un
+    //    directorio permitido canonico y archivo regular: un enlace que escapa
+    //    se rechaza aqui.
+    const QString canonica = info.canonicalFilePath();
+    const bool canonicaDentro =
+        std::any_of(canonicos.cbegin(), canonicos.cend(), [&](const QString& c) { return dentroDe(canonica, c); });
+    if (!canonicaDentro || !QFileInfo(canonica).isFile()) {
+        return fallido();
+    }
+    if (!m_os) {
+        return fallido();
+    }
+    auto promesa = std::make_shared<QPromise<ResultadoAccionFinder>>();
+    promesa->start();
+    QFuture<ResultadoAccionFinder> futuro = promesa->future();
+    const QString peticion = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    m_pendientes.insert(peticion, Pendiente{promesa, Destino::VistaPrevia});
+    // El adaptador revalida con lstat (archivo regular, no enlace).
+    m_os->abrirEnVistaPrevia(peticion, canonica);
+    return futuro;
 }
 
 void AccesoFinder::setOS(OSIntegration* os)
@@ -159,11 +248,14 @@ void AccesoFinder::alTerminarFinder(const QString& peticionId, OSIntegration::Re
         break;
     case OSIntegration::ResultadoFinder::NoEncontrado:
         salida = resultado(ResultadoAccionFinder::Estado::NoEncontrado,
-                           p.destino == Destino::Archivo ? mensajesacceso::archivoNoEncontrado()
-                                                         : mensajesacceso::carpetaNoEncontrada());
+                           p.destino == Destino::Archivo       ? mensajesacceso::archivoNoEncontrado()
+                           : p.destino == Destino::VistaPrevia ? mensajeVistaPreviaNoEncontrada()
+                                                               : mensajesacceso::carpetaNoEncontrada());
         break;
     case OSIntegration::ResultadoFinder::Fallido:
-        salida = resultado(ResultadoAccionFinder::Estado::Fallido, mensajeFinderFallido());
+        salida = resultado(ResultadoAccionFinder::Estado::Fallido, p.destino == Destino::VistaPrevia
+                                                                       ? mensajeVistaPreviaFallida()
+                                                                       : mensajeFinderFallido());
         break;
     }
     p.promesa->addResult(salida);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ports/repositories/CfdiCatalogRepository.h"
+#include "VisorPdfCfdiViewModel.h"
 
 #include <QObject>
 #include <QPointer>
@@ -16,6 +17,7 @@ namespace satcfdi {
 class AccionesFinder;
 class CfdiListModel;
 class ConsultaCatalogoCfdi;
+class PrevisualizacionCfdi;
 
 // Explorador de CFDI de una solicitud (T015.3, T015 D1). Lista los CFDI ya
 // indexados con busqueda y filtro por tipo, y el estado del indice.
@@ -40,7 +42,10 @@ class ConsultaCatalogoCfdi;
 // retardo corto (`intervaloBusqueda`, 250 ms) y el filtro de tipo al
 // instante; tokens de generacion: la ultima respuesta gana.
 //
-// previsualizar(fila) solo expone la intencion (T015.4 la atiende).
+// previsualizar(fila) emite la intencion y, con PrevisualizacionCfdi
+// (T015.4), abre el visor (`visor`) con el PDF de esa fila; otra fila, otra
+// solicitud o salir de la pagina cierran el visor e ignoran lo que estaba en
+// curso (la ultima peticion gana).
 class ExploradorCfdiViewModel : public QObject {
     Q_OBJECT
     QML_ELEMENT
@@ -60,6 +65,7 @@ class ExploradorCfdiViewModel : public QObject {
     Q_PROPERTY(QVariantList lineasEstado READ lineasEstado NOTIFY resumenChanged)
     Q_PROPERTY(bool puedeAbrirCarpeta READ puedeAbrirCarpeta NOTIFY mensajeFinderChanged)
     Q_PROPERTY(QString mensajeFinder READ mensajeFinder NOTIFY mensajeFinderChanged)
+    Q_PROPERTY(satcfdi::VisorPdfCfdiViewModel* visor READ visor CONSTANT)
 
 public:
     enum class Estado {
@@ -77,6 +83,8 @@ public:
     // No propietarios; nullptr = sin consulta (lista vacia) o sin Finder.
     void setConsulta(ConsultaCatalogoCfdi* consulta);
     void setAccionesFinder(AccionesFinder* acciones);
+    // T015.4: generacion del PDF; nullptr = sin visor (solo la intencion).
+    void setPrevisualizacion(PrevisualizacionCfdi* previsualizacion);
     // Retardo de la busqueda (pruebas: 0).
     void setIntervaloBusqueda(int ms) { m_retardo.setInterval(ms); }
     int intervaloBusqueda() const { return m_retardo.interval(); }
@@ -97,6 +105,7 @@ public:
     QVariantList lineasEstado() const;
     bool puedeAbrirCarpeta() const { return m_finder != nullptr && m_solicitud.has_value(); }
     QString mensajeFinder() const { return m_mensajeFinder; }
+    VisorPdfCfdiViewModel* visor() const { return m_visor; }
 
     // Abre (o reabre) el explorador de la solicitud. Otra solicitud vacia la
     // lista y los filtros. false si el id no es canonico.
@@ -105,8 +114,8 @@ public:
     Q_INVOKABLE void recargar();
     Q_INVOKABLE void limpiarFiltros();
     Q_INVOKABLE void abrirCarpetaSolicitud();
-    // Intencion de previsualizar el CFDI de la fila (T015.4). false si la
-    // fila no existe.
+    // Previsualiza el CFDI de la fila (T015.4): emite la intencion y abre el
+    // visor si hay PrevisualizacionCfdi. false si la fila no existe.
     Q_INVOKABLE bool previsualizar(int fila);
     // Al salir de la pagina: descarta respuestas en curso y deja de recargar
     // con las senales hasta el siguiente abrir().
@@ -139,6 +148,7 @@ private:
     QPointer<ConsultaCatalogoCfdi> m_consulta;
     AccionesFinder* m_finder = nullptr;
     CfdiListModel* m_modelo;
+    VisorPdfCfdiViewModel* m_visor;
     QTimer m_retardo;
     std::optional<SolicitudId> m_solicitud;
     bool m_activo = false;

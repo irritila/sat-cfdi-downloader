@@ -30,6 +30,10 @@ public:
     virtual QFuture<ResultadoAccionFinder> mostrarPaquete(const SolicitudId& solicitud, const QString& idPaqueteSat) = 0;
     virtual QFuture<ResultadoAccionFinder> abrirCarpetaSolicitud(const SolicitudId& solicitud) = 0;
     virtual QFuture<ResultadoAccionFinder> abrirCarpetaPaquetes() = 0;
+    // T015.4: abre en Vista Previa el PDF `rutaAbsoluta` que entrego
+    // PrevisualizacionCfdi (cache de PDF o temporal de la app). Rutas fuera de
+    // esos directorios -> Fallido sin llamar al SO; inexistente -> NoEncontrado.
+    virtual QFuture<ResultadoAccionFinder> abrirEnVistaPrevia(const QString& rutaAbsoluta) = 0;
 };
 
 } // namespace satcfdi

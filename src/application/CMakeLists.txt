@@ -2,7 +2,8 @@
 # DTOs, servicios (demo y persistidos), PersistenceDispatcher y
 # RegexLogSanitizer y, desde T007, OperacionExecutor/WorkerLocal (hilo propio
 # del ejecutor) y, desde T015.2, IndexadorCfdi (hilo propio del indice de
-# CFDI; archivos y ZIP solo por puertos). Sin SQL, red, archivos ni timers (el Programador de
+# CFDI; archivos y ZIP solo por puertos) y, desde T015.4,
+# PrevisualizacionCfdiService (hilo propio del PDF; render y cache por puertos). Sin SQL, red, archivos ni timers (el Programador de
 # produccion vive en app_core/ProgramadorQt). Unico hilo permitido:
 # el QThread de PersistenceDispatcher (DA4). Los servicios Demo* y *Persistido
 # solo se instancian en el composition root (o en pruebas).
@@ -14,6 +15,9 @@ qt_add_library(satcfdi_application STATIC
     cfdi/IndexadorCfdi.cpp
     cfdi/CatalogoCfdiService.h
     cfdi/CatalogoCfdiService.cpp
+    # T015.4: previsualizacion PDF (hilo propio; cache y render por puertos).
+    cfdi/PrevisualizacionCfdiService.h
+    cfdi/PrevisualizacionCfdiService.cpp
     common/Errores.h
     common/FechasLegibles.h
     common/FechasLegibles.cpp

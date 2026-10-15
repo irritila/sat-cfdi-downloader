@@ -13,6 +13,7 @@
 #include "presentation/viewmodels/AccionesSolicitud.h"
 #include "presentation/viewmodels/ConsultaCatalogoCfdi.h"
 #include "presentation/viewmodels/ConsultaExistenciaPaquetes.h"
+#include "presentation/viewmodels/PrevisualizacionCfdi.h"
 
 #include <QHash>
 #include <QList>
@@ -143,6 +144,10 @@ public:
     {
         return listo(ResultadoAccionFinder{ResultadoAccionFinder::Estado::Mostrado, {}});
     }
+    QFuture<ResultadoAccionFinder> abrirEnVistaPrevia(const QString&) override // T015.4
+    {
+        return listo(ResultadoAccionFinder{ResultadoAccionFinder::Estado::Mostrado, {}});
+    }
 };
 
 class ExistenciaFija final : public ConsultaExistenciaPaquetes {
@@ -184,6 +189,25 @@ public:
         return listo(ResultadoResumen::exito(resumenIndice));
     }
     QFuture<void> revisarSolicitud(const SolicitudId&) override { return QtFuture::makeReadyVoidFuture(); }
+};
+
+// T015.4: PDF fijo (generado con el renderer real a partir de un XML
+// sintetico, ver main.cpp). Guardar no escribe nada.
+class PrevisualizacionFija final : public PrevisualizacionCfdi {
+public:
+    QString rutaPdf; // vacio = Fallo
+
+    QFuture<ResultadoGenerar> generar(const SolicitudId&, const QString&, int) override
+    {
+        if (rutaPdf.isEmpty()) {
+            return listo(ResultadoGenerar::fallo(MotivoPrevisualizacion::Fallo));
+        }
+        return listo(ResultadoGenerar::exito(PdfPrevisualizado{rutaPdf, QStringLiteral("CFDI-A1187-5F2B1A30.pdf")}));
+    }
+    QFuture<ResultadoGuardar> guardarComo(const QString&, const QString&) override
+    {
+        return listo(ResultadoGuardar::exito(true));
+    }
 };
 
 } // namespace capturas

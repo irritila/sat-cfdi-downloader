@@ -140,7 +140,135 @@ bool razonExcedida(qint64 descomprimido, zip_uint64_t comprimido, const LimitesL
     return descomprimido > static_cast<qint64>(comprimido) * limites.razonCompresionMax;
 }
 
-enum class LecturaEntrada { Aceptada, Omitida, ExcedeTotal };
+// Resultado de leer una entrada: contenido aceptado, motivo de omision o
+// exceso del total descomprimido del ZIP (error del paquete).
+struct LecturaEntrada {
+    std::optional<QByteArray> contenido;
+    std::optional<MotivoOmision> motivo;
+    bool excedeTotal = false;
+};
+
+// Reglas por entrada (D4), compartidas por recorrer() y leerEntrada().
+// `totalDescomprimido` acumula los bytes reales leidos del ZIP.
+LecturaEntrada leerUna(zip_t* zip, zip_uint64_t indice, const LimitesLectorZip& limites, qint64& totalDescomprimido)
+{
+    LecturaEntrada r;
+    zip_stat_t st;
+    zip_stat_init(&st);
+    if (zip_stat_index(zip, indice, ZIP_FL_ENC_RAW, &st) != 0 || !(st.valid & ZIP_STAT_NAME) || st.name == nullptr) {
+        r.motivo = MotivoOmision::ErrorLectura;
+        return r;
+    }
+    const QByteArray nombre(st.name);
+
+    if (esRutaInvalida(nombre)) {
+        r.motivo = MotivoOmision::RutaInvalida;
+        return r;
+    }
+    if (esEnlace(zip, indice)) {
+        r.motivo = MotivoOmision::Enlace;
+        return r;
+    }
+    if ((st.valid & ZIP_STAT_ENCRYPTION_METHOD) && st.encryption_method != ZIP_EM_NONE) {
+        r.motivo = MotivoOmision::Cifrada;
+        return r;
+    }
+    if (!esXml(nombre)) {
+        r.motivo = MotivoOmision::NoXml;
+        return r;
+    }
+
+    const bool conTamano = (st.valid & ZIP_STAT_SIZE) != 0;
+    const bool conComprimido = (st.valid & ZIP_STAT_COMP_SIZE) != 0;
+    const zip_uint64_t comprimido = conComprimido ? st.comp_size : 0;
+    // Atajo por tamanos declarados (un encabezado que miente a la baja lo
+    // detecta la lectura acotada).
+    if (conTamano && st.size > static_cast<zip_uint64_t>(limites.maxBytesEntrada)) {
+        r.motivo = MotivoOmision::ExcedeTamano;
+        return r;
+    }
+    if (conTamano && conComprimido && razonExcedida(static_cast<qint64>(st.size), comprimido, limites)) {
+        r.motivo = MotivoOmision::RazonCompresion;
+        return r;
+    }
+
+    EntradaUnica entrada(zip_fopen_index(zip, indice, 0));
+    if (!entrada) {
+        r.motivo = MotivoOmision::ErrorLectura;
+        return r;
+    }
+
+    // Lectura acotada: nunca mas de maxBytesEntrada + 1 bytes en memoria.
+    QByteArray contenido;
+    if (conTamano)
+        contenido.reserve(static_cast<qsizetype>(st.size));
+    qint64 leidos = 0;
+    for (;;) {
+        const qint64 permitido = limites.maxBytesEntrada + 1 - leidos;
+        const qint64 pedir = std::min(limites.bytesPorTrozo, permitido);
+        contenido.resize(static_cast<qsizetype>(leidos + pedir));
+        const zip_int64_t n = zip_fread(entrada.get(), contenido.data() + leidos, static_cast<zip_uint64_t>(pedir));
+        if (n < 0) {
+            r.motivo = MotivoOmision::ErrorLectura;
+            return r;
+        }
+        if (n == 0)
+            break;
+        leidos += n;
+        totalDescomprimido += n;
+        if (totalDescomprimido > limites.maxBytesTotal) {
+            r.excedeTotal = true;
+            return r;
+        }
+        if (leidos > limites.maxBytesEntrada) {
+            r.motivo = MotivoOmision::ExcedeTamano;
+            return r;
+        }
+        if (razonExcedida(leidos, comprimido, limites)) {
+            r.motivo = MotivoOmision::RazonCompresion;
+            return r;
+        }
+    }
+    contenido.resize(static_cast<qsizetype>(leidos));
+    r.contenido = std::move(contenido);
+    return r;
+}
+
+// Apertura comun: valida existencia, ZIP vacio, apertura y numero de entradas.
+struct ZipAbierto {
+    ZipUnico zip;
+    zip_int64_t entradas = 0;
+};
+
+Resultado<ZipAbierto, ErrorPaqueteZip> abrirZip(const QString& rutaZip, const LimitesLectorZip& limites)
+{
+    using R = Resultado<ZipAbierto, ErrorPaqueteZip>;
+    const auto rechazo = [](const ResultadoLectura& f) { return R::fallo(f.error()); };
+    const QFileInfo info(rutaZip);
+    if (rutaZip.isEmpty() || !info.exists())
+        return rechazo(fallo(ErrorPaqueteZip::Tipo::NoExiste, ErrorPaqueteZip::Causa::NoExiste));
+    // libzip abre un archivo vacio como ZIP sin entradas; para un paquete del
+    // SAT eso solo puede ser una descarga incompleta.
+    if (info.isFile() && info.size() == 0)
+        return rechazo(ilegible(ErrorPaqueteZip::Causa::Truncado));
+
+    const QByteArray rutaNativa = QFile::encodeName(rutaZip);
+    int codigoError = 0;
+    ZipUnico zip(zip_open(rutaNativa.constData(), ZIP_RDONLY | ZIP_CHECKCONS, &codigoError));
+    if (!zip) {
+        if (codigoError == ZIP_ER_NOENT || codigoError == ZIP_ER_OPEN)
+            return rechazo(fallo(ErrorPaqueteZip::Tipo::NoExiste, ErrorPaqueteZip::Causa::NoExiste));
+        qCDebug(lcLectorZip) << "zip_open fallo; codigo libzip:" << codigoError;
+        return rechazo(ilegible(clasificarIlegible(rutaZip)));
+    }
+
+    const zip_int64_t numEntradas = zip_get_num_entries(zip.get(), 0);
+    if (numEntradas < 0)
+        return rechazo(ilegible(ErrorPaqueteZip::Causa::Corrupto));
+    if (numEntradas > limites.maxEntradas)
+        return rechazo(ilegible(ErrorPaqueteZip::Causa::DemasiadasEntradas));
+    return R::exito(ZipAbierto{std::move(zip), numEntradas});
+}
 
 } // namespace
 
@@ -151,129 +279,25 @@ LectorZipLibzip::LectorZipLibzip(const LimitesLectorZip& limites) : m_limites(li
 Resultado<ResumenLecturaZip, ErrorPaqueteZip> LectorZipLibzip::recorrer(
     const QString& rutaZip, const std::function<bool(const EntradaXmlCfdi&)>& alXml)
 {
-    const QFileInfo info(rutaZip);
-    if (rutaZip.isEmpty() || !info.exists())
-        return fallo(ErrorPaqueteZip::Tipo::NoExiste, ErrorPaqueteZip::Causa::NoExiste);
-    // libzip abre un archivo vacio como ZIP sin entradas; para un paquete del
-    // SAT eso solo puede ser una descarga incompleta.
-    if (info.isFile() && info.size() == 0)
-        return ilegible(ErrorPaqueteZip::Causa::Truncado);
-
-    const QByteArray rutaNativa = QFile::encodeName(rutaZip);
-    int codigoError = 0;
-    ZipUnico zip(zip_open(rutaNativa.constData(), ZIP_RDONLY | ZIP_CHECKCONS, &codigoError));
-    if (!zip) {
-        if (codigoError == ZIP_ER_NOENT || codigoError == ZIP_ER_OPEN)
-            return fallo(ErrorPaqueteZip::Tipo::NoExiste, ErrorPaqueteZip::Causa::NoExiste);
-        qCDebug(lcLectorZip) << "zip_open fallo; codigo libzip:" << codigoError;
-        return ilegible(clasificarIlegible(rutaZip));
-    }
-
-    const zip_int64_t numEntradas = zip_get_num_entries(zip.get(), 0);
-    if (numEntradas < 0)
-        return ilegible(ErrorPaqueteZip::Causa::Corrupto);
-    if (numEntradas > m_limites.maxEntradas)
-        return ilegible(ErrorPaqueteZip::Causa::DemasiadasEntradas);
+    auto abierto = abrirZip(rutaZip, m_limites);
+    if (!abierto.esExito())
+        return ResultadoLectura::fallo(abierto.error());
+    zip_t* zip = abierto.valor().zip.get();
+    const zip_int64_t numEntradas = abierto.valor().entradas;
 
     ResumenLecturaZip resumen;
     qint64 totalDescomprimido = 0;
-    auto omitir = [&resumen](MotivoOmision motivo) { ++resumen.omitidas[motivo]; };
 
     for (zip_int64_t i = 0; i < numEntradas; ++i) {
-        const auto indice = static_cast<zip_uint64_t>(i);
-
-        zip_stat_t st;
-        zip_stat_init(&st);
-        if (zip_stat_index(zip.get(), indice, ZIP_FL_ENC_RAW, &st) != 0 || !(st.valid & ZIP_STAT_NAME)
-            || st.name == nullptr) {
-            omitir(MotivoOmision::ErrorLectura);
-            continue;
-        }
-        const QByteArray nombre(st.name);
-
-        if (esRutaInvalida(nombre)) {
-            omitir(MotivoOmision::RutaInvalida);
-            continue;
-        }
-        if (esEnlace(zip.get(), indice)) {
-            omitir(MotivoOmision::Enlace);
-            continue;
-        }
-        if ((st.valid & ZIP_STAT_ENCRYPTION_METHOD) && st.encryption_method != ZIP_EM_NONE) {
-            omitir(MotivoOmision::Cifrada);
-            continue;
-        }
-        if (!esXml(nombre)) {
-            omitir(MotivoOmision::NoXml);
-            continue;
-        }
-
-        const bool conTamano = (st.valid & ZIP_STAT_SIZE) != 0;
-        const bool conComprimido = (st.valid & ZIP_STAT_COMP_SIZE) != 0;
-        const zip_uint64_t comprimido = conComprimido ? st.comp_size : 0;
-        // Atajo por tamanos declarados (un encabezado que miente a la baja lo
-        // detecta la lectura acotada).
-        if (conTamano && st.size > static_cast<zip_uint64_t>(m_limites.maxBytesEntrada)) {
-            omitir(MotivoOmision::ExcedeTamano);
-            continue;
-        }
-        if (conTamano && conComprimido && razonExcedida(static_cast<qint64>(st.size), comprimido, m_limites)) {
-            omitir(MotivoOmision::RazonCompresion);
-            continue;
-        }
-
-        EntradaUnica entrada(zip_fopen_index(zip.get(), indice, 0));
-        if (!entrada) {
-            omitir(MotivoOmision::ErrorLectura);
-            continue;
-        }
-
-        // Lectura acotada: nunca mas de maxBytesEntrada + 1 bytes en memoria.
-        QByteArray contenido;
-        if (conTamano)
-            contenido.reserve(static_cast<qsizetype>(st.size));
-        qint64 leidos = 0;
-        std::optional<MotivoOmision> motivo;
-        bool excedeTotal = false;
-        for (;;) {
-            const qint64 permitido = m_limites.maxBytesEntrada + 1 - leidos;
-            const qint64 pedir = std::min(m_limites.bytesPorTrozo, permitido);
-            contenido.resize(static_cast<qsizetype>(leidos + pedir));
-            const zip_int64_t n = zip_fread(entrada.get(), contenido.data() + leidos,
-                                            static_cast<zip_uint64_t>(pedir));
-            if (n < 0) {
-                motivo = MotivoOmision::ErrorLectura;
-                break;
-            }
-            if (n == 0)
-                break;
-            leidos += n;
-            totalDescomprimido += n;
-            if (totalDescomprimido > m_limites.maxBytesTotal) {
-                excedeTotal = true;
-                break;
-            }
-            if (leidos > m_limites.maxBytesEntrada) {
-                motivo = MotivoOmision::ExcedeTamano;
-                break;
-            }
-            if (razonExcedida(leidos, comprimido, m_limites)) {
-                motivo = MotivoOmision::RazonCompresion;
-                break;
-            }
-        }
-        entrada.reset();
-
-        if (excedeTotal)
+        LecturaEntrada lectura = leerUna(zip, static_cast<zip_uint64_t>(i), m_limites, totalDescomprimido);
+        if (lectura.excedeTotal)
             return ilegible(ErrorPaqueteZip::Causa::ExcedeTotal);
-        if (motivo) {
-            omitir(*motivo);
+        if (lectura.motivo) {
+            ++resumen.omitidas[*lectura.motivo];
             continue;
         }
-
-        contenido.resize(static_cast<qsizetype>(leidos));
         ++resumen.xmlEntregados;
-        if (!alXml(EntradaXmlCfdi{static_cast<int>(i), std::move(contenido)})) {
+        if (!alXml(EntradaXmlCfdi{static_cast<int>(i), std::move(*lectura.contenido)})) {
             qCDebug(lcLectorZip) << "lectura cancelada; xml entregados:" << resumen.xmlEntregados;
             return ResultadoLectura::exito(std::move(resumen));
         }
@@ -285,6 +309,27 @@ Resultado<ResumenLecturaZip, ErrorPaqueteZip> LectorZipLibzip::recorrer(
     }
     qCDebug(lcLectorZip) << "lectura completa; xml entregados:" << resumen.xmlEntregados;
     return ResultadoLectura::exito(std::move(resumen));
+}
+
+Resultado<std::optional<QByteArray>, ErrorPaqueteZip> LectorZipLibzip::leerEntrada(const QString& rutaZip, int indice)
+{
+    using R = Resultado<std::optional<QByteArray>, ErrorPaqueteZip>;
+    auto abierto = abrirZip(rutaZip, m_limites);
+    if (!abierto.esExito())
+        return R::fallo(abierto.error());
+    if (indice < 0 || indice >= abierto.valor().entradas)
+        return R::exito(std::nullopt);
+    // Una sola entrada: el limite total no puede excederse antes que el de la
+    // entrada (maxBytesEntrada < maxBytesTotal), pero se respeta igual.
+    qint64 total = 0;
+    LecturaEntrada lectura = leerUna(abierto.valor().zip.get(), static_cast<zip_uint64_t>(indice), m_limites, total);
+    if (lectura.excedeTotal)
+        return R::fallo(ilegible(ErrorPaqueteZip::Causa::ExcedeTotal).error());
+    if (lectura.motivo) {
+        qCInfo(lcLectorZip).noquote() << "entrada omitida;" << nombreMotivo(*lectura.motivo);
+        return R::exito(std::nullopt);
+    }
+    return R::exito(std::move(lectura.contenido));
 }
 
 } // namespace satcfdi

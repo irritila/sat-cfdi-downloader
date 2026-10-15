@@ -506,6 +506,42 @@ private slots:
         QVERIFY(recError.entregadas.isEmpty());
         QCOMPARE(fake.rutasRecorridas().size(), 2);
     }
+
+    // T015.4: leerEntrada devuelve solo la entrada de esa posicion, con las
+    // mismas reglas que recorrer (lector real y la implementacion por
+    // defecto del puerto que usan los fakes).
+    void leerEntradaPorPosicion()
+    {
+        const QString ruta = crearZip(m_dir, "posicion.zip",
+                                      {{"a.xml", kXmlA}, {"nota.txt", "texto"}, {"../malo.xml", kXmlA},
+                                       {"sub/B.XML", kXmlB}});
+        QVERIFY(!ruta.isEmpty());
+        LectorZipLibzip lector;
+        auto r = lector.leerEntrada(ruta, 0);
+        QVERIFY(r.esExito() && r.valor());
+        QCOMPARE(*r.valor(), kXmlA);
+        r = lector.leerEntrada(ruta, 3);
+        QVERIFY(r.esExito() && r.valor());
+        QCOMPARE(*r.valor(), kXmlB);
+        // Omitidas (no XML, ruta invalida) y fuera de rango: exito sin contenido.
+        for (int i : {1, 2, 4, -1}) {
+            r = lector.leerEntrada(ruta, i);
+            QVERIFY(r.esExito());
+            QVERIFY(!r.valor());
+        }
+        r = lector.leerEntrada(m_dir.filePath("no-existe.zip"), 0);
+        QVERIFY(!r.esExito());
+        QCOMPARE(r.error().tipo, ErrorPaqueteZip::Tipo::NoExiste);
+
+        fakes::FakeCfdiArchiveReader fake;
+        fake.agregarXml(kXmlA);
+        fake.agregarOmision(MotivoOmision::NoXml);
+        fake.agregarXml(kXmlB);
+        QCOMPARE(*fake.leerEntrada(QStringLiteral("/x.zip"), 2).valor(), kXmlB);
+        QVERIFY(!fake.leerEntrada(QStringLiteral("/x.zip"), 1).valor());
+        fake.programarError({ErrorPaqueteZip::Tipo::Ilegible, ErrorPaqueteZip::Causa::Corrupto});
+        QVERIFY(!fake.leerEntrada(QStringLiteral("/x.zip"), 0).esExito());
+    }
 };
 
 QTEST_GUILESS_MAIN(TestLectorZipLibzip)

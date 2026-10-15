@@ -6,6 +6,7 @@
 // Finder espia. Context property "fixtureExplorador". Datos ficticios.
 
 #include "../ConsultaCatalogoFake.h"
+#include "../PrevisualizacionFake.h"
 #include "../ServiciosAsincronosFake.h"
 #include "fakes/FakeCredencialesSatService.h"
 #include "fakes/FakePerfilesSatService.h"
@@ -63,11 +64,26 @@ public:
     Q_INVOKABLE QString ultimaPrevisualizacion() const;
     Q_INVOKABLE int numCarpetas() const;
 
+    // T015.4: previsualizacion (sin activar, Enter solo emite la intencion).
+    Q_INVOKABLE void activarPrevisualizacion();
+    Q_INVOKABLE int numGeneraciones() const;
+    // "paquete:posicion" del ultimo PDF pedido.
+    Q_INVOKABLE QString ultimoPdfPedido() const;
+    // Entrega un PDF sintetico de `paginas` paginas (QPdfWriter, temporal).
+    Q_INVOKABLE void resolverPdf(int indice, int paginas = 1);
+    // `motivo`: origenNoDisponible, versionNoSoportada, ilegible, cancelada, fallo.
+    Q_INVOKABLE void fallarPdf(int indice, const QString& motivo);
+    Q_INVOKABLE int numGuardados() const;
+    Q_INVOKABLE void resolverGuardado(int indice, bool exito);
+    Q_INVOKABLE int numVistasPrevias() const;
+    Q_INVOKABLE void resolverVistaPrevia(int indice, bool exito, const QString& mensaje = {});
+
 signals:
     void reiniciado();
 
 private:
     struct Grafo;
     std::unique_ptr<Grafo> m_grafo;
+    QString m_dirPdf;
     std::vector<std::unique_ptr<Grafo>> m_retirados;
 };

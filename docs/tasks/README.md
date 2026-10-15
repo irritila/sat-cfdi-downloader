@@ -36,11 +36,11 @@ Ejemplo: `T001-modelo-fisico-sqlite.md`.
 | [T014.4](T014.4-notificaciones-accionables-icono.md) | Completada | Notificaciones accionables e icono con estado |
 | [T011](T011-empaquetado-firma-local.md) | Pendiente | Empaquetado y firma local (previa a T010) |
 | [T010](T010-pruebas-aceptacion-mvp.md) | Pendiente | Pruebas de aceptacion del MVP |
-| [T015](T015-explorador-cfdi.md) | Pendiente | Explorador de CFDI con previsualizacion PDF (M2, epica) |
+| [T015](T015-explorador-cfdi.md) | Completada | Explorador de CFDI con previsualizacion PDF (M2, epica) |
 | [T015.1](T015.1-lector-zip-parser-cfdi.md) | Completada | Lector de ZIP seguro y parser de CFDI |
 | [T015.2](T015.2-indice-cfdi.md) | Completada | Indice SQLite de CFDI |
 | [T015.3](T015.3-explorador-por-solicitud.md) | Completada | Explorador de CFDI por solicitud |
-| [T015.4](T015.4-pdf-qr-visor.md) | Pendiente | PDF con QR, visor y acciones |
+| [T015.4](T015.4-pdf-qr-visor.md) | Completada | PDF con QR, visor y acciones |
 
 ## Estados
 

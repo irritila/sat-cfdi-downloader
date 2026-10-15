@@ -1,5 +1,12 @@
 #include "FixtureExplorador.h"
 
+#include <QCoreApplication>
+#include <QDir>
+#include <QFont>
+#include <QPageSize>
+#include <QPainter>
+#include <QPdfWriter>
+#include <QStandardPaths>
 #include <QTimeZone>
 
 using namespace satcfdi;
@@ -21,6 +28,7 @@ bool existe(const P& promesas, int indice, const char* que)
 class FinderEspia final : public AccionesFinder {
 public:
     int carpetas = 0;
+    fakes::PromesasPendientes<ResultadoAccionFinder> vistasPrevias;
     QFuture<ResultadoAccionFinder> mostrarPaquete(const SolicitudId&, const QString&) override
     {
         return QtFuture::makeReadyValueFuture(ResultadoAccionFinder{ResultadoAccionFinder::Estado::Mostrado, {}});
@@ -33,6 +41,10 @@ public:
     QFuture<ResultadoAccionFinder> abrirCarpetaPaquetes() override
     {
         return QtFuture::makeReadyValueFuture(ResultadoAccionFinder{ResultadoAccionFinder::Estado::Mostrado, {}});
+    }
+    QFuture<ResultadoAccionFinder> abrirEnVistaPrevia(const QString&) override // T015.4
+    {
+        return vistasPrevias.nueva();
     }
 };
 
@@ -71,6 +83,7 @@ struct FixtureExplorador::Grafo {
     fakes::FakeCredencialesSatService credenciales;
     SolicitudesServiceAsincrono solicitudes;
     fakes::ConsultaCatalogoFake catalogo;
+    fakes::PrevisualizacionFake previsualizacion;
     FinderEspia finder;
     QStringList previsualizaciones;
     PresentacionViewModels vms{&solicitudes, &perfiles, &credenciales};
@@ -82,7 +95,12 @@ FixtureExplorador::FixtureExplorador(QObject* parent)
 {
 }
 
-FixtureExplorador::~FixtureExplorador() = default;
+FixtureExplorador::~FixtureExplorador()
+{
+    if (!m_dirPdf.isEmpty()) {
+        QDir(m_dirPdf).removeRecursively();
+    }
+}
 
 AppViewModel* FixtureExplorador::app() const { return m_grafo->vms.app(); }
 SolicitudDetailViewModel* FixtureExplorador::detalle() const { return m_grafo->vms.detalle(); }
@@ -191,3 +209,86 @@ QString FixtureExplorador::ultimaPrevisualizacion() const
 }
 
 int FixtureExplorador::numCarpetas() const { return m_grafo->finder.carpetas; }
+
+void FixtureExplorador::activarPrevisualizacion()
+{
+    m_grafo->vms.setPrevisualizacionCfdi(&m_grafo->previsualizacion);
+}
+
+int FixtureExplorador::numGeneraciones() const { return m_grafo->previsualizacion.generaciones.size(); }
+
+QString FixtureExplorador::ultimoPdfPedido() const
+{
+    return m_grafo->previsualizacion.pedidos.isEmpty() ? QString() : m_grafo->previsualizacion.pedidos.constLast();
+}
+
+void FixtureExplorador::resolverPdf(int indice, int paginas)
+{
+    if (!existe(m_grafo->previsualizacion.generaciones, indice, "generar")) {
+        return;
+    }
+    if (m_dirPdf.isEmpty()) {
+        m_dirPdf = QDir(QStandardPaths::writableLocation(QStandardPaths::TempLocation))
+                       .filePath(QStringLiteral("satcfdi-quicktests-pdf-%1").arg(QCoreApplication::applicationPid()));
+        QDir().mkpath(m_dirPdf);
+    }
+    const QString ruta = QDir(m_dirPdf).filePath(QStringLiteral("cfdi-%1-%2.pdf").arg(indice).arg(paginas));
+    {
+        QPdfWriter pdf(ruta);
+        pdf.setPageSize(QPageSize(QPageSize::Letter));
+        pdf.setResolution(72);
+        QPainter p(&pdf);
+        for (int i = 0; i < paginas; ++i) {
+            if (i > 0) {
+                pdf.newPage();
+            }
+            p.setFont(QFont(QStringLiteral("Helvetica"), 14));
+            p.drawText(QPointF(72, 96), QStringLiteral("CFDI ficticio, pagina %1").arg(i + 1));
+        }
+    }
+    m_grafo->previsualizacion.resolverPdf(indice, ruta, QStringLiteral("CFDI-A100-0A1B2C3D.pdf"));
+}
+
+void FixtureExplorador::fallarPdf(int indice, const QString& motivo)
+{
+    if (!existe(m_grafo->previsualizacion.generaciones, indice, "generar")) {
+        return;
+    }
+    MotivoPrevisualizacion m = MotivoPrevisualizacion::Fallo;
+    if (motivo == QLatin1String("origenNoDisponible")) {
+        m = MotivoPrevisualizacion::OrigenNoDisponible;
+    } else if (motivo == QLatin1String("versionNoSoportada")) {
+        m = MotivoPrevisualizacion::VersionNoSoportada;
+    } else if (motivo == QLatin1String("ilegible")) {
+        m = MotivoPrevisualizacion::Ilegible;
+    } else if (motivo == QLatin1String("cancelada")) {
+        m = MotivoPrevisualizacion::Cancelada;
+    }
+    m_grafo->previsualizacion.fallarPdf(indice, m);
+}
+
+int FixtureExplorador::numGuardados() const { return m_grafo->previsualizacion.copias.size(); }
+
+void FixtureExplorador::resolverGuardado(int indice, bool exito)
+{
+    if (!existe(m_grafo->previsualizacion.copias, indice, "guardarComo")) {
+        return;
+    }
+    if (exito) {
+        m_grafo->previsualizacion.resolverGuardado(indice);
+    } else {
+        m_grafo->previsualizacion.fallarGuardado(indice);
+    }
+}
+
+int FixtureExplorador::numVistasPrevias() const { return m_grafo->finder.vistasPrevias.size(); }
+
+void FixtureExplorador::resolverVistaPrevia(int indice, bool exito, const QString& mensaje)
+{
+    if (!existe(m_grafo->finder.vistasPrevias, indice, "abrirEnVistaPrevia")) {
+        return;
+    }
+    m_grafo->finder.vistasPrevias.resolver(
+        indice, ResultadoAccionFinder{exito ? ResultadoAccionFinder::Estado::Mostrado : ResultadoAccionFinder::Estado::Fallido,
+                                      mensaje});
+}

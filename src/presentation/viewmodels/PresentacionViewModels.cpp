@@ -82,6 +82,11 @@ void PresentacionViewModels::setConsultaCatalogo(ConsultaCatalogoCfdi* consulta)
     m_app->setExplorador(consulta ? m_explorador : nullptr);
 }
 
+void PresentacionViewModels::setPrevisualizacionCfdi(PrevisualizacionCfdi* previsualizacion)
+{
+    m_explorador->setPrevisualizacion(previsualizacion);
+}
+
 QVariantMap PresentacionViewModels::initialProperties() const
 {
     return {

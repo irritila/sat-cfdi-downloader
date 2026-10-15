@@ -12,6 +12,8 @@
 
 #include "application/notificaciones/Notificador.h"
 #include "application/notificaciones/ServicioNotificaciones.h"
+#include "infrastructure/cfdi/pdf/RenderizadorPdfCfdi.h"
+#include "infrastructure/cfdi/xml/ParserCfdi.h"
 #include "infrastructure/os/MenuBarDefinicion.h"
 #include "presentation/viewmodels/AppViewModel.h"
 #include "presentation/viewmodels/ExploradorCfdiViewModel.h"
@@ -19,10 +21,12 @@
 #include "presentation/viewmodels/NuevaSolicitudViewModel.h"
 #include "presentation/viewmodels/PerfilesSatViewModel.h"
 #include "presentation/viewmodels/PresentacionViewModels.h"
+#include "presentation/viewmodels/VisorPdfCfdiViewModel.h"
 #include "presentation/estilo/EstiloVisual.h"
 
 #include <QApplication>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QElapsedTimer>
 #include <QEventLoop>
@@ -31,7 +35,9 @@
 #include <QQmlComponent>
 #include <QQuickItem>
 #include <QQuickWindow>
+#include <QScreen>
 #include <QStyleHints>
+#include <QTemporaryDir>
 #include <QTimeZone>
 #include <QTimer>
 
@@ -265,6 +271,58 @@ void llenarCatalogo(CatalogoFijo& catalogo)
     r.cfdiIlegibles = 1;
 }
 
+// T015.4: PDF del primer CFDI de la lista (Papeleria Ejemplo, A-1187) con el
+// parser y el renderer reales. XML sintetico: RFC genericos, nombres, UUID,
+// certificados y sellos inventados.
+QByteArray xmlCfdiFijo()
+{
+    return QStringLiteral(
+               "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+               "<cfdi:Comprobante xmlns:cfdi=\"http://www.sat.gob.mx/cfd/4\" "
+               "xmlns:tfd=\"http://www.sat.gob.mx/TimbreFiscalDigital\" Version=\"4.0\" Serie=\"A\" "
+               "Folio=\"1187\" Fecha=\"2026-09-03T18:42:10\" Sello=\"U0VMTE9GSUNUSUNJT0RFTUFOVUFM=Xk9fQ2w=\" "
+               "FormaPago=\"03\" NoCertificado=\"00001000000000000001\" SubTotal=\"1000.00\" Moneda=\"MXN\" "
+               "Total=\"1160.00\" TipoDeComprobante=\"I\" Exportacion=\"01\" MetodoPago=\"PUE\" "
+               "LugarExpedicion=\"64000\">"
+               "<cfdi:Emisor Rfc=\"%1\" Nombre=\"PAPELERIA EJEMPLO\" RegimenFiscal=\"601\"/>"
+               "<cfdi:Receptor Rfc=\"%2\" Nombre=\"CONTRIBUYENTE DE EJEMPLO\" DomicilioFiscalReceptor=\"64000\" "
+               "RegimenFiscalReceptor=\"616\" UsoCFDI=\"G03\"/>"
+               "<cfdi:Conceptos>"
+               "<cfdi:Concepto ClaveProdServ=\"44121600\" Cantidad=\"10\" ClaveUnidad=\"H87\" Unidad=\"Pieza\" "
+               "Descripcion=\"Cuaderno profesional de ejemplo\" ValorUnitario=\"60.00\" Importe=\"600.00\" "
+               "ObjetoImp=\"02\"/>"
+               "<cfdi:Concepto ClaveProdServ=\"44121700\" Cantidad=\"20\" ClaveUnidad=\"H87\" Unidad=\"Pieza\" "
+               "Descripcion=\"Bolígrafo de ejemplo\" ValorUnitario=\"20.00\" Importe=\"400.00\" "
+               "ObjetoImp=\"02\"/>"
+               "</cfdi:Conceptos>"
+               "<cfdi:Impuestos TotalImpuestosTrasladados=\"160.00\"><cfdi:Traslados>"
+               "<cfdi:Traslado Base=\"1000.00\" Impuesto=\"002\" TipoFactor=\"Tasa\" TasaOCuota=\"0.160000\" "
+               "Importe=\"160.00\"/></cfdi:Traslados></cfdi:Impuestos>"
+               "<cfdi:Complemento><tfd:TimbreFiscalDigital Version=\"1.1\" UUID=\"%3\" "
+               "FechaTimbrado=\"2026-09-03T18:43:02\" RfcProvCertif=\"%2\" "
+               "SelloCFD=\"U0VMTE9GSUNUSUNJT0RFTUFOVUFM=Xk9fQ2w=\" NoCertificadoSAT=\"00001000000000000002\" "
+               "SelloSAT=\"U0VMTE9TQVRGSUNUSUNJTw==\"/></cfdi:Complemento>"
+               "</cfdi:Comprobante>\n")
+        .arg(kRfcOtro, kRfcPerfil, QStringLiteral("5F2B1A30-4D5E-4F60-8A7B-0C1D2E3F4A5B"))
+        .toUtf8();
+}
+
+// Escribe el PDF en `dir`; "" si no se pudo.
+QString pdfFijo(const QString& dir)
+{
+    RenderizadorPdfCfdi renderer;
+    const auto pdf = renderer.renderizar(parsearCfdi(xmlCfdiFijo()));
+    if (!pdf.esExito()) {
+        return {};
+    }
+    const QString ruta = QDir(dir).filePath(QStringLiteral("CFDI-A1187-5F2B1A30.pdf"));
+    QFile f(ruta);
+    if (!f.open(QIODevice::WriteOnly) || f.write(pdf.valor().contenido) != pdf.valor().contenido.size()) {
+        return {};
+    }
+    return ruta;
+}
+
 // --- Render -----------------------------------------------------------------
 
 void esperar(int ms)
@@ -273,6 +331,30 @@ void esperar(int ms)
     t.start();
     while (t.elapsed() < ms) {
         QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+    }
+}
+
+// T015.4: pantalla con mayor devicePixelRatio. Con un monitor externo de
+// dpr 1 como principal, la ventana se abria ahi y se reescalaba a 1920x1280:
+// QtPdfQuick rasteriza el PDF a renderScale * Screen.devicePixelRatio y, a
+// 1.25 px/pt, pdfium pierde el acento de "i" ("Boligrafo"). Todas las
+// capturas usan la pantalla de mayor dpr (Retina = 2 = kEscala).
+QScreen* pantallaCaptura()
+{
+    QScreen* mejor = QGuiApplication::primaryScreen();
+    for (QScreen* s : QGuiApplication::screens()) {
+        if (mejor == nullptr || s->devicePixelRatio() > mejor->devicePixelRatio()) {
+            mejor = s;
+        }
+    }
+    return mejor;
+}
+
+void colocarEnPantallaCaptura(QWindow* ventana)
+{
+    if (QScreen* s = pantallaCaptura()) {
+        ventana->setScreen(s);
+        ventana->setPosition(s->availableGeometry().topLeft() + QPoint(40, 40));
     }
 }
 
@@ -297,6 +379,8 @@ bool guardar(QQuickWindow* ventana, const QString& ruta)
     }
     imagen = imagen.convertToFormat(QImage::Format_RGB32);
     if (imagen.size() != QSize(kAncho * kEscala, kAlto * kEscala)) {
+        std::fprintf(stderr, "aviso: sin pantalla de dpr %d; la captura se reescala (texto del PDF menos nitido)\n",
+                     kEscala);
         imagen = imagen.scaled(kAncho * kEscala, kAlto * kEscala, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
     }
     imagen.setDevicePixelRatio(1.0);
@@ -318,6 +402,7 @@ struct Grafo {
     AccionesNulas acciones;
     ExistenciaFija existencia;
     CatalogoFijo catalogo; // T015.3
+    PrevisualizacionFija previsualizacion; // T015.4
     std::unique_ptr<PresentacionViewModels> vms;
     std::unique_ptr<QQmlApplicationEngine> engine;
 
@@ -335,6 +420,7 @@ struct Grafo {
         vms->setAccionesFinder(&acciones);
         vms->setConsultaExistencia(&existencia);
         vms->setConsultaCatalogo(&catalogo);
+        vms->setPrevisualizacionCfdi(&previsualizacion);
         engine = std::make_unique<QQmlApplicationEngine>();
         if (gTemaOscuro) {
             QObject* tema = engine->singletonInstance<QObject*>("SatCfdiDownloader", "Theme");
@@ -349,6 +435,7 @@ struct Grafo {
             return nullptr;
         }
         auto* ventana = qobject_cast<QQuickWindow*>(engine->rootObjects().constFirst());
+        colocarEnPantallaCaptura(ventana);
         ventana->resize(kAncho, kAlto);
         ventana->show();
         return ventana;
@@ -434,6 +521,7 @@ bool ilustracion(const QString& ruta, const QString& componente, const QVariantM
     }
     QQuickWindow ventana;
     ventana.setColor(QColor(QStringLiteral("#e5e5ea")));
+    colocarEnPantallaCaptura(&ventana);
     ventana.resize(kAncho, kAlto);
     raiz->setParentItem(ventana.contentItem());
     ventana.show();
@@ -652,6 +740,43 @@ QList<Escenario> escenarios()
                  }
                  esperar(500);
                  return g.vms->explorador()->vista() == QStringLiteral("lista");
+             });
+         }},
+        // T015.4: visor del PDF del primer CFDI (renderer real, XML sintetico).
+        {QStringLiteral("14-visor-pdf.png"), QStringLiteral("Captura"),
+         [](const QString& r) {
+             QTemporaryDir dir;
+             const QString pdf = dir.isValid() ? pdfFijo(dir.path()) : QString();
+             if (pdf.isEmpty()) {
+                 std::fprintf(stderr, "14: no se pudo generar el PDF sintetico\n");
+                 return false;
+             }
+             return capturaApp(r, [pdf](Grafo& g, QQuickWindow* v) {
+                 g.previsualizacion.rutaPdf = pdf;
+                 g.solicitudes.detalles = {solicitudTerminada()};
+                 if (!g.vms->app()->abrirDetalle(solicitudId(3).texto())) {
+                     return false;
+                 }
+                 esperar(300);
+                 if (!g.vms->app()->abrirFacturas(solicitudId(3).texto())) {
+                     return false;
+                 }
+                 esperar(500);
+                 if (!g.vms->explorador()->previsualizar(0)) {
+                     std::fprintf(stderr, "14: no se pudo previsualizar\n");
+                     return false;
+                 }
+                 // QtQuick.Pdf carga y renderiza la pagina de forma asincrona.
+                 QElapsedTimer t;
+                 t.start();
+                 QQuickItem* visor = g.pagina(v, QStringLiteral("visorPdfCfdi"));
+                 while (t.elapsed() < 8000 && !(visor && visor->property("documentoListo").toBool())) {
+                     esperar(100);
+                     visor = g.pagina(v, QStringLiteral("visorPdfCfdi"));
+                 }
+                 esperar(1500);
+                 return g.vms->explorador()->visor()->estado() == VisorPdfCfdiViewModel::Estado::Listo && visor
+                        && visor->property("documentoListo").toBool();
              });
          }},
     };

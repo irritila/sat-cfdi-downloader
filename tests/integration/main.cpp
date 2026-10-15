@@ -13,6 +13,7 @@ int ejecutarTestPaquetes(int argc, char* argv[]);
 int ejecutarTestFlujoSat(int argc, char* argv[]);
 int ejecutarTestNotificacionesAccionables(int argc, char* argv[]);
 int ejecutarTestIndiceCfdi(int argc, char* argv[]);
+int ejecutarTestPrevisualizacionCfdi(int argc, char* argv[]);
 
 // satcfdi_integration_tests (T003 + T004). Offscreen (ver CMakeLists).
 int main(int argc, char* argv[])
@@ -33,5 +34,6 @@ int main(int argc, char* argv[])
     fallos += ejecutarTestFlujoSat(argc, argv);
     fallos += ejecutarTestNotificacionesAccionables(argc, argv);
     fallos += ejecutarTestIndiceCfdi(argc, argv); // T015.2
+    fallos += ejecutarTestPrevisualizacionCfdi(argc, argv); // T015.4
     return fallos == 0 ? 0 : 1;
 }

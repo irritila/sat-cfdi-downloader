@@ -17,6 +17,9 @@ target_link_libraries(satcfdi_manual_capturas PRIVATE
     satcfdi_application
     satcfdi_domain
     satcfdi_ports
+    # T015.4: PDF del visor con el parser y el renderer reales (XML sintetico).
+    satcfdi_cfdi_xml
+    satcfdi_cfdi_pdf
     Qt6::Widgets
     Qt6::Quick
     Qt6::Qml

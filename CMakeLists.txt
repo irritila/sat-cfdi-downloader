@@ -31,6 +31,12 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS
     QuickTest
 )
 
+# T015.4 (T015 D7): Qt Pdf. QPdfWriter (generacion) es de Qt Gui; Qt6::Pdf
+# (QPdfDocument) solo lo enlazan las pruebas del PDF para extraer texto y
+# rasterizar paginas, y PdfQuick el visor de la presentacion. Empaquetado y
+# firma en T011 o sucesora (T015 D12).
+find_package(Qt6 6.8 REQUIRED COMPONENTS Pdf PdfQuick)
+
 qt_standard_project_setup(REQUIRES 6.8)
 
 # Metadatos del bundle macOS consumidos por src/app (MACOSX_BUNDLE_INFO_PLIST).
@@ -106,6 +112,10 @@ if(APPLE AND NOT libzip_DIR)
     endforeach()
 endif()
 find_package(libzip REQUIRED)
+
+# T015.4 (T015 D8): qrcodegen (MIT) como biblioteca estatica de terceros, sin
+# -Werror. Solo la enlaza satcfdi_cfdi_pdf.
+add_subdirectory(third_party/qrcodegen)
 
 # Capas en orden de dependencia.
 add_subdirectory(src/domain)

@@ -298,3 +298,31 @@ target_link_libraries(satcfdi_cfdi_xml
         Qt6::Core
 )
 satcfdi_enable_warnings(satcfdi_cfdi_xml)
+
+# --- T015.4 (core): PDF de CFDI ---------------------------------------------
+# satcfdi_cfdi_pdf: RenderizadorPdfCfdi (puerto CfdiPdfRenderer, QPdfWriter/
+# QPainter de Qt Gui), URL del QR del Anexo 20 (funcion pura) y
+# AlmacenPdfCfdiFs (puerto AlmacenPdfCfdi: cache con limite y "Guardar
+# PDF..."). qrcodegen es PRIVATE (sus tipos no salen de este target). Sin
+# SQL, red ni libzip. Requiere una QGuiApplication viva al renderizar.
+qt_add_library(satcfdi_cfdi_pdf STATIC
+    cfdi/pdf/UrlVerificacionCfdi.h
+    cfdi/pdf/UrlVerificacionCfdi.cpp
+    cfdi/pdf/RenderizadorPdfCfdi.h
+    cfdi/pdf/RenderizadorPdfCfdi.cpp
+    cfdi/pdf/AlmacenPdfCfdiFs.h
+    cfdi/pdf/AlmacenPdfCfdiFs.cpp
+)
+target_include_directories(satcfdi_cfdi_pdf PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+target_link_libraries(satcfdi_cfdi_pdf
+    PUBLIC
+        satcfdi_domain
+        satcfdi_ports
+        Qt6::Core
+        Qt6::Gui
+    PRIVATE
+        satcfdi_qrcodegen
+)
+satcfdi_enable_warnings(satcfdi_cfdi_pdf)

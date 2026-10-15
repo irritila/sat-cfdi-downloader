@@ -360,7 +360,7 @@ más antiguo, con estas columnas:
   copiarlo completo, y el estado de lectura: Completo, Parcial (hay datos o
   complementos que la app no representa), Versión no soportada o Ilegible.
 
-![Facturas de una solicitud Recibidos con 7 CFDI ficticios de XEXX010101000 para XAXX010101000: aviso 1 CFDI ilegible o no soportado con Abrir carpeta de la solicitud, búsqueda por RFC, nombre, UUID o folio, filtro Todos los tipos y la lista con Fecha, Emisor, Receptor, Total y UUID; una factura Parcial y una Ilegible](img/13-explorador-facturas.png)
+![Facturas de una solicitud Recibidos con 7 CFDI ficticios de XEXX010101000 para XAXX010101000: aviso 1 CFDI ilegible o no soportado con Abrir carpeta de la solicitud, búsqueda por RFC, nombre, UUID o folio, filtro Todos los tipos, el botón Ver PDF y la lista con Fecha, Emisor, Receptor, Total y UUID; una factura Parcial y una Ilegible](img/13-explorador-facturas.png)
 
 **Buscar** encuentra por RFC, nombre, UUID (completo o parcial) o serie y folio,
 sin importar mayúsculas ni acentos; la lista se actualiza al dejar de escribir.
@@ -383,10 +383,47 @@ los ZIP en Finder. Si la solicitud no tiene facturas que mostrar, la pantalla
 dice "Sin facturas". Si la app no puede leer la lista, dice "No se pudo leer la
 lista de facturas." con **Reintentar**.
 
-Con el teclado: Tab pasa por la búsqueda, el filtro y la lista; las flechas
-mueven la selección; ⌘F lleva a la búsqueda; ⌘C copia el UUID de la factura
-seleccionada; Escape (o **‹ Solicitud**) regresa al detalle. Abrir la vista
-previa de una factura llegará en una versión posterior.
+Con el teclado: Tab pasa por la búsqueda, el filtro, **Ver PDF** y la lista;
+las flechas mueven la selección; Enter abre el PDF de la factura seleccionada;
+⌘F lleva a la búsqueda; ⌘C copia el UUID de la factura seleccionada; Escape (o
+**‹ Solicitud**) regresa al detalle.
+
+### Ver el PDF de una factura
+
+Para ver una factura, selecciónala y pulsa Enter, haz doble clic sobre ella o
+usa **Ver PDF**. La app genera en tu equipo un PDF con los datos del XML:
+emisor, receptor, conceptos, impuestos, totales, el timbre fiscal y el código
+QR de verificación del SAT. Mientras lo prepara, la pantalla dice "Generando el
+PDF…"; la siguiente vez que abras la misma factura aparece al instante.
+
+![PDF de la factura Ingreso A-1187 de XEXX010101000 por 1160.00 MXN, con Facturas para regresar, Guardar PDF… y Abrir en Vista Previa; el documento muestra Comprobante Fiscal Digital por Internet, el folio fiscal, el código QR de verificación, emisor, receptor, datos de pago y conceptos](img/14-visor-pdf.png)
+
+El PDF es una **visualización generada localmente**: no es la representación
+impresa que emite el contribuyente ni valida el sello, la vigencia o la
+cancelación. El comprobante fiscal sigue siendo el XML dentro del ZIP. El PDF
+lo indica con una leyenda.
+
+En la vista del PDF:
+
+- **Guardar PDF…** abre el diálogo de macOS para elegir dónde guardar una
+  copia; el nombre sugerido es `CFDI-<serie y folio>-<inicio del UUID>.pdf`,
+  sin RFC ni nombres. Al terminar, la app dice "PDF guardado como …". Si no se
+  pudo guardar, lo dice ahí mismo y nada más cambia.
+- **Abrir en Vista Previa** abre el PDF en la app Vista Previa de macOS (para
+  imprimirlo, por ejemplo). Si no se pudo abrir, la app muestra el motivo.
+- Si el PDF tiene varias páginas, desplázate hacia abajo; la esquina inferior
+  indica "Página N de M". ⌘+ y ⌘− cambian el zoom y ⌘0 lo ajusta al ancho.
+- Escape (o **‹ Facturas**) regresa a la lista con la misma factura
+  seleccionada.
+
+Si la app no puede generar el PDF, lo dice en lugar del documento:
+
+| Mensaje | Qué hacer |
+| --- | --- |
+| El ZIP de esta factura no está disponible. | El ZIP se movió o se borró fuera de la app. Revisa la carpeta de la solicitud y pulsa **Reintentar**. |
+| La app no representa esta versión de CFDI. / No se pudo leer el XML de esta factura. | No hay PDF para esa factura; el XML sigue en el ZIP de la solicitud. |
+| No se pudo generar el PDF. / Se canceló la generación del PDF. | Pulsa **Reintentar**. |
+| No se pudo mostrar el PDF. | Pulsa **Reintentar** o usa **Abrir en Vista Previa**. |
 
 ## 6. Paquetes en Finder
 
@@ -505,6 +542,8 @@ contraseña.
 | Ya existe un archivo con ese nombre en la carpeta del paquete. | Mueve o renombra el archivo existente y reintenta. |
 | Archivo local no encontrado / Archivo local no encontrado: el ZIP se movió o se borró fuera de la app. | El ZIP se movió o se borró fuera de la app. El estado del paquete no cambia. |
 | Carpeta de paquetes no encontrada / No se pudo abrir Finder | Revisa que la carpeta exista e intenta de nuevo. |
+| PDF no encontrado / No se pudo abrir Vista Previa | Regresa a la lista y vuelve a abrir la factura; la app genera el PDF otra vez. |
+| No se pudo guardar el PDF. Revisa que la carpeta exista y tengas permiso de escritura. | Elige otra carpeta en **Guardar PDF…**. |
 
 ### Otros
 

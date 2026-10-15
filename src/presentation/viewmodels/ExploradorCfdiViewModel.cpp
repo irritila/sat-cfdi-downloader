@@ -3,6 +3,7 @@
 #include "AccionesFinder.h"
 #include "CfdiListModel.h"
 #include "ConsultaCatalogoCfdi.h"
+#include "VisorPdfCfdiViewModel.h"
 
 #include "domain/cfdi/TipoComprobante.h"
 
@@ -64,6 +65,7 @@ void ExploradorCfdiViewModel::notificar(F&& cambio)
 ExploradorCfdiViewModel::ExploradorCfdiViewModel(QObject* parent)
     : QObject(parent)
     , m_modelo(new CfdiListModel(this))
+    , m_visor(new VisorPdfCfdiViewModel(this))
 {
     m_retardo.setSingleShot(true);
     m_retardo.setInterval(kIntervaloBusquedaMs);
@@ -88,7 +90,13 @@ void ExploradorCfdiViewModel::setConsulta(ConsultaCatalogoCfdi* consulta)
 void ExploradorCfdiViewModel::setAccionesFinder(AccionesFinder* acciones)
 {
     m_finder = acciones;
+    m_visor->setAccionesFinder(acciones);
     emit mensajeFinderChanged();
+}
+
+void ExploradorCfdiViewModel::setPrevisualizacion(PrevisualizacionCfdi* previsualizacion)
+{
+    m_visor->setServicio(previsualizacion);
 }
 
 QString ExploradorCfdiViewModel::solicitudId() const
@@ -209,6 +217,7 @@ bool ExploradorCfdiViewModel::abrir(const QString& id)
     notificar([&] {
         const bool otra = !m_solicitud || *m_solicitud != *solicitud;
         if (otra) {
+            m_visor->cerrar();
             m_solicitud = solicitud;
             m_modelo->limpiar();
             m_listaConocida = false;
@@ -294,7 +303,9 @@ bool ExploradorCfdiViewModel::previsualizar(int fila)
     if (!f || !m_solicitud) {
         return false;
     }
-    emit previsualizacionSolicitada(m_solicitud->texto(), f->paqueteId, f->posicion);
+    const FilaCfdi copia = *f; // la senal puede recargar el modelo
+    emit previsualizacionSolicitada(m_solicitud->texto(), copia.paqueteId, copia.posicion);
+    m_visor->abrir(*m_solicitud, copia);
     return true;
 }
 
@@ -309,6 +320,7 @@ void ExploradorCfdiViewModel::desactivar()
         m_filtroSolicitado.reset();
         ++m_genFinder;
     });
+    m_visor->cerrar();
 }
 
 FiltroListaCfdi ExploradorCfdiViewModel::filtroActual() const

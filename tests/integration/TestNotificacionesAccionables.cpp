@@ -87,6 +87,10 @@ struct FinderFalso final : AccionesFinder {
     {
         return QtFuture::makeReadyValueFuture(ResultadoAccionFinder{ResultadoAccionFinder::Estado::Fallido, {}});
     }
+    QFuture<ResultadoAccionFinder> abrirEnVistaPrevia(const QString&) override // T015.4: sin uso aqui
+    {
+        return QtFuture::makeReadyValueFuture(ResultadoAccionFinder{ResultadoAccionFinder::Estado::Fallido, {}});
+    }
 };
 
 // Controlador real sobre AppViewModel real y servicios demo (solo navegacion).

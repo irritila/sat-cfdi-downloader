@@ -2,7 +2,7 @@
 
 ## Estado
 
-Pendiente (refinada 2026-10-11). Epica dividida en T015.1-T015.4. Milestone M2, posterior al MVP.
+Completada (2026-10-13). Epica dividida en T015.1-T015.4, todas completadas. Milestone M2, posterior al MVP.
 
 ## Objetivo
 
@@ -23,7 +23,7 @@ Cada solicitud existe para obtener CFDI, pero hoy la app solo guarda los paquete
 | D5 | Parser con `QXmlStreamReader`: rechaza `<!DOCTYPE`, profundidad maxima 64, UTF-8 (BOM aceptado); montos con decimal exacto (nunca `double`). CFDI 4.0 y 3.3 completos; 3.2 u otros se listan con los datos minimos legibles y estado "version no soportada". Un error afecta solo a ese CFDI. | Recomendacion tecnica | `especialista-sat-seguridad`. |
 | D6 | Complementos: TimbreFiscalDigital 1.1; Pagos 2.0 (y 1.0 en 3.3) basico: fecha, monto, moneda y documentos relacionados con parcialidad e importe pagado; Nomina 1.2 basico: periodo, fecha de pago, total de percepciones y deducciones. Otros complementos solo se nombran ("contiene complemento X, no representado"). | Aprobada por usuario | Refinamiento T015. |
 | D7 | PDF generado bajo demanda con `QPdfWriter`/`QPainter` y visto dentro de la app con Qt Pdf (`QtPdfQuick`); cache regenerable en `QStandardPaths::CacheLocation`/`cfdi-pdf`, clave UUID + SHA-256 del XML + version del generador, limite de 200 MB con expulsion de los menos usados tras cada escritura; si la cache falta o no se puede escribir, el PDF se genera en un temporal y se muestra igual. Acciones: "Guardar PDF..." y "Abrir en Vista Previa". | Recomendacion tecnica | `qt-architecture-lead`. |
-| D8 | El PDF incluye el QR de verificacion del Anexo 20 (`https://verificacfdi.facturaelectronica.sat.gob.mx/default.aspx?id=&re=&rr=&tt=&fe=`, `fe` = ultimos 8 caracteres del `Sello`, ISO/IEC 18004, al menos 2.75 cm), con una libreria de QR pequena (p. ej. qrcodegen, MIT) incluida en el repositorio. Se genera como el ejemplo del Anexo 20 (`tt` con 10 enteros rellenados con ceros y 6 decimales; `fe` sin codificar), usado como vector de prueba. Como el texto del Anexo es ambiguo, la regla se confirma escaneando el QR de un CFDI real del usuario; si el portal no lo acepta, se ajusta `tt`/`fe` dentro de T015.4 y se registra la regla validada. | Aprobada por usuario | Refinamiento T015; Anexo 20 (DOF 2022), seccion D. |
+| D8 | El PDF incluye el QR de verificacion del Anexo 20 (`https://verificacfdi.facturaelectronica.sat.gob.mx/default.aspx?id=&re=&rr=&tt=&fe=`, `fe` = ultimos 8 caracteres del `Sello`, ISO/IEC 18004, al menos 2.75 cm), con una libreria de QR pequena (p. ej. qrcodegen, MIT) incluida en el repositorio. Se genera como el ejemplo del Anexo 20 (`tt` con 10 enteros rellenados con ceros y 6 decimales; `fe` sin codificar), usado como vector de prueba. Como el texto del Anexo es ambiguo, la regla se confirma escaneando el QR de un CFDI real del usuario; si el portal no lo acepta, se ajusta `tt`/`fe` dentro de T015.4 y se registra la regla validada. Validada el 2026-10-13 con un CFDI real: el formato del ejemplo funciona sin cambios. | Aprobada por usuario | Refinamiento T015; Anexo 20 (DOF 2022), seccion D. |
 | D9 | Leyenda fija en el PDF: "Visualizacion generada localmente a partir del XML del CFDI. No es la representacion impresa emitida por el contribuyente ni valida sello, vigencia o cancelacion. El XML es el comprobante fiscal." No se valida sello, certificado, vigencia, cancelacion, XSD ni aritmetica. | Recomendacion tecnica | `especialista-sat-seguridad`. |
 | D10 | Capas (ADR 0012): `domain/cfdi` (resumen, montos, UUID), puertos `CfdiArchiveReader`, `CfdiCatalogRepository` y `CfdiPdfRenderer`; implementaciones en `infrastructure/cfdi`; orquestacion en `application/cfdi`. Indexacion, lectura y PDF en un hilo de trabajo serial propio, separado del `OperacionExecutor` del SAT (nunca se encolan juntos); escrituras por `PersistenceDispatcher` en una transaccion por paquete (CFDI + estado "indexado" + huella), de modo que una cancelacion deja el paquete "pendiente" y se reindexa al arrancar; QML sin SQL, archivos ni XML. | Recomendacion tecnica | `qt-architecture-lead`. |
 | D11 | Logs sin contenido XML, RFC, nombres, UUID completos, montos, sellos, rutas personales ni nombres de entradas del ZIP; solo conteos, Id de paquete enmascarado y tipo de error. | Recomendacion tecnica | `especialista-sat-seguridad`, reglas de logs del proyecto. |
@@ -54,7 +54,7 @@ Cada solicitud existe para obtener CFDI, pero hoy la app solo guarda los paquete
 
 ## Criterios de aceptacion
 
-- [ ] T015.1-T015.4 completadas con sus criterios.
+- [x] T015.1-T015.4 completadas con sus criterios.
 
 ## Verificacion
 
@@ -62,7 +62,8 @@ Ver cada subtarea.
 
 ## Resultado
 
-Pendiente.
+Explorador de CFDI por solicitud completo: lector seguro de ZIP y parser (T015.1), indice SQLite (T015.2), explorador con busqueda y
+estados (T015.3; 13 de 13 CFDI reales coinciden con su XML) y PDF local con QR validado en el portal del SAT, visor y acciones (T015.4).
 
 ## Referencias
 

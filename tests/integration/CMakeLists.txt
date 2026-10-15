@@ -19,6 +19,8 @@ qt_add_executable(satcfdi_integration_tests
     TestNotificacionesAccionables.cpp
     # T015.2: indice de CFDI con ZIP sinteticos (libzip).
     TestIndiceCfdi.cpp
+    # T015.4: previsualizacion PDF con el root real (Qt Pdf para leer el PDF).
+    TestPrevisualizacionCfdi.cpp
     ../fakes/LectorCfdiCompuerta.h
     ../fakes/ZipCfdiSintetico.h
     ../fakes/FakeSatGateway.h
@@ -37,6 +39,8 @@ target_link_libraries(satcfdi_integration_tests PRIVATE
     # T015.2: genera ZIP sinteticos en la prueba (fakes/ZipCfdiSintetico.h).
     libzip::zip
     Qt6::Gui
+    # T015.4: QPdfDocument para extraer el texto del PDF generado.
+    Qt6::Pdf
     Qt6::Test
 )
 
@@ -53,6 +57,21 @@ target_compile_definitions(satcfdi_integration_tests PRIVATE
 
 add_test(NAME satcfdi_integration_tests COMMAND satcfdi_integration_tests)
 set_tests_properties(satcfdi_integration_tests PROPERTIES
+    LABELS integration
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
+# T015.4: AccesoFinder::abrirEnVistaPrevia (directorios permitidos, `..`,
+# enlaces que escapan) con FakeOSIntegration y filesystem real.
+qt_add_executable(satcfdi_acceso_finder_tests
+    TestAccesoFinderVistaPrevia.cpp
+    ../fakes/FakeOSIntegration.h
+)
+target_include_directories(satcfdi_acceso_finder_tests PRIVATE ${PROJECT_SOURCE_DIR}/tests)
+target_link_libraries(satcfdi_acceso_finder_tests PRIVATE satcfdi_app_core Qt6::Gui Qt6::Test)
+satcfdi_enable_warnings(satcfdi_acceso_finder_tests)
+add_test(NAME satcfdi_acceso_finder_tests COMMAND satcfdi_acceso_finder_tests)
+set_tests_properties(satcfdi_acceso_finder_tests PROPERTIES
     LABELS integration
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )

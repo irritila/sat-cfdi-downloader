@@ -373,6 +373,10 @@ struct FinderEspia final : AccionesFinder {
         return nueva(QStringLiteral("solicitud"));
     }
     QFuture<ResultadoAccionFinder> abrirCarpetaPaquetes() override { return nueva(QStringLiteral("raiz")); }
+    QFuture<ResultadoAccionFinder> abrirEnVistaPrevia(const QString&) override // T015.4
+    {
+        return nueva(QStringLiteral("vistaPrevia"));
+    }
     void resolver(int i, ResultadoAccionFinder::Estado e, const QString& mensaje = {})
     {
         promesas.at(i)->addResult(ResultadoAccionFinder{e, mensaje});
@@ -974,6 +978,8 @@ void TestPresentacion::qmlSinImportsProhibidos()
         QStringLiteral("QtQuick.Controls.Basic"),
         // T005.1 (DA4): selector de archivos de e.firma; entrega QUrl.
         QStringLiteral("QtQuick.Dialogs"),
+        // T015.4 (T015 D7): visor del PDF ya generado; solo recibe su URL.
+        QStringLiteral("QtQuick.Pdf"),
     };
     const QRegularExpression prohibido(
         QStringLiteral("eliminado_?en|dedup|sql|keychain|\\.zip|file:|XMLHttpRequest|"
@@ -1004,7 +1010,7 @@ void TestPresentacion::qmlSinImportsProhibidos()
                  qPrintable(archivo.fileName() + QStringLiteral(": ") + termino.captured(0)));
         ++archivos;
     }
-    QCOMPARE(archivos, 30); // 29 .qml (Theme, Icono, componentes T013, BotonCopiar y T015.3) + Etiquetas.js
+    QCOMPARE(archivos, 31); // 30 .qml (Theme, Icono, componentes T013, BotonCopiar, T015.3 y VisorPdfCfdi) + Etiquetas.js
 }
 
 // ---------------------------------------------------------------------------

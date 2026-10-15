@@ -80,3 +80,30 @@ target_link_libraries(satcfdi_cfdi_zip_tests PRIVATE
 add_test(NAME satcfdi_cfdi_zip_tests COMMAND satcfdi_cfdi_zip_tests)
 set_tests_properties(satcfdi_cfdi_zip_tests PROPERTIES LABELS infrastructure)
 satcfdi_enable_warnings(satcfdi_cfdi_zip_tests)
+
+# T015.4: PDF de CFDI (URL del QR, RenderizadorPdfCfdi y AlmacenPdfCfdiFs).
+# Ejecutable propio con QGuiApplication offscreen (QPdfWriter necesita la base
+# de fuentes) y Qt6::Pdf (QPdfDocument) para extraer el texto del PDF,
+# contar paginas y rasterizar el QR. qrcodegen se enlaza para comparar cada
+# modulo dibujado con el simbolo esperado.
+qt_add_executable(satcfdi_cfdi_pdf_tests
+    TestCfdiPdf.cpp
+    CfdiPdfPruebasComun.h
+)
+target_include_directories(satcfdi_cfdi_pdf_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
+target_link_libraries(satcfdi_cfdi_pdf_tests PRIVATE
+    satcfdi_cfdi_pdf
+    satcfdi_cfdi_xml
+    satcfdi_qrcodegen
+    satcfdi_ports
+    satcfdi_domain
+    Qt6::Gui
+    Qt6::Pdf
+    Qt6::Test
+)
+add_test(NAME satcfdi_cfdi_pdf_tests COMMAND satcfdi_cfdi_pdf_tests)
+set_tests_properties(satcfdi_cfdi_pdf_tests PROPERTIES
+    LABELS infrastructure
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+satcfdi_enable_warnings(satcfdi_cfdi_pdf_tests)

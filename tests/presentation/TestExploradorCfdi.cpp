@@ -81,6 +81,10 @@ public:
     {
         return QtFuture::makeReadyValueFuture(resultado);
     }
+    QFuture<ResultadoAccionFinder> abrirEnVistaPrevia(const QString&) override // T015.4
+    {
+        return QtFuture::makeReadyValueFuture(resultado);
+    }
 };
 
 // Explorador abierto con su consulta fake (sin retardo de busqueda por omision).

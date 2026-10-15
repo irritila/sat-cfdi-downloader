@@ -1,6 +1,6 @@
 # M2 - Explorador de CFDI
 
-Estado: borrador. Posterior al MVP (M1); no lo bloquea.
+Estado: completado (2026-10-13). Posterior al MVP (M1); no lo bloquea.
 
 ## Objetivo
 
@@ -18,7 +18,7 @@ Que el usuario vea las facturas CFDI contenidas en los paquetes ZIP de sus solic
 
 ## Tareas
 
-- [T015](../tasks/T015-explorador-cfdi.md) Explorador de CFDI con previsualizacion PDF (epica T015.1-T015.4).
+- [T015](../tasks/T015-explorador-cfdi.md) Explorador de CFDI con previsualizacion PDF (epica T015.1-T015.4, completada).
 
 ## Referencias
 

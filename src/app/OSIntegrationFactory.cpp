@@ -39,6 +39,10 @@ public:
     {
         emit finderTerminado(peticionId, ResultadoFinder::Fallido);
     }
+    void abrirEnVistaPrevia(const QString& peticionId, const QString&) override
+    {
+        emit finderTerminado(peticionId, ResultadoFinder::Fallido);
+    }
     void reflejarPreferenciaLoginItem(bool) override {}
     void reflejarMonitoreoPausado(bool) override {}
     void reflejarEstadoMonitoreo(const EstadoMonitoreo&) override {}

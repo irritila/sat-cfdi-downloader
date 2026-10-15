@@ -229,7 +229,7 @@ public:
     }
 
     // T009.1: Finder. Registra cada peticion ("mostrarEnFinder"/
-    // "abrirCarpetaEnFinder", peticionId, ruta) y responde con
+    // "abrirCarpetaEnFinder"/"abrirEnVistaPrevia" (T015.4), peticionId, ruta) y responde con
     // `resultadoFinder` (Mostrado por defecto) al instante o con
     // completarFinder() si responderInmediato == false. No toca el disco.
     struct PeticionFinder {
@@ -247,6 +247,10 @@ public:
     void abrirCarpetaEnFinder(const QString& peticionId, const QString& rutaAbsoluta) override
     {
         registrarFinder(QStringLiteral("abrirCarpetaEnFinder"), peticionId, rutaAbsoluta);
+    }
+    void abrirEnVistaPrevia(const QString& peticionId, const QString& rutaAbsoluta) override
+    {
+        registrarFinder(QStringLiteral("abrirEnVistaPrevia"), peticionId, rutaAbsoluta);
     }
     int pendientesFinder() const { return int(m_pendientesFinder.size()); }
     // Completa la peticion pendiente mas antigua con `resultado` (o el programado).

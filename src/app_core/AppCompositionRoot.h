@@ -18,6 +18,9 @@ namespace satcfdi {
 class AccionesWorker;
 class ArchivosZipCfdi;
 class AdaptadorCatalogoCfdi;
+class AlmacenPdfCfdi;
+class CfdiPdfRenderer;
+class PrevisualizacionCfdiService;
 class CatalogoCfdiService;
 class CfdiArchiveReader;
 class IndexadorCfdi;
@@ -112,6 +115,15 @@ struct OpcionesMonitoreo {
     CfdiArchiveReader* lectorCfdi = nullptr;
     // T015.2: version del parser guardada con el indice. 0 = kVersionParserCfdi.
     int versionParserCfdi = 0;
+    // T015.4 (D7): cache de PDF de CFDI. Vacio = <directorio de datos>/cache/
+    // cfdi-pdf si la base no esta en el directorio de datos por defecto (es
+    // decir, con --data-dir o en pruebas), si no CacheLocation/cfdi-pdf.
+    QString directorioCachePdf;
+    // Temporal de la app si la cache no se puede escribir. Vacio =
+    // TempLocation/satcfdi-cfdi-pdf.
+    QString directorioTemporalPdf;
+    // Limite de la cache en bytes. 0 = 200 MB (D7). Las pruebas lo reducen.
+    qint64 limiteCachePdfBytes = 0;
 };
 
 class AppCompositionRoot {
@@ -170,6 +182,10 @@ public:
     // T015.2: indexador (hilo propio) y API de consulta del indice para T015.3.
     IndexadorCfdi& indexadorCfdi() const { return *m_indexadorCfdi; }
     CatalogoCfdiService& catalogoCfdi() const { return *m_catalogoCfdi; }
+    // T015.4: previsualizacion PDF (hilo propio) y sus directorios efectivos.
+    PrevisualizacionCfdiService& previsualizacionCfdi() const { return *m_previsualizacionCfdi; }
+    const QString& directorioCachePdf() const noexcept { return m_directorioCachePdf; }
+    const QString& directorioTemporalPdf() const noexcept { return m_directorioTemporalPdf; }
     QQmlApplicationEngine* engine() const { return m_engine.get(); }
 
 private:
@@ -207,6 +223,17 @@ private:
     // T015.3: ConsultaCatalogoCfdi de la presentacion sobre m_catalogoCfdi
     // (se destruye antes que el, despues de los view models).
     std::unique_ptr<AdaptadorCatalogoCfdi> m_adaptadorCatalogo;
+    // T015.4: previsualizacion PDF (se destruye antes que el indexador, que
+    // usa para reindexar, y que el dispatcher; une su hilo). Sus puertos
+    // propios (lector y archivos independientes de los del indexador,
+    // renderer y cache) se destruyen despues de el.
+    std::unique_ptr<CfdiArchiveReader> m_lectorPdf;
+    std::unique_ptr<ArchivosZipCfdi> m_archivosPdf;
+    std::unique_ptr<CfdiPdfRenderer> m_renderizadorPdf;
+    std::unique_ptr<AlmacenPdfCfdi> m_almacenPdf;
+    std::unique_ptr<PrevisualizacionCfdiService> m_previsualizacionCfdi;
+    QString m_directorioCachePdf;
+    QString m_directorioTemporalPdf;
     PackageStorage* m_packageStorage = nullptr;
     QString m_raizPaquetes;
     std::unique_ptr<Programador> m_programadorEjecutorPropio;

@@ -51,6 +51,8 @@ target_link_libraries(satcfdi_app_core
         # empaquetado y firma en T011 o sucesora, T015 D12) y parser de CFDI.
         satcfdi_cfdi_zip
         satcfdi_cfdi_xml
+        # T015.4: renderer PDF (Qt Gui, qrcodegen estatico) y cache de PDF.
+        satcfdi_cfdi_pdf
         satcfdi_domain
         satcfdi_ports
         Qt6::Core

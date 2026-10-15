@@ -7,6 +7,10 @@
 #include "SingleInstanceCoordinator.h"
 #include "application/cfdi/CatalogoCfdiService.h"
 #include "application/cfdi/IndexadorCfdi.h"
+#include "application/cfdi/PrevisualizacionCfdiService.h"
+#include "AppBootstrapper.h"
+#include "infrastructure/cfdi/pdf/AlmacenPdfCfdiFs.h"
+#include "infrastructure/cfdi/pdf/RenderizadorPdfCfdi.h"
 #include "application/configuration/ConfiguracionAppServicePersistido.h"
 #include "application/logging/RegexLogSanitizer.h"
 #include "application/operaciones/OperacionExecutor.h"
@@ -32,12 +36,14 @@
 #include "presentation/viewmodels/AppViewModel.h"
 #include "presentation/viewmodels/CatalogoMensajes.h"
 #include "presentation/viewmodels/ConsultaCatalogoCfdi.h"
+#include "presentation/viewmodels/PrevisualizacionCfdi.h"
 #include "presentation/viewmodels/PresentacionViewModels.h"
 
 #include <QDir>
 #include <QFileInfo>
 #include <QLoggingCategory>
 #include <QQmlApplicationEngine>
+#include <QStandardPaths>
 #include <QWindow>
 
 #include <functional>
@@ -79,6 +85,63 @@ public:
 private:
     CatalogoCfdiService& m_catalogo;
 };
+
+// T015.4 (bloque de interfaz): la presentacion pide el PDF por su propia
+// interfaz (PrevisualizacionCfdi); este adaptador la implementa sobre
+// PrevisualizacionCfdiService y traduce el tipo de error. Los futures del
+// servicio ya se completan en el hilo grafico; el map es trivial y corre ahi.
+// Lo posee PresentacionViewModels (hijo QObject), que se destruye antes que
+// el servicio.
+namespace {
+
+MotivoPrevisualizacion motivoPresentacion(ErrorPrevisualizacion::Tipo tipo)
+{
+    switch (tipo) {
+    case ErrorPrevisualizacion::Tipo::OrigenNoDisponible:
+        return MotivoPrevisualizacion::OrigenNoDisponible;
+    case ErrorPrevisualizacion::Tipo::VersionNoSoportada:
+        return MotivoPrevisualizacion::VersionNoSoportada;
+    case ErrorPrevisualizacion::Tipo::Ilegible:
+        return MotivoPrevisualizacion::Ilegible;
+    case ErrorPrevisualizacion::Tipo::Cancelada:
+        return MotivoPrevisualizacion::Cancelada;
+    case ErrorPrevisualizacion::Tipo::Fallo:
+        break;
+    }
+    return MotivoPrevisualizacion::Fallo;
+}
+
+class AdaptadorPrevisualizacionCfdi final : public PrevisualizacionCfdi {
+public:
+    AdaptadorPrevisualizacionCfdi(PrevisualizacionCfdiService& servicio, QObject* parent)
+        : PrevisualizacionCfdi(parent)
+        , m_servicio(servicio)
+    {
+    }
+
+    QFuture<ResultadoGenerar> generar(const SolicitudId& solicitud, const QString& paqueteId, int posicion) override
+    {
+        return m_servicio.generar(solicitud, paqueteId, posicion)
+            .then(QtFuture::Launch::Sync, [](const PrevisualizacionCfdiService::ResultadoPdf& r) {
+                return r.esExito() ? ResultadoGenerar::exito(PdfPrevisualizado{r.valor().rutaArchivo,
+                                                                               r.valor().nombreSugerido})
+                                   : ResultadoGenerar::fallo(motivoPresentacion(r.error().tipo));
+            });
+    }
+    QFuture<ResultadoGuardar> guardarComo(const QString& rutaPdf, const QString& destinoAbsoluto) override
+    {
+        return m_servicio.guardarComo(rutaPdf, destinoAbsoluto)
+            .then(QtFuture::Launch::Sync, [](const PrevisualizacionCfdiService::ResultadoGuardar& r) {
+                return r.esExito() ? ResultadoGuardar::exito(r.valor())
+                                   : ResultadoGuardar::fallo(motivoPresentacion(r.error().tipo));
+            });
+    }
+
+private:
+    PrevisualizacionCfdiService& m_servicio;
+};
+
+} // namespace
 
 AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& secretStore,
                                        OpcionesMonitoreo monitoreo)
@@ -233,6 +296,43 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
         CatalogoCfdiService* catalogo = m_catalogoCfdi.get();
         QObject::connect(m_solicitudesService.get(), &SolicitudesService::solicitudEliminada, catalogo,
                          [catalogo](const SolicitudId& id) { emit catalogo->indiceCambiado(id); });
+
+        // T015.4: previsualizacion PDF en su propio hilo (nunca el grafico ni
+        // la cola SAT). Lector y archivos propios (sin estado; los del
+        // indexador pueden ser fakes con compuertas en pruebas). Reindexa con
+        // el indexador. Cache D7: con --data-dir (o en pruebas) dentro del
+        // directorio de datos; si no, CacheLocation del usuario.
+        const QString directorioDatos = QDir::cleanPath(QFileInfo(rutaBase).absolutePath());
+        m_directorioCachePdf = QDir::cleanPath(
+            !monitoreo.directorioCachePdf.isEmpty() ? QDir(monitoreo.directorioCachePdf).absolutePath()
+            : directorioDatos == QDir::cleanPath(AppBootstrapper::directorioDatosPorDefecto())
+                ? QDir(QStandardPaths::writableLocation(QStandardPaths::CacheLocation))
+                      .filePath(QStringLiteral("cfdi-pdf"))
+                : QDir(directorioDatos).filePath(QStringLiteral("cache/cfdi-pdf")));
+        m_directorioTemporalPdf = QDir::cleanPath(
+            !monitoreo.directorioTemporalPdf.isEmpty()
+                ? QDir(monitoreo.directorioTemporalPdf).absolutePath()
+                : QDir(QStandardPaths::writableLocation(QStandardPaths::TempLocation))
+                      .filePath(QStringLiteral("satcfdi-cfdi-pdf")));
+        m_lectorPdf = std::make_unique<LectorZipLibzip>();
+        m_archivosPdf = std::make_unique<ArchivosZipCfdiFs>(raizIndice);
+        m_renderizadorPdf = std::make_unique<RenderizadorPdfCfdi>();
+        m_almacenPdf = std::make_unique<AlmacenPdfCfdiFs>(m_directorioCachePdf, m_directorioTemporalPdf,
+                                                          monitoreo.limiteCachePdfBytes);
+        PuertosPrevisualizacionCfdi puertosPdf{*m_dispatcher,
+                                               p.catalogoCfdi(),
+                                               *m_lectorPdf,
+                                               *m_archivosPdf,
+                                               [](QByteArrayView xml) { return parsearCfdi(xml); },
+                                               *m_renderizadorPdf,
+                                               *m_almacenPdf,
+                                               [indexador](const SolicitudId& id) {
+                                                   return indexador->revisarSolicitud(id);
+                                               },
+                                               indexador->versionParser()};
+        m_previsualizacionCfdi = std::make_unique<PrevisualizacionCfdiService>(std::move(puertosPdf));
+        // "Abrir en Vista Previa" solo acepta PDF de la cache o del temporal.
+        m_accesoFinder->setDirectoriosVistaPrevia({m_directorioCachePdf, m_directorioTemporalPdf});
     }
 
     // T014.3 D1: primer uso (lectura en el dispatcher). D2/D3: aviso de
@@ -290,6 +390,9 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
     m_viewModels->setConsultaPrimerUso(m_consultaPrimerUso.get()); // T014.3 D1
     m_adaptadorCatalogo = std::make_unique<AdaptadorCatalogoCfdi>(*m_catalogoCfdi);
     m_viewModels->setConsultaCatalogo(m_adaptadorCatalogo.get()); // T015.3
+    // T015.4 (interfaz): visor PDF del explorador sobre el servicio de core.
+    m_viewModels->setPrevisualizacionCfdi(
+        new AdaptadorPrevisualizacionCfdi(*m_previsualizacionCfdi, m_viewModels.get()));
 
     // Primera tarea del dispatcher serial: limpia generaciones huerfanas del
     // SecretStore (residuos de fallos previos). No se espera aqui; las
@@ -310,6 +413,13 @@ AppCompositionRoot::~AppCompositionRoot()
     // T015.2: el indexador cancela su paquete en curso (sin escribirlo) y une
     // su hilo; sus escrituras ya encoladas se completan en dispatcher.cerrar().
     m_adaptadorCatalogo.reset(); // T015.3: sus consumidores (view models) ya no existen
+    // T015.4: antes que el indexador (lo usa para reindexar) y el dispatcher;
+    // une su hilo. Despues, sus puertos.
+    m_previsualizacionCfdi.reset();
+    m_almacenPdf.reset();
+    m_renderizadorPdf.reset();
+    m_archivosPdf.reset();
+    m_lectorPdf.reset();
     m_catalogoCfdi.reset();
     m_indexadorCfdi.reset();
     m_archivosCfdi.reset();
@@ -439,6 +549,9 @@ AppLifecycleController& AppCompositionRoot::iniciarCicloDeVida(OSIntegration& os
     // T015.2: la salida detiene el indexador (el paquete en curso no se escribe).
     QObject::connect(controlador, &AppLifecycleController::salidaIniciada, m_indexadorCfdi.get(),
                      &IndexadorCfdi::detener);
+    // T015.4: la salida cancela la previsualizacion en curso.
+    QObject::connect(controlador, &AppLifecycleController::salidaIniciada, m_previsualizacionCfdi.get(),
+                     &PrevisualizacionCfdiService::detener);
     monitor->alCambiarWorker(m_worker->instantanea());
     monitor->iniciar();
 

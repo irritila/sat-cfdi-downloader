@@ -4,6 +4,7 @@
 #include "ports/OSIntegration.h"
 
 #include <QHash>
+#include <QStringList>
 #include <QObject>
 #include <QPointer>
 #include <QPromise>
@@ -41,10 +42,24 @@ public:
     QFuture<ResultadoAccionFinder> abrirCarpetaSolicitud(const SolicitudId& solicitud) override;
     QFuture<ResultadoAccionFinder> abrirCarpetaPaquetes() override;
 
+    // T015.4: directorios absolutos desde los que abrirEnVistaPrevia acepta
+    // archivos (el root pasa la cache de PDF y el temporal de la app). Pueden
+    // no existir aun: se canonicalizan en cada peticion. Sin configurar, toda
+    // peticion devuelve Fallido. Hilo grafico.
+    void setDirectoriosVistaPrevia(const QStringList& directoriosAbsolutos);
+    // Solo acepta un archivo regular cuya ruta canonica (enlaces resueltos)
+    // quede estrictamente dentro de un directorio permitido canonico; la ruta
+    // pedida debe ser absoluta y sin componentes `.`/`..`. Fuera -> Fallido
+    // sin llamar al SO; dentro pero inexistente -> NoEncontrado sin llamar al
+    // SO; si no, OSIntegration::abrirEnVistaPrevia con la ruta canonica.
+    QFuture<ResultadoAccionFinder> abrirEnVistaPrevia(const QString& rutaAbsoluta) override;
+
     static QString mensajeFinderFallido();
+    static QString mensajeVistaPreviaFallida();     // "No se pudo abrir Vista Previa"
+    static QString mensajeVistaPreviaNoEncontrada(); // "PDF no encontrado"
 
 private:
-    enum class Destino { Archivo, Carpeta };
+    enum class Destino { Archivo, Carpeta, VistaPrevia };
     QFuture<ResultadoAccionFinder> revelar(QFuture<ResolucionRevelable> resolucion, Destino destino);
     void alTerminarFinder(const QString& peticionId, OSIntegration::ResultadoFinder resultado);
 
@@ -58,6 +73,7 @@ private:
         Destino destino;
     };
     QHash<QString, Pendiente> m_pendientes;
+    QStringList m_directoriosVistaPrevia; // absolutos y limpios (QDir::cleanPath)
 };
 
 } // namespace satcfdi

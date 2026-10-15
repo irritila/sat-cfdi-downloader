@@ -20,11 +20,15 @@ import "Etiquetas.js" as Etiquetas
 //   indexados. Estados segun `vista`: cargando (tras 300 ms), error (EstadoVacio
 //   con "Reintentar" enfocado, reemplaza la lista), sinCoincidencias (con
 //   "Limpiar filtros"), indexando (sin estado vacio) y sinFacturas.
-// Teclado: Tab recorre regreso, busqueda, filtro, Limpiar filtros, lista y
-// acciones de las lineas; flechas mueven la seleccion; Enter/Return pide la
-// previsualizacion (T015.4); ⌘C copia el UUID de la fila; ⌘F (Main.qml)
-// enfoca la busqueda; Flecha abajo pasa de la busqueda a la lista; Escape
-// vacia la busqueda o regresa al detalle.
+// - Visor del PDF (T015.4, VisorPdfCfdi): Enter, doble clic o "Ver PDF" sobre
+//   la fila seleccionada lo abren encima de la lista (que sigue viva y
+//   conserva la seleccion); Escape o "‹ Facturas" lo cierran y devuelven el
+//   foco a la fila.
+// Teclado: Tab recorre regreso, busqueda, filtro, Limpiar filtros, Ver PDF,
+// lista y acciones de las lineas; flechas mueven la seleccion; Enter/Return
+// abre el PDF; ⌘C copia el UUID de la fila; ⌘F (Main.qml) enfoca la busqueda;
+// Flecha abajo pasa de la busqueda a la lista; Escape vacia la busqueda,
+// cierra el visor o regresa al detalle.
 Page {
     id: pagina
     objectName: "paginaExploradorCfdi"
@@ -37,11 +41,15 @@ Page {
     readonly property string vista: pagina.explorador.vista
     readonly property bool conDatos: pagina.explorador.estado === ExploradorCfdiViewModel.ConDatos
     readonly property bool anchoAmplio: pagina.width >= 760
-    // T014.1 D5: el explorador no abre dialogos propios.
-    readonly property bool dialogoAbierto: false
+    // T014.1 D5: el unico dialogo del explorador es el selector de guardado
+    // del visor (T015.4).
+    readonly property bool dialogoAbierto: visor.dialogoAbierto
+    readonly property bool visorAbierto: pagina.explorador.visor.abierto
     readonly property bool puedeBuscar: pagina.explorador.estado !== ExploradorCfdiViewModel.Ninguno
+                                        && !pagina.visorAbierto
     readonly property alias campoBusqueda: busqueda
     readonly property alias lista: lista
+    readonly property alias visor: visor
 
     readonly property bool mismaSolicitud: pagina.detalle.cargada
                                            && pagina.detalle.solicitudId === pagina.explorador.solicitudId
@@ -109,6 +117,24 @@ Page {
             pagina.explorador.previsualizar(lista.currentIndex)
     }
 
+    function cerrarVisor() {
+        pagina.explorador.visor.cerrar()
+    }
+
+    // Al abrir, el foco entra al visor; al cerrar, vuelve a la fila.
+    onVisorAbiertoChanged: Qt.callLater(pagina.enfocarTrasVisor)
+    function enfocarTrasVisor() {
+        if (pagina.visorAbierto) {
+            visor.forceActiveFocus(Qt.OtherFocusReason)
+            visor.enfocarInicial()
+        } else if (lista.visible && lista.count > 0) {
+            lista.forceActiveFocus(Qt.OtherFocusReason)
+            lista.positionViewAtIndex(lista.currentIndex, ListView.Contain)
+        } else {
+            pagina.enfocarInicial()
+        }
+    }
+
     function copiarUuidActual() {
         const uuid = pagina.modelo.uuidEn(lista.currentIndex)
         if (uuid.length > 0 && Portapapeles.copiar(uuid)) {
@@ -118,10 +144,17 @@ Page {
         return false
     }
 
-    Keys.onEscapePressed: pagina.regresar()
+    Keys.onEscapePressed: {
+        if (pagina.visorAbierto)
+            pagina.cerrarVisor()
+        else
+            pagina.regresar()
+    }
 
     header: EncabezadoPagina {
         id: encabezado
+        // Con el visor abierto, su propio encabezado ocupa este lugar.
+        visible: !pagina.visorAbierto
         titulo: qsTr("Facturas")
         contador: !pagina.conDatos ? ""
                   : pagina.explorador.hayFiltros ? qsTr("%1 de %2").arg(pagina.modelo.count).arg(pagina.explorador.totalCfdi)
@@ -141,6 +174,7 @@ Page {
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
+        visible: !pagina.visorAbierto
 
         // ---- Busqueda y filtro ----
         Rectangle {
@@ -247,6 +281,18 @@ Page {
                     onClicked: pagina.limpiarFiltros()
                 }
                 Item { Layout.fillWidth: true }
+                // T015.4: PDF de la factura seleccionada (igual que Enter).
+                BotonAccion {
+                    id: botonVerPdf
+                    objectName: "botonVerPdf"
+                    visible: pagina.explorador.visor.disponible
+                    enabled: lista.visible && lista.currentIndex >= 0
+                    variante: "secundario"
+                    icono: "doc"
+                    text: qsTr("Ver PDF")
+                    descripcion: qsTr("Ver el PDF de la factura seleccionada (Enter)")
+                    onClicked: pagina.previsualizarActual()
+                }
             }
             Rectangle {
                 anchors.left: parent.left
@@ -522,5 +568,14 @@ Page {
                 onAccionSolicitada: pagina.explorador.recargar()
             }
         }
+    }
+
+    // ---- Visor del PDF (T015.4) ----
+    VisorPdfCfdi {
+        id: visor
+        anchors.fill: parent
+        visible: pagina.visorAbierto
+        vm: pagina.explorador.visor
+        onCerrarSolicitado: pagina.cerrarVisor()
     }
 }

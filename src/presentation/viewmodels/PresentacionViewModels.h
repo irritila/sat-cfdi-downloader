@@ -12,6 +12,7 @@ class AccionesFinder;
 class ConsultaCatalogoCfdi;
 class ConsultaExistenciaPaquetes;
 class ConsultaPrimerUso;
+class PrevisualizacionCfdi;
 class AppViewModel;
 class CredencialesSatService;
 class EFirmaFormViewModel;
@@ -70,6 +71,9 @@ public:
     // T015.3: indice de CFDI ("Ver facturas" y explorador). No propietario;
     // nullptr = sin explorador.
     void setConsultaCatalogo(ConsultaCatalogoCfdi* consulta);
+    // T015.4: PDF del CFDI en el explorador. No propietario; nullptr = sin
+    // visor (Enter solo emite la intencion).
+    void setPrevisualizacionCfdi(PrevisualizacionCfdi* previsualizacion);
 
 private:
     void conectarPreparacionDetalle(PerfilesSatService* perfiles, CredencialesSatService* credenciales,
