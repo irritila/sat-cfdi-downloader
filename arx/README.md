@@ -8,6 +8,12 @@ Todos los roles comparten una base tecnica obligatoria: C++, Qt 6, QML, Qt Quick
 Controls y CMake. Cada archivo agrega una cualidad principal distinta, pero
 ningun rol debe analizar el proyecto ignorando ese stack.
 
+Excepcion: los roles de produccion de video tienen una base minima del proyecto
+en lugar de la base Qt completa. Conocen la aplicacion y sus pantallas, leen QML
+y el guion, saben que se puede pedir a la herramienta de video de T017 y no
+implementan C++. Cuando necesitan un cambio en la herramienta, lo piden al rol
+Qt propietario.
+
 ## Uso
 
 Selecciona un solo rol para una tarea y lee su archivo antes de comenzar:
@@ -69,6 +75,36 @@ finalizacion. Selecciona el rol segun la responsabilidad principal de la tarea.
 Coordinar un cambio compartido implica identificar consumidores, acordar el
 contrato y registrar su impacto; no activa otros roles automaticamente. Combina
 roles solo cuando la tarea lo solicite explicitamente, como indica `AGENTS.md`.
+
+## Roles de produccion de video
+
+| Rol | Cuando invocarlo | Responsabilidad principal |
+| --- | --- | --- |
+| [especialista-guion-tutoriales](agents/especialista-guion-tutoriales.md) | Escribir o revisar el guion de un video tutorial: orden y duracion de escenas, textos en pantalla y hablados, coherencia con el manual. | Estructura didactica, presupuesto de cuadros, pronunciacion en el campo `voz` y regla de datos sinteticos. |
+| [especialista-audio-voz](agents/especialista-audio-voz.md) | Elegir modelo, voz y tono del TTS; revisar pronunciacion, pausas, loudness y mezcla; preparar la muestra de voz. | Voz sintetica reproducible y uniforme, sin exponer `OPENAI_API_KEY` ni generar costos sin aprobacion del usuario. |
+| [especialista-motion-design](agents/especialista-motion-design.md) | Cursor simulado, resaltados, transiciones, titulos y rotulos; ilustraciones de menu bar, selector, Finder y notificaciones. | Movimiento determinista en cuadros, legibilidad y contraste, rotulos que no tapan controles y rotulo "Ilustracion". |
+
+Estos roles tienen la base minima descrita arriba y declaran su proveedor por
+omision: guion y motion design en Claude Fable 5.1 (`claude-fable-5-1`); audio y
+voz en Codex GPT-6-Astra (`gpt-6-astra`). Cuando trabajan en el video leen
+ademas `docs/manual/usuario.md` y `docs/tasks/T017-video-tutorial.md`.
+
+## Solicitud de especialistas y cruce de proveedor
+
+Las skills de refinamiento y de ciclo de desarrollo fijan una ruta de proveedor
+por omision para cada rol. Sobre esa ruta aplica esta regla:
+
+- a. Todo especialista, sea de Claude o de Codex, puede cerrar su respuesta con
+  una seccion `Especialistas solicitados` que indique rol, area, motivo,
+  proveedor y modelo sugeridos, y que decidiria o revisaria ese rol.
+- b. El coordinador decide si lo convoca y registra la decision en
+  `sesiones.json` y en la bitacora de la sesion.
+- c. Si el rol no existe, el coordinador puede convocarlo con un encargo acotado
+  y etiquetado como rol provisional, y propone al usuario una tarea para
+  crearlo en `arx/agents/`.
+- d. La sugerencia de proveedor o modelo de un especialista no reemplaza la ruta
+  por omision sin decision del coordinador, y esa decision se registra con su
+  motivo.
 
 ## Integraciones
 

@@ -2,7 +2,7 @@
 
 ## Estado
 
-Pendiente (refinada 2026-10-15). Bloqueada por T018 (roles especialistas); lista para `/development-cycle T017` cuando T018 se complete.
+Pendiente (refinada 2026-10-15). Lista para `/development-cycle T017` (T018 completada).
 
 ## Prioridad y tamano
 

@@ -58,11 +58,25 @@ asked to use it.
   | Roles | Provider and model |
   | --- | --- |
   | `qt-architecture-lead`, `qt-quality-engineer` | Codex with GPT-5.6 |
+  | `especialista-audio-voz` | Codex with GPT-6-Astra (`gpt-6-astra`) |
+  | `especialista-guion-tutoriales`, `especialista-motion-design` | Claude with Fable 5.1 (`claude-fable-5-1`) |
   | Every other selected specialist | Claude with Opus 5.5 |
 
   Record the selected route in `bitacora.md` before launching jobs. A provider
   outage or unavailable model does not silently change this route; follow the
   bridge recovery guide and obtain a replacement choice when one is needed.
+- Requesting specialists and crossing providers:
+  - a. Any specialist, Claude or Codex, may close its response with a section
+    `Especialistas solicitados` stating role, area, reason, suggested provider
+    and model, and what that role would decide or review.
+  - b. The coordinator decides whether to convene it and records the decision
+    in `sesiones.json` and `bitacora.md`.
+  - c. If the role does not exist, the coordinator may convene it with a
+    bounded brief labeled as a provisional role, and proposes a task to the
+    user to create it in `arx/agents/`.
+  - d. A specialist's provider or model suggestion does not replace the default
+    route without a coordinator decision, and that decision is recorded with
+    its reason.
 - Select specialists because the task needs them. Typical roles are
   `qt-architecture-lead`, `qt-core-engineer`, `qt-interface-engineer`,
   `qt-platform-engineer` and `qt-quality-engineer`; include security or macOS

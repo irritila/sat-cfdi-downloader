@@ -2,7 +2,7 @@
 
 ## Estado
 
-Pendiente (refinada 2026-10-15). Lista para `/development-cycle T018`.
+Completada (2026-10-15).
 
 ## Prioridad y tamano
 
@@ -37,7 +37,7 @@ En el refinamiento de T017, `qt-platform-engineer` y `qt-architecture-lead` pidi
 - `arx/agents/especialista-audio-voz.md`: modelo, voz e instrucciones de tono del TTS, pronunciacion, pausas, loudness, mezcla, cortes entre clips, costo y manejo de `OPENAI_API_KEY` (nunca en repo ni logs).
 - `arx/agents/especialista-motion-design.md`: cursor simulado, resaltados, easing y velocidades, transiciones, legibilidad, contraste y posicion de rotulos para que no tapen controles, y el rotulo "Ilustracion".
 - Cada rol sigue la estructura de los roles existentes (Rol, Mision, Cualidad principal, Base tecnica, Contexto obligatorio con `Contexto leido`, Autonomia y limites, Enfoque, Forma de trabajo, Entrega esperada) e indica su proveedor por omision.
-- Adaptadores de seis lineas en `.claude/agents/` como los existentes.
+- Adaptadores en `.claude/agents/` con la misma forma que los existentes.
 - `arx/README.md`: tabla "Roles de produccion de video", excepcion de la base tecnica (D3) y regla de solicitud y cruce (D5).
 - Tabla de ruta de proveedor y regla D5 en las dos skills de `arx/skills/`.
 
@@ -58,13 +58,13 @@ En el refinamiento de T017, `qt-platform-engineer` y `qt-architecture-lead` pidi
 
 ## Criterios de aceptacion
 
-- [ ] Existen los tres archivos de D1 en `arx/agents/` con todas las secciones del formato existente y su proveedor por omision segun D2.
-- [ ] Existen los tres adaptadores en `.claude/agents/` con `name` igual al nombre del archivo, una `description` de una linea y la referencia al rol canonico, sin copiar su contenido. Claude Code los lista como tipos de agente al iniciar una sesion nueva.
-- [ ] Cada rol de video declara la base minima de D3, dice que no implementa C++ y exige leer `docs/manual/usuario.md` y `docs/tasks/T017-video-tutorial.md` cuando trabaja en el video.
-- [ ] El rol de audio y voz prohibe escribir `OPENAI_API_KEY` en el repo, logs o evidencias y exige aprobacion del usuario antes de cualquier llamada con costo. El de guion exige datos sinteticos (`XAXX010101000` / `XEXX010101000`).
-- [ ] `arx/README.md` lista los tres roles con cuando invocarlos y su responsabilidad, documenta la excepcion D3 y la regla D5.
-- [ ] Las dos `SKILL.md` de `arx/skills/` incluyen los roles nuevos en la ruta de proveedor y la regla D5 con sus cuatro puntos.
-- [ ] Cada enlace Markdown agregado apunta a un archivo existente, y `git diff --check` pasa.
+- [x] Existen los tres archivos de D1 en `arx/agents/` con todas las secciones del formato existente y su proveedor por omision segun D2.
+- [x] Existen los tres adaptadores en `.claude/agents/` con `name` igual al nombre del archivo, una `description` de una linea y la referencia al rol canonico, sin copiar su contenido. Claude Code los lista como tipos de agente al iniciar una sesion nueva.
+- [x] Cada rol de video declara la base minima de D3, dice que no implementa C++ y exige leer `docs/manual/usuario.md` y `docs/tasks/T017-video-tutorial.md` cuando trabaja en el video.
+- [x] El rol de audio y voz prohibe escribir `OPENAI_API_KEY` en el repo, logs o evidencias y exige aprobacion del usuario antes de cualquier llamada con costo. El de guion exige datos sinteticos (`XAXX010101000` / `XEXX010101000`).
+- [x] `arx/README.md` lista los tres roles con cuando invocarlos y su responsabilidad, documenta la excepcion D3 y la regla D5.
+- [x] Las dos `SKILL.md` de `arx/skills/` incluyen los roles nuevos en la ruta de proveedor y la regla D5 con sus cuatro puntos.
+- [x] Cada enlace Markdown agregado apunta a un archivo existente, y `git diff --check` pasa.
 
 ## Verificacion
 
@@ -75,7 +75,14 @@ En el refinamiento de T017, `qt-platform-engineer` y `qt-architecture-lead` pidi
 
 ## Resultado
 
-Pendiente.
+- Roles `especialista-guion-tutoriales`, `especialista-audio-voz` y `especialista-motion-design` en `arx/agents/` con adaptadores en
+  `.claude/agents/`; base minima (D3) y proveedor por omision (D2: Claude Fable 5.1 / GPT-6-Astra).
+- `arx/README.md` con la tabla de roles de video, la excepcion de base tecnica y la regla de solicitud y cruce de proveedor (D5);
+  las dos skills de `arx/skills/` con la ruta y la regla.
+- Contrato de cache alineado con T017 D5 (solo se sintetizan hashes faltantes) y valor de la clave distinguido de su identificador.
+- Revision de Codex GPT-6-Astra en dos rondas; prueba de humo en sesion nueva: los tres tipos aparecen y el guionista responde con
+  `Contexto leido`.
+- Pendiente fuera del repo (D6): sincronizar `~/.claude/skills/` con `arx/skills/`.
 
 ## Referencias
 

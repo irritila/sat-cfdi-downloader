@@ -46,7 +46,23 @@ implementation-boundary or testability questions. The default provider route is:
 | Roles | Provider and model |
 | --- | --- |
 | `qt-architecture-lead`, `qt-quality-engineer` | Codex GPT-5.6 |
+| `especialista-audio-voz` | Codex GPT-6-Astra (`gpt-6-astra`) |
+| `especialista-guion-tutoriales`, `especialista-motion-design` | Claude Fable 5.1 (`claude-fable-5-1`) |
 | Other selected specialists | Claude Opus 5.5 |
+
+Requesting specialists and crossing providers:
+
+- a. Any specialist, Claude or Codex, may close its response with a section
+  `Especialistas solicitados` stating role, area, reason, suggested provider
+  and model, and what that role would decide or review.
+- b. The coordinator decides whether to convene it and records the decision in
+  `sesiones.json` and the meeting log.
+- c. If the role does not exist, the coordinator may convene it with a bounded
+  brief labeled as a provisional role, and proposes a task to the user to
+  create it in `arx/agents/`.
+- d. A specialist's provider or model suggestion does not replace the default
+  route without a coordinator decision, and that decision is recorded with its
+  reason.
 
 Record selected roles, exact model/effort and transport in `sesiones.json` before
 contacting them. Follow `references/bridge-recovery.md` when a provider bridge is
