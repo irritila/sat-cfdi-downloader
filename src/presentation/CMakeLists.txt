@@ -22,6 +22,7 @@ set(_satcfdi_qml_files
     qml/components/Icono.qml
     qml/components/AnilloFoco.qml
     qml/components/AvisoEnLinea.qml
+    qml/components/FranjaAvisoRaizPaquetes.qml
     qml/components/CampoArchivo.qml
     qml/components/CampoCombo.qml
     qml/components/CampoFormulario.qml
@@ -108,6 +109,8 @@ qt_add_qml_module(satcfdi_presentation
         viewmodels/FormatoFechas.cpp
         viewmodels/PresentacionViewModels.h
         viewmodels/PresentacionViewModels.cpp
+        viewmodels/AvisoRaizPaquetesViewModel.h
+        viewmodels/AvisoRaizPaquetesViewModel.cpp
 )
 
 # Includes: "presentation/viewmodels/X.h" desde src/, y "X.h" para el codigo

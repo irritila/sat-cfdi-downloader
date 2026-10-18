@@ -1,4 +1,4 @@
-# Arquitectura - SAT CFDI Downloader
+# Arquitectura - Archivo Fiscal
 
 Estado: borrador incremental para revision por diagrama.
 
@@ -15,7 +15,7 @@ flowchart LR
     user["Usuario contador<br/>Uso personal"]
 
     subgraph macos["Equipo local macOS"]
-        app["SAT CFDI Downloader<br/>App desktop"]
+        app["Archivo Fiscal<br/>App desktop"]
         secrets["Almacen seguro de credenciales<br/>Contrato local"]
         db["Base de datos local<br/>Perfiles, solicitudes, paquetes, logs"]
         files["Carpeta local<br/>Paquetes ZIP descargados"]
@@ -38,7 +38,7 @@ flowchart LR
 
 ### Lectura del diagrama
 
-- El sistema principal es `SAT CFDI Downloader`.
+- El sistema principal es `Archivo Fiscal`.
 - Todo lo propio de la aplicacion vive en el equipo local macOS.
 - No hay backend remoto propio.
 - El unico sistema externo de negocio es el SAT.
@@ -73,7 +73,7 @@ Objetivo: describir las capacidades visibles del MVP separadas por actor para ev
 flowchart LR
     user["Usuario contador<br/>Uso personal"]
 
-    subgraph app["SAT CFDI Downloader"]
+    subgraph app["Archivo Fiscal"]
         profiles(["Administrar perfiles SAT"])
         create(["Crear solicitud masiva"])
         list(["Listar solicitudes"])
@@ -117,7 +117,7 @@ Lectura:
 flowchart LR
     sat["Servicios web SAT"]
 
-    subgraph app["SAT CFDI Downloader"]
+    subgraph app["Archivo Fiscal"]
         auth(["Autenticar con e.firma"])
         create(["Enviar solicitud masiva"])
         verify(["Verificar estatus"])
@@ -153,7 +153,7 @@ Lectura:
 flowchart LR
     macos["macOS"]
 
-    subgraph app["SAT CFDI Downloader"]
+    subgraph app["Archivo Fiscal"]
         menu(["Exponer icono de menu bar"])
         autostart(["Iniciar con sesion de macOS"])
         notify(["Emitir notificaciones nativas"])
@@ -749,7 +749,7 @@ La decision de activacion macOS queda fijada en `ADR 0009`: foreground al abrir 
 sequenceDiagram
     actor Usuario
     participant macOS as macOS
-    participant App as SAT CFDI Downloader
+    participant App as Archivo Fiscal
     participant DB as Base de datos local
     participant MenuBar as Menu bar controller
     participant UI as Ventana principal
@@ -846,7 +846,7 @@ La estructura fisica de carpetas y targets CMake queda definida en `ADR 0012` y 
 
 ```mermaid
 flowchart TB
-    subgraph app["SAT CFDI Downloader - proceso local macOS - Qt 6"]
+    subgraph app["Archivo Fiscal - proceso local macOS - Qt 6"]
         subgraph presentation["Presentacion QML / Qt Quick Controls"]
             main_ui["Ventana principal QML"]
             menu_bar["Menu bar controller"]
@@ -1250,7 +1250,7 @@ flowchart TB
         menu_bar["Menu bar macOS"]
         notification_center["Notificaciones macOS"]
 
-        subgraph bundle["SAT CFDI Downloader.app"]
+        subgraph bundle["Archivo Fiscal.app"]
             process["Proceso local de aplicacion"]
             ui["Ventana principal"]
             menu_controller["Controlador menu bar"]
@@ -1259,7 +1259,7 @@ flowchart TB
 
         secure_store["Almacen seguro local<br/>referencias de e.firma"]
         local_db["Base de datos local<br/>perfiles, solicitudes, paquetes, logs, configuracion"]
-        package_folder["Carpeta local de paquetes ZIP<br/>~/SAT-CFDI-Downloader/paquetes/..."]
+        package_folder["Carpeta local de paquetes ZIP<br/>~/Archivo-Fiscal/paquetes/..."]
     end
 
     internet["Internet"]
@@ -1291,7 +1291,7 @@ flowchart TB
 ### Lectura del diagrama
 
 - Todo corre en el Mac del usuario, dentro de su sesion local.
-- `SAT CFDI Downloader.app` es una aplicacion local con un solo proceso principal para UI, menu bar y worker.
+- `Archivo Fiscal.app` es una aplicacion local con un solo proceso principal para UI, menu bar y worker.
 - El inicio automatico usa la integracion normal de macOS y solo levanta el proceso con icono de menu bar; no abre la ventana principal.
 - Al abrir la app manualmente, se muestra la ventana principal aunque el proceso ya exista.
 - La base de datos local guarda metadata operativa; la carpeta local guarda paquetes ZIP.
@@ -1312,7 +1312,7 @@ flowchart TB
 
 ### Preguntas para revisar
 
-- Validado: `SAT CFDI Downloader.app` se modela como un solo proceso local con UI, menu bar y worker.
+- Validado: `Archivo Fiscal.app` se modela como un solo proceso local con UI, menu bar y worker.
 - Validado: la base local es el unico almacenamiento de logs del MVP.
 - Validado: el worker solo existe mientras corre el proceso de la app; no es daemon independiente de macOS.
 
@@ -1326,7 +1326,7 @@ Objetivo: fijar las fronteras de seguridad para e.firma, llave privada, contrase
 flowchart TB
     usuario["Usuario contador<br/>uso personal"]
 
-    subgraph app["SAT CFDI Downloader.app"]
+    subgraph app["Archivo Fiscal.app"]
         ui["UI macOS"]
         profiles["Servicio de perfiles SAT"]
         requests["Servicio de solicitudes / acciones / worker"]
@@ -1598,7 +1598,7 @@ flowchart TB
     autostart["Inicio automatico macOS"]
     notification["Notificacion macOS"]
 
-    subgraph app["SAT CFDI Downloader.app"]
+    subgraph app["Archivo Fiscal.app"]
         menu_bar["Icono menu bar"]
         main_window["Ventana principal"]
 

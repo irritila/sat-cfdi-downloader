@@ -17,7 +17,9 @@ Para este MVP personal no conviene introducir un helper, daemon o LaunchAgent pr
 
 ## Decision
 
-Usar un solo bundle `SAT CFDI Downloader.app` con activacion por contexto, encapsulada detras de `OSIntegration`.
+Usar un solo bundle `Archivo Fiscal.app` con activacion por contexto, encapsulada detras de `OSIntegration`.
+
+Nota T019 (D1, D5): el nombre visible es "Archivo Fiscal" (`CFBundleName` y `CFBundleDisplayName`); el bundle instalado se llama `Archivo Fiscal.app` (staging de T011). El bundle id `mx.adenium.satcfdi-downloader`, el target y el ejecutable `satcfdi_app` no cambian, asi que el registro del login item y la autorizacion de notificaciones siguen ligados al mismo id.
 
 Reglas:
 

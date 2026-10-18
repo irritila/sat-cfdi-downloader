@@ -4,7 +4,7 @@ Estado: borrador para implementacion.
 
 ## Objetivo
 
-Construir una primera version local de `SAT CFDI Downloader.app` usando Qt 6, QML / Qt Quick Controls y C++, alineada con el MVP personal definido en `docs/requirements.md`.
+Construir una primera version local de `Archivo Fiscal.app` usando Qt 6, QML / Qt Quick Controls y C++, alineada con el MVP personal definido en `docs/requirements.md`.
 
 Este milestone no agrega alcance comercial, multiusuario ni backend remoto. La prioridad es dejar una app macOS ejecutable, mantenible y preparada para conectar el servicio SAT real.
 

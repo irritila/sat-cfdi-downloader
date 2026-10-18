@@ -1,10 +1,10 @@
-# Requerimientos - SAT CFDI Downloader
+# Requerimientos - Archivo Fiscal
 
 Estado: borrador simple para revision iterativa.
 
 ## 1. Contexto
 
-SAT CFDI Downloader es una aplicacion de escritorio para uso personal. El usuario sera una sola persona actuando como contador desde su propio equipo.
+Archivo Fiscal es una aplicacion de escritorio para uso personal. El usuario sera una sola persona actuando como contador desde su propio equipo.
 
 La aplicacion no se esta disenando como producto comercial, SaaS, portal multiusuario ni herramienta para clientes hipoteticos. Las decisiones deben mantenerse simples y enfocadas en el uso real actual.
 
@@ -52,7 +52,7 @@ El MVP incluye:
 - Pausa del worker: si el usuario pausa el monitoreo, la pausa persiste entre sesiones hasta que el usuario reanude.
 - Frecuencia inicial del worker: cada 10 minutos para solicitudes pendientes.
 - Backoff inicial: si una solicitud permanece sin cambios despues de tres verificaciones consecutivas, verificarla cada 30 minutos.
-- Carpeta local por defecto: `~/SAT-CFDI-Downloader/paquetes/{rfc}/{yyyy-mm}/{solicitud_id}/`.
+- Carpeta local por defecto: `~/Archivo-Fiscal/paquetes/{rfc}/{yyyy-mm}/{solicitud_id}/`. Desde T019 la app migra al arrancar la carpeta anterior `~/SAT-CFDI-Downloader/paquetes` (renombrandola, sin copiar ni borrar ZIP); ver ADR 0004.
 - En la ruta local, `{yyyy-mm}` corresponde al mes de la fecha inicial solicitada y `{solicitud_id}` corresponde al identificador SAT de la solicitud.
 - Retencion local: el MVP no borra paquetes ZIP automaticamente.
 
@@ -365,7 +365,7 @@ Debe existir:
 Los paquetes se guardan por defecto en:
 
 ```text
-~/SAT-CFDI-Downloader/paquetes/{rfc}/{yyyy-mm}/{solicitud_id}/
+~/Archivo-Fiscal/paquetes/{rfc}/{yyyy-mm}/{solicitud_id}/
 ```
 
 Donde:

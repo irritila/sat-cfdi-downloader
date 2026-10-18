@@ -1,4 +1,4 @@
-# SAT CFDI Downloader
+# Archivo Fiscal
 
 Este repositorio contiene una aplicacion de escritorio local-first para gestionar solicitudes de descarga masiva de CFDI. La descarga usa el servicio web que el SAT pone al servicio del contribuyente.
 

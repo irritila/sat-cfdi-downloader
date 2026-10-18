@@ -28,4 +28,5 @@ private slots:
 
 private:
     bool m_carpetaUsuarioExistia = false;
+    bool m_carpetaNuevaExistia = false; // T019: ~/Archivo-Fiscal
 };

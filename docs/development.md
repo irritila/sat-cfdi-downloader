@@ -178,6 +178,9 @@ el hilo grafico no ejecuta SQL:
 
 - Por defecto: `QStandardPaths::AppDataLocation`, que en macOS es
   `~/Library/Application Support/Adenium/SAT CFDI Downloader/satcfdi.sqlite3`.
+  El nombre interno `applicationName` "SAT CFDI Downloader" no cambio con
+  T019 (D2): define esta ruta; lo visible es "Archivo Fiscal"
+  (`applicationDisplayName`).
 - Con `--data-dir <dir>` (o `--data-dir=<dir>`): `<dir>/satcfdi.sqlite3`. Util
   para pruebas manuales sin tocar los datos reales:
 
@@ -343,8 +346,15 @@ propia prueba (lista vacia tras borrar).
 ## Paquetes ZIP locales (T008)
 
 - Raiz de paquetes (D8): con `--data-dir <dir>`, `<dir>/paquetes`; sin
-  `--data-dir`, `~/SAT-CFDI-Downloader/paquetes` (no `Application Support`).
+  `--data-dir`, `~/Archivo-Fiscal/paquetes` (no `Application Support`).
   `ruta_local` se guarda relativa a esa raiz.
+- Migracion T019 (D3, D4): sin `--data-dir`, la instancia primaria renombra
+  al arrancar la carpeta vieja `~/SAT-CFDI-Downloader/paquetes` a
+  `~/Archivo-Fiscal/paquetes` (`renamex_np` con `RENAME_EXCL`; nunca copia ni
+  borra ZIP), antes de que el worker escriba. Con conflicto o error sigue con la
+  raiz vieja y avisa en la ventana. Revertir a mano (app cerrada):
+  `mkdir -p ~/SAT-CFDI-Downloader && mv ~/Archivo-Fiscal/paquetes ~/SAT-CFDI-Downloader/paquetes`
+  y `rmdir ~/Archivo-Fiscal` si quedo vacia; detalle en ADR 0004.
 - La app crea la raiz al ARRANCAR, en el hilo de E/S del bootstrap (no en el
   hilo grafico), con permisos 0700 (los componentes que falten;
   no cambia permisos de carpetas que ya existian). El adaptador
@@ -511,6 +521,27 @@ QT_QPA_PLATFORM=cocoa ./build/tools/capturas-manual/satcfdi_manual_capturas \
 - La prueba `satcfdi_manual_enlaces` (label `docs`, `ctest -L docs`) verifica que
   cada `![...](img/X.png)` de `docs/manual/usuario.md` exista y que no haya PNG
   sin referenciar.
+
+## Nombre de la app (T019)
+
+- Lo visible es "Archivo Fiscal": `CFBundleName`/`CFBundleDisplayName`
+  (`SATCFDI_BUNDLE_NAME` en el `CMakeLists.txt` raiz) y
+  `applicationDisplayName`. El bundle id `mx.adenium.satcfdi-downloader`, el
+  `applicationName` interno "SAT CFDI Downloader" (ruta de datos), el target y
+  ejecutable `satcfdi_app`, el modulo QML `SatCfdiDownloader` y los prefijos
+  `SATCFDI_*` no cambian (T019 D1, D2, D5).
+- El nombre anterior solo puede aparecer en las coincidencias de
+  `tools/verificar-nombre/permitidos.txt` (nombre interno, origen de la
+  migracion de paquetes, `tools/sat_spike` y documentos historicos):
+
+```bash
+cmake --build build --target verificar_nombre   # o: ctest --test-dir build -L nombre
+cmake -DRAIZ=. -P tools/verificar-nombre/verificar-nombre.cmake
+```
+
+  Usa `git grep` sobre archivos versionados y no versionados (no los ignorados)
+  y falla con cada coincidencia fuera de la lista; avisa de entradas que ya no
+  cubren nada.
 
 ## Video tutorial (T017)
 

@@ -102,7 +102,7 @@ void AppLifecycleController::iniciar()
     connect(&m_os, &OSIntegration::permisoNotificacionesSolicitado, this,
             [this] { m_os.solicitarPermisoNotificaciones(); });
     connect(&m_os, &OSIntegration::notificacionPruebaSolicitada, this, [this] {
-        m_os.enviarNotificacionPrueba(QStringLiteral("SAT CFDI Downloader"),
+        m_os.enviarNotificacionPrueba(QStringLiteral("Archivo Fiscal"),
                                       QStringLiteral("Notificacion de prueba."));
     });
     connect(&m_os, &OSIntegration::salirSolicitado, this,

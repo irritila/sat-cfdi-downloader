@@ -658,7 +658,7 @@ Medidas fijas (pt): alto de control 28; badge 20 (grande 26); encabezado 52; fil
   13. [info] «Notificaciones: sin permiso solicitado / permitidas / deshabilitadas / no disponibles»
   14. «Solicitar permiso de notificaciones», «Enviar notificación de prueba» o «Abrir ajustes de notificaciones…», según el caso
   15. —
-  16. Salir de SAT CFDI Downloader
+  16. Salir de Archivo Fiscal
 - **Estados de la pantalla:** activo, en pausa (con pendientes) y trabajando.
 - **Acciones:** las actuales, sin cambios.
 - **Cambios respecto de la versión actual:** UX-01, UX-37, UX-38.
@@ -777,7 +777,7 @@ Medidas fijas (pt): alto de control 28; badge 20 (grande 26); encabezado 52; fil
 | menu.nueva | Nueva solicitud | Nueva solicitud… | Menu bar |
 | menu.inicio | Iniciar al iniciar sesion | Abrir al iniciar sesión | Menu bar |
 | menu.pausado | Monitoreo pausado | Monitoreo en pausa | Menu bar |
-| menu.salir | Salir | Salir de SAT CFDI Downloader | Menu bar |
+| menu.salir | Salir | Salir de Archivo Fiscal | Menu bar |
 | notif.descarga.cuerpo | Descarga completa: 1 de 1. Recibidos del 2026-09-03 al 2026-09-03, RFC ***000. | 1 de 1 paquetes descargados. / Recibidos · 3 sep 2026 · RFC ***000 | Notificación |
 | notif.efirma.titulo | (título actual de la notificación de e.firma) | e.firma no disponible | Notificación |
 

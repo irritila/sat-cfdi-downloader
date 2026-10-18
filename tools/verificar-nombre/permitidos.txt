@@ -1,0 +1,57 @@
+# T019: coincidencias permitidas del nombre anterior ("SAT CFDI Downloader" y
+# "SAT-CFDI-Downloader"). Formato en verificar-nombre.cmake:
+#   <glob>                   toda coincidencia en esos archivos
+#   <glob> :: <fragmento>    solo lineas que contienen <fragmento> (literal)
+# Cualquier otra coincidencia hace fallar la verificacion. Entradas por archivo
+# concreto: si aparece el nombre en otro archivo, se revisa y se agrega aqui.
+
+# --- La propia verificacion ---
+tools/verificar-nombre/**
+
+# --- Nombre interno congelado (D2): applicationName define AppDataLocation ---
+src/app_core/AppBootstrapper.cpp :: setApplicationName(QStringLiteral("SAT CFDI Downloader"))
+src/app_core/AppBootstrapper.h :: applicationName ("SAT CFDI Downloader")
+# Pruebas que fijan el nombre interno y la ruta de datos.
+tests/integration/TestComposicionPersistida.cpp :: QStringLiteral("SAT CFDI Downloader")
+tests/integration/TestComposicionPersistida.cpp :: Adenium/SAT CFDI Downloader
+tests/integration/migracion/TestMigracionRaizPaquetes.cpp :: QStringLiteral("SAT CFDI Downloader")
+tests/integration/migracion/TestMigracionRaizPaquetes.cpp :: Adenium/SAT CFDI Downloader
+# Documentos que citan la ruta de datos interna o el nombre interno.
+docs/development.md :: Adenium/SAT CFDI Downloader
+docs/development.md :: applicationName` "SAT CFDI Downloader"
+docs/development.md :: applicationName` interno "SAT CFDI Downloader"
+docs/adrs/0004-local-persistence-boundaries.md :: Adenium/SAT CFDI Downloader
+docs/design/qt-project-structure.md :: applicationName="SAT CFDI Downloader"
+
+# --- Origen de la migracion de paquetes (D3, D4, D8) ---
+src/app_core/MigracionRaizPaquetes.* :: SAT-CFDI-Downloader
+src/infrastructure/storage/FilesystemPackageStorage.* :: kCarpetaHomeLegada
+# Pruebas de migracion, raiz de paquetes y aviso.
+tests/infrastructure/TestPackageStorageFs.cpp :: SAT-CFDI-Downloader
+tests/integration/TestPaquetes.cpp :: SAT-CFDI-Downloader
+tests/integration/TestRaizPaquetesMigrada.cpp :: SAT-CFDI-Downloader
+tests/integration/migracion/TestMigracionRaizPaquetes.cpp :: SAT-CFDI-Downloader
+tests/presentation/TestAvisoRaizPaquetes.cpp :: SAT-CFDI-Downloader
+tests/presentation/TestPresentacion.cpp :: SAT-CFDI-Downloader
+tests/presentation/quick/FixtureAvisoRaiz.h :: SAT-CFDI-Downloader
+tests/presentation/quick/tst_aviso_raiz_paquetes.qml :: SAT-CFDI-Downloader
+# Documentacion de la migracion y de como revertirla.
+docs/adrs/0004-local-persistence-boundaries.md :: SAT-CFDI-Downloader
+docs/development.md :: SAT-CFDI-Downloader
+docs/requirements.md :: SAT-CFDI-Downloader
+docs/manual/usuario.md :: SAT-CFDI-Downloader
+
+# --- Herramienta historica (spike T006): usa la ruta de datos interna ---
+tools/sat_spike/**
+
+# --- Documentos historicos (D6): tareas completadas, ADR historicos, bitacoras ---
+docs/meetings/**
+docs/tasks/T003-persistencia-local.md
+docs/tasks/T008-almacenamiento-zip.md
+docs/tasks/T009.1-acceso-paquetes.md
+docs/tasks/T017-video-tutorial.md
+docs/tasks/T019-renombrar-archivo-fiscal.md
+docs/adrs/0003-single-macos-app-process.md
+docs/adrs/0016-sqlite-runtime-migrations-and-threading.md
+# Registro historico del cambio UX-37 (el catalogo de textos vigente ya dice "Archivo Fiscal").
+docs/design/ui-ux-v2/traspaso.md :: UX-37

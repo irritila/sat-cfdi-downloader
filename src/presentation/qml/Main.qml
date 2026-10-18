@@ -21,13 +21,15 @@ ApplicationWindow {
     required property PerfilesSatViewModel perfilesViewModel
     required property EFirmaFormViewModel eFirmaViewModel
     required property ExploradorCfdiViewModel exploradorViewModel
+    // T019 D8: aviso de la carpeta de paquetes (inactivo si no hay aviso).
+    required property AvisoRaizPaquetesViewModel avisoRaizPaquetesViewModel
 
     width: 960
     height: 640
     minimumWidth: 560
     minimumHeight: 420
     visible: false
-    title: qsTr("SAT CFDI Downloader")
+    title: qsTr("Archivo Fiscal")
 
     // T013: fondo y paleta de los controles Basic desde Theme (claro/oscuro);
     // los componentes propios usan Theme directamente.
@@ -198,10 +200,24 @@ ApplicationWindow {
             ventana.menuBar = barraMenuComponente.createObject(ventana)
     }
 
+    // T019 D8: arriba de todas las paginas mientras haya aviso; no toma foco
+    // ni cambia el orden de tabulacion. No muestra la ventana por su cuenta.
+    FranjaAvisoRaizPaquetes {
+        id: franjaAvisoRaiz
+        aviso: ventana.avisoRaizPaquetesViewModel
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        height: implicitHeight
+    }
+
     Loader {
         id: paginaActual
         objectName: "paginaActual"
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: franjaAvisoRaiz.bottom
+        anchors.bottom: parent.bottom
         focus: true
         Component.onCompleted: ventana.actualizarPagina()
     }

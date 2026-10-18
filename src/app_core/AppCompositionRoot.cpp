@@ -179,6 +179,7 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
     // T008 D8: almacenamiento de ZIP. La raiz la crea AppBootstrapper al
     // arrancar, en su hilo de E/S (nunca en el hilo grafico); el adaptador
     // tambien la crea al primer guardado.
+    m_avisoRaizPaquetes = monitoreo.avisoRaizPaquetes;
     m_packageStorage = monitoreo.packageStorage;
     if (!m_packageStorage) {
         m_raizPaquetes = monitoreo.raizPaquetes.isEmpty()
@@ -384,6 +385,14 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
     m_viewModels = std::make_unique<PresentacionViewModels>(
         m_solicitudesService.get(), m_perfilesService.get(), m_credencialesService.get(), nullptr,
         reloj); // T014.3: mismo reloj que AvisoVencimientoEFirma (badge = aviso)
+    if (m_avisoRaizPaquetes) { // T019 D8: aviso de la carpeta de paquetes (fijo en la sesion)
+        using MotivoVm = AvisoRaizPaquetesViewModel::Motivo;
+        const auto& a = *m_avisoRaizPaquetes;
+        const MotivoVm motivo = a.motivo == AvisoRaizPaquetes::Motivo::Conflicto ? MotivoVm::Conflicto
+                                : a.motivo == AvisoRaizPaquetes::Motivo::Error   ? MotivoVm::Error
+                                                                                 : MotivoVm::RaizNoDisponible;
+        m_viewModels->avisoRaizPaquetes()->fijar({motivo, a.rutaLegada, a.rutaNueva, a.rutaEfectiva});
+    }
     m_viewModels->setAccionesSolicitud(m_accionesWorker.get());
     m_viewModels->setConsultaExistencia(m_consultaExistencia.get());
     m_viewModels->setAccionesFinder(m_accesoFinder.get());

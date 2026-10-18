@@ -18,6 +18,9 @@ qt_add_library(satcfdi_app_core STATIC
     ExtensionCicloDeVida.h
     IntegracionWorker.h
     IntegracionWorker.cpp
+    # T019 D4/D8: politica de migracion de la raiz de paquetes del home.
+    MigracionRaizPaquetes.h
+    MigracionRaizPaquetes.cpp
     ProgramadorQt.h
     ProgramadorQt.cpp
     SingleInstanceCoordinator.h

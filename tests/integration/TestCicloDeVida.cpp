@@ -296,7 +296,7 @@ void TestCicloDeVida::permisoYNotificacionDePrueba()
         QCOMPARE(envios.size(), 1);
         QCOMPARE(envios.at(0).at(0).value<NotificationSendResult>(), NotificationSendResult::Sent);
         QCOMPARE(e.os.notificacionesEnviadas.size(), 1);
-        QCOMPARE(e.os.notificacionesEnviadas.at(0).first, QStringLiteral("SAT CFDI Downloader"));
+        QCOMPARE(e.os.notificacionesEnviadas.at(0).first, QStringLiteral("Archivo Fiscal"));
     }
     {
         // Denied: la prueba informa deshabilitado y la app sigue operativa.

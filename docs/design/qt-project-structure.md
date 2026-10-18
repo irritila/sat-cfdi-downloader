@@ -309,7 +309,9 @@ Reglas:
 
 - La base productiva vive en `QStandardPaths::AppDataLocation/satcfdi.sqlite3`.
 - `main.cpp` o el bootstrap debe fijar `organizationName="Adenium"` y
-  `applicationName="SAT CFDI Downloader"` antes de resolver `AppDataLocation`.
+  `applicationName="SAT CFDI Downloader"` antes de resolver `AppDataLocation`
+  (nombre interno congelado por T019 D2; lo visible usa
+  `applicationDisplayName` "Archivo Fiscal").
 - La app acepta `--data-dir <dir>` para desarrollo y pruebas manuales.
 - La migracion inicial se lee desde `:/migrations/001_initial_schema.sql`; la
   fuente vive en `src/infrastructure/persistence/migrations/001_initial_schema.sql`.

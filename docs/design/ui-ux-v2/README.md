@@ -1,4 +1,4 @@
-Sistema de diseño de **SAT CFDI Downloader**: una app de escritorio para macOS (Qt 6 / QML) con la que un contador descarga del SAT, de forma masiva, los CFDI de sus contribuyentes. Las vistas previas son HTML de referencia. La implementación es QML: cada token se traduce a una propiedad de un `Theme.qml` y cada componente, a un archivo QML con el mismo nombre. El documento de traspaso completo (tokens, componentes, pantallas, cambios UX-NN, textos, sugerencias y preguntas) es la sección **Traspaso UI/UX**.
+Sistema de diseño de **Archivo Fiscal**: una app de escritorio para macOS (Qt 6 / QML) con la que un contador descarga del SAT, de forma masiva, los CFDI de sus contribuyentes. Las vistas previas son HTML de referencia. La implementación es QML: cada token se traduce a una propiedad de un `Theme.qml` y cada componente, a un archivo QML con el mismo nombre. El documento de traspaso completo (tokens, componentes, pantallas, cambios UX-NN, textos, sugerencias y preguntas) es la sección **Traspaso UI/UX**.
 
 ## Principios
 

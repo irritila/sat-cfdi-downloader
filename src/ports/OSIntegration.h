@@ -191,7 +191,7 @@ public:
     virtual void reflejarEstadoMonitoreo(const EstadoMonitoreo& estado) = 0;
 
     // T014.4 D2: cambia SOLO el icono plantilla del menu bar y su
-    // tooltip/nombre accesible ("SAT CFDI Downloader", "...: trabajando",
+    // tooltip/nombre accesible ("Archivo Fiscal", "...: trabajando",
     // "...: en pausa", "...: requiere atención"). No emite intenciones ni
     // cambia el menu. Puede llamarse antes de inicializar() (se aplica al
     // crear el icono).

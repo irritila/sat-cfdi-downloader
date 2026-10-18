@@ -21,7 +21,7 @@ Separar la persistencia local en tres fronteras:
 Los ZIP se guardan por defecto en:
 
 ```text
-~/SAT-CFDI-Downloader/paquetes/{rfc}/{yyyy-mm}/{solicitud_id}/
+~/Archivo-Fiscal/paquetes/{rfc}/{yyyy-mm}/{solicitud_id}/
 ```
 
 La ruta queda fija para el MVP. No se guarda como preferencia configurable en `ConfiguracionApp`.
@@ -47,9 +47,37 @@ sustituye por `_`, el prefijo se trunca a 100 y se agrega
 maximo 255 bytes. La ruta persistida es relativa a la raiz y no admite
 componentes absolutos ni `..`.
 
-La raiz de produccion es `~/SAT-CFDI-Downloader/paquetes`. Con `--data-dir`,
+La raiz de produccion es `~/Archivo-Fiscal/paquetes`. Con `--data-dir`,
 la raiz es `<data-dir>/paquetes`; las pruebas inyectan una raiz temporal. La
 ruta no se configura como preferencia del usuario.
+
+## Nota de detalle (T019)
+
+T019 renombro la app a "Archivo Fiscal" y la raiz de produccion paso de
+`~/SAT-CFDI-Downloader/paquetes` a `~/Archivo-Fiscal/paquetes` (T019 D3, D4).
+La base guarda rutas relativas a la raiz, asi que no se reescribe SQLite. La
+carpeta de datos interna (`AppDataLocation`, `Adenium/SAT CFDI Downloader`) no
+cambia (T019 D2).
+
+Al arrancar, solo la instancia primaria y antes de que el worker escriba (no
+con `--data-dir`), la app migra la carpeta vieja sin copiar ni borrar ZIP: la
+renombra con `renamex_np(..., RENAME_EXCL)`. Si `~/SAT-CFDI-Downloader` solo
+contiene `paquetes` (y `.DS_Store`) se renombra completa; si contiene otras
+cosas, se crea `~/Archivo-Fiscal` y se mueve solo `paquetes`. Ante conflicto
+(las dos carpetas con contenido) o error, no toca nada, sigue usando la raiz
+vieja y avisa en la ventana. El detalle de casos esta en T019 D4 y el contrato
+en T019 D8.
+
+Revertir a mano (por ejemplo, para volver a una build anterior a T019, que
+crearia una raiz vacia y mostraria los ZIP como faltantes): con la app cerrada,
+
+```bash
+mkdir -p ~/SAT-CFDI-Downloader
+mv ~/Archivo-Fiscal/paquetes ~/SAT-CFDI-Downloader/paquetes
+rmdir ~/Archivo-Fiscal   # solo si quedo vacia
+```
+
+Una build con T019 vuelve a migrar en su siguiente arranque.
 
 ## Consecuencias
 

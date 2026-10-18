@@ -52,6 +52,17 @@ public:
     virtual int listar(const QByteArray& directorio, QList<EntradaDirectorio>& entradas) = 0;
     // Bytes aleatorios para el sufijo del temporal (arc4random_buf).
     virtual void aleatorio(unsigned char* destino, std::size_t n) = 0;
+
+    // T019 D4: migracion de la raiz de paquetes (solo directorios y enlaces;
+    // nunca copia ni borra archivos).
+    // rmdir: solo elimina un directorio VACIO (ENOTEMPTY/EEXIST si no lo esta).
+    virtual int eliminarDirectorioVacio(const QByteArray& ruta) = 0;
+    // Renombra la entrada `origen` (directorio o enlace; un enlace se renombra
+    // a si mismo, su objetivo no se toca) a `destino` sin reemplazar:
+    // renamex_np(RENAME_EXCL) en macOS. EEXIST si `destino` existe (incluido
+    // un directorio vacio, que rename(2) reemplazaria en silencio); EXDEV si
+    // cruza volumenes. Fuera de macOS devuelve ENOTSUP (la migracion no aplica).
+    virtual int renombrarSinReemplazo(const QByteArray& origen, const QByteArray& destino) = 0;
 };
 
 // Implementacion real POSIX/macOS.
@@ -69,6 +80,8 @@ public:
     int eliminarArchivo(const QByteArray& ruta) override;
     int listar(const QByteArray& directorio, QList<EntradaDirectorio>& entradas) override;
     void aleatorio(unsigned char* destino, std::size_t n) override;
+    int eliminarDirectorioVacio(const QByteArray& ruta) override;
+    int renombrarSinReemplazo(const QByteArray& origen, const QByteArray& destino) override;
 };
 
 } // namespace satcfdi

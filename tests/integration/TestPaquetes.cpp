@@ -30,18 +30,22 @@ int modo(const QString& ruta)
     return ::lstat(QFile::encodeName(ruta).constData(), &st) == 0 ? static_cast<int>(st.st_mode & 0777) : -1;
 }
 
-// Huella de ~/SAT-CFDI-Downloader (si existe es del usuario: no se toca).
+// Huella de ~/SAT-CFDI-Downloader y ~/Archivo-Fiscal (T019; si existen son
+// del usuario: no se tocan).
 QStringList huellaHome()
 {
-    const QString raiz = QDir(QDir::homePath()).filePath(QStringLiteral("SAT-CFDI-Downloader"));
-    if (!QFileInfo::exists(raiz)) {
-        return {QStringLiteral("<no existe>")};
-    }
     QStringList r;
-    QDirIterator it(raiz, QDir::AllEntries | QDir::Hidden | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
-    while (it.hasNext()) {
-        const QFileInfo f(it.next());
-        r.append(f.filePath() + QLatin1Char('@') + QString::number(f.lastModified().toMSecsSinceEpoch()));
+    for (const QString& carpeta : {QStringLiteral("SAT-CFDI-Downloader"), QStringLiteral("Archivo-Fiscal")}) {
+        const QString raiz = QDir(QDir::homePath()).filePath(carpeta);
+        if (!QFileInfo::exists(raiz)) {
+            r.append(carpeta + QStringLiteral("<no existe>"));
+            continue;
+        }
+        QDirIterator it(raiz, QDir::AllEntries | QDir::Hidden | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+        while (it.hasNext()) {
+            const QFileInfo f(it.next());
+            r.append(f.filePath() + QLatin1Char('@') + QString::number(f.lastModified().toMSecsSinceEpoch()));
+        }
     }
     r.sort();
     return r;
@@ -75,11 +79,14 @@ void TestPaquetes::raizConDataDirEsDataDirPaquetes()
     const QString esperada = QDir(dataDir).filePath(QStringLiteral("paquetes"));
     QCOMPARE(FilesystemPackageStorage::resolverRaiz(dataDir, QDir::homePath()), esperada);
     QCOMPARE(FilesystemPackageStorage::resolverRaiz(std::nullopt, QStringLiteral("/Users/x")),
-             QStringLiteral("/Users/x/SAT-CFDI-Downloader/paquetes"));
+             QStringLiteral("/Users/x/Archivo-Fiscal/paquetes"));
 
+    // T019: el mismo camino que main (configurarRaizPaquetes) con --data-dir:
+    // sin migrador, aunque se le pase el home real.
     AppBootstrapper::Opciones opciones;
     opciones.directorioDatos = dataDir;
-    opciones.raizPaquetes = FilesystemPackageStorage::resolverRaiz(dataDir, QDir::homePath());
+    AppBootstrapper::configurarRaizPaquetes(opciones, QDir::homePath());
+    QVERIFY(!opciones.migradorRaizPaquetes);
     const auto arranque = AppBootstrapper(opciones).preparar();
     QVERIFY(arranque);
     QCOMPARE(arranque.valor().raizPaquetes, esperada);
@@ -99,7 +106,7 @@ void TestPaquetes::raizConDataDirEsDataDirPaquetes()
         AppCompositionRoot root(arranque.valor().rutaBase, secretos);
         QCOMPARE(root.raizPaquetes(), esperada);
     }
-    QCOMPARE(huellaHome(), homeAntes); // nada bajo ~/SAT-CFDI-Downloader
+    QCOMPARE(huellaHome(), homeAntes); // nada bajo ~/SAT-CFDI-Downloader ni ~/Archivo-Fiscal
 }
 
 void TestPaquetes::finalSinSolicitudSeConservaConDiagnostico()

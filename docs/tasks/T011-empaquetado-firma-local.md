@@ -11,7 +11,9 @@ Pendiente (borrador creado en el refinamiento de T010, 2026-10-04; refinar con `
 
 ## Objetivo
 
-Producir un `SAT CFDI Downloader.app` autocontenido, sin dependencias de Homebrew, firmado con Developer ID y un perfil de larga vigencia, e instalado en `/Applications`, sobre el que T010 ejecuta la aceptacion del MVP.
+Producir un `Archivo Fiscal.app` autocontenido, sin dependencias de Homebrew, firmado con Developer ID y un perfil de larga vigencia, e instalado en `/Applications`, sobre el que T010 ejecuta la aceptacion del MVP.
+
+Nombre (T019 D5): el bundle de desarrollo sigue siendo `build/src/app/satcfdi_app.app`, con target y ejecutable `satcfdi_app`; el staging produce el bundle instalado `Archivo Fiscal.app` (renombrar el directorio no invalida la firma). El bundle id `mx.adenium.satcfdi-downloader` no cambia (T019 D1). El login item se registra desde `/Applications/Archivo Fiscal.app`.
 
 ## Contexto
 

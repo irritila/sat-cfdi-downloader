@@ -214,12 +214,14 @@ QString relativa()
 void TestPackageStorageFs::initTestCase()
 {
     m_carpetaUsuarioExistia = QDir::home().exists(QStringLiteral("SAT-CFDI-Downloader"));
+    m_carpetaNuevaExistia = QDir::home().exists(QStringLiteral("Archivo-Fiscal"));
 }
 
 void TestPackageStorageFs::cleanupTestCase()
 {
     // Ninguna prueba crea la carpeta productiva del usuario (D8).
     QCOMPARE(QDir::home().exists(QStringLiteral("SAT-CFDI-Downloader")), m_carpetaUsuarioExistia);
+    QCOMPARE(QDir::home().exists(QStringLiteral("Archivo-Fiscal")), m_carpetaNuevaExistia);
 }
 
 void TestPackageStorageFs::guardadoExitosoPorChunks()
@@ -564,10 +566,12 @@ void TestPackageStorageFs::raizEfectiva()
 {
     QCOMPARE(FilesystemPackageStorage::resolverRaiz(QStringLiteral("/datos/app"), QStringLiteral("/Users/x")),
              QStringLiteral("/datos/app/paquetes"));
+    // T019 D3: destino de produccion ~/Archivo-Fiscal/paquetes (la raiz
+    // efectiva puede ser la legada si la migracion no pudo completarse).
     QCOMPARE(FilesystemPackageStorage::resolverRaiz(std::nullopt, QStringLiteral("/Users/x")),
-             QStringLiteral("/Users/x/SAT-CFDI-Downloader/paquetes"));
+             QStringLiteral("/Users/x/Archivo-Fiscal/paquetes"));
     QCOMPARE(FilesystemPackageStorage::resolverRaiz(QString(), QStringLiteral("/Users/x")),
-             QStringLiteral("/Users/x/SAT-CFDI-Downloader/paquetes"));
+             QStringLiteral("/Users/x/Archivo-Fiscal/paquetes"));
     // Con data-dir real: la raiz efectiva se crea solo bajo ese directorio.
     QTemporaryDir dataDir;
     FilesystemPackageStorage storage(FilesystemPackageStorage::resolverRaiz(dataDir.path(), QDir::homePath()));

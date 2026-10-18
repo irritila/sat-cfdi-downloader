@@ -130,7 +130,7 @@ private slots:
                                QStringLiteral("---"),
                                textoEstadoNotificaciones(satcfdi::OSIntegration::NotificationStatus::NotDetermined),
                                QStringLiteral("Solicitar permiso de notificaciones"), QStringLiteral("---"),
-                               QStringLiteral("Salir de SAT CFDI Downloader")}));
+                               QStringLiteral("Salir de Archivo Fiscal")}));
         QVERIFY(!entrada(Id::EstadoMonitoreo, estado).habilitada);
         estado.monitoreo.pendientes = 2;
         estado.monitoreoPausado = true;
@@ -332,10 +332,10 @@ private slots:
     void textosIcono()
     {
         using E = satcfdi::OSIntegration::EstadoIcono;
-        QCOMPARE(textoEstadoIcono(E::Normal), QStringLiteral("SAT CFDI Downloader"));
-        QCOMPARE(textoEstadoIcono(E::Trabajando), QStringLiteral("SAT CFDI Downloader: trabajando"));
-        QCOMPARE(textoEstadoIcono(E::Pausado), QStringLiteral("SAT CFDI Downloader: en pausa"));
-        QCOMPARE(textoEstadoIcono(E::Atencion), QStringLiteral("SAT CFDI Downloader: requiere atención"));
+        QCOMPARE(textoEstadoIcono(E::Normal), QStringLiteral("Archivo Fiscal"));
+        QCOMPARE(textoEstadoIcono(E::Trabajando), QStringLiteral("Archivo Fiscal: trabajando"));
+        QCOMPARE(textoEstadoIcono(E::Pausado), QStringLiteral("Archivo Fiscal: en pausa"));
+        QCOMPARE(textoEstadoIcono(E::Atencion), QStringLiteral("Archivo Fiscal: requiere atención"));
     }
 
     void variantesIcono()

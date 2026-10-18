@@ -23,9 +23,17 @@ public:
     explicit FilesystemPackageStorage(QString raizAbsoluta,
                                       std::unique_ptr<FileOps> fileOps = std::make_unique<PosixFileOps>());
 
-    // Raiz efectiva (D8), PURA: con `dataDir` -> <dataDir>/paquetes; sin el ->
-    // <home>/SAT-CFDI-Downloader/paquetes. `home` se inyecta (QDir::homePath()
-    // en produccion) para que las pruebas no dependan de la carpeta real.
+    // T019 D3: carpeta del home con la raiz de produccion y su nombre previo
+    // (origen de la migracion de MigracionRaizPaquetes; no se vuelve a crear).
+    static constexpr const char* kCarpetaHome = "Archivo-Fiscal";
+    static constexpr const char* kCarpetaHomeLegada = "SAT-CFDI-Downloader";
+    static constexpr const char* kCarpetaPaquetes = "paquetes";
+
+    // Raiz de destino (D8), PURA: con `dataDir` -> <dataDir>/paquetes; sin el ->
+    // <home>/Archivo-Fiscal/paquetes (T019 D3). `home` se inyecta
+    // (QDir::homePath() en produccion) para que las pruebas no dependan de la
+    // carpeta real. Sin `dataDir` la raiz EFECTIVA la decide la migracion
+    // (puede ser la legada); este valor es solo el destino.
     static QString resolverRaiz(const std::optional<QString>& dataDir, const QString& home);
 
     const QString& raiz() const noexcept { return m_raiz; }

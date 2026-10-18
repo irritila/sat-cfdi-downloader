@@ -107,6 +107,22 @@ set_tests_properties(satcfdi_visor_pdf_tests PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )
 
+# satcfdi_aviso_raiz_tests (T019 D8): AvisoRaizPaquetesViewModel sin aviso
+# y con cada motivo (conflicto, error, raiz no disponible).
+qt_add_executable(satcfdi_aviso_raiz_tests
+    TestAvisoRaizPaquetes.cpp
+)
+target_link_libraries(satcfdi_aviso_raiz_tests PRIVATE
+    satcfdi_presentation
+    Qt6::Test
+)
+satcfdi_enable_warnings(satcfdi_aviso_raiz_tests)
+add_test(NAME satcfdi_aviso_raiz_tests COMMAND satcfdi_aviso_raiz_tests)
+set_tests_properties(satcfdi_aviso_raiz_tests PROPERTIES
+    LABELS presentation
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
 # satcfdi_presentation_quicktests (T005.1, DA7): Qt Quick Test de
 # PerfilesSatPage y EFirmaDialogo sobre el modulo QML real. Los tst_*.qml se
 # leen de QUICK_TEST_SOURCE_DIR; FixturePerfiles expone view models sobre
@@ -118,6 +134,7 @@ qt_add_executable(satcfdi_presentation_quicktests
     quick/FixturePerfiles.cpp
     quick/FixtureExplorador.h
     quick/FixtureExplorador.cpp
+    quick/FixtureAvisoRaiz.h
     ConsultaCatalogoFake.h
     PrevisualizacionFake.h
     ServiciosAsincronosFake.h

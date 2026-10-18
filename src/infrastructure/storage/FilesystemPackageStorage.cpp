@@ -70,7 +70,8 @@ QString FilesystemPackageStorage::resolverRaiz(const std::optional<QString>& dat
     if (dataDir && !dataDir->isEmpty()) {
         return QDir::cleanPath(*dataDir + QStringLiteral("/paquetes"));
     }
-    return QDir::cleanPath(home + QStringLiteral("/SAT-CFDI-Downloader/paquetes"));
+    return QDir::cleanPath(home + QLatin1Char('/') + QLatin1String(kCarpetaHome) + QLatin1Char('/')
+                           + QLatin1String(kCarpetaPaquetes));
 }
 
 bool FilesystemPackageStorage::raizValida() const

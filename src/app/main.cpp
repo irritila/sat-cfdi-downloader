@@ -4,7 +4,6 @@
 #include "app_core/ArranqueProceso.h"
 #include "app_core/AppCompositionRoot.h"
 #include "app_core/SingleInstanceCoordinator.h"
-#include "infrastructure/storage/FilesystemPackageStorage.h"
 #include "presentation/estilo/EstiloVisual.h"
 
 #include <QApplication>
@@ -17,7 +16,7 @@ namespace {
 int errorFatal(const QString& mensaje)
 {
     qCritical("Error de arranque: %s", qUtf8Printable(mensaje));
-    QMessageBox::critical(nullptr, QApplication::applicationName(), mensaje);
+    QMessageBox::critical(nullptr, QApplication::applicationDisplayName(), mensaje);
     return 2;
 }
 
@@ -42,14 +41,13 @@ int main(int argc, char* argv[])
 
     // Vive todo el proceso: mientras exista, esta es la instancia primaria.
     satcfdi::SingleInstanceCoordinator instancia;
-    // T008 D8: con --data-dir los ZIP van a <dir>/paquetes; sin el, a
-    // ~/SAT-CFDI-Downloader/paquetes (no a AppDataLocation). La crea el
-    // bootstrapper en su hilo de E/S.
+    // T008 D8 / T019 D4: con --data-dir los ZIP van a <dir>/paquetes (sin
+    // migracion ni rutas del home); sin el, a ~/Archivo-Fiscal/paquetes (no a
+    // AppDataLocation), migrando la carpeta de paquetes previa si existe
+    // (MigracionRaizPaquetes). El bootstrapper lo resuelve en su hilo de E/S,
+    // despues de adquirir la instancia unica y antes de crear el worker.
     satcfdi::AppBootstrapper::Opciones arranque = std::move(opciones).valor();
-    arranque.raizPaquetes = satcfdi::FilesystemPackageStorage::resolverRaiz(
-        arranque.directorioDatos.isEmpty() ? std::nullopt
-                                           : std::optional<QString>(QDir(arranque.directorioDatos).absolutePath()),
-        QDir::homePath());
+    satcfdi::AppBootstrapper::configurarRaizPaquetes(arranque, QDir::homePath());
     const satcfdi::AppBootstrapper bootstrapper(std::move(arranque));
     const auto preparacion = satcfdi::prepararProceso(instancia, bootstrapper);
     switch (preparacion.tipo) {
@@ -78,6 +76,8 @@ int main(int argc, char* argv[])
     }
     satcfdi::OpcionesMonitoreo monitoreo;
     monitoreo.raizPaquetes = preparacion.arranque.raizPaquetes;
+    // T019 D8: aviso de conflicto o fallo de la carpeta de paquetes (UI).
+    monitoreo.avisoRaizPaquetes = preparacion.arranque.resolucionRaizPaquetes.aviso;
     satcfdi::AppCompositionRoot root(preparacion.arranque.rutaBase, *secretStore, monitoreo);
     if (!root.cargar()) {
         return 1;

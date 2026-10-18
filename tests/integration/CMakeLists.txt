@@ -21,6 +21,8 @@ qt_add_executable(satcfdi_integration_tests
     TestIndiceCfdi.cpp
     # T015.4: previsualizacion PDF con el root real (Qt Pdf para leer el PDF).
     TestPrevisualizacionCfdi.cpp
+    # T019: raiz efectiva (migrada o vieja por conflicto) en el root real.
+    TestRaizPaquetesMigrada.cpp
     ../fakes/LectorCfdiCompuerta.h
     ../fakes/ZipCfdiSintetico.h
     ../fakes/FakeSatGateway.h
@@ -106,3 +108,20 @@ if(APPLE)
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
     )
 endif()
+
+# T019 (D2, D4, D8): politica de migracion de la raiz de paquetes con
+# FileOpsSimulado y home inyectado, PosixFileOps real sobre un home temporal
+# (inode, enlaces, RENAME_EXCL, recuperacion), orden en el bootstrap,
+# --data-dir y la identidad interna (AppDataLocation y display name).
+qt_add_executable(satcfdi_migracion_paquetes_tests
+    migracion/TestMigracionRaizPaquetes.cpp
+    migracion/FileOpsSimulado.h
+)
+target_include_directories(satcfdi_migracion_paquetes_tests PRIVATE ${PROJECT_SOURCE_DIR}/tests)
+target_link_libraries(satcfdi_migracion_paquetes_tests PRIVATE satcfdi_app_core Qt6::Gui Qt6::Test)
+satcfdi_enable_warnings(satcfdi_migracion_paquetes_tests)
+add_test(NAME satcfdi_migracion_paquetes_tests COMMAND satcfdi_migracion_paquetes_tests)
+set_tests_properties(satcfdi_migracion_paquetes_tests PROPERTIES
+    LABELS integration
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)

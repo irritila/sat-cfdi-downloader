@@ -156,7 +156,7 @@ inline Entrada entrada(Id id, const EstadoMenu& s)
         e.visible = s.notificaciones == NotificationStatus::Denied;
         break;
     case Id::Salir:
-        e.texto = textoMenu("Salir de SAT CFDI Downloader");
+        e.texto = textoMenu("Salir de Archivo Fiscal");
         break;
     case Id::Separador:
         e.separador = true;

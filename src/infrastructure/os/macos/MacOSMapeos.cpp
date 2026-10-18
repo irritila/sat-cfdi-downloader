@@ -289,15 +289,15 @@ QString textoEstadoIcono(OSIntegration::EstadoIcono estado)
     using E = OSIntegration::EstadoIcono;
     switch (estado) {
     case E::Trabajando:
-        return tr("SAT CFDI Downloader: trabajando");
+        return tr("Archivo Fiscal: trabajando");
     case E::Pausado:
-        return tr("SAT CFDI Downloader: en pausa");
+        return tr("Archivo Fiscal: en pausa");
     case E::Atencion:
-        return tr("SAT CFDI Downloader: requiere atención");
+        return tr("Archivo Fiscal: requiere atención");
     case E::Normal:
         break;
     }
-    return tr("SAT CFDI Downloader");
+    return tr("Archivo Fiscal");
 }
 
 } // namespace satcfdi::macos

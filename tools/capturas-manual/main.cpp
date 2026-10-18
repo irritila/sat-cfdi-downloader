@@ -666,7 +666,7 @@ struct Escenario {
 QList<Escenario> escenarios()
 {
     const QString carpetaSolicitud =
-        QStringLiteral("/Users/usuario/SAT-CFDI-Downloader/paquetes/%1/2026-09/%2").arg(kRfcPerfil, solicitudId(3).texto());
+        QStringLiteral("/Users/usuario/Archivo-Fiscal/paquetes/%1/2026-09/%2").arg(kRfcPerfil, solicitudId(3).texto());
     return {
         {QStringLiteral("01-perfiles.png"), QStringLiteral("Captura"),
          [](const QString& r) {
@@ -908,7 +908,10 @@ int main(int argc, char* argv[])
     QApplication app(argc, argv);
     satcfdi::presentacion::fijarEstiloBasico(); // T013 D1, igual que la app
     QCoreApplication::setOrganizationName(QStringLiteral("Adenium"));
-    QCoreApplication::setApplicationName(QStringLiteral("SAT CFDI Downloader"));
+    // T019: nombre interno propio de la herramienta (no resuelve rutas de datos
+    // de la app); lo visible usa el nombre de la app, como satcfdi_app (D2).
+    QCoreApplication::setApplicationName(QStringLiteral("Archivo Fiscal Capturas Manual"));
+    QGuiApplication::setApplicationDisplayName(QStringLiteral("Archivo Fiscal"));
     QLocale::setDefault(QLocale(QLocale::Spanish, QLocale::Mexico));
     QGuiApplication::styleHints()->setColorScheme(Qt::ColorScheme::Light);
 

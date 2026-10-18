@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.21)
 
 project(SatCfdiDownloader
     VERSION 0.1.0
-    DESCRIPTION "SAT CFDI Downloader: app desktop local-first para descarga masiva de CFDI"
+    DESCRIPTION "Archivo Fiscal: app desktop local-first para descarga masiva de CFDI"
     LANGUAGES CXX
 )
 
@@ -40,7 +40,10 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS Pdf PdfQuick)
 qt_standard_project_setup(REQUIRES 6.8)
 
 # Metadatos del bundle macOS consumidos por src/app (MACOSX_BUNDLE_INFO_PLIST).
-set(SATCFDI_BUNDLE_NAME "SAT CFDI Downloader")
+# T019 D5: CFBundleName/CFBundleDisplayName visibles. El bundle id (D1), el
+# target/ejecutable satcfdi_app, el modulo QML y los prefijos SATCFDI_* no
+# cambian.
+set(SATCFDI_BUNDLE_NAME "Archivo Fiscal")
 set(SATCFDI_BUNDLE_IDENTIFIER "mx.adenium.satcfdi-downloader" CACHE STRING
     "CFBundleIdentifier de satcfdi_app")
 # Migracion T004: un build dir configurado antes conserva en cache el id
@@ -138,6 +141,23 @@ add_subdirectory(tests/integration)
 add_subdirectory(tests/presentation)
 # T012 D8: enlaces de imagenes del manual de usuario (label docs).
 add_subdirectory(tests/docs)
+
+# T019: el nombre anterior de la app (y su carpeta de paquetes) solo puede
+# aparecer en las coincidencias de tools/verificar-nombre/permitidos.txt.
+add_test(NAME satcfdi_nombre_verificador
+    COMMAND ${CMAKE_COMMAND}
+            -DSCRIPT=${CMAKE_CURRENT_SOURCE_DIR}/tools/verificar-nombre/verificar-nombre.cmake
+            -DDIR=${CMAKE_CURRENT_BINARY_DIR}/nombre-prueba
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tools/verificar-nombre/prueba-verificar-nombre.cmake)
+add_test(NAME satcfdi_nombre_repositorio
+    COMMAND ${CMAKE_COMMAND} -DRAIZ=${CMAKE_CURRENT_SOURCE_DIR}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tools/verificar-nombre/verificar-nombre.cmake)
+set_tests_properties(satcfdi_nombre_verificador satcfdi_nombre_repositorio PROPERTIES LABELS "docs;nombre")
+add_custom_target(verificar_nombre
+    COMMAND ${CMAKE_COMMAND} -DRAIZ=${CMAKE_CURRENT_SOURCE_DIR}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tools/verificar-nombre/verificar-nombre.cmake
+    USES_TERMINAL
+    COMMENT "T019: nombre anterior fuera de la lista permitida")
 
 # T006 (D3): CLI manual del spike SAT. Apagada por defecto; fuera del bundle.
 # tests/sat (sin red) se registra desde src/infrastructure y corre siempre.

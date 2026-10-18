@@ -140,6 +140,7 @@ private slots:
     void complementoNoRepresentadoSeNombra();
     void noSoportadoEIlegibleNoGeneranPdf();
     void acentosYEnieDelXmlAlPdf();
+    void metadatosUsanElNombreVisible();
 
     // Cache
     void cacheAciertoYMiss();
@@ -419,6 +420,17 @@ void TestCfdiPdf::noSoportadoEIlegibleNoGeneranPdf()
     pdf = renderer.renderizar(ilegible);
     QVERIFY(!pdf.esExito());
     QCOMPARE(pdf.error().tipo, ErrorRenderPdf::Tipo::NoRepresentable);
+}
+
+// T019: el creador del PDF es el nombre visible "Archivo Fiscal"; los
+// metadatos no llevan datos fiscales.
+void TestCfdiPdf::metadatosUsanElNombreVisible()
+{
+    DocumentoPdf doc;
+    QVERIFY(doc.cargar(renderizar(parsear(OpcionesCfdi{})).contenido));
+    QCOMPARE(doc.doc->metaData(QPdfDocument::MetaDataField::Creator).toString(), QStringLiteral("Archivo Fiscal"));
+    QCOMPARE(doc.doc->metaData(QPdfDocument::MetaDataField::Title).toString(),
+             QStringLiteral("Visualización de CFDI"));
 }
 
 void TestCfdiPdf::acentosYEnieDelXmlAlPdf()

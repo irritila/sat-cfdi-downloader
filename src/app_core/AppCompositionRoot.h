@@ -1,5 +1,6 @@
 #pragma once
 
+#include "app_core/MigracionRaizPaquetes.h"
 #include "application/persistence/PuertosPersistencia.h"
 #include "application/profiles/CredencialesSatService.h"
 #include "domain/perfiles/PerfilId.h"
@@ -10,6 +11,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 
 class QQmlApplicationEngine;
 
@@ -103,6 +105,9 @@ struct OpcionesMonitoreo {
     // pasa resolverRaiz(dataDir, home) (D8).
     PackageStorage* packageStorage = nullptr;
     QString raizPaquetes;
+    // T019 D8: aviso de la resolucion de la raiz (ArranquePreparado::
+    // resolucionRaizPaquetes.aviso); main lo pasa tal cual. Vacio = sin aviso.
+    std::optional<AvisoRaizPaquetes> avisoRaizPaquetes;
     // T009: SatGateway. Nulo = SatGatewayProductivo propio del root (endpoints
     // productivos). Las pruebas inyectan FakeSatGateway.
     SatGateway* satGateway = nullptr;
@@ -160,6 +165,10 @@ public:
     AccesoFinder& accesoFinder() const { return *m_accesoFinder; }
     // Raiz absoluta efectiva de los paquetes (D8); vacia si se inyecto el storage.
     const QString& raizPaquetes() const noexcept { return m_raizPaquetes; }
+    // T019 D8: aviso de la carpeta de paquetes para la UI (conflicto, error o
+    // raiz nueva no disponible). Fijo durante la sesion; hilo grafico. Rutas
+    // como `~/...`. Lo consume el view model del aviso (presentacion).
+    const std::optional<AvisoRaizPaquetes>& avisoRaizPaquetes() const noexcept { return m_avisoRaizPaquetes; }
     WorkerLocal& worker() const { return *m_worker; }
     ConfiguracionAppService& configuracion() const;
     CredencialesSatService& credenciales() const;
@@ -236,6 +245,7 @@ private:
     QString m_directorioTemporalPdf;
     PackageStorage* m_packageStorage = nullptr;
     QString m_raizPaquetes;
+    std::optional<AvisoRaizPaquetes> m_avisoRaizPaquetes;
     std::unique_ptr<Programador> m_programadorEjecutorPropio;
     std::unique_ptr<Programador> m_programadorWorkerPropio;
     std::unique_ptr<OperacionExecutor> m_ejecutor;

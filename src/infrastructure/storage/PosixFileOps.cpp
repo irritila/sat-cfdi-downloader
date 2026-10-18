@@ -50,9 +50,12 @@ int PosixFileOps::crearDirectorio(const QByteArray& ruta, unsigned modo)
     if (::mkdir(ruta.constData(), mode_t(modo)) != 0) {
         return errno;
     }
-    // mkdir aplica umask: se fija el modo exacto.
+    // mkdir aplica umask: se fija el modo exacto. Si chmod falla se retira
+    // el directorio recien creado (vacio) para no dejar uno con otro modo.
     if (::chmod(ruta.constData(), mode_t(modo)) != 0) {
-        return errno;
+        const int e = errno;
+        ::rmdir(ruta.constData());
+        return e;
     }
     return 0;
 }
@@ -175,6 +178,24 @@ void PosixFileOps::aleatorio(unsigned char* destino, std::size_t n)
     for (std::size_t i = 0; i < n; ++i) {
         destino[i] = static_cast<unsigned char>(QRandomGenerator::system()->bounded(256));
     }
+#endif
+}
+
+int PosixFileOps::eliminarDirectorioVacio(const QByteArray& ruta)
+{
+    return ::rmdir(ruta.constData()) == 0 ? 0 : errno;
+}
+
+int PosixFileOps::renombrarSinReemplazo(const QByteArray& origen, const QByteArray& destino)
+{
+#if defined(Q_OS_DARWIN)
+    return ::renamex_np(origen.constData(), destino.constData(), RENAME_EXCL) == 0 ? 0 : errno;
+#else
+    // Sin renamex_np no hay rename de directorios sin reemplazo portable: no
+    // se intenta (rename(2) reemplazaria un destino vacio).
+    Q_UNUSED(origen);
+    Q_UNUSED(destino);
+    return ENOTSUP;
 #endif
 }
 

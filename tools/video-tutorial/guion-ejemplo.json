@@ -1,7 +1,7 @@
 {
   "esquema": 1,
   "tipo": "ejemplo",
-  "titulo": "SAT CFDI Downloader: ejemplo minimo",
+  "titulo": "Archivo Fiscal: ejemplo minimo",
   "presupuestoTotal": {
     "min": 300,
     "max": 6000

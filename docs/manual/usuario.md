@@ -1,6 +1,6 @@
-# SAT CFDI Downloader: manual de usuario
+# Archivo Fiscal: manual de usuario
 
-SAT CFDI Downloader es una aplicación de escritorio para macOS. Sirve para
+Archivo Fiscal es una aplicación de escritorio para macOS. Sirve para
 solicitar al SAT la descarga masiva de CFDI de los contribuyentes que
 administras, darle seguimiento a cada solicitud y guardar en tu equipo los
 paquetes ZIP que entrega el SAT. Todo se guarda localmente: perfiles,
@@ -472,9 +472,16 @@ Si la app no puede generar el PDF, lo dice en lugar del documento:
 
 ## 6. Paquetes en Finder
 
-Los paquetes se guardan como ZIP en la carpeta `SAT-CFDI-Downloader/paquetes`
+Los paquetes se guardan como ZIP en la carpeta `Archivo-Fiscal/paquetes`
 de tu carpeta de usuario, organizados por RFC, mes de la solicitud e
 identificador local. La app no abre ni modifica los ZIP.
+
+Si usabas la app con su nombre anterior, tus paquetes estaban en
+`SAT-CFDI-Downloader/paquetes`. Al abrirla por primera vez con el nombre
+nuevo, la app mueve esa carpeta a `Archivo-Fiscal/paquetes` sin copiar ni
+borrar ningún ZIP. Si no puede hacerlo (por ejemplo, porque las dos carpetas
+ya tienen contenido), sigue usando la carpeta anterior y te avisa en la
+ventana con las dos rutas para que decidas qué hacer.
 
 Hay tres formas de llegar a ellos:
 
@@ -498,7 +505,7 @@ oculta: la app y el monitoreo siguen activos. Haz clic en el icono para abrir
 su menú; el icono también indica el estado de la app (ver [El icono y su
 estado](#el-icono-y-su-estado)).
 
-![Ilustración del menú de la app abierto desde su icono en la barra de menús (documento con flecha de descarga) con Mostrar ventana, Nueva solicitud…, Abrir carpeta de paquetes, Monitoreo activo, Pendientes: 1, Pausar monitoreo, Abrir al iniciar sesión marcado, Estado en macOS: habilitado, Notificaciones: permitidas, Enviar notificación de prueba y Salir de SAT CFDI Downloader](img/11-menu-bar.png)
+![Ilustración del menú de la app abierto desde su icono en la barra de menús (documento con flecha de descarga) con Mostrar ventana, Nueva solicitud…, Abrir carpeta de paquetes, Monitoreo activo, Pendientes: 1, Pausar monitoreo, Abrir al iniciar sesión marcado, Estado en macOS: habilitado, Notificaciones: permitidas, Enviar notificación de prueba y Salir de Archivo Fiscal](img/11-menu-bar.png)
 
 | Opción | Para qué sirve |
 | --- | --- |
@@ -511,7 +518,7 @@ estado](#el-icono-y-su-estado)).
 | Abrir al iniciar sesión | Abre la app al iniciar sesión en macOS, sin mostrar la ventana. |
 | Estado en macOS: … | Lo que macOS reporta para ese inicio automático: habilitado, deshabilitado, pendiente de aprobación, rechazado o no disponible. Si está pendiente o rechazado aparece **Abrir ajustes de inicio de sesión…** |
 | Notificaciones: … | Permiso de notificaciones: sin permiso solicitado, permitidas, deshabilitadas o no disponibles. Según el caso aparecen **Solicitar permiso de notificaciones**, **Enviar notificación de prueba** o **Abrir ajustes de notificaciones…** |
-| Salir de SAT CFDI Downloader | Termina la app de forma ordenada: espera la operación en curso y cierra. |
+| Salir de Archivo Fiscal | Termina la app de forma ordenada: espera la operación en curso y cierra. |
 
 ### El icono y su estado
 
@@ -522,12 +529,12 @@ aparece al pasar el cursor sobre el icono (VoiceOver lee el mismo texto):
 
 | Icono | Al pasar el cursor | Cuándo aparece |
 | --- | --- | --- |
-| Sin insignia | SAT CFDI Downloader | Normal: el monitoreo está activo, no hay trabajo en curso y nada requiere atención. |
-| Dos barras (pausa) | SAT CFDI Downloader: en pausa | El monitoreo está en pausa. |
-| Flecha circular | SAT CFDI Downloader: trabajando | La app está trabajando con el SAT: enviando, verificando o descargando. |
-| Punto sólido | SAT CFDI Downloader: requiere atención | Hay algo que debes revisar (ver la lista siguiente). |
+| Sin insignia | Archivo Fiscal | Normal: el monitoreo está activo, no hay trabajo en curso y nada requiere atención. |
+| Dos barras (pausa) | Archivo Fiscal: en pausa | El monitoreo está en pausa. |
+| Flecha circular | Archivo Fiscal: trabajando | La app está trabajando con el SAT: enviando, verificando o descargando. |
+| Punto sólido | Archivo Fiscal: requiere atención | Hay algo que debes revisar (ver la lista siguiente). |
 
-![Ilustración de las cuatro variantes del icono de la app en la barra de menús, ampliadas y a tamaño real, con el texto que aparece al pasar el cursor: SAT CFDI Downloader (documento con flecha de descarga, sin insignia), SAT CFDI Downloader: en pausa (insignia de dos barras), SAT CFDI Downloader: trabajando (insignia de flecha circular) y SAT CFDI Downloader: requiere atención (insignia de punto sólido)](img/15-icono-menu-bar.png)
+![Ilustración de las cuatro variantes del icono de la app en la barra de menús, ampliadas y a tamaño real, con el texto que aparece al pasar el cursor: Archivo Fiscal (documento con flecha de descarga, sin insignia), Archivo Fiscal: en pausa (insignia de dos barras), Archivo Fiscal: trabajando (insignia de flecha circular) y Archivo Fiscal: requiere atención (insignia de punto sólido)](img/15-icono-menu-bar.png)
 
 Si se cumplen varios estados a la vez, el icono muestra el de mayor prioridad:
 primero requiere atención, después trabajando, después en pausa y, por último,
@@ -668,7 +675,7 @@ contraseña.
 - "Vence en N días" en Perfiles SAT o la notificación "e.firma por vencer":
   renueva la e.firma con el SAT y usa **Reemplazar e.firma…** antes de esa
   fecha (ver [Aviso de vencimiento](#aviso-de-vencimiento)).
-- El icono del menu bar muestra un punto ("SAT CFDI Downloader: requiere
+- El icono del menu bar muestra un punto ("Archivo Fiscal: requiere
   atención"): revisa la lista de solicitudes y Perfiles SAT (ver [El icono y su
   estado](#el-icono-y-su-estado)).
 - "No se pudo cargar la lista de solicitudes." o "No se pudo cargar la

@@ -450,7 +450,8 @@ int main(int argc, char* argv[])
     satcfdi::presentacion::fijarEstiloBasico(); // T013 D1, igual que la app
     // Nombre propio: nada de lo que Qt pudiera guardar coincide con la app real.
     QCoreApplication::setOrganizationName(QStringLiteral("Adenium"));
-    QCoreApplication::setApplicationName(QStringLiteral("SAT CFDI Downloader Video Tutorial"));
+    QCoreApplication::setApplicationName(QStringLiteral("Archivo Fiscal Video Tutorial"));
+    QGuiApplication::setApplicationDisplayName(QStringLiteral("Archivo Fiscal")); // T019: lo visible, como la app
     QLocale::setDefault(QLocale(QLocale::Spanish, QLocale::Mexico));
     QGuiApplication::styleHints()->setColorScheme(Qt::ColorScheme::Light);
     // El parpadeo del cursor de texto usa un QTimer de tiempo real: fijo (sin

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "app_core/MigracionRaizPaquetes.h"
 #include "domain/common/Resultado.h"
 #include "infrastructure/persistence/sqlite/SqliteTipos.h"
 #include "ports/persistence/ErrorPersistencia.h"
@@ -32,7 +33,10 @@ struct ArranquePreparado {
     QString directorioDatos;
     QString rutaBase; // <directorioDatos>/satcfdi.sqlite3
     InformeInicializacionSqlite informe;
-    QString raizPaquetes; // T008 D8: raiz efectiva de los ZIP (absoluta)
+    QString raizPaquetes; // T008 D8: raiz efectiva de los ZIP (absoluta) = resolucionRaizPaquetes.raizEfectiva
+    // T019 D8: como se resolvio la raiz (migracion, conflicto o error) y el
+    // aviso opcional para la UI. NoAplica con --data-dir o raiz inyectada.
+    ResolucionRaizPaquetes resolucionRaizPaquetes;
 };
 
 // T008 D8: crea `raiz` y sus componentes FALTANTES con 0700 (no cambia
@@ -40,9 +44,12 @@ struct ArranquePreparado {
 // llama desde el hilo temporal de AppBootstrapper, nunca desde el grafico.
 void crearRaizPaquetesPrivada(const QString& raiz);
 
-// Fija organizationName ("Adenium") y applicationName ("SAT CFDI Downloader").
-// main.cpp la llama justo despues de crear QApplication y antes de resolver la
-// ruta de datos (determinan QStandardPaths::AppDataLocation).
+// Fija organizationName ("Adenium"), applicationName ("SAT CFDI Downloader")
+// y applicationDisplayName ("Archivo Fiscal", T019 D2). main.cpp la llama
+// justo despues de crear QApplication y antes de resolver la ruta de datos.
+// organizationName y applicationName quedan CONGELADOS: determinan
+// QStandardPaths::AppDataLocation (base, credenciales cifradas y logs);
+// cambiarlos arrancaria con una base vacia. Lo visible usa el display name.
 void configurarIdentidadAplicacion();
 
 // Arranque de T003 (DA5): resuelve el directorio de datos, lo crea e
@@ -74,9 +81,22 @@ public:
         // T008 D8: raiz de paquetes; vacia = <directorioDatos>/paquetes.
         QString raizPaquetes;
         // Crea la raiz en el hilo temporal; vacia = crearRaizPaquetesPrivada.
-        // Costura para pruebas (p. ej. registrar el hilo y delegar).
+        // Costura para pruebas (p. ej. registrar el hilo y delegar). Solo se
+        // usa sin `migradorRaizPaquetes`.
         std::function<void(const QString&)> crearRaizPaquetes;
+        // T019 D4/D8: migrador de la raiz del home. Si existe, se invoca UNA
+        // vez en el hilo temporal, despues de inicializar la base (y por tanto
+        // despues de adquirir la instancia unica en prepararProceso) y antes
+        // de crear el composition root y el worker; su raiz efectiva sustituye
+        // a `raizPaquetes`. Vacio = sin migracion (NoAplica).
+        MigradorRaizPaquetes migradorRaizPaquetes;
     };
+
+    // T019 D4: raiz de paquetes de produccion. Con `directorioDatos`
+    // (--data-dir): <dir absoluto>/paquetes, sin migrador (no se toca el home).
+    // Sin el: migrador POSIX sobre `home` (QDir::homePath() en main; las
+    // pruebas inyectan un home temporal).
+    static void configurarRaizPaquetes(Opciones& opciones, const QString& home);
 
     // Acepta `--data-dir <dir>` y `--data-dir=<dir>`; ignora otros argumentos
     // (Qt ya retiro los suyos de QCoreApplication::arguments()).

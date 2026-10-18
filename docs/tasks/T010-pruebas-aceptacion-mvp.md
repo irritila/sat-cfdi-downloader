@@ -112,7 +112,7 @@ T004-T009 ya definen pruebas automatizadas de transiciones, agenda, recuperacion
 ## Verificacion
 
 1. `ctest --test-dir build --output-on-failure` en el commit candidato.
-2. El checklist manual sobre `/Applications/SAT CFDI Downloader.app`.
+2. El checklist manual sobre `/Applications/Archivo Fiscal.app`.
 3. Los casos dirigidos y de recuperacion con `--data-dir` aislado.
 4. La parte SAT (D1), ejecutada por el usuario.
 5. La medicion de escala con la base sintetica.

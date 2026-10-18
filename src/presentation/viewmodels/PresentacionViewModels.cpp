@@ -26,6 +26,7 @@ PresentacionViewModels::PresentacionViewModels(SolicitudesService* solicitudes,
     , m_eFirma(new EFirmaFormViewModel(credenciales, this))
     , m_explorador(new ExploradorCfdiViewModel(this))
     , m_app(new AppViewModel(m_nuevaSolicitud, m_detalle, m_perfiles, m_eFirma, this))
+    , m_avisoRaizPaquetes(new AvisoRaizPaquetesViewModel(this))
 {
     // Tras registrar/reemplazar (exito o fallo) se reverifica el estado real
     // del perfil: un reemplazo fallido muestra la credencial anterior.
@@ -97,6 +98,7 @@ QVariantMap PresentacionViewModels::initialProperties() const
         {QStringLiteral("perfilesViewModel"), QVariant::fromValue(m_perfiles)},
         {QStringLiteral("eFirmaViewModel"), QVariant::fromValue(m_eFirma)},
         {QStringLiteral("exploradorViewModel"), QVariant::fromValue(m_explorador)},
+        {QStringLiteral("avisoRaizPaquetesViewModel"), QVariant::fromValue(m_avisoRaizPaquetes)},
     };
 }
 

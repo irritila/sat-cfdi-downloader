@@ -23,6 +23,7 @@
 #include "AccionesSolicitud.h"
 #include "ConsultaExistenciaPaquetes.h"
 #include "AppViewModel.h"
+#include "AvisoRaizPaquetesViewModel.h"
 #include "FormatoFechas.h"
 #include "NuevaSolicitudViewModel.h"
 #include "PerfilesSatListModel.h"
@@ -396,6 +397,7 @@ private slots:
     void rolesDelModelo();
     void cargaQmlSinWarnings();
     void ventanaArrancaOculta();
+    void avisoRaizPaquetesArribaDeLasPaginas();
     void nuevaSolicitudDesdeCppConVentanaOculta();
     void estadoVacioConDatosVacios();
     void navegacionListaADetallePorId();
@@ -557,12 +559,69 @@ void TestPresentacion::ventanaArrancaOculta()
     QVERIFY(e.cargar(false));
     QCOMPARE(e.ventana->isVisible(), false);
     QCOMPARE(e.ventana->property("visible").toBool(), false);
+    // T019: titulo con el nombre visible.
+    QCOMPARE(e.ventana->title(), QStringLiteral("Archivo Fiscal"));
     // Oculta, la app sigue funcionando: la lista carga y la pagina existe.
     QTRY_COMPARE(e.vms.solicitudes()->rowCount(), 11);
     QTRY_VERIFY(e.pagina() != nullptr);
     QCOMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
     procesarEventos();
     QVERIFY(!e.ventana->isVisible()); // nada en QML la muestra por su cuenta
+}
+
+// T019 D8: sin aviso la franja no ocupa espacio; con aviso (fijado antes de
+// cargar, como el composition root) aparece arriba de la pagina al mostrar
+// la ventana, sin mostrarla por su cuenta, se anuncia como alerta con las
+// rutas ~/..., sigue visible al navegar y no toma foco.
+void TestPresentacion::avisoRaizPaquetesArribaDeLasPaginas()
+{
+    {
+        Escenario e(DemoSolicitudesService::Datos::Representativos);
+        QVERIFY(e.cargar());
+        QQuickItem* franja = buscar(e.ventana->contentItem(), QStringLiteral("franjaAvisoRaizPaquetes"));
+        QVERIFY(franja);
+        QVERIFY(!franja->isVisible());
+        QCOMPARE(franja->height(), 0.0);
+        QQuickItem* loader = buscar(e.ventana->contentItem(), QStringLiteral("paginaActual"));
+        QCOMPARE(loader->y(), 0.0);
+    }
+
+    Escenario e(DemoSolicitudesService::Datos::Representativos);
+    e.vms.avisoRaizPaquetes()->fijar({AvisoRaizPaquetesViewModel::Motivo::Conflicto,
+                                      QStringLiteral("~/SAT-CFDI-Downloader/paquetes"),
+                                      QStringLiteral("~/Archivo-Fiscal/paquetes"),
+                                      QStringLiteral("~/SAT-CFDI-Downloader/paquetes")});
+    QVERIFY(e.cargar(false));
+    procesarEventos();
+    QVERIFY(!e.ventana->isVisible()); // el aviso no abre la ventana (inicio automatico)
+    e.ventana->show();
+    QVERIFY(QTest::qWaitForWindowExposed(e.ventana));
+
+    QQuickItem* franja = buscar(e.ventana->contentItem(), QStringLiteral("franjaAvisoRaizPaquetes"));
+    QVERIFY(franja);
+    QTRY_VERIFY(franja->isVisible());
+    QVERIFY(franja->height() > 0);
+    QCOMPARE(franja->y(), 0.0);
+    QQuickItem* loader = buscar(e.ventana->contentItem(), QStringLiteral("paginaActual"));
+    QCOMPARE(loader->y(), franja->height());
+
+    QQuickItem* aviso = buscar(franja, QStringLiteral("avisoRaizPaquetes"));
+    QVERIFY(aviso);
+    QAccessibleInterface* acc = QAccessible::queryAccessibleInterface(aviso);
+    QVERIFY(acc);
+    QCOMPARE(acc->role(), QAccessible::AlertMessage);
+    const QString nombre = acc->text(QAccessible::Name);
+    QVERIFY2(nombre.startsWith(QStringLiteral("Los paquetes siguen en la carpeta anterior.")), qPrintable(nombre));
+    QVERIFY2(nombre.contains(QStringLiteral("~/Archivo-Fiscal/paquetes")), qPrintable(nombre));
+    QVERIFY2(nombre.contains(QStringLiteral("Esta sesión usa ~/SAT-CFDI-Downloader/paquetes")), qPrintable(nombre));
+    QVERIFY(!nombre.contains(QDir::homePath()));
+    QVERIFY(!aviso->hasActiveFocus());
+
+    // Sigue visible en otra pagina (no se descarta durante la sesion).
+    e.vms.app()->mostrarPerfiles();
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaPerfilesSat"));
+    QVERIFY(franja->isVisible());
+    QCOMPARE(loader->y(), franja->height());
 }
 
 void TestPresentacion::nuevaSolicitudDesdeCppConVentanaOculta()
@@ -1010,7 +1069,7 @@ void TestPresentacion::qmlSinImportsProhibidos()
                  qPrintable(archivo.fileName() + QStringLiteral(": ") + termino.captured(0)));
         ++archivos;
     }
-    QCOMPARE(archivos, 31); // 30 .qml (Theme, Icono, componentes T013, BotonCopiar, T015.3 y VisorPdfCfdi) + Etiquetas.js
+    QCOMPARE(archivos, 32); // 31 .qml (Theme, Icono, componentes T013, BotonCopiar, T015.3, VisorPdfCfdi y T019) + Etiquetas.js
 }
 
 // ---------------------------------------------------------------------------

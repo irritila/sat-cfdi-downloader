@@ -1,10 +1,12 @@
 #include "AppBootstrapper.h"
 
 #include "infrastructure/persistence/sqlite/SqlitePersistencia.h"
+#include "infrastructure/storage/FilesystemPackageStorage.h"
 
 #include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
+#include <QGuiApplication>
 #include <QStandardPaths>
 #include <QThread>
 
@@ -51,8 +53,15 @@ QString mensajeBaseDatos(const ErrorPersistencia& causa)
 
 void configurarIdentidadAplicacion()
 {
+    // T019 D2: NO cambiar organizationName ni applicationName. Definen la ruta
+    // de AppDataLocation (~/Library/Application Support/Adenium/SAT CFDI
+    // Downloader) donde viven la base, `credentials` y los logs del usuario;
+    // renombrarlos separaria la app de sus datos. Lo prueba
+    // TestMigracionRaizPaquetes::identidadCongelada.
     QCoreApplication::setOrganizationName(QStringLiteral("Adenium"));
     QCoreApplication::setApplicationName(QStringLiteral("SAT CFDI Downloader"));
+    // Nombre visible (dialogos, menu de la app, titulo por defecto).
+    QGuiApplication::setApplicationDisplayName(QStringLiteral("Archivo Fiscal"));
 }
 
 void crearRaizPaquetesPrivada(const QString& raiz)
@@ -101,6 +110,18 @@ AppBootstrapper::opcionesDesdeArgumentos(const QStringList& argumentos)
     return Resultado<Opciones, ErrorArranque>::exito(std::move(opciones));
 }
 
+void AppBootstrapper::configurarRaizPaquetes(Opciones& opciones, const QString& home)
+{
+    if (!opciones.directorioDatos.isEmpty()) {
+        opciones.raizPaquetes =
+            FilesystemPackageStorage::resolverRaiz(QDir(opciones.directorioDatos).absolutePath(), home);
+        opciones.migradorRaizPaquetes = {};
+        return;
+    }
+    opciones.raizPaquetes = FilesystemPackageStorage::resolverRaiz(std::nullopt, home);
+    opciones.migradorRaizPaquetes = migradorRaizPaquetesPosix(home);
+}
+
 QString AppBootstrapper::directorioDatosPorDefecto()
 {
     return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
@@ -145,18 +166,30 @@ Resultado<ArranquePreparado, ErrorArranque> AppBootstrapper::preparar() const
     // SQL de bootstrap fuera del hilo grafico: hilo temporal unido aqui.
     // T008 D8: la raiz de paquetes se crea en el MISMO hilo de E/S, despues
     // de inicializar la base (solo si la base quedo lista).
+    // T019 D4: con migrador, en ese mismo punto se resuelve la raiz del home
+    // (migracion incluida): antes de que exista el worker que escribe ZIP.
     const QString raizPaquetes = m_opciones.raizPaquetes.isEmpty()
                                      ? QDir(directorio).filePath(QStringLiteral("paquetes"))
                                      : QDir::cleanPath(m_opciones.raizPaquetes);
     std::function<void(const QString&)> crearRaiz =
         m_opciones.crearRaizPaquetes ? m_opciones.crearRaizPaquetes : &crearRaizPaquetesPrivada;
+    const MigradorRaizPaquetes& migrador = m_opciones.migradorRaizPaquetes;
+    ResolucionRaizPaquetes resolucionRaiz;
+    resolucionRaiz.raizEfectiva = raizPaquetes;
     std::optional<Resultado<InformeInicializacionSqlite, ErrorPersistencia>> salida;
-    const std::unique_ptr<QThread> hilo(QThread::create([&salida, &inicializador, &rutaBase, &crearRaiz, &raizPaquetes] {
-        salida = inicializador(rutaBase);
-        if (salida->esExito()) {
-            crearRaiz(raizPaquetes);
-        }
-    }));
+    const std::unique_ptr<QThread> hilo(QThread::create(
+        [&salida, &inicializador, &rutaBase, &crearRaiz, &raizPaquetes, &migrador, &resolucionRaiz] {
+            salida = inicializador(rutaBase);
+            if (!salida->esExito()) {
+                return;
+            }
+            if (migrador) {
+                resolucionRaiz = migrador();
+                resolucionRaiz.raizEfectiva = QDir::cleanPath(resolucionRaiz.raizEfectiva);
+            } else {
+                crearRaiz(raizPaquetes);
+            }
+        }));
     hilo->setObjectName(QStringLiteral("satcfdi-bootstrap"));
     hilo->start();
     hilo->wait();
@@ -175,7 +208,8 @@ Resultado<ArranquePreparado, ErrorArranque> AppBootstrapper::preparar() const
     ArranquePreparado preparado;
     preparado.directorioDatos = directorio;
     preparado.rutaBase = rutaBase;
-    preparado.raizPaquetes = raizPaquetes;
+    preparado.raizPaquetes = resolucionRaiz.raizEfectiva;
+    preparado.resolucionRaizPaquetes = std::move(resolucionRaiz);
     preparado.informe = std::move(inicializacion).valor();
     return R::exito(std::move(preparado));
 }

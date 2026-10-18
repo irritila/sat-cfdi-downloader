@@ -1,6 +1,7 @@
 #pragma once
 
 #include "application/persistence/PuertosPersistencia.h"
+#include "AvisoRaizPaquetesViewModel.h"
 
 #include <QObject>
 #include <QVariantMap>
@@ -51,10 +52,13 @@ public:
     PerfilesSatViewModel* perfiles() const { return m_perfiles; }
     EFirmaFormViewModel* eFirma() const { return m_eFirma; }
     ExploradorCfdiViewModel* explorador() const { return m_explorador; }
+    // T019 D8: aviso de la carpeta de paquetes; lo fija el composition root
+    // antes de cargar Main.qml (sin aviso queda inactivo).
+    AvisoRaizPaquetesViewModel* avisoRaizPaquetes() const { return m_avisoRaizPaquetes; }
 
     // {"appViewModel", "solicitudesModel", "nuevaSolicitudViewModel",
     //  "detalleViewModel", "perfilesViewModel", "eFirmaViewModel",
-    //  "exploradorViewModel"} para
+    //  "exploradorViewModel", "avisoRaizPaquetesViewModel"} para
     //  QQmlApplicationEngine::setInitialProperties.
     QVariantMap initialProperties() const;
 
@@ -86,6 +90,7 @@ private:
     EFirmaFormViewModel* m_eFirma;
     ExploradorCfdiViewModel* m_explorador;
     AppViewModel* m_app;
+    AvisoRaizPaquetesViewModel* m_avisoRaizPaquetes;
 };
 
 } // namespace satcfdi

@@ -769,7 +769,7 @@ void configurar(QPdfWriter& writer)
     writer.setPageLayout(QPageLayout(QPageSize(QPageSize::Letter), QPageLayout::Portrait, QMarginsF(0, 0, 0, 0),
                                      QPageLayout::Point));
     // Metadatos sin datos fiscales.
-    writer.setCreator(QStringLiteral("SAT CFDI Downloader"));
+    writer.setCreator(QStringLiteral("Archivo Fiscal"));
     writer.setTitle(QStringLiteral("Visualización de CFDI"));
 }
 
