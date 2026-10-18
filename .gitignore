@@ -26,3 +26,12 @@ sat-spike/
 # Residuos de configurar CMake sin -B en la raiz
 /CMakeFiles/
 /CMakeCache.txt
+
+# T017: salidas del video tutorial si se generan fuera de build*/ (D1, D5)
+*.mp4
+*.srt
+*.linea-tiempo.json
+*.ffmeta
+tts-cache/
+video-cuadros/
+*.cuadros/

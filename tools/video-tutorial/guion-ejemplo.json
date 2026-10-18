@@ -1,0 +1,640 @@
+{
+  "esquema": 1,
+  "tipo": "ejemplo",
+  "titulo": "SAT CFDI Downloader: ejemplo minimo",
+  "presupuestoTotal": {
+    "min": 300,
+    "max": 6000
+  },
+  "cuadrosTitulo": 75,
+  "datos": {
+    "ahora": "2026-10-01T10:00:00Z",
+    "perfiles": [
+      {
+        "clave": "principal",
+        "rfc": "XAXX010101000",
+        "nombre": "Contribuyente de ejemplo",
+        "efirma": "lista"
+      },
+      {
+        "clave": "proveedor",
+        "rfc": "XEXX010101000",
+        "nombre": "Proveedor de ejemplo",
+        "efirma": "sinEFirma",
+        "visible": false
+      }
+    ],
+    "solicitudes": [
+      {
+        "clave": "agosto",
+        "perfil": "principal",
+        "tipo": "emitidos",
+        "desde": "2026-08-01",
+        "hasta": "2026-08-31",
+        "estado": "enProceso"
+      },
+      {
+        "clave": "septiembre",
+        "perfil": "principal",
+        "tipo": "recibidos",
+        "desde": "2026-09-01",
+        "hasta": "2026-09-30",
+        "estado": "terminada",
+        "cfdis": [
+          {
+            "tipo": "I",
+            "serie": "A",
+            "folio": "1187",
+            "contraparte": "Papelería Ejemplo",
+            "fecha": "2026-09-03T18:42:10",
+            "subtotal": "1000.00",
+            "descripcion": "Cuaderno profesional de ejemplo"
+          },
+          {
+            "tipo": "I",
+            "serie": "F",
+            "folio": "5521",
+            "contraparte": "Comercializadora Imaginaria",
+            "fecha": "2026-09-12T10:02:15",
+            "subtotal": "7200.00",
+            "descripcion": "Servicio de ejemplo"
+          },
+          {
+            "tipo": "E",
+            "serie": "NC",
+            "folio": "17",
+            "contraparte": "Papelería Ejemplo",
+            "fecha": "2026-09-20T11:47:30",
+            "subtotal": "100.00",
+            "descripcion": "Devolución de ejemplo"
+          }
+        ]
+      }
+    ]
+  },
+  "capitulos": [
+    {
+      "id": "perfiles",
+      "titulo": "Perfil SAT y e.firma",
+      "escenas": [
+        {
+          "id": "lista",
+          "presupuesto": {
+            "min": 90,
+            "max": 400
+          },
+          "lineas": [
+            {
+              "id": "l1",
+              "texto": "Esta es la lista de solicitudes de descarga masiva."
+            }
+          ],
+          "acciones": [
+            {
+              "tipo": "esperar",
+              "cuadros": 20
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "botonPerfilesSat",
+              "cuadros": 30
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l1",
+              "momento": "fin"
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 20
+            }
+          ]
+        },
+        {
+          "id": "alta-perfil",
+          "presupuesto": {
+            "min": 150,
+            "max": 700
+          },
+          "lineas": [
+            {
+              "id": "l1",
+              "texto": "Con Nuevo perfil capturas el RFC y un nombre descriptivo."
+            }
+          ],
+          "acciones": [
+            {
+              "tipo": "mover",
+              "objetivo": "botonNuevoPerfil",
+              "cuadros": 24
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 10
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "campoRfcPerfil",
+              "cuadros": 20
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "escribir",
+              "texto": "XEXX010101000",
+              "cuadrosPorCaracter": 2
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "campoNombrePerfil",
+              "cuadros": 20
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "escribir",
+              "texto": "Proveedor de ejemplo",
+              "cuadrosPorCaracter": 2
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "botonGuardarPerfil",
+              "cuadros": 20
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 15
+            }
+          ]
+        },
+        {
+          "id": "registrar-efirma",
+          "presupuesto": {
+            "min": 200,
+            "max": 900
+          },
+          "lineas": [
+            {
+              "id": "l1",
+              "texto": "Registrar e.firma pide el certificado, la llave privada y su contraseña.",
+              "voz": "Registrar e firma pide el certificado, la llave privada y su contraseña."
+            },
+            {
+              "id": "l2",
+              "texto": "Eliges cada archivo en el selector de macOS."
+            }
+          ],
+          "acciones": [
+            {
+              "tipo": "mover",
+              "objetivo": "botonEFirma",
+              "cuadros": 24
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 10
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "botonElegirCertificado",
+              "cuadros": 20
+            },
+            {
+              "tipo": "clic",
+              "sinEfecto": true
+            },
+            {
+              "tipo": "mostrarIlustracion",
+              "ilustracion": "selectorArchivos",
+              "parametros": {
+                "carpeta": "/Users/usuario/Documentos/efirma",
+                "archivos": [
+                  "demo.cer",
+                  "demo.key"
+                ],
+                "seleccionado": "demo.cer"
+              }
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l2",
+              "momento": "fin"
+            },
+            {
+              "tipo": "ocultarIlustracion"
+            },
+            {
+              "tipo": "seleccionarArchivoEFirma",
+              "archivo": "certificado",
+              "ruta": "/Users/usuario/Documentos/efirma/demo.cer"
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "botonElegirLlave",
+              "cuadros": 20
+            },
+            {
+              "tipo": "clic",
+              "sinEfecto": true
+            },
+            {
+              "tipo": "seleccionarArchivoEFirma",
+              "archivo": "llave",
+              "ruta": "/Users/usuario/Documentos/efirma/demo.key"
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "campoContrasena",
+              "cuadros": 20
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "escribirContrasena",
+              "longitud": 8
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "botonEnviarEFirma",
+              "cuadros": 20
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 40
+            },
+            {
+              "tipo": "completarEFirma",
+              "perfil": "proveedor"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 30
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "botonCerrarEFirma",
+              "cuadros": 20
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 15
+            }
+          ]
+        },
+        {
+          "id": "perfil",
+          "presupuesto": {
+            "min": 90,
+            "max": 400
+          },
+          "lineas": [
+            {
+              "id": "l1",
+              "texto": "En Perfiles SAT eliges el contribuyente y revisas su e.firma.",
+              "voz": "En Perfiles SAT eliges el contribuyente y revisas su e firma."
+            }
+          ],
+          "acciones": [
+            {
+              "tipo": "cambiarEFirma",
+              "perfil": "principal",
+              "efirma": "lista",
+              "vigenteHasta": "2026-10-22T12:00:00Z"
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "filaPerfil_0",
+              "cuadros": 30
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 30
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "explorador",
+      "titulo": "Explorador de facturas y PDF",
+      "escenas": [
+        {
+          "id": "menu-bar",
+          "presupuesto": {
+            "min": 120,
+            "max": 600
+          },
+          "lineas": [
+            {
+              "id": "l1",
+              "texto": "El icono de la barra de menús muestra el estado del monitoreo."
+            },
+            {
+              "id": "l2",
+              "texto": "Las notificaciones avisan cuando termina una descarga o vence la e.firma.",
+              "voz": "Las notificaciones avisan cuando termina una descarga o vence la e firma."
+            }
+          ],
+          "acciones": [
+            {
+              "tipo": "mostrarIlustracion",
+              "ilustracion": "menuBar"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l1",
+              "momento": "fin"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 10
+            },
+            {
+              "tipo": "mostrarIlustracion",
+              "ilustracion": "notificacion",
+              "parametros": {
+                "notificaciones": [
+                  {
+                    "tipo": "descargaCompleta",
+                    "solicitud": "septiembre"
+                  },
+                  {
+                    "tipo": "efirmaPorVencer",
+                    "perfil": "principal"
+                  }
+                ]
+              }
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l2",
+              "momento": "fin"
+            },
+            {
+              "tipo": "ocultarIlustracion"
+            }
+          ]
+        },
+        {
+          "id": "verificar",
+          "presupuesto": {
+            "min": 120,
+            "max": 600
+          },
+          "lineas": [
+            {
+              "id": "l1",
+              "texto": "Verificar ahora consulta el estado sin esperar al siguiente ciclo."
+            }
+          ],
+          "acciones": [
+            {
+              "tipo": "mover",
+              "objetivo": "botonRegresar",
+              "cuadros": 24
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 15
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "filaSolicitud_1",
+              "cuadros": 24
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 15
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "botonVerificarAhora",
+              "cuadros": 24
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 20
+            },
+            {
+              "tipo": "avanzarSolicitud",
+              "solicitud": "agosto",
+              "estado": "terminada",
+              "verificadaEn": "2026-10-01T10:40:00Z"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 30
+            }
+          ]
+        },
+        {
+          "id": "descarga",
+          "presupuesto": {
+            "min": 90,
+            "max": 500
+          },
+          "lineas": [
+            {
+              "id": "l1",
+              "texto": "Cuando el paquete se descarga, la solicitud muestra sus facturas."
+            }
+          ],
+          "acciones": [
+            {
+              "tipo": "avanzarSolicitud",
+              "solicitud": "septiembre",
+              "estado": "descargada"
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "botonRegresar",
+              "cuadros": 24
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 15
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "filaSolicitud_0",
+              "cuadros": 24
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 20
+            }
+          ]
+        },
+        {
+          "id": "facturas",
+          "presupuesto": {
+            "min": 120,
+            "max": 600
+          },
+          "lineas": [
+            {
+              "id": "l1",
+              "texto": "En Ver facturas revisas cada CFDI del paquete."
+            },
+            {
+              "id": "l2",
+              "texto": "Y con Ver PDF obtienes su representación impresa.",
+              "voz": "Y con Ver PDF obtienes su representación impresa."
+            }
+          ],
+          "acciones": [
+            {
+              "tipo": "mover",
+              "objetivo": "botonVerFacturas",
+              "cuadros": 24
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "esperarConteo",
+              "objetivo": "listaFacturas",
+              "conteo": 3,
+              "timeoutMs": 5000
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 15
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "filaCfdi_0",
+              "cuadros": 24
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l2",
+              "momento": "inicio"
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "botonVerPdf",
+              "cuadros": 24
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "esperarDocumento",
+              "timeoutMs": 8000
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 45
+            }
+          ]
+        },
+        {
+          "id": "buscar",
+          "presupuesto": {
+            "min": 90,
+            "max": 600
+          },
+          "lineas": [
+            {
+              "id": "l1",
+              "texto": "La búsqueda filtra por RFC, nombre, UUID o folio."
+            }
+          ],
+          "acciones": [
+            {
+              "tipo": "tecla",
+              "tecla": "Escape"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 10
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "campoBusquedaFacturas",
+              "cuadros": 24
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "escribir",
+              "texto": "Papel"
+            },
+            {
+              "tipo": "esperarConteo",
+              "objetivo": "listaFacturas",
+              "conteo": 2,
+              "timeoutMs": 5000
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 30
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "botonLimpiarBusquedaFacturas",
+              "cuadros": 20
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "esperarConteo",
+              "objetivo": "listaFacturas",
+              "conteo": 3,
+              "timeoutMs": 5000
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 20
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+;; T017 D15: perfil de sandbox de proceso para grabar el video sin red.
+;; Todo permitido salvo la red (sockets IP y de dominio Unix, entrada y salida,
+;; tambien de procesos hijos como ffmpeg). Se usa con:
+;;   sandbox-exec -f tools/video-tutorial/sin-red.sb satcfdi_video_tutorial ... --offline
+;; satcfdi_video_tutorial --sonda-red comprueba que una conexion TCP falla aqui.
+(version 1)
+(allow default)
+(deny network*)

@@ -1,0 +1,32 @@
+{
+  "esquema": 1,
+  "tipo": "ejemplo",
+  "titulo": "Prueba: varias frases por cue",
+  "presupuestoTotal": { "min": 1, "max": 100000 },
+  "datos": {
+    "ahora": "2026-10-01T10:00:00Z",
+    "perfiles": [
+      { "clave": "principal", "rfc": "XAXX010101000", "nombre": "Contribuyente de ejemplo", "efirma": "lista" }
+    ],
+    "solicitudes": []
+  },
+  "capitulos": [
+    {
+      "id": "c",
+      "titulo": "Frases",
+      "escenas": [
+        {
+          "id": "frases",
+          "presupuesto": { "min": 1, "max": 100000 },
+          "lineas": [
+            { "id": "l1", "texto": "Abre la lista de solicitudes. Revisa el estado de cada una." },
+            { "id": "l2", "texto": "Pulsa Nuevo perfil." },
+            { "id": "l3", "texto": "¿Ya tienes la e.firma? Registrala ahora. Despues crea la solicitud..." },
+            { "id": "l4", "texto": "Listo: La descarga empieza sola." }
+          ],
+          "acciones": [ { "tipo": "esperar", "cuadros": 10 } ]
+        }
+      ]
+    }
+  ]
+}

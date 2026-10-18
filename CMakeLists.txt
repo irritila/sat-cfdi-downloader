@@ -195,3 +195,12 @@ _satcfdi_dependencias_link(satcfdi_app _satcfdi_deps_app)
 if("satcfdi_sat_spike_core" IN_LIST _satcfdi_deps_app)
     message(FATAL_ERROR "satcfdi_app enlaza la CLI del spike SAT (satcfdi_sat_spike_core)")
 endif()
+
+# T017 (D10): herramienta que graba el video tutorial con la UI real sobre
+# servicios fijos (tools/video-tutorial). Fuera de la app; sus pruebas (label
+# video) solo existen con la opcion. Targets video_tutorial (y, en el corte 3,
+# video_tutorial_voz). Va al final: usa _satcfdi_dependencias_link.
+option(SATCFDI_BUILD_VIDEO_TUTORIAL "Compilar la herramienta del video tutorial (tools/video-tutorial)" OFF)
+if(SATCFDI_BUILD_VIDEO_TUTORIAL)
+    add_subdirectory(tools/video-tutorial)
+endif()

@@ -512,6 +512,70 @@ QT_QPA_PLATFORM=cocoa ./build/tools/capturas-manual/satcfdi_manual_capturas \
   cada `![...](img/X.png)` de `docs/manual/usuario.md` exista y que no haya PNG
   sin referenciar.
 
+## Video tutorial (T017)
+
+`tools/video-tutorial/` graba el video tutorial cuadro a cuadro desde el guion
+versionado (`guion-tutorial.json`) con datos sinteticos, voz sintetica (OpenAI
+TTS, cacheada) y musica de fondo generada localmente. Detalle completo en
+`tools/video-tutorial/README.md`.
+
+Requisitos:
+
+- `-DSATCFDI_BUILD_VIDEO_TUTORIAL=ON` (no es parte de la app) y ffmpeg/ffprobe
+  de Homebrew (`brew install ffmpeg`).
+- Sesion grafica de macOS en consola (la grabacion abre ventanas cocoa; sin
+  sesion, la herramienta y sus pruebas graficas hacen SKIP) y pantalla Retina
+  (el lienzo es 2560x1440; sin Retina se reescala).
+- La grabacion corre siempre sin red, dentro de `sandbox-exec` con
+  `tools/video-tutorial/sin-red.sb` y `--offline`; los targets ya lo hacen.
+
+```bash
+cmake -S . -B build -G Ninja -DSATCFDI_BUILD_VIDEO_TUTORIAL=ON
+# 1. Paso de voz (OpenAI TTS). Solo lo ejecuta el usuario: tiene costo.
+export OPENAI_API_KEY=...          # solo en el entorno de tu terminal
+cmake --build build --target video_tutorial_voz_estimar   # sin llamadas: bloques, caracteres y costo
+cmake --build build --target video_tutorial_voz           # pide escribir "si" antes de llamar
+# 2. Grabacion (sin red, sin clave): build/video/tutorial.mp4, .srt y .linea-tiempo.json
+cmake --build build --target video_tutorial
+```
+
+- `OPENAI_API_KEY` se lee solo del entorno: nunca se escribe en archivos,
+  argumentos ni logs, y la grabacion no la usa. El paso de voz muestra el costo
+  estimado y no llama a la API sin la confirmacion del usuario; con el cache
+  completo no hace ninguna llamada.
+- Cache de voz: `build/video/tts-cache/` (sintesis, montaje y alineacion por
+  bloque, generaciones atomicas). Cambiar el texto de una linea solo resintetiza
+  su bloque; tempo, pausas o alineacion se rehacen localmente sin TTS. Las
+  marcas mal alineadas se corrigen en `tts-cache/alineacion/correcciones.json`.
+- Cache de musica: `build/video/musica-cache/` (independiente del TTS; clave
+  por version del generador, configuracion del bloque `"musica"` del guion,
+  duracion, intervalos de voz y version de ffmpeg).
+- Si falta un bloque de voz en el cache, la grabacion falla nombrando la escena
+  y no llama a OpenAI.
+
+Verificacion D16 (reproducibilidad): una segunda grabacion con el mismo guion y
+los mismos caches, y el script contra el manifiesto versionado
+`tools/video-tutorial/verificacion-d16.json` (capitulos de `ffprobe
+-show_chapters`, pistas, numero de cuadros, MD5 del audio decodificado y PSNR
+>= 60 dB en los cuadros muestreados). Sale con codigo != 0 si algo no coincide.
+
+```bash
+caffeinate -i sandbox-exec -f tools/video-tutorial/sin-red.sb \
+    build/tools/video-tutorial/satcfdi_video_tutorial --guion tools/video-tutorial/guion-tutorial.json \
+    --salida build/video/verificacion --nombre tutorial --offline --voz build/video/tts-cache
+cmake --build build --target video_tutorial_verificar
+# o, para cualquier par de videos (B es opcional: sin B solo contra el manifiesto):
+cmake -DMODO=verificar -DMANIFIESTO=tools/video-tutorial/verificacion-d16.json \
+      -DA=build/video/tutorial.mp4 -DB=build/video/verificacion/tutorial.mp4 \
+      -DFFMPEG=$(which ffmpeg) -DFFPROBE=$(which ffprobe) -P tools/video-tutorial/verificar-d16.cmake
+```
+
+Cada grabacion completa tarda unos 20 minutos (`caffeinate -i` evita que el
+equipo se suspenda). Si cambia el guion aprobado, el manifiesto se regenera
+desde la linea de tiempo de la grabacion aprobada (`-DMODO=generar`, ver la
+cabecera de `verificar-d16.cmake`) y se revisa en el diff. Las salidas
+(`build/video/`) estan ignoradas por git.
+
 ## Directorios de build
 
 Todos los directorios `build*/` estan ignorados por git. Durante ciclos de

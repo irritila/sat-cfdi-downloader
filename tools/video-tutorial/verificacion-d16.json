@@ -1,0 +1,34 @@
+{
+  "esquema": 1,
+  "descripcion": "Manifiesto de verificacion D16 de T017 (verificar-d16.cmake). Generado de guion-tutorial.json y de la linea de tiempo de la grabacion aprobada.",
+  "video": {"codec": "h264", "ancho": 2560, "alto": 1440, "fps": "30/1"},
+  "audio": {"codec": "aac", "frecuencia": 48000,
+            "decodificacion": "ffmpeg -i <mp4> -map 0:a:0 -c:a pcm_s16le -ar 48000 -ac 2 -f md5 -"},
+  "toleranciaPistasMs": 100,
+  "duracionMinS": 300,
+  "duracionMaxS": 450,
+  "totalCuadros": 10576,
+  "psnrMinimoDb": 60,
+  "picoVerdaderoMaximoAacDb": -1.8,
+  "capitulos": [
+    {"titulo": "1 · Perfil y e.firma", "inicio": 0, "fin": 3043},
+    {"titulo": "2 · Nueva solicitud", "inicio": 3043, "fin": 4223},
+    {"titulo": "3 · Seguimiento y estados", "inicio": 4223, "fin": 5695},
+    {"titulo": "4 · Paquetes", "inicio": 5695, "fin": 7054},
+    {"titulo": "5 · Explorador y PDF", "inicio": 7054, "fin": 8867},
+    {"titulo": "6 · Menu bar y notificaciones", "inicio": 8867, "fin": 10576}
+  ],
+  "cuadrosMuestreados": [
+    {"cuadro": 437, "motivo": "capitulo perfil-efirma: bienvenida"},
+    {"cuadro": 2100, "motivo": "ilustracion selectorArchivos: perfil-efirma/registrar-efirma, antes del fin de l3"},
+    {"cuadro": 3193, "motivo": "capitulo nueva-solicitud: volver-guia"},
+    {"cuadro": 4509, "motivo": "capitulo seguimiento: envio-automatico"},
+    {"cuadro": 6059, "motivo": "capitulo paquetes: paquetes-terminada"},
+    {"cuadro": 6813, "motivo": "ilustracion finder: paquetes/finder, antes del inicio de l4"},
+    {"cuadro": 7347, "motivo": "capitulo explorador-pdf: facturas"},
+    {"cuadro": 9149, "motivo": "capitulo menu-bar-notificaciones: menu-bar"},
+    {"cuadro": 9400, "motivo": "ilustracion menuBar: menu-bar-notificaciones/menu-bar, antes del fin de l4"},
+    {"cuadro": 9712, "motivo": "ilustracion iconoMenuBar: menu-bar-notificaciones/icono, antes del fin de l2"},
+    {"cuadro": 10222, "motivo": "ilustracion notificacion: menu-bar-notificaciones/notificaciones, antes del fin de l4"}
+  ]
+}

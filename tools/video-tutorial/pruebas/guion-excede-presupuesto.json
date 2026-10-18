@@ -1,0 +1,33 @@
+{
+  "esquema": 1,
+  "tipo": "ejemplo",
+  "titulo": "Prueba: escena fuera de presupuesto",
+  "presupuestoTotal": { "min": 1, "max": 100000 },
+  "datos": {
+    "ahora": "2026-10-01T10:00:00Z",
+    "perfiles": [
+      { "clave": "principal", "rfc": "XAXX010101000", "nombre": "Contribuyente de ejemplo", "efirma": "lista" }
+    ],
+    "solicitudes": []
+  },
+  "capitulos": [
+    {
+      "id": "demo",
+      "titulo": "Demo",
+      "escenas": [
+        {
+          "id": "corta",
+          "presupuesto": { "min": 30, "max": 300 },
+          "lineas": [ { "id": "l1", "texto": "Una linea corta." } ],
+          "acciones": [ { "tipo": "esperar", "cuadros": 10 } ]
+        },
+        {
+          "id": "larga",
+          "presupuesto": { "min": 30, "max": 60 },
+          "lineas": [ { "id": "l1", "texto": "Esta linea es demasiado larga para el presupuesto de su escena." } ],
+          "acciones": [ { "tipo": "esperar", "cuadros": 90 } ]
+        }
+      ]
+    }
+  ]
+}
