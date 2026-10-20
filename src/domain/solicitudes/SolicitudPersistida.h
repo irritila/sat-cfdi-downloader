@@ -74,6 +74,11 @@ struct SolicitudPersistida {
     bool descargaPendiente = false;                    // descarga_pendiente
     std::optional<QDateTime> accionPendienteEn;        // accion_pendiente_en
     std::optional<QDateTime> eliminadoEn;              // eliminado_en
+    // T023.2 (migracion 007): instante de la verificacion SAT Terminada que
+    // persistio un conjunto VACIO de paquetes. NULL en filas anteriores y
+    // mientras no se haya confirmado; solo con valor acredita cobertura
+    // mensual sin paquetes (ADR 0019).
+    std::optional<QDateTime> conjuntoPaquetesVacioConfirmadoEn; // conjunto_paquetes_vacio_confirmado_en
 };
 
 } // namespace satcfdi

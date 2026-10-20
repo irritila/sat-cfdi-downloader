@@ -28,6 +28,9 @@ qt_add_library(satcfdi_ports STATIC
     # T015.2: indice de CFDI (catalogo SQLite y archivos ZIP locales).
     cfdi/ArchivosZipCfdi.h
     repositories/CfdiCatalogRepository.h
+    # T023.2: catalogo mensual y lotes de descarga guiada.
+    repositories/CatalogoMensualRepository.h
+    repositories/LoteDescargaGuiadaRepository.h
 )
 
 set_target_properties(satcfdi_ports PROPERTIES AUTOMOC ON)

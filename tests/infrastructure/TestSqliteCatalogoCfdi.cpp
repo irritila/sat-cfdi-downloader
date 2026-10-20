@@ -139,7 +139,7 @@ void TestSqliteCatalogoCfdi::migracion006SobreBase005ConDatos()
     const QString ruta = rutaBase(dir);
     auto embebidas = migracionesSqliteEmbebidas();
     QVERIFY(embebidas);
-    QCOMPARE(embebidas.valor().size(), 6);
+    QVERIFY(embebidas.valor().size() >= 6);
     // Base con el esquema de T014 (001-005) y datos.
     QVERIFY(inicializarBaseSqlite(ruta, embebidas.valor().mid(0, 5)));
     const QString huellaSql = QStringLiteral(
@@ -175,7 +175,8 @@ void TestSqliteCatalogoCfdi::migracion006SobreBase005ConDatos()
         prov.cerrarConexionDelHiloActual();
     }
 
-    auto migrada = inicializarBaseSqlite(ruta);
+    // Solo hasta 006: esta prueba fija el efecto de 006 (007 tiene la suya).
+    auto migrada = inicializarBaseSqlite(ruta, embebidas.valor().mid(0, 6));
     QVERIFY2(migrada, migrada ? "" : qPrintable(migrada.error().mensaje));
     QCOMPARE(migrada.valor().migracion.versionInicial, 5);
     QCOMPARE(migrada.valor().migracion.aplicadas, QList<int>{6});
@@ -210,7 +211,7 @@ void TestSqliteCatalogoCfdi::migracion006SobreBase005ConDatos()
     }
 
     // Idempotente: una segunda apertura no aplica nada ni cambia objetos.
-    auto repetida = inicializarBaseSqlite(ruta);
+    auto repetida = inicializarBaseSqlite(ruta, embebidas.valor().mid(0, 6));
     QVERIFY(repetida);
     QVERIFY(repetida.valor().migracion.aplicadas.isEmpty());
     QCOMPARE(repetida.valor().migracion.versionInicial, 6);

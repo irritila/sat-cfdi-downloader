@@ -341,7 +341,7 @@ void TestIndiceCfdiIntegracion::baseT014IndexaUnaVezYNoRepite()
     const auto a = base.arrancar();
     QVERIFY(a);
     QCOMPARE(a->informe.migracion.versionInicial, 5);
-    QCOMPARE(a->informe.migracion.aplicadas, QList<int>{6});
+    QCOMPARE(a->informe.migracion.aplicadas, (QList<int>{6, 7})); // 007: T023.2
 
     Dependencias d;
     QLoggingCategory::setFilterRules(QStringLiteral("satcfdi.cfdi.*=true"));

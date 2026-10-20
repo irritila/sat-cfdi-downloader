@@ -89,7 +89,7 @@ void TestSqliteMigraciones::recursoEmbebidoIgualAlFuente()
 
     auto lista = migracionesSqliteEmbebidas();
     QVERIFY(lista);
-    QCOMPARE(lista.valor().size(), 6);
+    QCOMPARE(lista.valor().size(), 7);
     for (int i = 0; i < lista.valor().size(); ++i) {
         QCOMPARE(lista.valor().at(i).version, i + 1); // consecutivas desde 1
     }
@@ -122,6 +122,12 @@ void TestSqliteMigraciones::recursoEmbebidoIgualAlFuente()
     QVERIFY(!fuente006.isEmpty());
     QCOMPARE(lista.valor().at(5).nombre, QStringLiteral("006_indice_cfdi"));
     QCOMPARE(lista.valor().at(5).sql.toUtf8(), fuente006);
+
+    // T023.2: 007 embebida igual al fuente.
+    const QByteArray fuente007 = leerArchivo(QStringLiteral(SATCFDI_MIGRACION_007_FUENTE));
+    QVERIFY(!fuente007.isEmpty());
+    QCOMPARE(lista.valor().at(6).nombre, QStringLiteral("007_catalogo_mensual"));
+    QCOMPARE(lista.valor().at(6).sql.toUtf8(), fuente007);
 }
 
 void TestSqliteMigraciones::dividirSentenciasDm2()
@@ -191,7 +197,10 @@ void TestSqliteMigraciones::migraBaseVacia()
                                   QStringLiteral("cfdi_indexado"), // T015.2
                                   QStringLiteral("configuracion_app"), QStringLiteral("credencial_sat"),
                                   QStringLiteral("indice_cfdi_paquete"), // T015.2
-                                  QStringLiteral("log_solicitud"), QStringLiteral("paquete_solicitud"),
+                                  QStringLiteral("log_solicitud"),
+                                  QStringLiteral("lote_descarga_guiada"),           // T023.2
+                                  QStringLiteral("lote_descarga_guiada_solicitud"), // T023.2
+                                  QStringLiteral("paquete_solicitud"),
                                   QStringLiteral("perfil_sat"), QStringLiteral("schema_migrations"),
                                   QStringLiteral("solicitud_masiva")}));
     QCOMPARE(columna(proveedor, QStringLiteral("SELECT version FROM schema_migrations ORDER BY version")),

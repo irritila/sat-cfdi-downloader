@@ -179,6 +179,27 @@ void TestOperacionExecutor::verificacionTerminadaRegistraPaquetesEnUnaTransaccio
     QCOMPARE(e.almacen.paquetes.first().vencimientoEstimadoEn, std::optional(kInicio.addSecs(72 * 3600)));
 }
 
+void TestOperacionExecutor::verificacionTerminadaSinPaquetesConfirmaConjuntoVacio()
+{
+    // T023.2 (ADR 0019): solo una verificacion Terminada con conjunto vacio
+    // de IdPaquete lo confirma, en la misma aplicacion de la verificacion.
+    Entorno e;
+    const SolicitudId enProceso = e.sembrar(EstadoLocal::Enviada).id;
+    e.sat.responderVerificacion(RV::exito(verificacion(EstadoSolicitudSat::EnProceso, {}, 0)));
+    QVERIFY(esperar(e.ejecutor->verificar(enProceso, OrigenLog::Worker)));
+    QVERIFY(!e.solicitud(enProceso)->conjuntoPaquetesVacioConfirmadoEn);
+
+    e.sat.responderVerificacion(RV::exito(verificacion(EstadoSolicitudSat::Terminada, {}, 0)));
+    QVERIFY(esperar(e.ejecutor->verificar(enProceso, OrigenLog::Usuario)));
+    QCOMPARE(e.solicitud(enProceso)->conjuntoPaquetesVacioConfirmadoEn, std::optional(kInicio));
+    QVERIFY(e.almacen.paquetes.isEmpty());
+
+    const SolicitudId conPaquetes = e.sembrar(EstadoLocal::Enviada).id;
+    e.sat.responderVerificacion(RV::exito(verificacion(EstadoSolicitudSat::Terminada, {u"B_01"_s}, 3)));
+    QVERIFY(esperar(e.ejecutor->verificar(conPaquetes, OrigenLog::Worker)));
+    QVERIFY(!e.solicitud(conPaquetes)->conjuntoPaquetesVacioConfirmadoEn);
+}
+
 void TestOperacionExecutor::verificacionVencidaVencePaquetesNoDescargados()
 {
     Entorno e;

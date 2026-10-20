@@ -279,6 +279,61 @@ Registro unico local.
   monitoreo activo. Es la unica sentencia idempotente por si misma de 001 (DM3).
 - Sin `eliminado_en`.
 
+### Catalogo mensual guiado (migracion 007, T023.2)
+
+Fuente ejecutable: `src/infrastructure/persistence/migrations/007_catalogo_mensual.sql`
+(ADR 0019). Solo agrega; no reconstruye tablas ni cambia datos existentes.
+
+`solicitud_masiva.conjunto_paquetes_vacio_confirmado_en` (`TEXT`, nulo,
+timestamp): instante de la verificacion SAT `Terminada` que persistio un
+conjunto vacio de `IdPaquete`. Se escribe en la misma transaccion que la
+verificacion, solo si la solicitud no tiene paquetes registrados, y conserva
+el primer instante; cualquier otra verificacion lo deja nulo. No se infiere de
+`numero_cfdi = 0`. Filas anteriores a 007 quedan nulas y no acreditan
+cobertura mensual sin paquetes.
+
+`lote_descarga_guiada`: una accion del flujo guiado sobre un mes de un perfil.
+
+| Columna | Tipo | Nulo | Default | Restricciones |
+| --- | --- | --- | --- | --- |
+| `id` | `TEXT` | No | - | PK, UUID canonico. |
+| `perfil_sat_id` | `TEXT` | No | - | FK `perfil_sat(id)`. |
+| `mes` | `TEXT` | No | - | `YYYY-MM`, mes `01`-`12`. |
+| `creado_en` | `TEXT` | No | - | Timestamp. |
+
+`lote_descarga_guiada_solicitud`: tramo SAT exacto de cada solicitud del lote
+(varias por direccion, una por hueco, ADR 0020).
+
+| Columna | Tipo | Nulo | Default | Restricciones |
+| --- | --- | --- | --- | --- |
+| `lote_id` | `TEXT` | No | - | FK `lote_descarga_guiada(id)`; PK `(lote_id, solicitud_masiva_id)`. |
+| `solicitud_masiva_id` | `TEXT` | No | - | FK `solicitud_masiva(id)`; unico (`ux_lote_guiado_solicitud`). |
+| `tipo_cfdi` | `TEXT` | No | - | `emitidos` o `recibidos`. |
+| `fecha_inicial_sat` | `TEXT` | No | - | Formato SAT (`GLOB`), `<= fecha_final_sat` (`ck_lote_guiado_tramo`). |
+| `fecha_final_sat` | `TEXT` | No | - | Formato SAT (`GLOB`). |
+
+- Un lote puede tener varios tramos por direccion (uno por hueco maximo);
+  los de una misma direccion no se traslapan. Esa regla la valida el
+  repositorio en la transaccion de insercion (DM2 no admite triggers). Una
+  solicitud pertenece a lo sumo a un lote. Una actualizacion posterior del mes
+  crea un lote nuevo.
+- FK sin `ON DELETE` (DC10). La eliminacion logica de una solicitud no borra su
+  vinculo: el repositorio informa la eliminacion parcial y recalcula el
+  resultado del lote sin ella.
+- El perfil se identifica por `perfil_sat_id`, no por RFC: los lotes de un
+  perfil eliminado se ocultan con el y no se reasignan a uno recreado con el
+  mismo RFC.
+- La insercion revalida bajo `BEGIN IMMEDIATE` que el perfil y cada solicitud
+  sean visibles, del mismo perfil, direccion y tramo.
+- Catalogo mensual: deduplica por `upper(trim(uuid))` no vacio sin funciones
+  de ventana (DM4), con `min(clave)` y columnas *bare* de SQLite (>= 3.7.11).
+  `clave` concatena, con ancho fijo, guiada (`0`) o no (`1`),
+  `indice_cfdi_paquete.actualizado_en`, id de paquete y posicion. No se agrego
+  indice nuevo sobre `solicitud_masiva`: el filtro por perfil usa
+  `ix_solicitud_masiva_perfil` y el salto a CFDI `ix_cfdi_indexado_lista`; un
+  indice adicional `(perfil_sat_id, tipo_cfdi, ...)` cambiaba el plan de
+  consultas del worker sin beneficio medible.
+
 ## Indices
 
 | Indice | Definicion | Consulta que sirve |
@@ -296,6 +351,8 @@ Registro unico local.
 | `ix_paquete_solicitud_descarga` | `(estado_descarga, solicitud_masiva_id) WHERE eliminado_en IS NULL`. | Paquetes `Disponible`/`Error` por descargar y `Descargando` en recuperacion. |
 | `ix_paquete_solicitud_vencimiento_estimado` | `(vencimiento_estimado_en) WHERE eliminado_en IS NULL AND vencimiento_estimado_en IS NOT NULL AND estado_descarga IN ('Disponible','Descargando','Error')`. | Scheduler de vencimiento estimado. |
 | `ix_log_solicitud_detalle` | `(solicitud_masiva_id, creado_en)`. | Logs del detalle en orden cronologico y FK. |
+| `ix_lote_guiado_perfil_mes` | `lote_descarga_guiada(perfil_sat_id, mes, creado_en DESC)` (007). | Historial de lotes por perfil y mes. |
+| `ux_lote_guiado_solicitud` | `lote_descarga_guiada_solicitud(solicitud_masiva_id)`, unico (007). | Una solicitud en un solo lote, FK y "fuente guiada" del catalogo mensual. |
 
 Los indices parciales con `eliminado_en IS NULL` solo se usan si la consulta
 incluye literalmente `eliminado_en IS NULL` en su `WHERE`. Los repositorios de
@@ -452,6 +509,9 @@ Una transaccion:
 - `Vencida`: paquetes no eliminados y no `Descargado` pasan a `Vencido` con
   `motivo_vencimiento = 'solicitud_expirada'`, `origen_vencimiento = 'SAT'`,
   `vencido_en`.
+- Desde 007: `Terminada` con conjunto vacio de `IdPaquete` y sin paquetes
+  registrados fija `conjunto_paquetes_vacio_confirmado_en` (conserva el primer
+  instante); en otro caso queda nulo.
 - Si se consumio `verificacion_pendiente`: ponerla en `0` y recalcular
   `accion_pendiente_en` (nulo si `descarga_pendiente = 0`).
 - Logs `verificacion_realizada` o `verificacion_fallida` con

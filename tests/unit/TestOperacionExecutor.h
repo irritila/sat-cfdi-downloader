@@ -13,6 +13,7 @@ private slots:
     void envioNuncaSeReenviaNiSeSeleccionaCreada();
     void eliminadaDuranteOperacionNoCambiaNada();
     void verificacionTerminadaRegistraPaquetesEnUnaTransaccion();
+    void verificacionTerminadaSinPaquetesConfirmaConjuntoVacio();
     void verificacionVencidaVencePaquetesNoDescargados();
     void agendaSinCambioTresVecesYCambio();
     void fallaNoCuentaComoSinCambio();

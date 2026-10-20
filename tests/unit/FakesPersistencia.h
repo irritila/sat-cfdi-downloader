@@ -973,6 +973,16 @@ public:
             m_a.paquetes.append(p);
             r.paquetesInsertados.append(n.id);
         }
+        // T023.2: misma semantica que la columna SQLite (migracion 007).
+        const bool conPaquetes = std::any_of(m_a.paquetes.cbegin(), m_a.paquetes.cend(),
+                                             [&](const PaquetePersistido& p) { return p.solicitudMasivaId == a.solicitudId; });
+        if (a.conjuntoPaquetesVacio && !conPaquetes) {
+            if (!s->conjuntoPaquetesVacioConfirmadoEn) {
+                s->conjuntoPaquetesVacioConfirmadoEn = a.verificadaEn;
+            }
+        } else {
+            s->conjuntoPaquetesVacioConfirmadoEn.reset();
+        }
         if (a.vencerNoDescargados) {
             for (PaquetePersistido& p : m_a.paquetes) {
                 if (p.solicitudMasivaId == a.solicitudId && !p.eliminadoEn

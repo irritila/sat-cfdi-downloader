@@ -8,6 +8,13 @@
 //   1. lista completa de la solicitud ordenada por fecha (10,000 filas);
 //   2. busqueda por texto normalizado ("pena": 1,000 filas);
 //   3. busqueda por fragmento de UUID (1 fila).
+// T023.2 agrega el catalogo mensual (CatalogoMensualRepository::consultar,
+// deduplicado por UUID y con conteos por direccion y por mes del anio) sobre
+// los mismos 10,000 CFDI de UN perfil en UN mes (septiembre de 2026; la
+// solicitud es canonica del mes y esta vinculada a un lote guiado):
+//   4. lista mensual completa (10,000 filas);
+//   5. busqueda mensual por texto ("pena": 1,000 filas);
+//   6. busqueda mensual por fragmento de UUID (1 fila).
 // Imprime p50, p95 y maximo en ms. Criterio: p95 < 200 ms.
 // Datos sinteticos: RFC genericos del SAT, nombres y UUID inventados.
 
@@ -19,6 +26,7 @@
 #include "infrastructure/cfdi/xml/ParserCfdi.h"
 #include "infrastructure/persistence/sqlite/SqliteConnectionProvider.h"
 #include "infrastructure/persistence/sqlite/SqlitePersistencia.h"
+#include "ports/repositories/CatalogoMensualRepository.h"
 #include "ports/repositories/CfdiCatalogRepository.h"
 #include "ports/repositories/UnitOfWork.h"
 
@@ -45,7 +53,7 @@ constexpr int kPaquetes = 20;
 constexpr int kCfdiPorPaquete = 500;
 constexpr int kRepeticiones = 20;
 constexpr int kCalentamiento = 2;
-const QString kRfc = QStringLiteral("AAA010101AAA");
+const QString kRfc = QStringLiteral("XAXX010101000");
 
 QTextStream& salida()
 {
@@ -59,8 +67,9 @@ QByteArray xmlSintetico(int n)
     const QString nombre = n % 10 == 0 ? QStringLiteral("José Peña Hernández %1").arg(n % 50)
                                        : QStringLiteral("Proveedor Sintético %1").arg(n % 50);
     const QString uuid = QStringLiteral("B0000000-0000-4000-8000-%1").arg(n, 12, 10, QLatin1Char('0'));
-    const QString fecha = QDateTime(QDate(2026, 1, 1), QTime(0, 0), QTimeZone::UTC)
-                              .addSecs(qint64(n) * 3131)
+    // T023.2: todos en septiembre de 2026 (un mes: 30 d / 10,000 = 259 s).
+    const QString fecha = QDateTime(QDate(2026, 9, 1), QTime(0, 0), QTimeZone::UTC)
+                              .addSecs(qint64(n) * 259)
                               .toString(QStringLiteral("yyyy-MM-ddTHH:mm:ss"));
     const QString tipo = QStringList{QStringLiteral("I"), QStringLiteral("E"), QStringLiteral("P")}.at(n % 3);
     return QStringLiteral(
@@ -105,31 +114,58 @@ struct Medicion {
     qsizetype filas = 0;
 };
 
-Medicion medir(PersistenceDispatcher& dispatcher, CfdiCatalogRepository& catalogo, const SolicitudId& solicitud,
-               const QString& nombre, const FiltroListaCfdi& filtro)
+// Consulta medida: devuelve filas, o -1 ante error (ya impreso).
+using Consulta = std::function<qsizetype()>;
+
+Medicion medir(PersistenceDispatcher& dispatcher, const QString& nombre, const Consulta& consulta)
 {
     Medicion m;
     m.nombre = nombre;
     for (int i = 0; i < kCalentamiento + kRepeticiones; ++i) {
         QElapsedTimer reloj;
         reloj.start();
-        using R = Resultado<QList<CfdiListado>, ErrorPersistencia>;
-        QFuture<R> f = dispatcher.despachar<R>([&catalogo, solicitud, filtro] {
-            return catalogo.listarCfdi(solicitud, filtro);
-        });
+        QFuture<qsizetype> f = dispatcher.despachar<qsizetype>(consulta);
         f.waitForFinished();
         const double ms = double(reloj.nsecsElapsed()) / 1.0e6;
-        const R r = f.result();
-        if (!r.esExito()) {
-            salida() << "error de consulta: " << r.error().mensaje << Qt::endl;
+        const qsizetype filas = f.result();
+        if (filas < 0) {
+            m.ms.clear();
             return m;
         }
-        m.filas = r.valor().size();
+        m.filas = filas;
         if (i >= kCalentamiento) {
             m.ms.append(ms);
         }
     }
     return m;
+}
+
+Consulta porSolicitud(CfdiCatalogRepository& catalogo, const SolicitudId& solicitud, const FiltroListaCfdi& filtro)
+{
+    return [&catalogo, solicitud, filtro]() -> qsizetype {
+        const auto r = catalogo.listarCfdi(solicitud, filtro);
+        if (!r.esExito()) {
+            salida() << "error de consulta: " << r.error().mensaje << Qt::endl;
+            return -1;
+        }
+        return r.valor().size();
+    };
+}
+
+Consulta mensual(CatalogoMensualRepository& catalogo, const ConsultaCatalogoMensual& consulta)
+{
+    return [&catalogo, consulta]() -> qsizetype {
+        const auto r = catalogo.consultar(consulta);
+        if (!r.esExito()) {
+            salida() << "error de consulta mensual: " << r.error().mensaje << Qt::endl;
+            return -1;
+        }
+        if (r.valor().total != r.valor().cfdis.size() || !r.valor().conteos.porMes) {
+            salida() << "conteos incoherentes" << Qt::endl;
+            return -1;
+        }
+        return r.valor().cfdis.size();
+    };
 }
 
 } // namespace
@@ -152,6 +188,8 @@ int main(int argc, char* argv[])
     SqlitePersistencia persistencia(ruta);
     PersistenceDispatcher dispatcher;
     CfdiCatalogRepository& catalogo = persistencia.catalogoCfdi();
+    CatalogoMensualRepository& catalogoMensual = persistencia.catalogoMensual();
+    QString perfilId;
     UnitOfWork& uow = persistencia.unidadDeTrabajo();
     const SolicitudId solicitud = SolicitudId::generar();
 
@@ -166,6 +204,7 @@ int main(int argc, char* argv[])
                       }
                       QSqlDatabase db = conexion.valor();
                       const QString perfil = uuid::generarCanonico();
+                      perfilId = perfil;
                       const QString ahora = QStringLiteral("2026-10-11T12:00:00.000Z");
                       if (!sql(db, QStringLiteral("INSERT INTO perfil_sat (id, rfc, nombre, activo, creado_en, "
                                                   "actualizado_en) VALUES ('%1', '%2', 'Benchmark', 1, '%3', '%3')")
@@ -176,11 +215,21 @@ int main(int argc, char* argv[])
                                           "fecha_final_sat, dedup_key, estado_local, cod_estatus_solicitud, "
                                           "estado_solicitud_sat, creada_en, envio_iniciado_en, enviada_en, "
                                           "ultima_verificacion_en) VALUES ('%1', '%2', '%3', 'emitidos', "
-                                          "'SolicitaDescargaEmitidos', '%4', '%4', '2026-01-01T00:00:00', "
-                                          "'2026-12-31T23:59:59', '%5', 'Enviada', '5000', 'Terminada', '%6', '%6', "
+                                          "'SolicitaDescargaEmitidos', '%4', '%4', '2026-09-01T00:00:00', "
+                                          "'2026-09-30T23:59:59', '%5', 'Enviada', '5000', 'Terminada', '%6', '%6', "
                                           "'%6', '%6')")
                                           .arg(solicitud.texto(), perfil, solicitud.texto().toUpper(), kRfc,
                                                DedupKey::calcularV1("benchmark").texto(), ahora))) {
+                          return false;
+                      }
+                      // T023.2: la solicitud pertenece a un lote guiado del mes.
+                      const QString lote = uuid::generarCanonico();
+                      if (!sql(db, QStringLiteral("INSERT INTO lote_descarga_guiada VALUES ('%1', '%2', '2026-09', "
+                                                  "'%3')")
+                                       .arg(lote, perfil, ahora))
+                          || !sql(db, QStringLiteral("INSERT INTO lote_descarga_guiada_solicitud VALUES ('%1', '%2', "
+                                                     "'emitidos', '2026-09-01T00:00:00', '2026-09-30T23:59:59')")
+                                          .arg(lote, solicitud.texto()))) {
                           return false;
                       }
                       int n = 0;
@@ -228,19 +277,35 @@ int main(int argc, char* argv[])
     }
 
     QList<Medicion> mediciones;
-    mediciones.append(medir(dispatcher, catalogo, solicitud, QStringLiteral("lista por fecha (desc)"), {}));
+    mediciones.append(medir(dispatcher, QStringLiteral("lista por fecha (desc)"), porSolicitud(catalogo, solicitud, {})));
     FiltroListaCfdi pena;
     pena.texto = QStringLiteral("PEÑA");
-    mediciones.append(medir(dispatcher, catalogo, solicitud, QStringLiteral("busqueda texto \"PEÑA\""), pena));
+    mediciones.append(
+        medir(dispatcher, QStringLiteral("busqueda texto \"PEÑA\""), porSolicitud(catalogo, solicitud, pena)));
     FiltroListaCfdi uuid;
     uuid.texto = QStringLiteral("8000-000000004321");
-    mediciones.append(medir(dispatcher, catalogo, solicitud, QStringLiteral("busqueda UUID parcial"), uuid));
+    mediciones.append(medir(dispatcher, QStringLiteral("busqueda UUID parcial"), porSolicitud(catalogo, solicitud, uuid)));
+
+    // T023.2: catalogo mensual del perfil (deduplicado, conteos por direccion
+    // y por mes del anio incluidos en cada medicion).
+    ConsultaCatalogoMensual mes;
+    mes.perfil = *PerfilId::desdeTexto(perfilId);
+    mes.mes = *MesCalendario::crear(2026, 9);
+    mediciones.append(medir(dispatcher, QStringLiteral("mensual: lista del mes"), mensual(catalogoMensual, mes)));
+    ConsultaCatalogoMensual mesPena = mes;
+    mesPena.texto = QStringLiteral("PEÑA");
+    mediciones.append(
+        medir(dispatcher, QStringLiteral("mensual: busqueda texto \"PEÑA\""), mensual(catalogoMensual, mesPena)));
+    ConsultaCatalogoMensual mesUuid = mes;
+    mesUuid.texto = QStringLiteral("8000-000000004321");
+    mediciones.append(
+        medir(dispatcher, QStringLiteral("mensual: busqueda UUID parcial"), mensual(catalogoMensual, mesUuid)));
 
     dispatcher.despachar<void>(std::function<void()>([&persistencia] { persistencia.cerrarConexionDelHiloActual(); }));
     dispatcher.cerrar();
 
     QTextStream& out = salida();
-    out << "benchmark-cfdi (T015.2): " << kPaquetes << " paquetes x " << kCfdiPorPaquete << " = "
+    out << "benchmark-cfdi (T015.2, T023.2): " << kPaquetes << " paquetes x " << kCfdiPorPaquete << " = "
         << kPaquetes * kCfdiPorPaquete << " CFDI; " << kRepeticiones << " repeticiones en caliente ("
         << kCalentamiento << " de calentamiento)" << Qt::endl;
     out << "equipo: " << QSysInfo::prettyProductName() << " " << QSysInfo::currentCpuArchitecture()

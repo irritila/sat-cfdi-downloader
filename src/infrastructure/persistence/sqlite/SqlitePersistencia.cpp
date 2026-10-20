@@ -82,6 +82,8 @@ struct SqlitePersistencia::Impl {
         , credenciales(proveedor)
         , avisosVencimiento(proveedor)
         , catalogoCfdi(proveedor)
+        , catalogoMensual(proveedor)
+        , lotesGuiados(proveedor)
         , operaciones(proveedor)
         , unidadDeTrabajo(proveedor)
     {
@@ -98,6 +100,8 @@ struct SqlitePersistencia::Impl {
     SqliteCredencialSatRepository credenciales;
     SqliteAvisoVencimientoRepository avisosVencimiento;
     SqliteCfdiCatalogRepository catalogoCfdi;
+    SqliteCatalogoMensualRepository catalogoMensual;
+    SqliteLoteDescargaGuiadaRepository lotesGuiados;
     SqliteOperacionesSolicitudRepository operaciones;
     SqliteUnitOfWork unidadDeTrabajo;
 };
@@ -117,6 +121,8 @@ ConfiguracionAppRepository& SqlitePersistencia::configuracion() noexcept { retur
 CredencialSatRepository& SqlitePersistencia::credenciales() noexcept { return m_impl->credenciales; }
 AvisoVencimientoRepository& SqlitePersistencia::avisosVencimiento() noexcept { return m_impl->avisosVencimiento; }
 CfdiCatalogRepository& SqlitePersistencia::catalogoCfdi() noexcept { return m_impl->catalogoCfdi; }
+CatalogoMensualRepository& SqlitePersistencia::catalogoMensual() noexcept { return m_impl->catalogoMensual; }
+LoteDescargaGuiadaRepository& SqlitePersistencia::lotesDescargaGuiada() noexcept { return m_impl->lotesGuiados; }
 OperacionesSolicitudRepository& SqlitePersistencia::operaciones() noexcept { return m_impl->operaciones; }
 UnitOfWork& SqlitePersistencia::unidadDeTrabajo() noexcept { return m_impl->unidadDeTrabajo; }
 

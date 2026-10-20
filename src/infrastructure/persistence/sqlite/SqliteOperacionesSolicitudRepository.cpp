@@ -577,7 +577,11 @@ SqliteOperacionesSolicitudRepository::aplicarVerificacion(const AplicacionVerifi
                                "numero_cfdi = :numero, ultima_verificacion_en = :verificada, "
                                "siguiente_verificacion_en = :siguiente, verificaciones_sin_cambio = :sin_cambio, "
                                "ultimo_error = NULL, ultima_clave_falla_verificacion = NULL, "
-                               "fallas_verificacion_iguales = 0 "
+                               "fallas_verificacion_iguales = 0, "
+                               // T023.2: conjunto vacio confirmado solo si no hay paquetes registrados.
+                               "conjunto_paquetes_vacio_confirmado_en = CASE WHEN :vacio = 1 AND NOT EXISTS "
+                               "(SELECT 1 FROM paquete_solicitud WHERE solicitud_masiva_id = :id_paquetes) "
+                               "THEN coalesce(conjunto_paquetes_vacio_confirmado_en, :confirmado) ELSE NULL END "
                                "WHERE id = :id AND eliminado_en IS NULL AND estado_local = 'Enviada'"),
                 {{":estado", sqlite::texto(claveEstable(a.estadoSolicitudSat))},
                  {":codigo", sqlite::textoOpcional(a.codigoEstadoSolicitud)},
@@ -586,6 +590,9 @@ SqliteOperacionesSolicitudRepository::aplicarVerificacion(const AplicacionVerifi
                  {":verificada", sqlite::instante(a.verificadaEn)},
                  {":siguiente", sqlite::instanteOpcional(a.siguienteVerificacionEn)},
                  {":sin_cambio", sqlite::entero(a.verificacionesSinCambio)},
+                 {":vacio", sqlite::booleano(a.conjuntoPaquetesVacio)},
+                 {":id_paquetes", solicitud},
+                 {":confirmado", sqlite::instante(a.verificadaEn)},
                  {":id", solicitud}},
                 kContexto);
             !r) {

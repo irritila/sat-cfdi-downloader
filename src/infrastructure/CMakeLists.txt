@@ -22,6 +22,11 @@ qt_add_library(satcfdi_infrastructure STATIC
     persistence/sqlite/SqliteCredencialSatRepository.cpp
     # T015.2: catalogo de CFDI (migracion 006).
     persistence/sqlite/SqliteCfdiCatalogRepository.cpp
+    persistence/sqlite/SqliteCfdiFilas.h
+    persistence/sqlite/SqliteCfdiFilas.cpp
+    # T023.2: catalogo mensual y lotes guiados (migracion 007).
+    persistence/sqlite/SqliteCatalogoMensualRepository.cpp
+    persistence/sqlite/SqliteLoteDescargaGuiadaRepository.cpp
     persistence/sqlite/SqliteFilas.h
     persistence/sqlite/SqliteFilas.cpp
     persistence/sqlite/SqliteOperacionesConsultas.h
@@ -41,6 +46,7 @@ qt_add_resources(satcfdi_infrastructure "satcfdi_migrations"
         persistence/migrations/004_reintento_paquete.sql
         persistence/migrations/005_aviso_vencimiento_efirma.sql
         persistence/migrations/006_indice_cfdi.sql
+        persistence/migrations/007_catalogo_mensual.sql
 )
 
 target_include_directories(satcfdi_infrastructure PUBLIC

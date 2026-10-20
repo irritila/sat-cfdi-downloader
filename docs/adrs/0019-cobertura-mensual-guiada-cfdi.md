@@ -4,6 +4,8 @@
 
 Accepted
 
+Modificado por ADR 0020: huecos de cobertura y causas superadas.
+
 ## Contexto
 
 T023 cambia el recorrido principal de la aplicacion: el usuario consulta las

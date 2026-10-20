@@ -57,6 +57,13 @@ qt_add_library(satcfdi_domain STATIC
     # T015.2: estado de indice, huella y texto de busqueda.
     cfdi/IndiceCfdi.h
     cfdi/IndiceCfdi.cpp
+    # T023.2: mes calendario (Centro de Mexico) y regla de cobertura mensual.
+    cfdi/MesCalendario.h
+    cfdi/MesCalendario.cpp
+    cfdi/CoberturaMensual.h
+    cfdi/CoberturaMensual.cpp
+    cfdi/LoteDescargaGuiada.h
+    cfdi/LoteDescargaGuiada.cpp
 )
 
 # Convencion de includes: rutas relativas a src/, por ejemplo

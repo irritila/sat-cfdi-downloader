@@ -21,7 +21,8 @@ const QString kColumnasSolicitudTexto = QStringLiteral(
     "estado_solicitud_sat, codigo_estado_solicitud, mensaje_verificacion_sat, numero_cfdi, "
     "creada_en, envio_iniciado_en, enviada_en, ultima_verificacion_en, "
     "siguiente_verificacion_en, verificaciones_sin_cambio, ultimo_error, "
-    "verificacion_pendiente, descarga_pendiente, accion_pendiente_en, eliminado_en");
+    "verificacion_pendiente, descarga_pendiente, accion_pendiente_en, eliminado_en, "
+    "conjunto_paquetes_vacio_confirmado_en");
 
 QVariant valor(const QSqlQuery& q, const char* columna)
 {
@@ -124,6 +125,11 @@ Resultado<SolicitudPersistida, ErrorPersistencia> leerSolicitud(const QSqlQuery&
     }
     if (!sqlite::leerInstanteOpcional(valor(q, "eliminado_en"), s.eliminadoEn)) {
         return ilegible("eliminado_en");
+    }
+    // T023.2 (migracion 007).
+    if (!sqlite::leerInstanteOpcional(valor(q, "conjunto_paquetes_vacio_confirmado_en"),
+                                      s.conjuntoPaquetesVacioConfirmadoEn)) {
+        return ilegible("conjunto_paquetes_vacio_confirmado_en");
     }
     return R::exito(std::move(s));
 }

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "ports/repositories/AvisoVencimientoRepository.h"
+#include "ports/repositories/CatalogoMensualRepository.h"
+#include "ports/repositories/LoteDescargaGuiadaRepository.h"
 #include "ports/repositories/CfdiCatalogRepository.h"
 #include "ports/repositories/ConfiguracionAppRepository.h"
 #include "ports/repositories/CredencialSatRepository.h"
@@ -121,6 +123,34 @@ public:
                                                                const FiltroListaCfdi& filtro) override;
     Resultado<ResumenIndiceSolicitud, ErrorPersistencia> resumirSolicitud(const SolicitudId& solicitud,
                                                                           int versionParser) override;
+
+private:
+    SqliteConnectionProvider& m_proveedor;
+};
+
+// T023.2: catalogo mensual deduplicado y evidencia de cobertura (migraciones
+// 006 y 007). Solo lectura; hilo del llamador (tareas del dispatcher).
+class SqliteCatalogoMensualRepository final : public CatalogoMensualRepository {
+public:
+    explicit SqliteCatalogoMensualRepository(SqliteConnectionProvider& proveedor);
+
+    Resultado<CatalogoMensual, ErrorPersistencia> consultar(const ConsultaCatalogoMensual& consulta) override;
+    Resultado<QList<EvidenciaSolicitudMensual>, ErrorPersistencia>
+    leerEvidencia(const PerfilId& perfil, MesCalendario mes, int versionParser) override;
+
+private:
+    SqliteConnectionProvider& m_proveedor;
+};
+
+// T023.2: lotes de descarga guiada (migracion 007). insertar exige
+// SqliteUnitOfWork activo y revalida perfil y solicitudes en esa transaccion.
+class SqliteLoteDescargaGuiadaRepository final : public LoteDescargaGuiadaRepository {
+public:
+    explicit SqliteLoteDescargaGuiadaRepository(SqliteConnectionProvider& proveedor);
+
+    Resultado<Exito, ErrorPersistencia> insertar(const NuevoLoteGuiado& lote) override;
+    Resultado<QList<LoteGuiado>, ErrorPersistencia> listar(const PerfilId& perfil,
+                                                           const std::optional<MesCalendario>& mes) override;
 
 private:
     SqliteConnectionProvider& m_proveedor;

@@ -662,6 +662,8 @@ struct OperacionExecutor::Impl {
                     PaqueteNuevo{uuid::generarCanonico(), limpio, ahora, politicas::vencimientoEstimado(ahora)});
             }
         }
+        // T023.2: Terminada con conjunto de IdPaquete vacio (ADR 0019).
+        a.conjuntoPaquetesVacio = v.estadoSolicitudSat == EstadoSolicitudSat::Terminada && vistos.isEmpty();
         auto agenda = politicas::agendaTrasExito(racha.verificacionesSinCambio, !escalaresIguales, v.estadoSolicitudSat, ahora);
         a.siguienteVerificacionEn = agenda.siguienteVerificacionEn;
         a.verificacionesSinCambio = agenda.verificacionesSinCambio;

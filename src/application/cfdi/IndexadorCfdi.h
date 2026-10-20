@@ -1,6 +1,7 @@
 #pragma once
 
 #include "application/cfdi/CalculoIndicePaquete.h"
+#include "application/cfdi/ProgresoIndexacionCfdi.h"
 #include "application/persistence/PuertosPersistencia.h"
 #include "domain/solicitudes/SolicitudId.h"
 #include "ports/repositories/CfdiCatalogRepository.h"
@@ -69,7 +70,7 @@ struct PuertosIndexadorCfdi {
 // - indiceCambiado(id): el indice de la solicitud cambio; se emite a lo sumo
 //   una vez por solicitud y trabajo, al terminar sus paquetes.
 // - ocupadoCambiado(bool): hay o no trabajo en curso o en cola.
-class IndexadorCfdi final : public QObject {
+class IndexadorCfdi final : public QObject, public ProgresoIndexacionCfdi {
     Q_OBJECT
 
 public:
@@ -85,7 +86,7 @@ public:
     // (b)/(c). El future se completa cuando termina el trabajo que cubre la
     // solicitud (o al detener: cancelado). Tras detener(): future cancelado.
     QFuture<void> sincronizarSolicitud(const SolicitudId& solicitud);
-    QFuture<void> revisarSolicitud(const SolicitudId& solicitud) { return sincronizarSolicitud(solicitud); }
+    QFuture<void> revisarSolicitud(const SolicitudId& solicitud) override { return sincronizarSolicitud(solicitud); }
 
     // Salida (no bloquea). Idempotente.
     void detener();
@@ -93,8 +94,8 @@ public:
     bool ocupado() const noexcept { return m_actual.has_value() || !m_cola.isEmpty(); }
     bool detenido() const noexcept { return m_detenido; }
     // Hay trabajo en curso o en cola que alcanza a la solicitud.
-    bool cubre(const SolicitudId& solicitud) const;
-    int versionParser() const noexcept { return m_puertos.versionParser; }
+    bool cubre(const SolicitudId& solicitud) const override;
+    int versionParser() const noexcept override { return m_puertos.versionParser; }
 
     // Para pruebas y Q_ASSERT.
     const QThread* hilo() const noexcept { return &m_hilo; }

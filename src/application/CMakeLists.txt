@@ -15,6 +15,10 @@ qt_add_library(satcfdi_application STATIC
     cfdi/IndexadorCfdi.cpp
     cfdi/CatalogoCfdiService.h
     cfdi/CatalogoCfdiService.cpp
+    # T023.2: catalogo mensual, disponibilidad del mes y lotes guiados.
+    cfdi/ProgresoIndexacionCfdi.h
+    cfdi/CatalogoMensualCfdiService.h
+    cfdi/CatalogoMensualCfdiService.cpp
     # T015.4: previsualizacion PDF (hilo propio; cache y render por puertos).
     cfdi/PrevisualizacionCfdiService.h
     cfdi/PrevisualizacionCfdiService.cpp

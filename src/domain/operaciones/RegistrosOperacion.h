@@ -112,6 +112,12 @@ struct AplicacionVerificacion {
     int verificacionesSinCambio = 0;
     QList<PaqueteNuevo> paquetesNuevos;
     bool vencerNoDescargados = false;
+    // T023.2: la verificacion es Terminada y SAT devolvio un conjunto VACIO de
+    // IdPaquete. En la misma transaccion fija
+    // conjunto_paquetes_vacio_confirmado_en (si la solicitud no tiene
+    // paquetes registrados; conserva el primer instante). En otro caso la
+    // columna queda NULL.
+    bool conjuntoPaquetesVacio = false;
 };
 
 struct ResultadoAplicacionVerificacion {

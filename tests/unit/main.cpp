@@ -24,6 +24,8 @@
 #include "TestParserCfdi.h"
 #include "TestIndiceCfdi.h"
 #include "TestPrevisualizacionCfdi.h"
+#include "TestCoberturaMensual.h"
+#include "TestCatalogoMensualService.h"
 
 #include <QCoreApplication>
 #include <QTest>
@@ -60,5 +62,7 @@ int main(int argc, char* argv[])
     ejecutar(TestParserCfdi());               // T015.1
     ejecutar(TestIndiceCfdi());               // T015.2
     ejecutar(TestPrevisualizacionCfdi());     // T015.4
+    ejecutar(TestCoberturaMensual());         // T023.2
+    ejecutar(TestCatalogoMensualService());   // T023.2
     return fallos == 0 ? 0 : 1;
 }

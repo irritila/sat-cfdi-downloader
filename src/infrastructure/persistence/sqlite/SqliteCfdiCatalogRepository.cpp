@@ -1,3 +1,4 @@
+#include "infrastructure/persistence/sqlite/SqliteCfdiFilas.h"
 #include "infrastructure/persistence/sqlite/SqliteConnectionProvider.h"
 #include "infrastructure/persistence/sqlite/SqliteRepositorios.h"
 #include "infrastructure/persistence/sqlite/SqliteSoporte.h"
@@ -16,10 +17,14 @@
 
 namespace satcfdi {
 
+using sqlite::kColumnasCfdi;
+using sqlite::leerCfdi;
+using sqlite::leerTexto;
+using sqlite::patronLike;
+
 namespace {
 
 constexpr QStringView kTablaIndice = u"indice_cfdi_paquete";
-constexpr QStringView kTablaCfdi = u"cfdi_indexado";
 
 QLatin1StringView claveMotivo(MotivoOmision motivo)
 {
@@ -84,35 +89,6 @@ QVariant camposJson(const QStringList& campos)
     return QString::fromUtf8(QJsonDocument(QJsonArray::fromStringList(campos)).toJson(QJsonDocument::Compact));
 }
 
-QString leerTexto(const QVariant& valor)
-{
-    return valor.isNull() ? QString() : valor.toString();
-}
-
-std::optional<ImporteCfdi> leerImporte(const QVariant& valor)
-{
-    if (valor.isNull()) {
-        return std::nullopt;
-    }
-    return ImporteCfdi::desdeTexto(valor.toString());
-}
-
-// Escapa comodines de LIKE (ESCAPE '\').
-QString patronLike(const QString& texto)
-{
-    QString escapado;
-    escapado.reserve(texto.size() + 2);
-    escapado.append(QLatin1Char('%'));
-    for (const QChar c : texto) {
-        if (c == QLatin1Char('%') || c == QLatin1Char('_') || c == QLatin1Char('\\')) {
-            escapado.append(QLatin1Char('\\'));
-        }
-        escapado.append(c);
-    }
-    escapado.append(QLatin1Char('%'));
-    return escapado;
-}
-
 // Coherencia previa a escribir (los CHECK de 006 la garantizan igual).
 bool indiceCoherente(const IndicePaquete& i)
 {
@@ -125,63 +101,6 @@ bool indiceCoherente(const IndicePaquete& i)
         return false;
     }
     return i.versionParser > 0 && !i.paqueteId.isEmpty();
-}
-
-const QString kColumnasCfdi = QStringLiteral(
-    "paquete_solicitud_id, posicion, estado_parseo, version, tipo_comprobante, fecha, serie, folio, "
-    "rfc_emisor, nombre_emisor, regimen_emisor, rfc_receptor, nombre_receptor, regimen_receptor, uso_cfdi, "
-    "domicilio_receptor, lugar_expedicion, subtotal, descuento, total, moneda, tipo_cambio, metodo_pago, "
-    "forma_pago, uuid, complementos_json, campos_invalidos_json");
-
-Resultado<CfdiListado, ErrorPersistencia> leerCfdi(const QSqlQuery& q)
-{
-    using R = Resultado<CfdiListado, ErrorPersistencia>;
-    CfdiListado c;
-    c.paqueteId = q.value(0).toString();
-    c.posicion = q.value(1).toInt();
-    const auto estado = estadoParseoDesdeClave(q.value(2).toString());
-    if (!estado) {
-        return R::fallo(sqlite::filaIlegible(kTablaCfdi, u"estado_parseo"));
-    }
-    ResumenCfdi& r = c.resumen;
-    r.estado = *estado;
-    r.version = leerTexto(q.value(3));
-    r.tipo = tipoComprobanteDesdeTexto(leerTexto(q.value(4)));
-    r.fecha = leerTexto(q.value(5));
-    r.serie = leerTexto(q.value(6));
-    r.folio = leerTexto(q.value(7));
-    r.emisor.rfc = leerTexto(q.value(8));
-    r.emisor.nombre = leerTexto(q.value(9));
-    r.emisor.regimenFiscal = leerTexto(q.value(10));
-    r.receptor.rfc = leerTexto(q.value(11));
-    r.receptor.nombre = leerTexto(q.value(12));
-    r.receptor.regimenFiscal = leerTexto(q.value(13));
-    r.receptor.usoCfdi = leerTexto(q.value(14));
-    r.receptor.domicilioFiscal = leerTexto(q.value(15));
-    r.lugarExpedicion = leerTexto(q.value(16));
-    r.subtotal = leerImporte(q.value(17));
-    r.descuento = leerImporte(q.value(18));
-    r.total = leerImporte(q.value(19));
-    r.moneda = leerTexto(q.value(20));
-    r.tipoCambio = leerImporte(q.value(21));
-    r.metodoPago = leerTexto(q.value(22));
-    r.formaPago = leerTexto(q.value(23));
-    r.uuid = leerTexto(q.value(24));
-    if (!q.value(25).isNull()) {
-        const QJsonArray arreglo = QJsonDocument::fromJson(q.value(25).toString().toUtf8()).array();
-        for (const QJsonValue& v : arreglo) {
-            const QJsonObject o = v.toObject();
-            r.complementosNoRepresentados.append(
-                {o.value(QStringLiteral("ns")).toString(), o.value(QStringLiteral("nombre")).toString()});
-        }
-    }
-    if (!q.value(26).isNull()) {
-        const QJsonArray arreglo = QJsonDocument::fromJson(q.value(26).toString().toUtf8()).array();
-        for (const QJsonValue& v : arreglo) {
-            r.camposInvalidos.append(v.toString());
-        }
-    }
-    return R::exito(std::move(c));
 }
 
 } // namespace
