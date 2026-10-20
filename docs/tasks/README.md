@@ -48,6 +48,13 @@ Ejemplo: `T001-modelo-fisico-sqlite.md`.
 | [T020](T020-logo.md) | Pendiente | Logo e iconos en SVG |
 | [T021](T021-manual-capturas-al-dia.md) | Pendiente | Manual y capturas al dia con la app |
 | [T022](T022-intermitencia-pruebas-graficas-video.md) | Pendiente | Intermitencia de pruebas graficas del video |
+| [T023](T023-rediseno-ui-caso-de-uso.md) | Pendiente | Rediseno de la UI centrado en las facturas del perfil fiscal (epica) |
+| [T023.1](T023.1-prototipo-y-adr-cobertura.md) | Completada | Prototipo navegable y ADR de cobertura mensual |
+| [T023.2](T023.2-catalogo-mensual-y-disponibilidad.md) | Pendiente | Catalogo mensual y regla de disponibilidad |
+| [T023.3](T023.3-descarga-guiada.md) | Pendiente | Descarga guiada por mes y tramos |
+| [T023.4](T023.4-pantalla-facturas.md) | Pendiente | Pantalla Facturas |
+| [T023.5](T023.5-historial-diagnostico-notificaciones.md) | Pendiente | Historial, diagnostico, notificaciones y menu bar |
+| [T024](T024-vocabulario-y-materiales-flujo-facturas.md) | Pendiente | Vocabulario y materiales del flujo centrado en facturas |
 
 ## Estados
 

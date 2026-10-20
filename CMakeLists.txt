@@ -224,3 +224,11 @@ option(SATCFDI_BUILD_VIDEO_TUTORIAL "Compilar la herramienta del video tutorial 
 if(SATCFDI_BUILD_VIDEO_TUTORIAL)
     add_subdirectory(tools/video-tutorial)
 endif()
+
+# T023.1 (D5): prototipo navegable QML del recorrido Facturas con view models
+# falsos y datos sinteticos (prototypes/T023). Fuera de la app y de ctest.
+# Target satcfdi_prototipo_t023. Va al final: usa _satcfdi_dependencias_link.
+option(SATCFDI_BUILD_PROTOTIPO_T023 "Compilar el prototipo navegable de T023 (prototypes/T023)" OFF)
+if(SATCFDI_BUILD_PROTOTIPO_T023)
+    add_subdirectory(prototypes/T023)
+endif()
