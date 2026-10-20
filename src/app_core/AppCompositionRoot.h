@@ -24,6 +24,8 @@ class AlmacenPdfCfdi;
 class CfdiPdfRenderer;
 class PrevisualizacionCfdiService;
 class CatalogoCfdiService;
+class CatalogoMensualCfdiService;
+class DescargaGuiadaService;
 class CfdiArchiveReader;
 class IndexadorCfdi;
 class AccesoFinder;
@@ -191,6 +193,9 @@ public:
     // T015.2: indexador (hilo propio) y API de consulta del indice para T015.3.
     IndexadorCfdi& indexadorCfdi() const { return *m_indexadorCfdi; }
     CatalogoCfdiService& catalogoCfdi() const { return *m_catalogoCfdi; }
+    // T023.2/T023.3: catalogo mensual y descarga guiada (sin UI aun: T023.4).
+    CatalogoMensualCfdiService& catalogoMensual() const { return *m_catalogoMensual; }
+    DescargaGuiadaService& descargaGuiada() const { return *m_descargaGuiada; }
     // T015.4: previsualizacion PDF (hilo propio) y sus directorios efectivos.
     PrevisualizacionCfdiService& previsualizacionCfdi() const { return *m_previsualizacionCfdi; }
     const QString& directorioCachePdf() const noexcept { return m_directorioCachePdf; }
@@ -229,6 +234,8 @@ private:
     std::unique_ptr<ArchivosZipCfdi> m_archivosCfdi;
     std::unique_ptr<IndexadorCfdi> m_indexadorCfdi;
     std::unique_ptr<CatalogoCfdiService> m_catalogoCfdi;
+    std::unique_ptr<CatalogoMensualCfdiService> m_catalogoMensual;
+    std::unique_ptr<DescargaGuiadaService> m_descargaGuiada;
     // T015.3: ConsultaCatalogoCfdi de la presentacion sobre m_catalogoCfdi
     // (se destruye antes que el, despues de los view models).
     std::unique_ptr<AdaptadorCatalogoCfdi> m_adaptadorCatalogo;

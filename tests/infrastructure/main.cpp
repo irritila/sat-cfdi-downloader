@@ -1,5 +1,6 @@
 #include "TestSqliteCatalogoCfdi.h"
 #include "TestSqliteCatalogoMensual.h"
+#include "TestDescargaGuiadaService.h"
 #include "TestSqliteCentinelas.h"
 #include "TestSqliteConexion.h"
 #include "TestSqliteConfiguracion.h"
@@ -34,6 +35,7 @@ int main(int argc, char* argv[])
     ejecutar(TestSqliteOperaciones()); // T007
     ejecutar(TestSqliteCatalogoCfdi()); // T015.2
     ejecutar(TestSqliteCatalogoMensual()); // T023.2
+    ejecutar(TestDescargaGuiadaService()); // T023.3
     ejecutar(TestPackageStorageFs());  // T008
     ejecutar(TestPackageStorageRevelable()); // T009.1
     return fallos == 0 ? 0 : 1;

@@ -19,6 +19,9 @@ qt_add_library(satcfdi_application STATIC
     cfdi/ProgresoIndexacionCfdi.h
     cfdi/CatalogoMensualCfdiService.h
     cfdi/CatalogoMensualCfdiService.cpp
+    # T023.3: descarga guiada por mes y tramos.
+    cfdi/DescargaGuiadaService.h
+    cfdi/DescargaGuiadaService.cpp
     # T015.4: previsualizacion PDF (hilo propio; cache y render por puertos).
     cfdi/PrevisualizacionCfdiService.h
     cfdi/PrevisualizacionCfdiService.cpp
@@ -80,6 +83,9 @@ qt_add_library(satcfdi_application STATIC
     requests/SolicitudDtos.h
     requests/PreparacionSolicitud.h
     requests/PreparacionSolicitud.cpp
+    # T023.3: nucleo transaccional de crearLocal compartido con la descarga guiada.
+    requests/CreacionSolicitudLocal.h
+    requests/CreacionSolicitudLocal.cpp
     requests/SolicitudesService.h
     requests/SolicitudesServicePersistido.h
     requests/SolicitudesServicePersistido.cpp

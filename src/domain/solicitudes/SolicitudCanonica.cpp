@@ -5,6 +5,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonValue>
+#include <QTime>
 
 #include <algorithm>
 
@@ -148,6 +149,55 @@ SolicitudCanonica::normalizar(const EntradaSolicitudCanonica& entrada)
     }
     c.m_dedupKey = DedupKey::calcularV1(c.serializacionCanonicaV1());
     return Resultado<SolicitudCanonica, QList<ErrorSolicitudCanonica>>::exito(std::move(c));
+}
+
+Resultado<SolicitudCanonica, QList<ErrorSolicitudCanonica>>
+SolicitudCanonica::normalizarTramo(TipoDescarga tipo, const QString& rfcPerfil, const QString& fechaInicialSat,
+                                   const QString& fechaFinalSat)
+{
+    using R = Resultado<SolicitudCanonica, QList<ErrorSolicitudCanonica>>;
+    // Formato exacto: fecha civil y hora validas, sin zona ni fraccion.
+    auto valida = [](const QString& t) {
+        return t.size() == 19 && t.at(10) == u'T'
+               && QDate::fromString(t.left(10), u"yyyy-MM-dd").isValid()
+               && QTime::fromString(t.mid(11), u"HH:mm:ss").isValid();
+    };
+    QList<ErrorSolicitudCanonica> errores;
+    if (!valida(fechaInicialSat)) {
+        errores.append({Codigo::FechaInicialRequerida, QStringLiteral("fecha_inicial_sat"),
+                        QStringLiteral("La fecha inicial del tramo no es valida.")});
+    }
+    if (!valida(fechaFinalSat)) {
+        errores.append({Codigo::FechaFinalRequerida, QStringLiteral("fecha_final_sat"),
+                        QStringLiteral("La fecha final del tramo no es valida.")});
+    }
+    if (errores.isEmpty() && fechaFinalSat < fechaInicialSat) {
+        errores.append({Codigo::RangoFechasInvalido, QStringLiteral("fecha_final_sat"),
+                        QStringLiteral("El tramo termina antes de empezar.")});
+    }
+    // Reutiliza normalizar() para RFC y mapeo de direccion (dias completos
+    // provisionales) y despues fija el tramo exacto y la clave.
+    EntradaSolicitudCanonica entrada;
+    entrada.tipoDescarga = tipo;
+    entrada.rfcPerfil = rfcPerfil;
+    entrada.fechaInicial = QDate::fromString(fechaInicialSat.left(10), u"yyyy-MM-dd");
+    entrada.fechaFinal = QDate::fromString(fechaFinalSat.left(10), u"yyyy-MM-dd");
+    auto base = normalizar(entrada);
+    if (!base) {
+        for (const ErrorSolicitudCanonica& e : base.error()) {
+            if (e.codigo == Codigo::RfcSolicitanteInvalido) {
+                errores.prepend(e);
+            }
+        }
+    }
+    if (!errores.isEmpty()) {
+        return R::fallo(std::move(errores));
+    }
+    SolicitudCanonica c = std::move(base).valor();
+    c.m_fechaInicialSat = fechaInicialSat;
+    c.m_fechaFinalSat = fechaFinalSat;
+    c.m_dedupKey = DedupKey::calcularV1(c.serializacionCanonicaV1());
+    return R::exito(std::move(c));
 }
 
 std::optional<QString> SolicitudCanonica::rfcReceptoresJson() const

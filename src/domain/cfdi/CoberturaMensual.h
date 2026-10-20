@@ -111,6 +111,9 @@ struct HuecoCobertura {
     // Solicitudes en curso cuyo tramo intersecta el hueco: T023.3 las
     // reutiliza en lugar de crear una solicitud solapada.
     QList<SolicitudId> reservadoPor;
+    // Segmentos maximos del hueco que no intersectan ninguna reserva (todo
+    // el hueco si no hay reservas): lo que T023.3 puede pedir.
+    QList<TramoMensual> libres;
 
     friend bool operator==(const HuecoCobertura&, const HuecoCobertura&) = default;
 };
@@ -136,6 +139,12 @@ struct CoberturaDireccion {
     // Solicitudes canonicas en curso (Preparando) y sus tramos reservados.
     QList<SolicitudId> solicitudesEnCurso;
     QList<TramoEnCurso> enCurso;
+    // Solicitudes en curso que siguen en Creada (sin envio iniciado).
+    QList<SolicitudId> sinEnviar;
+    // La union de tramos acreditados y reservados en curso cubre
+    // contiguamente desde el inicio del mes hasta la frontera: no hay nada
+    // nuevo que pedir mientras ese trabajo termina (D7, ADR 0020).
+    bool alcanzaFronteraConReservas = false;
     // Solicitudes que acreditan cobertura (contigua o no).
     QList<SolicitudId> solicitudesAcreditadas;
 };

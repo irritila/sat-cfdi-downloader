@@ -23,6 +23,8 @@ qt_add_executable(satcfdi_integration_tests
     TestPrevisualizacionCfdi.cpp
     # T019: raiz efectiva (migrada o vieja por conflicto) en el root real.
     TestRaizPaquetesMigrada.cpp
+    # T023.3: descarga guiada con el root real y SAT simulado.
+    TestDescargaGuiada.cpp
     ../fakes/LectorCfdiCompuerta.h
     ../fakes/ZipCfdiSintetico.h
     ../fakes/FakeSatGateway.h

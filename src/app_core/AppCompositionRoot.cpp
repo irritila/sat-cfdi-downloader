@@ -5,6 +5,8 @@
 #include "IntegracionWorker.h"
 #include "ProgramadorQt.h"
 #include "SingleInstanceCoordinator.h"
+#include "application/cfdi/CatalogoMensualCfdiService.h"
+#include "application/cfdi/DescargaGuiadaService.h"
 #include "application/cfdi/CatalogoCfdiService.h"
 #include "application/cfdi/IndexadorCfdi.h"
 #include "application/cfdi/PrevisualizacionCfdiService.h"
@@ -287,6 +289,31 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
                                            reloj};
         m_indexadorCfdi = std::make_unique<IndexadorCfdi>(std::move(puertosIndice));
         m_catalogoCfdi = std::make_unique<CatalogoCfdiService>(*m_dispatcher, p.catalogoCfdi(), *m_indexadorCfdi);
+        // T023.2/T023.3: flujo mensual guiado (catalogo y disponibilidad del
+        // mes; descarga guiada). Cableado minimo: gate de e.firma por el
+        // ejecutor (D9) y envio por el worker (solo encola: el worker no crea
+        // solicitudes).
+        m_catalogoMensual = std::make_unique<CatalogoMensualCfdiService>(
+            *m_dispatcher, p.catalogoMensual(), p.lotesDescargaGuiada(), *m_indexadorCfdi, reloj);
+        OperacionExecutor* ejecutor = m_ejecutor.get();
+        WorkerLocal* worker = m_worker.get();
+        m_descargaGuiada = std::make_unique<DescargaGuiadaService>(PuertosDescargaGuiada{
+            *m_dispatcher, puertos, p.catalogoMensual(), p.lotesDescargaGuiada(), *m_indexadorCfdi,
+            [ejecutor](const PerfilId& perfil) {
+                return ejecutor->consultarCredenciales({perfil}).then(
+                    [perfil](const QList<std::pair<PerfilId, EstadoCredencial>>& estados) {
+                        for (const auto& [id, estado] : estados) {
+                            if (id == perfil) {
+                                return std::optional(estado);
+                            }
+                        }
+                        return std::optional<EstadoCredencial>();
+                    });
+            },
+            [worker](const SolicitudId& id) { worker->enviar(id); }, reloj});
+        SolicitudesService* listaSolicitudes = m_solicitudesService.get();
+        QObject::connect(m_descargaGuiada.get(), &DescargaGuiadaService::mesActualizado, listaSolicitudes,
+                         [listaSolicitudes] { emit listaSolicitudes->listaCambiada(); });
         // (b) Tras cada commit del ejecutor (incluida la descarga de un
         // paquete) se sincroniza el indice de esa solicitud.
         IndexadorCfdi* indexador = m_indexadorCfdi.get();
@@ -429,6 +456,8 @@ AppCompositionRoot::~AppCompositionRoot()
     m_renderizadorPdf.reset();
     m_archivosPdf.reset();
     m_lectorPdf.reset();
+    m_descargaGuiada.reset();  // T023.3: antes que indexador, worker, ejecutor y dispatcher
+    m_catalogoMensual.reset(); // T023.2
     m_catalogoCfdi.reset();
     m_indexadorCfdi.reset();
     m_archivosCfdi.reset();

@@ -26,6 +26,7 @@
 #include "TestPrevisualizacionCfdi.h"
 #include "TestCoberturaMensual.h"
 #include "TestCatalogoMensualService.h"
+#include "TestPlanDescargaGuiada.h"
 
 #include <QCoreApplication>
 #include <QTest>
@@ -64,5 +65,6 @@ int main(int argc, char* argv[])
     ejecutar(TestPrevisualizacionCfdi());     // T015.4
     ejecutar(TestCoberturaMensual());         // T023.2
     ejecutar(TestCatalogoMensualService());   // T023.2
+    ejecutar(TestPlanDescargaGuiada());       // T023.3
     return fallos == 0 ? 0 : 1;
 }

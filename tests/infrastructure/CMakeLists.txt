@@ -29,6 +29,9 @@ qt_add_executable(satcfdi_infrastructure_tests
     # T023.2: migracion 007, lotes guiados, evidencia y catalogo mensual.
     TestSqliteCatalogoMensual.h
     TestSqliteCatalogoMensual.cpp
+    # T023.3: descarga guiada sobre SQLite real.
+    TestDescargaGuiadaService.h
+    TestDescargaGuiadaService.cpp
     TestPackageStorageFs.h
     TestPackageStorageFs.cpp
     TestPackageStorageRevelable.h

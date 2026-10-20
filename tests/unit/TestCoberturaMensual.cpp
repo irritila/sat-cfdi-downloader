@@ -607,6 +607,8 @@ void TestCoberturaMensual::huecosMesEnCursoYReservaEnCurso()
                                                {"2026-09-21T00:00:00", "2026-09-30T23:59:59"}}));
     QVERIFY(rc.emitidos.huecos.at(0).reservadoPor.isEmpty());
     QCOMPARE(rc.emitidos.huecos.at(1).reservadoPor, QList<SolicitudId>{enCurso.solicitud.id});
+    QCOMPARE(rc.emitidos.huecos.at(0).libres, QList<TramoMensual>{rc.emitidos.huecos.at(0).tramo});
+    QVERIFY(rc.emitidos.huecos.at(1).libres.isEmpty()); // reservado por completo
     QCOMPARE(rc.emitidos.enCurso.size(), 1);
     QCOMPARE(rc.emitidos.enCurso.first().solicitud, enCurso.solicitud.id);
 }

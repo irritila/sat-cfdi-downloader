@@ -64,6 +64,9 @@ qt_add_library(satcfdi_domain STATIC
     cfdi/CoberturaMensual.cpp
     cfdi/LoteDescargaGuiada.h
     cfdi/LoteDescargaGuiada.cpp
+    # T023.3: plan puro de la descarga guiada y oferta.
+    cfdi/PlanDescargaGuiada.h
+    cfdi/PlanDescargaGuiada.cpp
 )
 
 # Convencion de includes: rutas relativas a src/, por ejemplo

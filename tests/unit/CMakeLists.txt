@@ -64,6 +64,9 @@ qt_add_executable(satcfdi_tests
     TestCoberturaMensual.cpp
     TestCatalogoMensualService.h
     TestCatalogoMensualService.cpp
+    # T023.3: plan de descarga guiada.
+    TestPlanDescargaGuiada.h
+    TestPlanDescargaGuiada.cpp
     # T015.4: previsualizacion PDF (servicio con fakes).
     TestPrevisualizacionCfdi.h
     TestPrevisualizacionCfdi.cpp

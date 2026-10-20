@@ -70,6 +70,16 @@ public:
     static Resultado<SolicitudCanonica, QList<ErrorSolicitudCanonica>>
     normalizar(const EntradaSolicitudCanonica& entrada);
 
+    // T023.3: solicitud canonica del flujo guiado con tramo EXACTO por
+    // segundos (`YYYY-MM-DDThh:mm:ss`, hora Centro sin offset, inclusivo),
+    // sin contraparte, tipo de comprobante ni complemento. Mismas reglas de
+    // RFC y la misma dedup_key v1 que normalizar(); errores de fecha:
+    // FechaInicialRequerida/FechaFinalRequerida (formato) y
+    // RangoFechasInvalido.
+    static Resultado<SolicitudCanonica, QList<ErrorSolicitudCanonica>>
+    normalizarTramo(TipoDescarga tipo, const QString& rfcPerfil, const QString& fechaInicialSat,
+                    const QString& fechaFinalSat);
+
     TipoDescarga tipoDescarga() const noexcept { return m_tipo; }
     QString tipoCfdi() const { return valorTipoCfdi(m_tipo); }         // columna tipo_cfdi
     OperacionSat operacionSat() const noexcept { return operacionPara(m_tipo); }

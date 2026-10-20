@@ -185,10 +185,25 @@ void calcularHuecos(const QDateTime& desde, const QDateTime& hasta, CoberturaDir
         if (siguiente <= fin) {
             HuecoCobertura h;
             h.tramo = Tramo{siguiente, fin};
+            QList<Tramo> reservados;
             for (const TramoEnCurso& e : std::as_const(cobertura.enCurso)) {
                 if (intersecta(e.tramo, h.tramo)) {
                     h.reservadoPor.append(e.solicitud);
+                    reservados.append(e.tramo);
                 }
+            }
+            // Libres = hueco menos la union de reservas que lo intersectan.
+            QDateTime cursor = h.tramo.inicio;
+            for (const Tramo& r : unir(reservados)) {
+                if (r.inicio > cursor) {
+                    h.libres.append(Tramo{cursor, std::min(r.inicio.addSecs(-1), h.tramo.fin)});
+                }
+                if (r.fin.addSecs(1) > cursor) {
+                    cursor = r.fin.addSecs(1);
+                }
+            }
+            if (cursor <= h.tramo.fin) {
+                h.libres.append(Tramo{cursor, h.tramo.fin});
             }
             cobertura.huecos.append(h);
         }
@@ -381,6 +396,9 @@ EvaluacionCoberturaMensual evaluarCoberturaMensual(const PerfilId& perfil, MesCa
             hayTrabajo = true;
             cobertura.solicitudesEnCurso.append(s.id);
             cobertura.enCurso.append(TramoEnCurso{s.id, c.tramo});
+            if (s.estadoLocal == EstadoLocal::Creada) {
+                cobertura.sinEnviar.append(s.id);
+            }
         }
         if (c.clasificacion.acredita) {
             cobertura.solicitudesAcreditadas.append(s.id);
@@ -407,6 +425,16 @@ EvaluacionCoberturaMensual evaluarCoberturaMensual(const PerfilId& perfil, MesCa
         calcularCobertura(*tramos, inicioMes, *cobertura);
         cobertura->alcanzaFrontera = r.tipoMes != TipoMes::Futuro && cobertura->hasta
                                      && *cobertura->hasta >= r.frontera;
+        {
+            QList<Tramo> conReservas = *tramos;
+            for (const TramoEnCurso& e : std::as_const(cobertura->enCurso)) {
+                conReservas.append(e.tramo);
+            }
+            const QList<Tramo> unidos = unir(conReservas);
+            cobertura->alcanzaFronteraConReservas = r.tipoMes != TipoMes::Futuro && !unidos.isEmpty()
+                                                    && unidos.first().inicio <= inicioMes
+                                                    && unidos.first().fin >= r.frontera;
+        }
         // T023 D7 / ADR 0019: en el mes en curso una cobertura que llega a hoy
         // alcanza la frontera y "Actualizar mes" no se ofrece el mismo dia, de
         // modo que no hay huecos que planear (cero huecos, no el tramo de hoy).

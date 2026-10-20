@@ -1,6 +1,7 @@
 #include "application/requests/SolicitudesServicePersistido.h"
 
 #include "application/persistence/PersistenceDispatcher.h"
+#include "application/requests/CreacionSolicitudLocal.h"
 #include "application/requests/PreparacionSolicitud.h"
 #include "domain/common/UuidCanonico.h"
 #include "domain/operaciones/PoliticasOperacion.h"
@@ -148,21 +149,6 @@ ErrorCrear errorDeEscritura(ErrorPersistencia e)
     return ErrorCrear::persistencia(std::move(e));
 }
 
-LogEntradaCruda logBase(const SolicitudId& id, TipoEventoLog tipo, const QDateTime& en,
-                        const SolicitudCanonica& canonica)
-{
-    LogEntradaCruda l;
-    l.id = uuid::generarCanonico();
-    l.solicitudId = id;
-    l.tipoEvento = tipo;
-    l.origen = OrigenLog::Usuario;
-    l.creadoEn = en;
-    l.operacionSat = canonica.operacionSat();
-    l.dedupKey = canonica.dedupKey();
-    l.filtros = canonica;
-    return l;
-}
-
 } // namespace
 
 SolicitudesServicePersistido::SolicitudesServicePersistido(PersistenceDispatcher& dispatcher,
@@ -299,54 +285,10 @@ SolicitudesServicePersistido::crearLocal(const NuevaSolicitudRequest& request,
             return R::fallo(std::move(error));
         };
 
-        // 4-6. Reclasificacion autoritativa dentro de la transaccion.
-        auto clasificada = p.solicitudes.clasificarDuplicado(canonica.dedupKey());
-        if (!clasificada.esExito()) {
-            return abortar(ErrorCrear::persistencia(std::move(clasificada).error()));
-        }
-        const EvaluacionDuplicado evaluacion = clasificada.valor();
-        if (evaluacion.clasificacion == ClasificacionDuplicado::Bloqueado) {
-            return abortar(ErrorCrear::dedupBloqueado(evaluacion));
-        }
-        const bool confirmable = evaluacion.clasificacion == ClasificacionDuplicado::RequiereConfirmacion;
-        if (confirmable && confirmacion != ConfirmacionDuplicado::Confirmada) {
-            return abortar(ErrorCrear::requiereConfirmacion(evaluacion));
-        }
-
-        // 7. INSERT Creada.
-        auto insercion = p.solicitudes.insertarCreada(SolicitudNuevaPersistida{id, request.perfilId, canonica, ahora});
-        if (!insercion.esExito()) {
-            ErrorPersistencia e = std::move(insercion).error();
-            if (e.tipo == T::DedupBloqueado) {
-                // Defensa DM6: el indice parcial detecto un bloqueante.
-                EvaluacionDuplicado bloqueada;
-                bloqueada.clasificacion = ClasificacionDuplicado::Bloqueado;
-                bloqueada.dedupKey = canonica.dedupKey();
-                bloqueada.motivo = MotivoDuplicado::SolicitudEnCurso;
-                return abortar(ErrorCrear::dedupBloqueado(bloqueada));
-            }
-            return abortar(errorDeEscritura(std::move(e)));
-        }
-
-        // 8. Logs saneados.
-        LogEntradaCruda creada = logBase(id, TipoEventoLog::SolicitudCreada, ahora, canonica);
-        creada.mensaje = QStringLiteral("Solicitud local creada.");
-        QList<LogEntradaCruda> logs = {creada};
-        if (confirmable) {
-            LogEntradaCruda dup = logBase(id, TipoEventoLog::DuplicadoConfirmado, ahora, canonica);
-            dup.mensaje = QStringLiteral("Duplicado confirmado por el usuario (%1).")
-                              .arg(claveEstable(evaluacion.motivo));
-            if (evaluacion.solicitudReferencia) {
-                dup.detalle = QStringLiteral("solicitud_referencia=%1")
-                                  .arg(evaluacion.solicitudReferencia->texto());
-            }
-            logs.append(dup);
-        }
-        for (const LogEntradaCruda& cruda : std::as_const(logs)) {
-            auto agregado = p.logs.agregar(p.sanitizer.sanitizar(cruda));
-            if (!agregado.esExito()) {
-                return abortar(errorDeEscritura(std::move(agregado).error()));
-            }
+        // 4-8. Duplicados, INSERT Creada y logs (nucleo compartido, T023.3).
+        auto creada = crearSolicitudLocalEnTransaccion(p, id, request.perfilId, canonica, confirmacion, ahora);
+        if (!creada.esExito()) {
+            return abortar(std::move(creada).error());
         }
 
         // 9. COMMIT.
