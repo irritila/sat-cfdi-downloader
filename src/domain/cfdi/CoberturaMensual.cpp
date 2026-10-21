@@ -1,5 +1,6 @@
 #include "domain/cfdi/CoberturaMensual.h"
 
+#include "domain/solicitudes/EstadoResumen.h"
 #include "domain/solicitudes/OperacionSat.h"
 
 #include <QTime>
@@ -18,12 +19,14 @@ struct Clasificacion {
     bool acredita = false;
 };
 
-void clasificarPaquetes(const EvidenciaSolicitudMensual& e, Clasificacion& c)
+void clasificarPaquetes(const EvidenciaSolicitudMensual& e, Clasificacion& c, bool sinInformacion)
 {
     if (e.paquetes.isEmpty()) {
         // Terminada sin paquetes: solo cuenta si la verificacion SAT persistio
         // el conjunto vacio; si no, los paquetes aun no se registraron.
-        c.acredita = e.solicitud.conjuntoPaquetesVacioConfirmadoEn.has_value();
+        // T023.6 (D22): Rechazada 5004 es por definicion un conjunto vacio
+        // (filas previas sin la marca incluidas).
+        c.acredita = sinInformacion || e.solicitud.conjuntoPaquetesVacioConfirmadoEn.has_value();
         return;
     }
     bool completos = true;
@@ -106,6 +109,13 @@ Clasificacion clasificar(const EvidenciaSolicitudMensual& e)
         c.causas.append(CausaAtencion::ErrorSat);
         return c;
     case EstadoSolicitudSat::Rechazada:
+        if (esSinInformacionSat(s.estadoSolicitudSat, s.codigoEstadoSolicitud)) {
+            // T023.6 (D22): periodo sin facturas, no es causa de atencion.
+            // Otras causas (5002/5005 ya agregadas) se conservan.
+            clasificarPaquetes(e, c, true);
+            c.acredita = c.acredita && c.causas.isEmpty() && !c.preparando;
+            return c;
+        }
         c.causas.append(CausaAtencion::Rechazada);
         return c;
     case EstadoSolicitudSat::Vencida:
@@ -114,7 +124,7 @@ Clasificacion clasificar(const EvidenciaSolicitudMensual& e)
     case EstadoSolicitudSat::Terminada:
         break;
     }
-    clasificarPaquetes(e, c);
+    clasificarPaquetes(e, c, false);
     // Una solicitud con causas o trabajo no acredita aunque sus paquetes lo
     // permitan (p. ej. 5005 registrado en una Terminada).
     c.acredita = c.acredita && c.causas.isEmpty() && !c.preparando;

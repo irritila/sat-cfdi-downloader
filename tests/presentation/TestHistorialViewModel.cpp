@@ -151,6 +151,7 @@ private slots:
     void reintentarDesdeHistorial();
     void irAMesPendienteAntesDeCargarPerfiles();
     void sinRutaANuevaSolicitud();
+    void sinInformacionEsSinFacturas(); // T023.6 (D22)
 };
 
 void TestHistorialViewModel::reglaResultadosDeLote()
@@ -531,6 +532,39 @@ void TestHistorialViewModel::sinRutaANuevaSolicitud()
     QVERIFY(mo->indexOfMethod("mostrarHistorial()") >= 0);
     QVERIFY(mo->indexOfMethod("mostrarDiagnostico()") >= 0);
     QVERIFY(mo->indexOfMethod("regresar()") >= 0);
+}
+
+void TestHistorialViewModel::sinInformacionEsSinFacturas()
+{
+    // Rechazada con CodigoEstadoSolicitud 5004 en ambas direcciones, sin la
+    // marca de conjunto vacio (filas previas a T023.6).
+    auto sinInfo = [](D d) {
+        EvidenciaSolicitudMensual e = completa(d, kAgosto);
+        e.solicitud.estadoSolicitudSat = EstadoSolicitudSat::Rechazada;
+        e.solicitud.codigoEstadoSolicitud = QStringLiteral("5004");
+        e.solicitud.conjuntoPaquetesVacioConfirmadoEn.reset();
+        return e;
+    };
+    const QList<EvidenciaSolicitudMensual> ev{sinInfo(D::Emitidos), sinInfo(D::Recibidos)};
+    const auto evaluacion = evaluar(kAgosto, ev);
+    QCOMPARE(evaluacion.estado, EstadoMes::Disponibles);
+    const EntradaHistorial e = entradaDeLote(lote(kAgosto, ev), &evaluacion, {});
+    QCOMPARE(e.resultado, ResultadoHistorial::SinFacturas);
+    QVERIFY(!e.puedeReintentar);
+    // Resultado del lote sin evaluacion (como lo calcula el repositorio).
+    QCOMPARE(resultadoLote({derivarEstadoResumen(EstadoLocal::Enviada, EstadoSolicitudSat::Rechazada,
+                                                 QStringLiteral("5004"))}),
+             ResultadoLote::Terminado);
+
+    // Facturas: el mes queda Disponibles con 0 facturas, sin atencion.
+    Grafo g;
+    g.fuente.evidenciaPorMes.insert(kAgosto.texto(), ev);
+    QVERIFY(g.facturasListas());
+    FacturasViewModel* f = g.vms.facturas();
+    f->recargar();
+    QTRY_COMPARE(f->franja()->estado(), FranjaMesViewModel::Estado::Disponibles);
+    QCOMPARE(f->conteoEmitidas() + f->conteoRecibidas(), 0);
+    QCOMPARE(f->franja()->accion(), FranjaMesViewModel::Accion::Ninguna);
 }
 
 QTEST_MAIN(TestHistorialViewModel)

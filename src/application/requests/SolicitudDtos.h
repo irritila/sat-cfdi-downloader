@@ -29,6 +29,9 @@ struct SolicitudResumen {
     QDate fechaFinal;                      // dia de fecha_final_sat
     EstadoLocal estadoLocal = EstadoLocal::Creada;
     std::optional<EstadoSolicitudSat> estadoSat; // nulo sin respuesta SAT
+    // T023.6: codigo_estado_solicitud de la verificacion (para resumir
+    // Rechazada 5004 como Terminada, esSinInformacionSat).
+    std::optional<QString> codigoEstadoSolicitud;
     QDateTime creadaEn;                          // UTC
     int totalPaquetes = 0;                       // paquetes visibles
     // T014.1 D2: paquetes visibles Descargado, y Disponible + Error (pendientes

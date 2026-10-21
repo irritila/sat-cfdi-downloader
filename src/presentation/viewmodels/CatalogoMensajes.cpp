@@ -1,5 +1,7 @@
 #include "CatalogoMensajes.h"
 
+#include "domain/solicitudes/EstadoResumen.h"
+
 #include <QCoreApplication>
 
 namespace satcfdi::catalogo {
@@ -72,7 +74,10 @@ QString mensajeSolicitud(const SolicitudDetalle& d)
         }
         return tr("El SAT rechazó la solicitud. No se registró en el SAT.");
     case EstadoLocal::Enviada: {
-        const QString codigoEstado = d.codigoEstadoSolicitud.value_or(QString());
+        const QString codigoEstado = d.codigoEstadoSolicitud.value_or(QString()).trimmed();
+        if (esSinInformacionSat(d.resumen.estadoSat, d.codigoEstadoSolicitud)) {
+            return tr("El SAT no tiene facturas en este periodo."); // T023.6 (D22)
+        }
         if (codigoEstado == QLatin1String("5004")) {
             return tr("El SAT no encontró esta solicitud. La verificación automática se detuvo.");
         }

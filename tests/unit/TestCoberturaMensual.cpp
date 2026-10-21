@@ -2,6 +2,8 @@
 
 #include "domain/cfdi/CoberturaMensual.h"
 #include "domain/cfdi/MesCalendario.h"
+#include "domain/cfdi/PlanDescargaGuiada.h"
+#include "domain/solicitudes/EstadoResumen.h"
 #include "domain/solicitudes/OperacionSat.h"
 
 #include <QTest>
@@ -102,6 +104,23 @@ Ev conPaquete(D d, std::function<void(EvidenciaPaqueteMensual&)> ajuste, bool in
     ajuste(e.paquetes.first());
     e.indexacionProgramada = indexacionProgramada;
     return e;
+}
+
+// T023.6: Rechazada con CodigoEstadoSolicitud `codigo`, sin paquetes y sin la
+// marca de conjunto vacio (como las filas guardadas antes de T023.6).
+Ev rechazada(D d, const QString& codigo, const QString& inicio, const QString& fin)
+{
+    Ev e = canonica(d, inicio, fin);
+    e.solicitud.estadoSolicitudSat = EstadoSolicitudSat::Rechazada;
+    e.solicitud.codigoEstadoSolicitud = codigo.isNull() ? std::nullopt : std::optional(codigo);
+    e.solicitud.conjuntoPaquetesVacioConfirmadoEn.reset();
+    e.paquetes.clear();
+    return e;
+}
+
+Ev sinInformacion(D d, MesCalendario mes = kSeptiembre)
+{
+    return rechazada(d, QStringLiteral("5004"), mes.inicioSat(), mes.finSat());
 }
 
 QString describir(const EvaluacionCoberturaMensual& r)
@@ -700,4 +719,106 @@ void TestCoberturaMensual::causasQueSiguenActivas()
         QCOMPARE(r.estado, EstadoMes::RequiereAtencion);
         QCOMPARE(r.causa->causa, CausaAtencion::EnvioIncierto);
     }
+}
+
+void TestCoberturaMensual::sinInformacionPredicado()
+{
+    using S = EstadoSolicitudSat;
+    QVERIFY(esSinInformacionSat(S::Rechazada, QStringLiteral("5004")));
+    QVERIFY(esSinInformacionSat(S::Rechazada, QStringLiteral(" 5004 "))); // recortado
+    QVERIFY(!esSinInformacionSat(S::Rechazada, QStringLiteral("5003")));
+    QVERIFY(!esSinInformacionSat(S::Rechazada, std::nullopt));
+    QVERIFY(!esSinInformacionSat(S::Terminada, QStringLiteral("5004")));
+    QVERIFY(!esSinInformacionSat(S::Error, QStringLiteral("5004")));
+    QVERIFY(!esSinInformacionSat(std::nullopt, QStringLiteral("5004")));
+    // Resumen: Terminada (no Rechazada); el resto sin cambio.
+    QCOMPARE(derivarEstadoResumen(EstadoLocal::Enviada, S::Rechazada, QStringLiteral("5004")), EstadoResumen::Terminada);
+    QCOMPARE(derivarEstadoResumen(EstadoLocal::Enviada, S::Rechazada, QStringLiteral("5003")), EstadoResumen::Rechazada);
+    QCOMPARE(derivarEstadoResumen(EstadoLocal::Enviada, S::Rechazada, std::nullopt), EstadoResumen::Rechazada);
+    QCOMPARE(derivarEstadoResumen(EstadoLocal::Enviada, S::Terminada, QStringLiteral("5000")), EstadoResumen::Terminada);
+}
+
+void TestCoberturaMensual::sinInformacionAcreditaConjuntoVacio()
+{
+    // Ambas direcciones sin informacion: Disponibles, sin causa ni huecos.
+    {
+        const auto r = evaluarCoberturaMensual(kPerfil, kSeptiembre, kAhora,
+                                               {sinInformacion(D::Emitidos), sinInformacion(D::Recibidos)});
+        QCOMPARE(r.estado, EstadoMes::Disponibles);
+        QVERIFY(!r.causa);
+        QVERIFY(r.causas.isEmpty() && r.causasSuperadas.isEmpty());
+        QVERIFY(r.emitidos.alcanzaFrontera && r.recibidos.alcanzaFrontera);
+        QCOMPARE(r.emitidos.solicitudesAcreditadas.size(), 1);
+        QVERIFY(r.emitidos.huecos.isEmpty());
+        // La descarga guiada no vuelve a pedir el tramo.
+        QVERIFY(!ofertaDescargaGuiada(r).accion);
+    }
+    // Una direccion sin informacion y la otra Terminada con paquetes indexados.
+    {
+        const auto r = evaluarCoberturaMensual(kPerfil, kSeptiembre, kAhora,
+                                               {sinInformacion(D::Emitidos), completa(D::Recibidos)});
+        QCOMPARE(r.estado, EstadoMes::Disponibles);
+        QVERIFY(!r.causa);
+    }
+    // Sin informacion con 5002 registrado: la causa 5002 se conserva.
+    {
+        Ev e = sinInformacion(D::Emitidos);
+        e.solicitud.codEstatusSolicitud = QStringLiteral("5002");
+        const auto r = evaluarCoberturaMensual(kPerfil, kSeptiembre, kAhora, {e, completa(D::Recibidos)});
+        QCOMPARE(r.estado, EstadoMes::RequiereAtencion);
+        QCOMPARE(r.causa->causa, CausaAtencion::Codigo5002);
+        QVERIFY(r.emitidos.solicitudesAcreditadas.isEmpty());
+    }
+    // Sin informacion pero con un paquete (inesperado) en Error: se conserva.
+    {
+        Ev e = sinInformacion(D::Emitidos);
+        EvidenciaPaqueteMensual p = paqueteIndexado();
+        p.estadoDescarga = EstadoDescarga::Error;
+        e.paquetes = {p};
+        const auto r = evaluarCoberturaMensual(kPerfil, kSeptiembre, kAhora, {e, completa(D::Recibidos)});
+        QCOMPARE(r.causa->causa, CausaAtencion::PaqueteError);
+    }
+}
+
+void TestCoberturaMensual::sinInformacionMesEnCurso()
+{
+    // Mes en curso (hoy 20 oct 12:00): un tramo sin informacion del 1 al 10
+    // acredita hasta su fin; con el otro tramo igual, se ofrece Actualizar mes (D7).
+    const QString inicio = kOctubre.inicioSat();
+    const QString fin = QStringLiteral("2026-10-10T09:30:00");
+    const auto r = evaluarCoberturaMensual(kPerfil, kOctubre, kAhora,
+                                           {rechazada(D::Emitidos, QStringLiteral("5004"), inicio, fin),
+                                            canonica(D::Recibidos, inicio, fin)});
+    QCOMPARE(r.tipoMes, TipoMes::EnCurso);
+    QCOMPARE(r.estado, EstadoMes::DisponiblesParcialmente);
+    QVERIFY(r.emitidos.hasta);
+    QCOMPARE(centro::fechaSat(*r.emitidos.hasta), fin);
+    QCOMPARE(ofertaDescargaGuiada(r).accion, std::optional(AccionGuiada::ActualizarMes));
+    // El plan pide solo lo que sigue al tramo acreditado.
+    const auto plan = planificarDescargaGuiada(r, AccionGuiada::ActualizarMes);
+    QVERIFY(plan);
+    QCOMPARE(plan.valor().emitidos.crear.size(), 1);
+    QCOMPARE(centro::fechaSat(plan.valor().emitidos.crear.first().inicio), QStringLiteral("2026-10-10T09:30:01"));
+}
+
+void TestCoberturaMensual::rechazadaConOtroCodigoSigueEnAtencion()
+{
+    const QList<Caso> casos = {
+        {"Rechazada 5003", {rechazada(D::Emitidos, QStringLiteral("5003"), kSeptiembre.inicioSat(), kSeptiembre.finSat()),
+                            completa(D::Recibidos)},
+         EstadoMes::RequiereAtencion, CausaAtencion::Rechazada},
+        {"Rechazada sin codigo", {rechazada(D::Emitidos, QString(), kSeptiembre.inicioSat(), kSeptiembre.finSat()),
+                                  completa(D::Recibidos)},
+         EstadoMes::RequiereAtencion, CausaAtencion::Rechazada},
+        // CodEstatus 5004 (de la operacion) no es "sin informacion": la
+        // solicitud sigue Enviada sin estado SAT y en curso.
+        {"CodEstatus 5004", {[] {
+                                 Ev e = conEstado(D::Emitidos, EstadoLocal::Enviada);
+                                 e.solicitud.codEstatusSolicitud = QStringLiteral("5004");
+                                 return e;
+                             }(),
+                             completa(D::Recibidos)},
+         EstadoMes::Preparando, std::nullopt},
+    };
+    verificarCasos(casos);
 }

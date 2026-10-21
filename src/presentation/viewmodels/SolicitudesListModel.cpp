@@ -50,7 +50,7 @@ QVariant SolicitudesListModel::data(const QModelIndex& index, int role) const
         // Nulo explicito (no undefined) cuando SAT aun no devolvio estado.
         return s.estadoSat ? QVariant(claveEstable(*s.estadoSat)) : QVariant::fromValue(nullptr);
     case EstadoResumenRole:
-        return claveEstable(derivarEstadoResumen(s.estadoLocal, s.estadoSat));
+        return claveEstable(derivarEstadoResumen(s.estadoLocal, s.estadoSat, s.codigoEstadoSolicitud));
     case CreadaEnRole:
         return s.creadaEn;
     case TotalPaquetesRole:

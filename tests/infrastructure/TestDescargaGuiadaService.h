@@ -24,4 +24,8 @@ private slots:
     void reservaParcialCreaSoloLoLibre();
     // T023.5: historial y ubicacion de solicitudes con CatalogoMensualCfdiService.
     void historialYUbicacionDeLotes();
+    // T023.6 (D22): Rechazada 5004 guardada antes de T023.6 (sin marca de
+    // conjunto vacio) acredita el mes, no se vuelve a pedir y el historial
+    // muestra Sin facturas en el SAT.
+    void sinInformacionNoSeVuelveAPedir();
 };

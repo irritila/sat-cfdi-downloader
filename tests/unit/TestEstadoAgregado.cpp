@@ -188,6 +188,16 @@ void TestEstadoAgregado::consultaSolicitudes()
         a.paquetes.last().eliminadoEn = QDateTime::currentDateTimeUtc();
         QCOMPARE(consultar(a), std::optional<bool>(false));
     }
+    {
+        // T023.6 (D22): Rechazada 5004 (sin facturas) no es atencion; con
+        // otro codigo, si.
+        Almacen a;
+        a.solicitudes.append(solicitud(EstadoLocal::Enviada, EstadoSolicitudSat::Rechazada));
+        a.solicitudes.last().codigoEstadoSolicitud = QStringLiteral("5004");
+        QCOMPARE(consultar(a), std::optional<bool>(false));
+        a.solicitudes.last().codigoEstadoSolicitud = QStringLiteral("5003");
+        QCOMPARE(consultar(a), std::optional<bool>(true));
+    }
     for (auto [local, sat] : {std::pair{EstadoLocal::Enviada, std::optional(EstadoSolicitudSat::Error)},
                               std::pair{EstadoLocal::Enviada, std::optional(EstadoSolicitudSat::Rechazada)},
                               std::pair{EstadoLocal::EnvioFallido, std::optional<EstadoSolicitudSat>{}},

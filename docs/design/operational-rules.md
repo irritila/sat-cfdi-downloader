@@ -75,7 +75,7 @@ En las tablas siguientes, los estados mostrados como `Aceptada`, `EnProceso`, `T
 | `EnProceso` | SAT reporto `EstadoSolicitud=2`. | Si | Verificar. | Verificar ahora, eliminar local. |
 | `Terminada` | SAT reporto `EstadoSolicitud=3`; paquetes deben estar registrados. | Si | Descargar paquetes pendientes; verificar solo si hace falta reconciliar. | Descargar, reintentar descarga, eliminar local. |
 | `ErrorSat` | SAT reporto `EstadoSolicitud=4`. | Si | Terminal para worker automatico. | Eliminar local. |
-| `Rechazada` | SAT reporto `EstadoSolicitud=5` en verificacion. | Si | Terminal para worker automatico. | Eliminar local. |
+| `Rechazada` | SAT reporto `EstadoSolicitud=5` en verificacion. Con `CodigoEstadoSolicitud=5004` es un periodo sin facturas (T023 D22): se presenta como `Terminada` sin paquetes, acredita su tramo en la cobertura mensual y no es error ni atencion; el estado persistido sigue siendo `Rechazada`. | Si | Terminal para worker automatico. | Eliminar local. |
 | `Vencida` | SAT reporto `EstadoSolicitud=6`. | Si | Terminal para verificacion/descarga automatica. | Eliminar local; crear nueva solicitud manualmente. |
 | `EnvioFallido` | Rechazo explicito y documentado de la operacion de creacion sin `IdSolicitud` (ADR 0017). Los fallos locales o de autenticacion previos al envio regresan a `Creada`. | No | Terminal para worker automatico. | Eliminar local; crear nueva solicitud manualmente. |
 | `EnvioIncierto` | Timeout/interrupcion despues de iniciar envio, `5000` sin `IdSolicitud`, `5006` o codigo de creacion no documentado; no se sabe si SAT creo solicitud. | No | No reintentar automaticamente. | Eliminar local; crear nueva solicitud manualmente con advertencia. |

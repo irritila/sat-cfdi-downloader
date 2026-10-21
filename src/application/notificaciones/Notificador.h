@@ -23,7 +23,7 @@ struct DestinoNotificacion {
 // composition root por `tipo`); el root adapta una a otra.
 // - id: clave de dedupe ("<solicitud>:<tipo>" o "credencial:<perfil>:<estado>");
 //   el SO reemplaza una notificacion con el mismo id.
-// - tipo: "terminada", "descarga_completa", "error_sat", "rechazada",
+// - tipo: "terminada", "descarga_completa", "error_sat", "rechazada", "sin_facturas",
 //   "vencida", "credencial" o "efirma_por_vencer" (T014.3).
 // - titulo/cuerpo: textos fijos (catalogo D10) sin RFC completo, Ids, token,
 //   rutas ni Mensaje SAT crudo.

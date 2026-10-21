@@ -63,6 +63,9 @@ void TestNotificaciones::textosPorTransicion()
          u"El SAT reportó un error en la solicitud."_s},
         {TipoTransicionNotificable::Rechazada, u"rechazada"_s, u"Solicitud rechazada"_s,
          u"El SAT rechazó la solicitud."_s},
+        // T023.6 (D22): informativo, sin "rechazó" ni "error".
+        {TipoTransicionNotificable::SinFacturas, u"sin_facturas"_s, u"Sin facturas en el periodo"_s,
+         u"El SAT no tiene facturas para este periodo."_s},
         {TipoTransicionNotificable::Vencida, u"vencida"_s, u"Solicitud vencida"_s,
          u"La solicitud venció en el SAT; los paquetes pueden ya no estar disponibles."_s},
     };
@@ -77,6 +80,14 @@ void TestNotificaciones::textosPorTransicion()
         // Sin RFC completo ni Id local en lo visible.
         QVERIFY(!n.titulo.contains(kRfc) && !n.cuerpo.contains(kRfc));
         QVERIFY(!n.cuerpo.contains(id.texto()));
+        // Destino tipado (T023.5): la solicitud, que app_core resuelve.
+        QCOMPARE(n.destino, (DestinoNotificacion{DestinoNotificacion::Tipo::Solicitud, id.texto()}));
+        if (c.tipo == TipoTransicionNotificable::SinFacturas) {
+            for (const QString& t : {n.titulo, n.cuerpo}) {
+                QVERIFY2(!t.contains(u"rechaz"_s, Qt::CaseInsensitive) && !t.contains(u"error"_s, Qt::CaseInsensitive),
+                         qPrintable(t));
+            }
+        }
     }
     QCOMPARE(ServicioNotificaciones::componer(transicion(TipoTransicionNotificable::Terminada, id, 1)).cuerpo.section(
                  QLatin1Char('\n'), 0, 0),

@@ -4,6 +4,7 @@
 #include "application/operaciones/WorkerLocal.h"
 #include "domain/common/UuidCanonico.h"
 #include "domain/operaciones/PoliticasOperacion.h"
+#include "domain/solicitudes/EstadoResumen.h"
 #include "ports/LogSanitizer.h"
 #include "ports/PackageStorage.h"
 #include "ports/repositories/PaqueteSolicitudRepository.h"
@@ -561,7 +562,12 @@ struct OperacionExecutor::Impl {
         switch (v.estadoSolicitudSat) {
         case EstadoSolicitudSat::Terminada: tipo = TipoTransicionNotificable::Terminada; break;
         case EstadoSolicitudSat::Error: tipo = TipoTransicionNotificable::ErrorSat; break;
-        case EstadoSolicitudSat::Rechazada: tipo = TipoTransicionNotificable::Rechazada; break;
+        case EstadoSolicitudSat::Rechazada:
+            // T023.6 (D22): Rechazada 5004 es un periodo sin facturas, no un error.
+            tipo = esSinInformacionSat(v.estadoSolicitudSat, v.codigoEstadoSolicitud)
+                       ? TipoTransicionNotificable::SinFacturas
+                       : TipoTransicionNotificable::Rechazada;
+            break;
         case EstadoSolicitudSat::Vencida: tipo = TipoTransicionNotificable::Vencida; break;
         case EstadoSolicitudSat::Aceptada:
         case EstadoSolicitudSat::EnProceso: break;

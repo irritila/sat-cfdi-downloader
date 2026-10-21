@@ -73,6 +73,12 @@ Notificacion ServicioNotificaciones::componer(const TransicionNotificable& t)
         n.titulo = QStringLiteral("Solicitud rechazada");
         resultado = QStringLiteral("El SAT rechazó la solicitud.");
         break;
+    case TipoTransicionNotificable::SinFacturas:
+        // T023.6 (D22): informativo; destino Solicitud (T023.5 lo resuelve a
+        // Facturas del perfil y mes si es de una descarga guiada).
+        n.titulo = QStringLiteral("Sin facturas en el periodo");
+        resultado = QStringLiteral("El SAT no tiene facturas para este periodo.");
+        break;
     case TipoTransicionNotificable::Vencida:
         n.titulo = QStringLiteral("Solicitud vencida");
         resultado = QStringLiteral("La solicitud venció en el SAT; los paquetes pueden ya no estar disponibles.");

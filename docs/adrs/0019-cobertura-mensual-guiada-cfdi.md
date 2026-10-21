@@ -6,6 +6,10 @@ Accepted
 
 Modificado por ADR 0020: huecos de cobertura y causas superadas.
 
+Enmendado por T023.6 (T023 D22, 2026-10-21): Rechazada con
+`CodigoEstadoSolicitud` 5004 es un periodo sin facturas (ver "Cobertura y
+estado mensual").
+
 ## Contexto
 
 T023 cambia el recorrido principal de la aplicacion: el usuario consulta las
@@ -51,6 +55,17 @@ ZIP presente y legible e indice completo; tambien acredita una solicitud
 terminada cuyo conjunto vacio de paquetes haya sido persistido desde la
 verificacion SAT.
 
+Enmienda D22 (T023.6): una solicitud canonica con `EstadoSolicitud` 5
+(`Rechazada`) y `CodigoEstadoSolicitud` 5004 ("la solicitud de descarga no
+genero paquetes por falta de informacion", `docs/web-service.md` 6.2) acredita
+su tramo como conjunto vacio, igual que una terminada sin paquetes confirmada,
+y no es causa de atencion. Se deduce del par estado/codigo persistido, sin
+migracion ni marca de conjunto vacio, de modo que las filas ya guardadas se
+corrigen solas. Las demas causas de la solicitud (`5002`, `5005`, paquetes) se
+conservan. `Rechazada` con otro codigo, o sin codigo, sigue siendo causa de
+atencion. El `CodEstatus` 5004 de la operacion de verificacion (solicitud no
+encontrada) es otro campo y sigue siendo falla (ADR 0018).
+
 La cobertura es la union contigua de tramos desde el primer instante del mes.
 Un tramo posterior a un hueco no la extiende. La frontera objetivo es el fin
 del mes para meses cerrados, o cualquier instante de hoy para el mes en curso;
@@ -59,7 +74,7 @@ una cobertura que termina en un dia anterior a hoy no alcanza esa frontera.
 El mes tiene exactamente estos estados, evaluados con esta precedencia:
 
 1. `Requiere atencion`: `EnvioIncierto`, `EnvioFallido`, `ErrorSat`,
-   `Rechazada`, `Vencida`, codigos `5002` o `5005`, paquete `Error` o
+   `Rechazada` (salvo `CodigoEstadoSolicitud` 5004, enmienda D22), `Vencida`, codigos `5002` o `5005`, paquete `Error` o
    `Vencido`, ZIP faltante o ilegible, indice ilegible u origen no disponible,
    o indexacion pendiente sin trabajo programado.
 2. `Preparando`: solicitud `Creada`, `Enviando`, `Enviada`, `Aceptada` o

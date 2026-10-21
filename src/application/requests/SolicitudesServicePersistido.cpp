@@ -48,6 +48,7 @@ SolicitudResumen aResumen(const SolicitudPersistida& s, int totalPaquetes)
     r.fechaFinal = diaDe(s.fechaFinalSat);
     r.estadoLocal = s.estadoLocal;
     r.estadoSat = s.estadoSolicitudSat;
+    r.codigoEstadoSolicitud = s.codigoEstadoSolicitud;
     r.creadaEn = s.creadaEn;
     r.totalPaquetes = totalPaquetes;
     return r;

@@ -26,4 +26,9 @@ private slots:
     void huecosMesEnCursoYReservaEnCurso();
     void causasSuperadasPorCoberturaPosterior();
     void causasQueSiguenActivas();
+    // T023.6 (D22): Rechazada con CodigoEstadoSolicitud 5004 = sin informacion.
+    void sinInformacionPredicado();
+    void sinInformacionAcreditaConjuntoVacio();
+    void sinInformacionMesEnCurso();
+    void rechazadaConOtroCodigoSigueEnAtencion();
 };

@@ -388,6 +388,7 @@ private slots:
     // T009
     void enviarSoloConCredencialLista();
     void mensajesDelCatalogoYSin5008();
+    void sinFacturasEnDiagnostico(); // T023.6 (D22)
     void avisoNotificacionesDeshabilitadas();
 
     // T009.1
@@ -1339,6 +1340,62 @@ void TestPresentacion::mensajesDelCatalogoYSin5008()
     // Sin RFC ni Ids en los mensajes visibles.
     QVERIFY(!d->mensajeEstado().contains(QStringLiteral("EKU9003173C9")));
     e.vms.setAccionesSolicitud(nullptr);
+}
+
+void TestPresentacion::sinFacturasEnDiagnostico()
+{
+    // Rechazada con CodigoEstadoSolicitud 5004: estado y mensajes
+    // informativos, sin "rechazó" ni "error"; la lista la resume como
+    // Terminada. Con otro codigo sigue siendo Rechazada.
+    EscenarioAsincrono e;
+    QVERIFY(e.cargar());
+    SolicitudResumen resumen = resumenDePrueba(SolicitudId::generar());
+    resumen.estadoLocal = EstadoLocal::Enviada;
+    resumen.estadoSat = EstadoSolicitudSat::Rechazada;
+    resumen.codigoEstadoSolicitud = QStringLiteral("5004");
+    resumen.totalPaquetes = 0;
+    SolicitudResumen otro = resumenDePrueba(SolicitudId::generar());
+    otro.estadoLocal = EstadoLocal::Enviada;
+    otro.estadoSat = EstadoSolicitudSat::Rechazada;
+    otro.codigoEstadoSolicitud = QStringLiteral("5003");
+    e.solicitudes.lista.resolver(0, ResultadoListaSol::exito({resumen, otro}));
+    SolicitudesListModel* lista = e.vms.solicitudes();
+    QTRY_COMPARE(lista->rowCount(), 2);
+    QCOMPARE(lista->index(lista->filaDe(resumen.id.texto())).data(Rol::EstadoResumenRole).toString(),
+             QStringLiteral("Terminada"));
+    QCOMPARE(lista->index(lista->filaDe(otro.id.texto())).data(Rol::EstadoResumenRole).toString(),
+             QStringLiteral("Rechazada"));
+
+    SolicitudDetailViewModel* d = e.vms.detalle();
+    SolicitudDetalle detalle;
+    detalle.resumen = resumen;
+    detalle.codEstatusSolicitud = QStringLiteral("5000");
+    detalle.codigoEstadoSolicitud = QStringLiteral("5004");
+    detalle.numeroCfdi = 0;
+    QVERIFY(e.vms.app()->abrirDetalle(resumen.id.texto()));
+    QTRY_COMPARE(int(e.solicitudes.detalle.size()), 1);
+    e.solicitudes.detalle.resolver(0, SolicitudesService::ResultadoDetalle::exito(detalle));
+    QTRY_VERIFY(d->cargada());
+    QCOMPARE(d->estadoResumen(), QStringLiteral("Terminada"));
+    QCOMPARE(d->titularResumen(), QStringLiteral("El SAT no tiene facturas en este periodo"));
+    QCOMPARE(d->mensajeEstado(), QStringLiteral("El SAT no tiene facturas en este periodo."));
+    for (const QString& t : {d->titularResumen(), d->descripcionResumen(), d->mensajeEstado()}) {
+        QVERIFY2(!t.contains(QStringLiteral("rechaz"), Qt::CaseInsensitive)
+                     && !t.contains(QStringLiteral("error"), Qt::CaseInsensitive)
+                     && !t.contains(QStringLiteral("no encontró")),
+                 qPrintable(t));
+    }
+    QVERIFY(!d->puedeVerificar());
+
+    SolicitudDetalle rechazada = detalle;
+    rechazada.resumen = otro;
+    rechazada.codigoEstadoSolicitud = QStringLiteral("5003");
+    QVERIFY(e.vms.app()->abrirDetalle(otro.id.texto()));
+    QTRY_COMPARE(int(e.solicitudes.detalle.size()), 2);
+    e.solicitudes.detalle.resolver(1, SolicitudesService::ResultadoDetalle::exito(rechazada));
+    QTRY_VERIFY(d->cargada() && d->solicitudId() == otro.id.texto());
+    QCOMPARE(d->estadoResumen(), QStringLiteral("Rechazada"));
+    QCOMPARE(d->titularResumen(), QStringLiteral("El SAT rechazó la solicitud"));
 }
 
 void TestPresentacion::avisoNotificacionesDeshabilitadas()

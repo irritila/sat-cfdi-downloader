@@ -168,7 +168,7 @@ SqliteLoteDescargaGuiadaRepository::listar(const PerfilId& perfil, const std::op
     q.setForwardOnly(true);
     QString sql = QStringLiteral(
         "SELECT l.id, l.mes, l.creado_en, t.tipo_cfdi, t.solicitud_masiva_id, t.fecha_inicial_sat, "
-        "t.fecha_final_sat, s.eliminado_en, s.estado_local, s.estado_solicitud_sat "
+        "t.fecha_final_sat, s.eliminado_en, s.estado_local, s.estado_solicitud_sat, s.codigo_estado_solicitud "
         "FROM lote_descarga_guiada l "
         "JOIN perfil_sat ps ON ps.id = l.perfil_sat_id AND ps.eliminado_en IS NULL "
         "LEFT JOIN lote_descarga_guiada_solicitud t ON t.lote_id = l.id "
@@ -231,7 +231,10 @@ SqliteLoteDescargaGuiadaRepository::listar(const PerfilId& perfil, const std::op
                     return R::fallo(sqlite::filaIlegible(u"solicitud_masiva", u"estado_solicitud_sat"));
                 }
             }
-            t.estado = derivarEstadoResumen(*local, sat);
+            // T023.6: Rechazada 5004 (sin informacion) se resume como Terminada.
+            const std::optional<QString> codigo =
+                q.value(10).isNull() ? std::nullopt : std::optional(q.value(10).toString());
+            t.estado = derivarEstadoResumen(*local, sat, codigo);
             vigentes.last().append(*t.estado);
         }
         LoteGuiado& lote = lotes.last();

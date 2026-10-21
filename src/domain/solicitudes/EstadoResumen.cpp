@@ -37,6 +37,23 @@ EstadoResumen derivarEstadoResumen(EstadoLocal estadoLocal,
     return estadoSat ? desdeSat(*estadoSat) : desdeLocal(estadoLocal);
 }
 
+bool esSinInformacionSat(std::optional<EstadoSolicitudSat> estadoSat,
+                         const std::optional<QString>& codigoEstadoSolicitud)
+{
+    return estadoSat == EstadoSolicitudSat::Rechazada && codigoEstadoSolicitud
+           && codigoEstadoSolicitud->trimmed() == u"5004";
+}
+
+EstadoResumen derivarEstadoResumen(EstadoLocal estadoLocal,
+                                   std::optional<EstadoSolicitudSat> estadoSat,
+                                   const std::optional<QString>& codigoEstadoSolicitud)
+{
+    if (esSinInformacionSat(estadoSat, codigoEstadoSolicitud)) {
+        return EstadoResumen::Terminada;
+    }
+    return derivarEstadoResumen(estadoLocal, estadoSat);
+}
+
 QString claveEstable(EstadoResumen estado)
 {
     switch (estado) {

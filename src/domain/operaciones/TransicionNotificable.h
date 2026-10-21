@@ -13,12 +13,13 @@ enum class TipoTransicionNotificable {
     Terminada,        // estado SAT -> Terminada ("El SAT terminó la solicitud con N paquetes.")
     DescargaCompleta, // no queda paquete por descargar ("X de N paquetes descargados.")
     ErrorSat,         // estado SAT -> Error
-    Rechazada,        // estado SAT -> Rechazada
+    Rechazada,        // estado SAT -> Rechazada (salvo sin informacion)
+    SinFacturas,      // T023.6: Rechazada con CodigoEstadoSolicitud 5004 (periodo sin facturas)
     Vencida,          // estado SAT -> Vencida (los paquetes pueden ya no estar)
 };
 
 // Claves estables (tipo de NotificacionLocal): "terminada",
-// "descarga_completa", "error_sat", "rechazada", "vencida".
+// "descarga_completa", "error_sat", "rechazada", "sin_facturas", "vencida".
 inline QString claveEstable(TipoTransicionNotificable tipo)
 {
     switch (tipo) {
@@ -26,6 +27,7 @@ inline QString claveEstable(TipoTransicionNotificable tipo)
     case TipoTransicionNotificable::DescargaCompleta: return QStringLiteral("descarga_completa");
     case TipoTransicionNotificable::ErrorSat: return QStringLiteral("error_sat");
     case TipoTransicionNotificable::Rechazada: return QStringLiteral("rechazada");
+    case TipoTransicionNotificable::SinFacturas: return QStringLiteral("sin_facturas");
     case TipoTransicionNotificable::Vencida: return QStringLiteral("vencida");
     }
     return {};

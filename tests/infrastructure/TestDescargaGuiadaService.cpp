@@ -578,3 +578,52 @@ void TestDescargaGuiadaService::historialYUbicacionDeLotes()
     u = esperar(catalogo.ubicar(*SolicitudId::desdeTexto(anterior)));
     QVERIFY(u && *u && !u->valor());
 }
+
+void TestDescargaGuiadaService::sinInformacionNoSeVuelveAPedir()
+{
+    Entorno e;
+    QVERIFY(e.preparar());
+    CatalogoMensualCfdiService catalogo(*e.dispatcher, e.p->catalogoMensual(), e.p->lotesDescargaGuiada(),
+                                        e.indexacion, [&e] { return e.ahora; });
+    auto pre = e.planificar(kSeptiembre);
+    QVERIFY(pre);
+    auto ej = e.ejecutar(pre.valor());
+    QVERIFY(ej && ej.valor().loteId && ej.valor().creadas.size() == 2);
+    // El SAT responde a ambas: EstadoSolicitud 5 (Rechazada) con
+    // CodigoEstadoSolicitud 5004, sin paquetes y sin la marca de conjunto
+    // vacio (filas guardadas antes de T023.6).
+    QCOMPARE(ejecutarSql(e.p->proveedor(),
+                         QStringLiteral("UPDATE solicitud_masiva SET estado_local = 'Enviada', "
+                                        "id_solicitud_sat = upper(id), envio_iniciado_en = %1, enviada_en = %1, "
+                                        "cod_estatus_solicitud = '5000', estado_solicitud_sat = 'Rechazada', "
+                                        "codigo_estado_solicitud = '5004', numero_cfdi = 0, ultima_verificacion_en = %1, "
+                                        "conjunto_paquetes_vacio_confirmado_en = NULL")
+                             .arg(citar(kAhora))),
+             QString());
+
+    auto d = esperar(catalogo.disponibilidad(e.pid(), kSeptiembre));
+    QVERIFY(d && *d);
+    QCOMPARE(d->valor().estado, EstadoMes::Disponibles);
+    QVERIFY(!d->valor().causa);
+
+    const int antes = e.contar(QStringLiteral("SELECT count(*) FROM solicitud_masiva"));
+    // Ninguna accion guiada se ofrece; pedir cualquiera se rechaza sin crear nada.
+    for (AccionGuiada a : {AccionGuiada::DescargarFacturas, AccionGuiada::CompletarMes, AccionGuiada::ActualizarMes}) {
+        auto otra = e.planificar(kSeptiembre, a);
+        QVERIFY(!otra);
+        QCOMPARE(otra.error().tipo, ErrorDescargaGuiada::Tipo::AccionNoDisponible);
+        QVERIFY(!otra.error().preplanActual->oferta.accion);
+    }
+    QCOMPARE(e.contar(QStringLiteral("SELECT count(*) FROM solicitud_masiva")), antes);
+
+    auto h = esperar(catalogo.historial(e.pid()));
+    QVERIFY(h && *h);
+    QCOMPARE(h->valor().size(), 1);
+    QCOMPARE(h->valor().first().resultado, ResultadoHistorial::SinFacturas);
+    QCOMPARE(h->valor().first().emitidas + h->valor().first().recibidas, 0);
+
+    // Sin evaluacion del mes el resultado del lote tampoco es atencion.
+    auto lotes = e.p->lotesDescargaGuiada().listar(e.pid(), kSeptiembre);
+    QVERIFY(lotes);
+    QCOMPARE(lotes.valor().first().resultado, ResultadoLote::Terminado);
+}

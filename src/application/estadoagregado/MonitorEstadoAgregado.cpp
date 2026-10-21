@@ -22,7 +22,8 @@ QFuture<std::optional<bool>> consultarAtencionSolicitudes(PersistenceDispatcher&
             return std::nullopt;
         }
         for (const SolicitudPersistida& fila : filas.valor()) {
-            if (solicitudRequiereAtencion(derivarEstadoResumen(fila.estadoLocal, fila.estadoSolicitudSat))) {
+            if (solicitudRequiereAtencion(derivarEstadoResumen(fila.estadoLocal, fila.estadoSolicitudSat,
+                                                                fila.codigoEstadoSolicitud))) {
                 return true;
             }
         }

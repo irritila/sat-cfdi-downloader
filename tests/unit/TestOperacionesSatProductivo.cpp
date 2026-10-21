@@ -859,6 +859,23 @@ void TestOperacionesSatProductivo::ejecutorPublicaTransicionesUnaVez()
     QVERIFY(esperar(p.ejecutor->verificar(otra, OrigenLog::Usuario)));
     QVERIFY(QTest::qWaitFor([&] { return transiciones.count() == 3; }));
     QCOMPARE(transiciones.at(2).at(0).value<TransicionNotificable>().tipo, TipoTransicionNotificable::Vencida);
+
+    // T023.6 (D22): Rechazada con CodigoEstadoSolicitud 5004 -> SinFacturas;
+    // Rechazada con otro codigo sigue siendo Rechazada.
+    const SolicitudId vacia = p.e.sembrar(EstadoLocal::Enviada, EstadoSolicitudSat::EnProceso).id;
+    RespuestaVerificacion sinInfo = verif("5000", 5);
+    sinInfo.codigoEstadoSolicitud = QStringLiteral("5004");
+    p.gw.programar(Op::Verificar, Paso::conVerificacion(sinInfo));
+    QVERIFY(esperar(p.ejecutor->verificar(vacia, OrigenLog::Usuario)));
+    QVERIFY(QTest::qWaitFor([&] { return transiciones.count() == 4; }));
+    QCOMPARE(transiciones.at(3).at(0).value<TransicionNotificable>().tipo, TipoTransicionNotificable::SinFacturas);
+    const SolicitudId rechazada = p.e.sembrar(EstadoLocal::Enviada, EstadoSolicitudSat::EnProceso).id;
+    RespuestaVerificacion otroCodigo = verif("5000", 5);
+    otroCodigo.codigoEstadoSolicitud = QStringLiteral("5003");
+    p.gw.programar(Op::Verificar, Paso::conVerificacion(otroCodigo));
+    QVERIFY(esperar(p.ejecutor->verificar(rechazada, OrigenLog::Usuario)));
+    QVERIFY(QTest::qWaitFor([&] { return transiciones.count() == 5; }));
+    QCOMPARE(transiciones.at(4).at(0).value<TransicionNotificable>().tipo, TipoTransicionNotificable::Rechazada);
 }
 
 namespace {

@@ -142,7 +142,8 @@ QVariant SolicitudDetailViewModel::estadoSat() const
 QString SolicitudDetailViewModel::estadoResumen() const
 {
     return SATCFDI_RESUMEN(claveEstable(derivarEstadoResumen(m_detalle->resumen.estadoLocal,
-                                                             m_detalle->resumen.estadoSat)),
+                                                             m_detalle->resumen.estadoSat,
+                                                             m_detalle->codigoEstadoSolicitud)),
                            QString());
 }
 
@@ -568,6 +569,9 @@ QString SolicitudDetailViewModel::titularResumen() const
     if (e == QLatin1String("EnProceso")) return tr("El SAT está preparando los paquetes");
     if (e == QLatin1String("Terminada")) {
         const ConteoPaquetes c = contar(m_detalle->paquetes);
+        if (esSinInformacionSat(m_detalle->resumen.estadoSat, m_detalle->codigoEstadoSolicitud)) {
+            return tr("El SAT no tiene facturas en este periodo"); // T023.6 (D22)
+        }
         if (c.total == 0) return tr("El SAT terminó sin paquetes");
         if (c.descargados == c.total) return tr("Todos los paquetes están descargados");
         if (c.conError > 0) return tr("Hay un paquete con error de descarga");
@@ -594,6 +598,10 @@ QString SolicitudDetailViewModel::descripcionResumen() const
     if (e == QLatin1String("EnProceso")) return tr("La app verifica el estado periódicamente. No necesitas hacer nada.");
     if (e == QLatin1String("Terminada")) {
         const ConteoPaquetes c = contar(m_detalle->paquetes);
+        if (esSinInformacionSat(m_detalle->resumen.estadoSat, m_detalle->codigoEstadoSolicitud)) {
+            // T023.6 (D22): EstadoSolicitud Rechazada con CodigoEstadoSolicitud 5004.
+            return tr("El SAT no tiene facturas para este periodo; no hay nada que descargar.");
+        }
         if (c.total == 0) return tr("No hay paquetes que descargar para estos filtros.");
         if (c.descargados == c.total) return tr("%1 de %1 paquetes en este equipo.").arg(c.total);
         QStringList partes{tr("%1 de %2 paquetes descargados").arg(c.descargados).arg(c.total)};
