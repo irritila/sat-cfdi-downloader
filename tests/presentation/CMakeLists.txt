@@ -4,6 +4,7 @@
 # controlados por la prueba (T003). Corre en -platform offscreen.
 qt_add_executable(satcfdi_presentation_tests
     TestPresentacion.cpp
+    FuenteFacturasFake.h
     EstiloPruebas.cpp
     SolicitudesServiceEspia.h
     ServiciosAsincronosFake.h
@@ -134,6 +135,8 @@ qt_add_executable(satcfdi_presentation_quicktests
     quick/FixturePerfiles.cpp
     quick/FixtureExplorador.h
     quick/FixtureExplorador.cpp
+    quick/FixtureFacturas.h
+    quick/FixtureFacturas.cpp
     quick/FixtureAvisoRaiz.h
     ConsultaCatalogoFake.h
     PrevisualizacionFake.h
@@ -183,6 +186,31 @@ target_link_libraries(satcfdi_tema_tests PRIVATE
 satcfdi_enable_warnings(satcfdi_tema_tests)
 add_test(NAME satcfdi_tema_tests COMMAND satcfdi_tema_tests)
 set_tests_properties(satcfdi_tema_tests PROPERTIES
+    LABELS presentation
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
+# satcfdi_facturas_vm_tests (T023.4): FacturasViewModel, franja, meses y lista
+# con una FuenteFacturasMes falsa y evaluaciones reales de cobertura.
+qt_add_executable(satcfdi_facturas_vm_tests
+    TestFacturasViewModel.cpp
+    FuenteFacturasFake.h
+    ServiciosAsincronosFake.h
+    ../fakes/PromesasPendientes.h
+    ../fakes/FakePerfilesSatService.h
+    ../fakes/FakeCredencialesSatService.h
+)
+target_include_directories(satcfdi_facturas_vm_tests PRIVATE ${PROJECT_SOURCE_DIR}/tests)
+target_link_libraries(satcfdi_facturas_vm_tests PRIVATE
+    satcfdi_presentation
+    satcfdi_application
+    satcfdi_domain
+    Qt6::Quick
+    Qt6::Test
+)
+satcfdi_enable_warnings(satcfdi_facturas_vm_tests)
+add_test(NAME satcfdi_facturas_vm_tests COMMAND satcfdi_facturas_vm_tests)
+set_tests_properties(satcfdi_facturas_vm_tests PROPERTIES
     LABELS presentation
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )

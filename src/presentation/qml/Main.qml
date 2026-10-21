@@ -21,6 +21,8 @@ ApplicationWindow {
     required property PerfilesSatViewModel perfilesViewModel
     required property EFirmaFormViewModel eFirmaViewModel
     required property ExploradorCfdiViewModel exploradorViewModel
+    // T023.4: pantalla principal Facturas (por perfil y mes).
+    required property FacturasViewModel facturasViewModel
     // T019 D8: aviso de la carpeta de paquetes (inactivo si no hay aviso).
     required property AvisoRaizPaquetesViewModel avisoRaizPaquetesViewModel
 
@@ -63,6 +65,8 @@ ApplicationWindow {
             return perfilesComponente
         case AppViewModel.Facturas:
             return facturasComponente
+        case AppViewModel.FacturasSolicitud:
+            return facturasSolicitudComponente
         default:
             return listaComponente
         }
@@ -91,11 +95,13 @@ ApplicationWindow {
     readonly property NuevaSolicitudPage paginaNueva: paginaActual.item as NuevaSolicitudPage
     readonly property DetalleSolicitudPage paginaDetalle: paginaActual.item as DetalleSolicitudPage
     readonly property PerfilesSatPage paginaPerfiles: paginaActual.item as PerfilesSatPage
-    readonly property ExploradorCfdiPage paginaFacturas: paginaActual.item as ExploradorCfdiPage
+    readonly property ExploradorCfdiPage paginaExplorador: paginaActual.item as ExploradorCfdiPage
+    readonly property FacturasPage paginaFacturas: paginaActual.item as FacturasPage
 
     readonly property bool dialogoAbierto: (ventana.paginaNueva !== null && ventana.paginaNueva.dialogoAbierto)
                                            || (ventana.paginaDetalle !== null && ventana.paginaDetalle.dialogoAbierto)
                                            || (ventana.paginaPerfiles !== null && ventana.paginaPerfiles.dialogoAbierto)
+                                           || (ventana.paginaExplorador !== null && ventana.paginaExplorador.dialogoAbierto)
                                            || (ventana.paginaFacturas !== null && ventana.paginaFacturas.dialogoAbierto)
     // Campos de texto con foco: TextInput (incluye TextField) o TextEdit.
     readonly property TextInput entradaConFoco: ventana.activeFocusItem as TextInput
@@ -112,16 +118,22 @@ ApplicationWindow {
             ventana.paginaDetalle.regresar()
         else if (ventana.paginaPerfiles !== null)
             ventana.paginaPerfiles.regresar()
-        else if (ventana.paginaFacturas !== null)
-            ventana.appViewModel.mostrarLista() // ⌘1: Solicitudes (Escape regresa al detalle)
+        else if (ventana.paginaExplorador !== null)
+            ventana.paginaExplorador.regresar()
     }
 
+    // T023 D10: fuera del recorrido principal. Paginas de la vista tecnica
+    // provisional (Ir > Diagnostico) hasta que T023.5 las sustituya.
+    readonly property bool enDiagnostico: ventana.paginaLista !== null || ventana.paginaNueva !== null
+                                          || ventana.paginaDetalle !== null || ventana.paginaExplorador !== null
+
+    // ⌘N solo desde la lista provisional de Diagnostico (D10); no es global.
     Action {
         id: accionNueva
         objectName: "atajoNuevaSolicitud"
         text: qsTr("Nueva solicitud")
         shortcut: "Ctrl+N"
-        enabled: ventana.atajosActivos && ventana.paginaNueva === null && paginaActual.item !== null
+        enabled: ventana.atajosActivos && ventana.paginaLista !== null
         onTriggered: ventana.appViewModel.mostrarNueva()
     }
     Action {
@@ -131,10 +143,13 @@ ApplicationWindow {
         shortcut: "Ctrl+F"
         enabled: ventana.atajosActivos
                  && ((ventana.paginaLista !== null && ventana.paginaLista.puedeBuscar)
+                     || (ventana.paginaExplorador !== null && ventana.paginaExplorador.puedeBuscar)
                      || (ventana.paginaFacturas !== null && ventana.paginaFacturas.puedeBuscar))
         onTriggered: {
             if (ventana.paginaFacturas !== null)
                 ventana.paginaFacturas.enfocarBusqueda()
+            else if (ventana.paginaExplorador !== null)
+                ventana.paginaExplorador.enfocarBusqueda()
             else
                 ventana.paginaLista.enfocarBusqueda()
         }
@@ -142,11 +157,40 @@ ApplicationWindow {
     Action {
         id: accionPrincipal
         objectName: "atajoAccionPrincipal"
-        text: ventana.paginaDetalle !== null ? ventana.paginaDetalle.textoAccionPrincipal : qsTr("Verificar ahora")
+        // T023.4: en Facturas, la accion de la franja; en el detalle, la suya.
+        text: ventana.paginaFacturas !== null
+              ? (ventana.paginaFacturas.franja.textoAccion.length > 0 ? ventana.paginaFacturas.franja.textoAccion
+                                                                      : qsTr("Acción del mes"))
+              : ventana.paginaDetalle !== null ? ventana.paginaDetalle.textoAccionPrincipal : qsTr("Acción principal")
         shortcut: "Ctrl+R"
-        enabled: !ventana.dialogoAbierto && !ventana.textoConFoco && ventana.paginaDetalle !== null
-                 && ventana.paginaDetalle.puedeAccionPrincipal
-        onTriggered: ventana.paginaDetalle.accionPrincipal()
+        enabled: !ventana.dialogoAbierto && !ventana.textoConFoco
+                 && ((ventana.paginaFacturas !== null && ventana.paginaFacturas.puedeAccion)
+                     || (ventana.paginaDetalle !== null && ventana.paginaDetalle.puedeAccionPrincipal))
+        onTriggered: {
+            if (ventana.paginaFacturas !== null)
+                ventana.paginaFacturas.ejecutarAccion()
+            else
+                ventana.paginaDetalle.accionPrincipal()
+        }
+    }
+    // T023.4: ⌘↑/⌘↓ mes anterior/siguiente en Facturas.
+    Action {
+        id: accionMesAnterior
+        objectName: "atajoMesAnterior"
+        text: qsTr("Mes anterior")
+        shortcut: "Ctrl+Up"
+        enabled: ventana.atajosActivos && ventana.paginaFacturas !== null && ventana.paginaFacturas.puedeMoverMes
+                 && ventana.facturasViewModel.puedeMesAnterior
+        onTriggered: ventana.paginaFacturas.moverMes(-1)
+    }
+    Action {
+        id: accionMesSiguiente
+        objectName: "atajoMesSiguiente"
+        text: qsTr("Mes siguiente")
+        shortcut: "Ctrl+Down"
+        enabled: ventana.atajosActivos && ventana.paginaFacturas !== null && ventana.paginaFacturas.puedeMoverMes
+                 && ventana.facturasViewModel.puedeMesSiguiente
+        onTriggered: ventana.paginaFacturas.moverMes(1)
     }
     Action {
         id: accionEliminar
@@ -167,10 +211,29 @@ ApplicationWindow {
     Action {
         id: accionRegresar
         objectName: "atajoRegresar"
-        text: qsTr("Solicitudes")
+        // T023.4: ⌘1 lleva a Facturas (pantalla principal) desde cualquier pagina.
+        text: qsTr("Facturas")
         shortcut: "Ctrl+1"
+        enabled: ventana.atajosActivos && paginaActual.item !== null && ventana.paginaFacturas === null
+        // Desde Nueva solicitud pasa primero por su regresar() (T014.1). Sin
+        // pantalla Facturas (sin fuente: pruebas o arranque sin datos),
+        // mostrarFacturas() no navega y ⌘1 conserva el regreso de T014.1.
+        onTriggered: {
+            const desdeNueva = ventana.paginaNueva !== null
+            if (desdeNueva)
+                ventana.paginaNueva.regresar()
+            ventana.appViewModel.mostrarFacturas()
+            if (!desdeNueva && ventana.appViewModel.pagina !== AppViewModel.Facturas)
+                ventana.regresarDePagina()
+        }
+    }
+    // Lista de descargas (vista tecnica hasta T023.5); sin atajo.
+    Action {
+        id: accionDiagnostico
+        objectName: "accionDiagnostico"
+        text: qsTr("Diagnóstico")
         enabled: ventana.atajosActivos && paginaActual.item !== null && ventana.paginaLista === null
-        onTriggered: ventana.regresarDePagina()
+        onTriggered: ventana.appViewModel.mostrarLista()
     }
 
     // Menu de la app con los atajos: solo con el menu nativo de macOS (en
@@ -179,12 +242,12 @@ ApplicationWindow {
         id: barraMenuComponente
         MenuBar {
             Menu {
-                title: qsTr("Solicitud")
-                MenuItem { action: accionNueva }
+                title: qsTr("Facturas")
                 MenuItem { action: accionBuscar }
-                MenuSeparator { }
                 MenuItem { action: accionPrincipal }
-                MenuItem { action: accionEliminar }
+                MenuSeparator { }
+                MenuItem { action: accionMesAnterior }
+                MenuItem { action: accionMesSiguiente }
             }
             Menu {
                 title: qsTr("Ir")
@@ -192,6 +255,11 @@ ApplicationWindow {
                 // oculto de Qt y ⌘[ cambia con el teclado latinoamericano).
                 MenuItem { action: accionRegresar }
                 MenuItem { action: accionPerfiles }
+                MenuSeparator { }
+                MenuItem { action: accionDiagnostico }
+                // Acciones de la vista tecnica: solo visibles en ella (D10).
+                MenuItem { action: accionNueva; visible: ventana.enDiagnostico }
+                MenuItem { action: accionEliminar; visible: ventana.paginaDetalle !== null }
             }
         }
     }
@@ -245,6 +313,13 @@ ApplicationWindow {
     }
     Component {
         id: facturasComponente
+        FacturasPage {
+            app: ventana.appViewModel
+            facturas: ventana.facturasViewModel
+        }
+    }
+    Component {
+        id: facturasSolicitudComponente
         ExploradorCfdiPage {
             app: ventana.appViewModel
             explorador: ventana.exploradorViewModel

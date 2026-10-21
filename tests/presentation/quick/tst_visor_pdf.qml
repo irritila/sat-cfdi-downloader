@@ -99,7 +99,7 @@ TestCase {
         verify(p.header.visible)
         tryVerify(() => lista.visible && lista.activeFocus)
         compare(lista.currentIndex, 1)
-        compare(fixtureExplorador.app.pagina, AppViewModel.Facturas)
+        compare(fixtureExplorador.app.pagina, AppViewModel.FacturasSolicitud)
         // Un segundo Escape regresa al detalle.
         keyClick(Qt.Key_Escape)
         compare(fixtureExplorador.app.pagina, AppViewModel.Detalle)

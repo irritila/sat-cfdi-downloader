@@ -5,6 +5,7 @@
 
 #include "FixtureAvisoRaiz.h"
 #include "FixtureExplorador.h"
+#include "FixtureFacturas.h"
 #include "FixturePerfiles.h"
 
 #include <QQmlContext>
@@ -22,6 +23,8 @@ public slots:
         engine->rootContext()->setContextProperty(QStringLiteral("fixtureExplorador"), new FixtureExplorador(engine));
         // T019 D8: aviso de la carpeta de paquetes.
         engine->rootContext()->setContextProperty(QStringLiteral("fixtureAvisoRaiz"), new FixtureAvisoRaiz(engine));
+        // T023.4: pantalla Facturas.
+        engine->rootContext()->setContextProperty(QStringLiteral("fixtureFacturas"), new FixtureFacturas(engine));
     }
 };
 

@@ -8,7 +8,9 @@ import QtQuick.Layouts
 //   Receptor (RFC / nombre, 1fr) | Total (total tal cual el XML / moneda ·
 //   metodo de pago, 130, derecha) | UUID (8 primeros + Copiar / estado de
 //   parseo con icono, 140).
-// Fondo: superficie, hover superficieSeccion, `seleccionada` Theme.seleccion;
+// Fondo: transparente en reposo (la lista o tarjeta ya es superficie y la
+// fila no tapa sus esquinas redondeadas), hover superficieSeccion,
+// `seleccionada` Theme.seleccion;
 // `conFoco` dibuja el anillo interior. Se usa como delegado (no toma foco: el
 // foco es de la lista); "Copiar UUID" se alcanza con el puntero o con ⌘C en la
 // lista. Nombre accesible: "tipo, fecha, emisor, total" (view model).
@@ -46,17 +48,18 @@ ItemDelegate {
     }
 
     focusPolicy: Qt.NoFocus
-    implicitHeight: Math.max(Theme.altoFila, contenido.implicitHeight + 16)
+    // Alto: contenido + padding vertical espacioS (minimo altoFila).
+    implicitHeight: Math.max(Theme.altoFila, contenido.implicitHeight + topPadding + bottomPadding)
     leftPadding: Theme.espacioL
     rightPadding: Theme.espacioL
-    topPadding: 8
-    bottomPadding: 8
+    topPadding: Theme.espacioS
+    bottomPadding: Theme.espacioS
 
     Accessible.role: Accessible.ListItem
     Accessible.name: fila.nombreAccesible
 
     background: Rectangle {
-        color: fila.seleccionada ? Theme.seleccion : fila.hovered ? Theme.superficieSeccion : Theme.superficie
+        color: fila.seleccionada ? Theme.seleccion : fila.hovered ? Theme.superficieSeccion : "transparent"
         Rectangle {
             anchors.left: parent.left
             anchors.right: parent.right
@@ -90,6 +93,7 @@ ItemDelegate {
             Layout.preferredWidth: 120 - Theme.espacioM
             Layout.maximumWidth: 120 - Theme.espacioM
             Linea {
+                id: lineaFecha
                 objectName: "fechaCfdi"
                 text: fila.fecha.length > 0 ? fila.fecha : "—"
             }
@@ -155,26 +159,33 @@ ItemDelegate {
             spacing: 0
             Layout.preferredWidth: 140 - Theme.espacioM
             Layout.maximumWidth: 140 - Theme.espacioM
-            RowLayout {
-                spacing: 2
-                Layout.fillWidth: true
-                Label {
-                    objectName: "uuidCfdi"
-                    text: fila.uuidCorto.length > 0 ? fila.uuidCorto : "—"
-                    color: Theme.texto
-                    font.family: Theme.familiaMono
-                    font.pixelSize: Theme.mono.size
-                    textFormat: Text.PlainText
-                    Accessible.ignored: true
-                }
+            // El boton de copiar va anclado al UUID, fuera del flujo del
+            // layout: la linea mide lo mismo que las de las demas columnas y
+            // "Completo" queda alineado con la segunda linea de la fila.
+            Label {
+                id: etiquetaUuid
+                objectName: "uuidCfdi"
+                text: fila.uuidCorto.length > 0 ? fila.uuidCorto : "—"
+                color: Theme.texto
+                font.family: Theme.familiaMono
+                font.pixelSize: Theme.mono.size
+                textFormat: Text.PlainText
+                // Misma altura de linea que la primera linea de las demas
+                // columnas (cuerpo), aunque el UUID use la fuente mono.
+                verticalAlignment: Text.AlignVCenter
+                Layout.preferredHeight: Math.max(implicitHeight, lineaFecha.implicitHeight)
+                Accessible.ignored: true
+
                 BotonCopiar {
                     objectName: "botonCopiarUuid"
                     focusPolicy: Qt.NoFocus
                     valor: fila.uuid
                     descripcionValor: qsTr("UUID")
-                    implicitHeight: 20
+                    implicitHeight: Theme.altoBadge
+                    anchors.left: parent.right
+                    anchors.leftMargin: Theme.espacioXs / 2
+                    anchors.verticalCenter: parent.verticalCenter
                 }
-                Item { Layout.fillWidth: true }
             }
             RowLayout {
                 spacing: Theme.espacioXs

@@ -1,5 +1,7 @@
 #include "AppViewModel.h"
 
+#include "FacturasViewModel.h"
+
 #include "AccionesFinder.h"
 #include "application/primeruso/ConsultaPrimerUso.h"
 #include "EFirmaFormViewModel.h"
@@ -103,13 +105,13 @@ bool AppViewModel::abrirFacturas(const QString& id)
             m_detalle->cargar(id); // el regreso muestra el detalle de esta solicitud
         }
     }
-    setPagina(Pagina::Facturas);
+    setPagina(Pagina::FacturasSolicitud);
     return true;
 }
 
 void AppViewModel::regresarDeFacturas()
 {
-    if (m_pagina != Pagina::Facturas) {
+    if (m_pagina != Pagina::FacturasSolicitud) {
         return;
     }
     if (m_detalle && m_detalle->solicitudId() != m_solicitudSeleccionadaId) {
@@ -144,7 +146,7 @@ void AppViewModel::alCambiarEstadoDetalle()
 {
     using Estado = SolicitudDetailViewModel::Estado;
     // T015.3: la solicitud del explorador ya no existe -> detalle "no encontrada".
-    if (m_pagina == Pagina::Facturas && m_detalle && m_detalle->estado() == Estado::NoEncontrada
+    if (m_pagina == Pagina::FacturasSolicitud && m_detalle && m_detalle->estado() == Estado::NoEncontrada
         && m_detalle->solicitudId() == m_solicitudSeleccionadaId) {
         setPagina(Pagina::Detalle);
     }
@@ -194,6 +196,31 @@ void AppViewModel::mostrarCarpetaSolicitudEnFinder(const QString& id)
     });
 }
 
+void AppViewModel::mostrarFacturas()
+{
+    if (m_facturas) {
+        setPagina(Pagina::Facturas);
+    }
+}
+
+void AppViewModel::setFacturas(FacturasViewModel* facturas)
+{
+    if (m_facturas) {
+        disconnect(m_facturas, nullptr, this, nullptr);
+    }
+    m_facturas = facturas;
+    if (!facturas) {
+        return;
+    }
+    connect(facturas, &FacturasViewModel::registrarEFirmaSolicitado, this,
+            [this](const QString& perfilId) { mostrarPerfilSeleccionado(perfilId); });
+    connect(facturas, &FacturasViewModel::detallesTecnicosSolicitados, this,
+            [this](const QString&, int, int) { mostrarLista(); });
+    if (m_pagina == Pagina::Facturas) {
+        facturas->activar();
+    }
+}
+
 void AppViewModel::mostrarPerfiles()
 {
     if (m_perfiles) {
@@ -214,12 +241,19 @@ void AppViewModel::setPagina(Pagina pagina)
             m_perfiles->cerrarFormulario();
         }
     }
-    if (m_pagina == Pagina::Facturas && pagina != Pagina::Facturas && m_explorador) {
+    if (m_pagina == Pagina::FacturasSolicitud && pagina != Pagina::FacturasSolicitud && m_explorador) {
         m_explorador->desactivar();
     }
+    if (m_pagina == Pagina::Facturas && pagina != Pagina::Facturas && m_facturas) {
+        m_facturas->desactivar();
+    }
+    const bool entraFacturas = m_pagina != Pagina::Facturas && pagina == Pagina::Facturas;
     if (m_pagina != pagina) {
         m_pagina = pagina;
         emit paginaChanged();
+    }
+    if (entraFacturas && m_facturas) {
+        m_facturas->activar();
     }
 }
 

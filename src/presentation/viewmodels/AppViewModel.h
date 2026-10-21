@@ -13,6 +13,7 @@ class ConsultaPrimerUso;
 
 class EFirmaFormViewModel;
 class ExploradorCfdiViewModel;
+class FacturasViewModel;
 class NuevaSolicitudViewModel;
 class PerfilesSatViewModel;
 class SolicitudDetailViewModel;
@@ -86,7 +87,8 @@ public:
         Nueva,
         Detalle,
         Perfiles,
-        Facturas,
+        FacturasSolicitud, // explorador de CFDI de una solicitud (T015.3; Diagnostico en T023.5)
+        Facturas,          // T023.4: pantalla principal (Facturas por mes)
     };
     Q_ENUM(Pagina)
 
@@ -148,6 +150,14 @@ public:
     Q_INVOKABLE void mostrarLista();
     Q_INVOKABLE void mostrarNueva();
     Q_INVOKABLE void mostrarPerfiles();
+    // T023.4: pantalla Facturas (Cmd+1). Activa el view model al entrar y lo
+    // desactiva al salir.
+    Q_INVOKABLE void mostrarFacturas();
+    // T023.4: no propietario; nullptr = sin pantalla Facturas (mostrarFacturas
+    // no navega). "Registrar e.firma..." abre Perfiles con ese perfil y "Ver
+    // detalles tecnicos" abre la lista de diagnostico actual (T023.5 la
+    // sustituye por Diagnostico del mes).
+    void setFacturas(FacturasViewModel* facturas);
     // T015.3: no propietario; nullptr = sin explorador (abrirFacturas no navega).
     void setExplorador(ExploradorCfdiViewModel* explorador);
     // false (sin navegar) si no hay explorador o `id` no es canonico.
@@ -189,6 +199,7 @@ private:
     QPointer<PerfilesSatViewModel> m_perfiles;
     QPointer<EFirmaFormViewModel> m_eFirma;
     QPointer<ExploradorCfdiViewModel> m_explorador;
+    QPointer<FacturasViewModel> m_facturas;
     Pagina m_pagina = Pagina::Lista;
     QString m_solicitudSeleccionadaId;
     bool m_notificacionesDeshabilitadas = false;

@@ -66,7 +66,7 @@ ItemDelegate {
                          .arg(fila.textoCreada.replace(",", ""))
 
     background: Rectangle {
-        color: fila.seleccionada ? Theme.seleccion : fila.hovered ? Theme.superficieSeccion : Theme.superficie
+        color: fila.seleccionada ? Theme.seleccion : fila.hovered ? Theme.superficieSeccion : "transparent"
         Rectangle {
             anchors.left: parent.left
             anchors.right: parent.right

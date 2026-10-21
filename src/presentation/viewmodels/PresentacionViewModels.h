@@ -18,6 +18,9 @@ class AppViewModel;
 class CredencialesSatService;
 class EFirmaFormViewModel;
 class ExploradorCfdiViewModel;
+class FacturasViewModel;
+class FuenteFacturasMes;
+class PreferenciasFacturas;
 class NuevaSolicitudViewModel;
 class PerfilesSatService;
 class PerfilesSatViewModel;
@@ -52,13 +55,16 @@ public:
     PerfilesSatViewModel* perfiles() const { return m_perfiles; }
     EFirmaFormViewModel* eFirma() const { return m_eFirma; }
     ExploradorCfdiViewModel* explorador() const { return m_explorador; }
+    // T023.4: pantalla Facturas (siempre existe; sin fuente queda vacia).
+    FacturasViewModel* facturas() const { return m_facturas; }
     // T019 D8: aviso de la carpeta de paquetes; lo fija el composition root
     // antes de cargar Main.qml (sin aviso queda inactivo).
     AvisoRaizPaquetesViewModel* avisoRaizPaquetes() const { return m_avisoRaizPaquetes; }
 
     // {"appViewModel", "solicitudesModel", "nuevaSolicitudViewModel",
     //  "detalleViewModel", "perfilesViewModel", "eFirmaViewModel",
-    //  "exploradorViewModel", "avisoRaizPaquetesViewModel"} para
+    //  "exploradorViewModel", "avisoRaizPaquetesViewModel",
+    //  "facturasViewModel"} para
     //  QQmlApplicationEngine::setInitialProperties.
     QVariantMap initialProperties() const;
 
@@ -78,6 +84,10 @@ public:
     // T015.4: PDF del CFDI en el explorador. No propietario; nullptr = sin
     // visor (Enter solo emite la intencion).
     void setPrevisualizacionCfdi(PrevisualizacionCfdi* previsualizacion);
+    // T023.4: datos de Facturas y preferencia del ultimo perfil. No
+    // propietarios. Con fuente, Facturas es la pagina inicial y la que abre
+    // AppViewModel::mostrarFacturas(); nullptr = sin pantalla Facturas.
+    void setFuenteFacturas(FuenteFacturasMes* fuente, PreferenciasFacturas* preferencias);
 
 private:
     void conectarPreparacionDetalle(PerfilesSatService* perfiles, CredencialesSatService* credenciales,
@@ -89,6 +99,7 @@ private:
     PerfilesSatViewModel* m_perfiles;
     EFirmaFormViewModel* m_eFirma;
     ExploradorCfdiViewModel* m_explorador;
+    FacturasViewModel* m_facturas;
     AppViewModel* m_app;
     AvisoRaizPaquetesViewModel* m_avisoRaizPaquetes;
 };

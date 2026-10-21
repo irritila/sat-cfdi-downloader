@@ -10,6 +10,9 @@
 // - EscenarioAsincrono: fakes con QPromise controlados por la prueba, para
 //   estados de carga, errores y respuestas tardias o desordenadas.
 
+#include "FuenteFacturasFake.h"
+#include "presentation/viewmodels/FacturasViewModel.h"
+#include "presentation/viewmodels/FranjaMesViewModel.h"
 #include "CredencialesSatServiceListo.h"
 #include "ServiciosAsincronosFake.h"
 #include "SolicitudesServiceEspia.h"
@@ -452,6 +455,7 @@ private slots:
     void atajosDePeriodoConRelojFijo();
     void verSolicitudExistenteDesdeDuplicado();
     void atajosDeTeclado();
+    void atajosDeFacturas();
     void copiarIdentificadores();
 
     // T014.2: reintento por paquete
@@ -1069,7 +1073,9 @@ void TestPresentacion::qmlSinImportsProhibidos()
                  qPrintable(archivo.fileName() + QStringLiteral(": ") + termino.captured(0)));
         ++archivos;
     }
-    QCOMPARE(archivos, 32); // 31 .qml (Theme, Icono, componentes T013, BotonCopiar, T015.3, VisorPdfCfdi y T019) + Etiquetas.js
+    // 31 .qml (Theme, Icono, componentes T013, BotonCopiar, T015.3, VisorPdfCfdi y T019) + Etiquetas.js,
+    // mas T023.4: FacturasPage, FranjaMes y ListaMesesFacturas.
+    QCOMPARE(archivos, 35);
 }
 
 // ---------------------------------------------------------------------------
@@ -3143,4 +3149,86 @@ void TestPresentacion::notificacionMostrarCarpetaSolicitudEnFinder()
     procesarEventos();
     QCOMPARE(aviso.count(), 2);
     e.vms.setAccionesFinder(nullptr);
+}
+
+void TestPresentacion::atajosDeFacturas()
+{
+    // T023.4: Cmd+1/2/R/F/Arriba/Abajo con Facturas; inactivos con un dialogo
+    // abierto o con un campo editable con foco.
+    using namespace pruebasfacturas;
+    EscenarioAsincrono e;
+    FuenteFalsa fuente;
+    PreferenciasMemoria preferencias;
+    fuente.cfdisPorMes[QStringLiteral("2026-08")] = {
+        cfdi(TipoDescarga::Emitidos, 1, QStringLiteral("2026-08-03T10:00:00"), QStringLiteral("PERFIL"),
+             QStringLiteral("CLIENTE SINTETICO"))};
+    e.vms.setFuenteFacturas(&fuente, &preferencias);
+    e.vms.facturas()->setIntervaloBusqueda(0);
+    QVERIFY(e.cargar());
+    QVERIFY(e.activar());
+    AppViewModel* app = e.vms.app();
+    FacturasViewModel* f = e.vms.facturas();
+    QCOMPARE(app->pagina(), Pagina::Facturas);
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaFacturas"));
+    QTRY_COMPARE(f->mes(), 8);
+    QTRY_COMPARE(f->franja()->estado(), FranjaMesViewModel::Estado::SinDescargar);
+    QTRY_VERIFY(e.item(QStringLiteral("listaFacturas")) && e.item(QStringLiteral("listaFacturas"))->isVisible());
+    auto enfocarLista = [&e] {
+        e.item(QStringLiteral("listaFacturas"))->forceActiveFocus();
+        procesarEventos();
+    };
+    enfocarLista();
+
+    // Cmd+Arriba/Abajo: mes anterior y siguiente.
+    atajo(e.ventana, Qt::Key_Up);
+    QTRY_COMPARE(f->mes(), 7);
+    atajo(e.ventana, Qt::Key_Down);
+    QTRY_COMPARE(f->mes(), 8);
+    // Cmd+R: accion de la franja.
+    QTRY_VERIFY(f->franja()->accionHabilitada());
+    enfocarLista();
+    atajo(e.ventana, Qt::Key_R);
+    QTRY_COMPARE(fuente.accionesPlanificadas.size(), 1);
+    QTRY_VERIFY(!f->franja()->ejecutando());
+
+    // Cmd+F enfoca la busqueda; con el campo enfocado no actua ningun atajo.
+    atajo(e.ventana, Qt::Key_F);
+    QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("campoBusquedaFacturas"));
+    atajo(e.ventana, Qt::Key_Up);
+    atajo(e.ventana, Qt::Key_2);
+    atajo(e.ventana, Qt::Key_R);
+    QCOMPARE(f->mes(), 8);
+    QCOMPARE(app->pagina(), Pagina::Facturas);
+    QCOMPARE(fuente.accionesPlanificadas.size(), 1);
+
+    // Cmd+2 Perfiles SAT y Cmd+1 de vuelta a Facturas.
+    enfocarLista();
+    atajo(e.ventana, Qt::Key_2);
+    QTRY_COMPARE(app->pagina(), Pagina::Perfiles);
+    atajo(e.ventana, Qt::Key_1);
+    QTRY_COMPARE(app->pagina(), Pagina::Facturas);
+    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaFacturas"));
+
+    // Con el dialogo de confirmacion abierto no actua ningun atajo.
+    PreplanGuiado conConfirmacion;
+    CandidatoGuiado candidato;
+    candidato.direccion = TipoDescarga::Emitidos;
+    candidato.duplicado.clasificacion = ClasificacionDuplicado::RequiereConfirmacion;
+    conConfirmacion.candidatos = {candidato};
+    fuente.planes.append(FuenteFacturasMes::ResultadoPreplan::exito(conConfirmacion));
+    QTRY_VERIFY(f->franja()->accionHabilitada());
+    QTRY_VERIFY(e.item(QStringLiteral("listaFacturas")) && e.item(QStringLiteral("listaFacturas"))->isVisible());
+    enfocarLista();
+    atajo(e.ventana, Qt::Key_R);
+    QTRY_VERIFY(f->confirmacionPendiente());
+    QTRY_VERIFY(e.pagina()->property("dialogoAbierto").toBool());
+    const int planificaciones = int(fuente.accionesPlanificadas.size());
+    atajo(e.ventana, Qt::Key_Up);
+    atajo(e.ventana, Qt::Key_2);
+    atajo(e.ventana, Qt::Key_R);
+    QCOMPARE(f->mes(), 8);
+    QCOMPARE(app->pagina(), Pagina::Facturas);
+    QCOMPARE(int(fuente.accionesPlanificadas.size()), planificaciones);
+    f->cancelarConfirmacion();
+    QTRY_VERIFY(!e.pagina()->property("dialogoAbierto").toBool());
 }

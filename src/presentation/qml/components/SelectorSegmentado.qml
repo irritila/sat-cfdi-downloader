@@ -22,8 +22,11 @@ Rectangle {
 
     signal activado(string clave)
 
-    implicitWidth: fila.implicitWidth + 4
-    implicitHeight: 28
+    // Carril con padding de 2 (ficha); el alto total es altoControl, como
+    // los campos y botones con los que se alinea.
+    readonly property int carril: 2
+    implicitWidth: fila.implicitWidth + 2 * selector.carril
+    implicitHeight: Theme.altoControl
     radius: 7
     color: Theme.controlSecundario
     opacity: selector.enabled ? 1 : 0.5
@@ -60,9 +63,9 @@ Rectangle {
 
     Row {
         id: fila
-        x: 2
-        y: 2
-        spacing: 2
+        x: selector.carril
+        y: selector.carril
+        spacing: selector.carril
 
         Repeater {
             id: repetidor
@@ -80,7 +83,7 @@ Rectangle {
                 objectName: "segmento_" + segmento.modelData.clave
                 checkable: false
                 focusPolicy: segmento.activo ? Qt.StrongFocus : Qt.ClickFocus
-                height: 24
+                height: Theme.altoControl - 2 * selector.carril
                 leftPadding: 14
                 rightPadding: 14
                 implicitWidth: contenido.implicitWidth + leftPadding + rightPadding

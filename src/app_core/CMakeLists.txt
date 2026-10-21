@@ -11,6 +11,9 @@ qt_add_library(satcfdi_app_core STATIC
     AppBootstrapper.cpp
     AppCompositionRoot.h
     AppCompositionRoot.cpp
+    # T023.4: fuente de Facturas y preferencia del ultimo perfil.
+    FuenteFacturasRoot.h
+    FuenteFacturasRoot.cpp
     AppLifecycleController.h
     ArranqueProceso.h
     ArranqueProceso.cpp

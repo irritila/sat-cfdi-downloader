@@ -609,7 +609,7 @@ void TestExploradorCfdi::navegacionDelExplorador()
 
     const int obtenciones = int(g.solicitudes.idsObtener.size());
     QVERIFY(app->abrirFacturas(kId));
-    QCOMPARE(app->pagina(), AppViewModel::Pagina::Facturas);
+    QCOMPARE(app->pagina(), AppViewModel::Pagina::FacturasSolicitud);
     QCOMPARE(explorador->solicitudId(), kId);
     QCOMPARE(g.solicitudes.idsObtener.size(), obtenciones); // el detalle ya era de kId
     QCOMPARE(g.catalogo.revisadas.size(), 1);

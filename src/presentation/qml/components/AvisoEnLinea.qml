@@ -35,8 +35,9 @@ Rectangle {
         }
     }
 
-    implicitWidth: fila.implicitWidth + 24
-    implicitHeight: fila.implicitHeight + 20
+    // Padding espacioM y gap espacioS (tokens de Theme, T023.4).
+    implicitWidth: fila.implicitWidth + 2 * Theme.espacioM
+    implicitHeight: fila.implicitHeight + 2 * Theme.espacioM
     radius: 8
     color: aviso.colores.fondo
     border.width: 1
@@ -48,11 +49,8 @@ Rectangle {
     RowLayout {
         id: fila
         anchors.fill: parent
-        anchors.leftMargin: 12
-        anchors.rightMargin: 12
-        anchors.topMargin: 10
-        anchors.bottomMargin: 10
-        spacing: 10
+        anchors.margins: Theme.espacioM
+        spacing: Theme.espacioS
 
         Icono {
             nombre: aviso.icono.length > 0 ? aviso.icono : aviso.iconoVariante
@@ -61,7 +59,7 @@ Rectangle {
             Layout.alignment: Qt.AlignTop
         }
         ColumnLayout {
-            spacing: 2
+            spacing: Theme.espacioXs / 2
             Layout.fillWidth: true
             Label {
                 objectName: "tituloAviso"

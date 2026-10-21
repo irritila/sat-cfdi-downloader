@@ -115,7 +115,7 @@ TestCase {
         keyClick(Qt.Key_Return)
         compare(fixtureExplorador.numPrevisualizaciones(), 1)
         compare(fixtureExplorador.ultimaPrevisualizacion(), "PAQ_01:1")
-        compare(fixtureExplorador.app.pagina, AppViewModel.Facturas)
+        compare(fixtureExplorador.app.pagina, AppViewModel.FacturasSolicitud)
         // ⌘C copia el UUID completo de la fila.
         verify(p.copiarUuidActual())
         // Flecha abajo desde la busqueda pasa a la lista.
@@ -243,7 +243,7 @@ TestCase {
         fixtureExplorador.resolverResumen(0, { total: 5 })
         tryCompare(boton, "text", "Ver facturas (5)")
         mouseClick(boton)
-        compare(fixtureExplorador.app.pagina, AppViewModel.Facturas)
+        compare(fixtureExplorador.app.pagina, AppViewModel.FacturasSolicitud)
         compare(fixtureExplorador.explorador.solicitudId, fixtureExplorador.solicitudId)
     }
 

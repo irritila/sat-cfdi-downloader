@@ -26,6 +26,8 @@ class PrevisualizacionCfdiService;
 class CatalogoCfdiService;
 class CatalogoMensualCfdiService;
 class DescargaGuiadaService;
+class FuenteFacturasRoot;
+class PreferenciasFacturasArchivo;
 class CfdiArchiveReader;
 class IndexadorCfdi;
 class AccesoFinder;
@@ -236,6 +238,9 @@ private:
     std::unique_ptr<CatalogoCfdiService> m_catalogoCfdi;
     std::unique_ptr<CatalogoMensualCfdiService> m_catalogoMensual;
     std::unique_ptr<DescargaGuiadaService> m_descargaGuiada;
+    std::unique_ptr<ConsultaPreparacionPerfiles> m_consultaPerfilesFacturas; // T023.4
+    std::unique_ptr<FuenteFacturasRoot> m_fuenteFacturas;                    // T023.4
+    std::unique_ptr<PreferenciasFacturasArchivo> m_preferenciasFacturas;     // T023.4
     // T015.3: ConsultaCatalogoCfdi de la presentacion sobre m_catalogoCfdi
     // (se destruye antes que el, despues de los view models).
     std::unique_ptr<AdaptadorCatalogoCfdi> m_adaptadorCatalogo;

@@ -5,6 +5,7 @@
 #include "IntegracionWorker.h"
 #include "ProgramadorQt.h"
 #include "SingleInstanceCoordinator.h"
+#include "app_core/FuenteFacturasRoot.h"
 #include "application/cfdi/CatalogoMensualCfdiService.h"
 #include "application/cfdi/DescargaGuiadaService.h"
 #include "application/cfdi/CatalogoCfdiService.h"
@@ -429,6 +430,27 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
     // T015.4 (interfaz): visor PDF del explorador sobre el servicio de core.
     m_viewModels->setPrevisualizacionCfdi(
         new AdaptadorPrevisualizacionCfdi(*m_previsualizacionCfdi, m_viewModels.get()));
+    // T023.4: pantalla Facturas (pagina inicial) y ultimo perfil usado.
+    m_consultaPerfilesFacturas = std::make_unique<ConsultaPreparacionPerfiles>(*m_perfilesService,
+                                                                               *m_credencialesService, nullptr, reloj);
+    m_fuenteFacturas = std::make_unique<FuenteFacturasRoot>(*m_catalogoMensual, *m_descargaGuiada,
+                                                            *m_consultaPerfilesFacturas, reloj);
+    {
+        FuenteFacturasRoot* fuente = m_fuenteFacturas.get();
+        QObject::connect(m_ejecutor.get(), &OperacionExecutor::solicitudActualizada, fuente,
+                         [fuente] { fuente->avisarCambio(); });
+        QObject::connect(m_catalogoCfdi.get(), &CatalogoCfdiService::indiceCambiado, fuente,
+                         [fuente] { fuente->avisarCambio(); });
+        QObject::connect(m_solicitudesService.get(), &SolicitudesService::solicitudEliminada, fuente,
+                         [fuente] { fuente->avisarCambio(); });
+        QObject::connect(m_perfilesService.get(), &PerfilesSatService::perfilesCambiaron, fuente,
+                         &FuenteFacturasMes::perfilesCambiados);
+        QObject::connect(m_credencialesService.get(), &CredencialesSatService::credencialCambio, fuente,
+                         [fuente] { emit fuente->perfilesCambiados(); });
+    }
+    m_preferenciasFacturas = std::make_unique<PreferenciasFacturasArchivo>(
+        QDir(QFileInfo(rutaBase).absolutePath()).filePath(QStringLiteral("preferencias.ini")));
+    m_viewModels->setFuenteFacturas(m_fuenteFacturas.get(), m_preferenciasFacturas.get());
 
     // Primera tarea del dispatcher serial: limpia generaciones huerfanas del
     // SecretStore (residuos de fallos previos). No se espera aqui; las
@@ -456,6 +478,8 @@ AppCompositionRoot::~AppCompositionRoot()
     m_renderizadorPdf.reset();
     m_archivosPdf.reset();
     m_lectorPdf.reset();
+    m_fuenteFacturas.reset(); // T023.4: antes que sus servicios
+    m_consultaPerfilesFacturas.reset();
     m_descargaGuiada.reset();  // T023.3: antes que indexador, worker, ejecutor y dispatcher
     m_catalogoMensual.reset(); // T023.2
     m_catalogoCfdi.reset();

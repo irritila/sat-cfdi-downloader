@@ -8,6 +8,10 @@ import QtQuick.Controls.Basic
 // - "destructivo": relleno controlSecundario con texto e icono Theme.error.
 // - "navegacion" / "plano": sin relleno, texto Theme.acentoTexto
 //   (navegacion lleva chevron-left si no se indica otro icono).
+// - "enlace": como "plano" pero sin padding lateral ni fondo en hover, para
+//   usarse dentro de un bloque de texto alineado con su borde izquierdo
+//   (p. ej. "Ver detalles técnicos" en la franja de Facturas). Hover:
+//   subrayado.
 // - "icono": cuadrado de 28 sin texto; `nombreAccesible` es obligatorio.
 // `compacto` = tamano sm (alto 24, texto 12). `icono` = nombre del SVG (16 pt).
 // `cargando` sustituye el icono por un BusyIndicator; el llamador deshabilita.
@@ -30,7 +34,8 @@ Button {
 
     readonly property bool esPrimario: boton.variante === "primario"
     readonly property bool esIcono: boton.variante === "icono"
-    readonly property bool sinRelleno: boton.variante === "navegacion" || boton.variante === "plano"
+    readonly property bool esEnlace: boton.variante === "enlace"
+    readonly property bool sinRelleno: boton.variante === "navegacion" || boton.variante === "plano" || boton.esEnlace
     readonly property color colorTexto: boton.esPrimario ? Theme.textoSobreAcento
                                         : boton.variante === "destructivo" ? Theme.error
                                         : boton.sinRelleno ? Theme.acentoTexto
@@ -43,7 +48,7 @@ Button {
     implicitHeight: boton.compacto ? 24 : Theme.altoControl
     implicitWidth: boton.esIcono ? boton.implicitHeight
                                  : Math.max(boton.implicitHeight, contenido.implicitWidth + boton.leftPadding + boton.rightPadding)
-    leftPadding: boton.esIcono ? 0 : (boton.sinRelleno ? Theme.espacioS : Theme.espacioM)
+    leftPadding: boton.esIcono || boton.esEnlace ? 0 : (boton.sinRelleno ? Theme.espacioS : Theme.espacioM)
     rightPadding: boton.leftPadding
     topPadding: 0
     bottomPadding: 0
@@ -92,7 +97,10 @@ Button {
             Text {
                 visible: !boton.esIcono && boton.text.length > 0
                 text: boton.text
-                font: boton.font
+                font.family: boton.font.family
+                font.pixelSize: boton.font.pixelSize
+                font.weight: boton.font.weight
+                font.underline: boton.esEnlace && boton.hovered
                 color: boton.colorTexto
                 elide: Text.ElideRight
                 anchors.verticalCenter: parent.verticalCenter
@@ -106,6 +114,8 @@ Button {
         implicitHeight: boton.implicitHeight
         radius: Theme.radioControl
         color: {
+            if (boton.esEnlace)
+                return "transparent"
             if (boton.sinRelleno)
                 return boton.down ? Theme.controlSecundario : boton.hovered ? Theme.superficieSeccion : "transparent"
             if (boton.down)

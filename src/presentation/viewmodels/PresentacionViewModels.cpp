@@ -7,6 +7,7 @@
 #include "AppViewModel.h"
 #include "EFirmaFormViewModel.h"
 #include "ExploradorCfdiViewModel.h"
+#include "FacturasViewModel.h"
 #include "NuevaSolicitudViewModel.h"
 #include "PerfilesSatViewModel.h"
 #include "SolicitudDetailViewModel.h"
@@ -25,6 +26,7 @@ PresentacionViewModels::PresentacionViewModels(SolicitudesService* solicitudes,
     , m_perfiles(new PerfilesSatViewModel(perfiles, credenciales, this, reloj))
     , m_eFirma(new EFirmaFormViewModel(credenciales, this))
     , m_explorador(new ExploradorCfdiViewModel(this))
+    , m_facturas(new FacturasViewModel(this))
     , m_app(new AppViewModel(m_nuevaSolicitud, m_detalle, m_perfiles, m_eFirma, this))
     , m_avisoRaizPaquetes(new AvisoRaizPaquetesViewModel(this))
 {
@@ -68,6 +70,7 @@ void PresentacionViewModels::setAccionesFinder(AccionesFinder* acciones)
 {
     m_detalle->setAccionesFinder(acciones);
     m_explorador->setAccionesFinder(acciones);
+    m_facturas->visor()->setAccionesFinder(acciones);
     m_app->setAccionesFinder(acciones);
 }
 
@@ -86,6 +89,17 @@ void PresentacionViewModels::setConsultaCatalogo(ConsultaCatalogoCfdi* consulta)
 void PresentacionViewModels::setPrevisualizacionCfdi(PrevisualizacionCfdi* previsualizacion)
 {
     m_explorador->setPrevisualizacion(previsualizacion);
+    m_facturas->setPrevisualizacion(previsualizacion);
+}
+
+void PresentacionViewModels::setFuenteFacturas(FuenteFacturasMes* fuente, PreferenciasFacturas* preferencias)
+{
+    m_facturas->setFuente(fuente);
+    m_facturas->setPreferencias(preferencias);
+    m_app->setFacturas(fuente ? m_facturas : nullptr);
+    if (fuente) {
+        m_app->mostrarFacturas(); // T023.4: pagina por omision
+    }
 }
 
 QVariantMap PresentacionViewModels::initialProperties() const
@@ -99,6 +113,7 @@ QVariantMap PresentacionViewModels::initialProperties() const
         {QStringLiteral("eFirmaViewModel"), QVariant::fromValue(m_eFirma)},
         {QStringLiteral("exploradorViewModel"), QVariant::fromValue(m_explorador)},
         {QStringLiteral("avisoRaizPaquetesViewModel"), QVariant::fromValue(m_avisoRaizPaquetes)},
+        {QStringLiteral("facturasViewModel"), QVariant::fromValue(m_facturas)},
     };
 }
 

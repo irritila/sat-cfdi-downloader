@@ -321,7 +321,9 @@ TestCase {
         compare(f.Accessible.name, "XAXX010101000, Contribuyente de ejemplo, e.firma lista, Disponible para solicitudes, Vigente hasta 2029-01-01")
         compare(findChild(f, "badgePerfil").icono, "check-shield")
         verify(!findChild(f, "reintentar").visible)
-        compare(f.background.color, Theme.superficie)
+        // T023.4: en reposo la fila es transparente (la lista o tarjeta ya es
+        // superficie y la fila no tapa sus esquinas redondeadas).
+        compare(f.background.color, Qt.color("transparent"))
         f.seleccionada = true
         compare(f.background.color, Theme.seleccion)
         f.preparacion = "EstadoNoDisponible"
@@ -375,7 +377,7 @@ TestCase {
         compare(findChild(s, "periodoFila").text, "3 sep 2026")
         compare(findChild(s, "paquetesFila").text, "0/3")
         verify(s.height >= Theme.altoFila)
-        compare(s.background.color, Theme.superficie)
+        compare(s.background.color, Qt.color("transparent"))
         s.seleccionada = true
         compare(s.background.color, Theme.seleccion)
         s.totalPaquetes = 1

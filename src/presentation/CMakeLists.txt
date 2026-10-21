@@ -11,6 +11,10 @@ set(_satcfdi_qml_files
     qml/screens/DetalleSolicitudPage.qml
     qml/screens/PerfilesSatPage.qml
     qml/screens/ExploradorCfdiPage.qml
+    # T023.4: pantalla Facturas (qt-interface-engineer, corte 2).
+    qml/screens/FacturasPage.qml
+    qml/components/FranjaMes.qml
+    qml/components/ListaMesesFacturas.qml
     qml/components/EFirmaDialogo.qml
     qml/components/EstadoBadge.qml
     qml/components/BotonAccion.qml
@@ -101,6 +105,16 @@ qt_add_qml_module(satcfdi_presentation
         viewmodels/PrevisualizacionCfdi.h
         viewmodels/VisorPdfCfdiViewModel.h
         viewmodels/VisorPdfCfdiViewModel.cpp
+        # T023.4: pantalla Facturas (perfil, meses, franja, pestanas, lista).
+        viewmodels/FuenteFacturasMes.h
+        viewmodels/FranjaMesViewModel.h
+        viewmodels/FranjaMesViewModel.cpp
+        viewmodels/MesesFacturasModel.h
+        viewmodels/MesesFacturasModel.cpp
+        viewmodels/FacturasListModel.h
+        viewmodels/FacturasListModel.cpp
+        viewmodels/FacturasViewModel.h
+        viewmodels/FacturasViewModel.cpp
         estilo/EstiloVisual.h
         estilo/EstiloVisual.cpp
         componentes/IconoSvg.h

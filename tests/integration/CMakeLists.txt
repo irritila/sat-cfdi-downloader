@@ -25,6 +25,8 @@ qt_add_executable(satcfdi_integration_tests
     TestRaizPaquetesMigrada.cpp
     # T023.3: descarga guiada con el root real y SAT simulado.
     TestDescargaGuiada.cpp
+    # T023.4: preferencia del ultimo perfil de Facturas (archivo real).
+    TestFacturasPreferencias.cpp
     ../fakes/LectorCfdiCompuerta.h
     ../fakes/ZipCfdiSintetico.h
     ../fakes/FakeSatGateway.h
