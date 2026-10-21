@@ -91,6 +91,38 @@ QFuture<FuenteFacturasMes::ResultadoEjecucion> FuenteFacturasRoot::ejecutar(cons
     return m_descarga.ejecutar(preplan, decisiones);
 }
 
+FuenteHistorialRoot::FuenteHistorialRoot(CatalogoMensualCfdiService& catalogo, FuenteFacturasMes& cambios,
+                                         QObject* parent)
+    : FuenteHistorial(parent)
+    , m_catalogo(catalogo)
+{
+    connect(&cambios, &FuenteFacturasMes::datosCambiados, this, &FuenteHistorial::datosCambiados);
+    connect(&cambios, &FuenteFacturasMes::perfilesCambiados, this, [this] { emit datosCambiados(PerfilId()); });
+}
+
+QFuture<FuenteHistorial::ResultadoEntradas> FuenteHistorialRoot::historial(const PerfilId& perfil)
+{
+    return m_catalogo.historial(perfil);
+}
+
+DestinoNavegacion destinoDeUbicacion(const std::optional<UbicacionSolicitud>& ubicacion)
+{
+    if (!ubicacion) {
+        return DestinoNavegacion::facturas();
+    }
+    if (ubicacion->mesLote) {
+        return DestinoNavegacion::facturasMes(ubicacion->perfil, *ubicacion->mesLote);
+    }
+    return DestinoNavegacion::diagnostico(ubicacion->solicitud);
+}
+
+QFuture<DestinoNavegacion> FuenteHistorialRoot::resolver(const SolicitudId& solicitud)
+{
+    return m_catalogo.ubicar(solicitud).then(this, [](const CatalogoMensualCfdiService::ResultadoUbicacion& r) {
+        return r ? destinoDeUbicacion(r.valor()) : DestinoNavegacion::facturas();
+    });
+}
+
 PreferenciasFacturasArchivo::PreferenciasFacturasArchivo(const QString& rutaIni)
     : m_settings(rutaIni, QSettings::IniFormat)
 {

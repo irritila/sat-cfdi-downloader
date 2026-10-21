@@ -244,4 +244,94 @@ SqliteLoteDescargaGuiadaRepository::listar(const PerfilId& perfil, const std::op
     return R::exito(std::move(lotes));
 }
 
+Resultado<QList<SolicitudSinLote>, ErrorPersistencia>
+SqliteLoteDescargaGuiadaRepository::listarSinLote(const PerfilId& perfil)
+{
+    using R = Resultado<QList<SolicitudSinLote>, ErrorPersistencia>;
+    constexpr QStringView kContexto = u"lote_descarga_guiada.listar_sin_lote";
+    constexpr QStringView kTabla = u"solicitud_masiva";
+    auto conexion = sqlite::conexionLectura(m_proveedor);
+    if (!conexion) {
+        return R::fallo(std::move(conexion).error());
+    }
+    QSqlQuery q(conexion.valor());
+    q.setForwardOnly(true);
+    const QString sql = QStringLiteral(
+        "SELECT s.id, s.tipo_cfdi, s.fecha_inicial_sat, s.fecha_final_sat, s.creada_en, "
+        "(s.tipo_comprobante IS NOT NULL OR s.complemento IS NOT NULL OR s.rfc_receptores_json IS NOT NULL "
+        "OR (s.tipo_cfdi = 'emitidos' AND s.rfc_receptor IS NOT NULL) "
+        "OR (s.tipo_cfdi = 'recibidos' AND s.rfc_emisor IS NOT NULL)) AS con_filtros "
+        "FROM solicitud_masiva s "
+        "JOIN perfil_sat ps ON ps.id = s.perfil_sat_id AND ps.eliminado_en IS NULL "
+        "WHERE s.perfil_sat_id = :perfil AND s.eliminado_en IS NULL "
+        "AND NOT EXISTS (SELECT 1 FROM lote_descarga_guiada_solicitud g WHERE g.solicitud_masiva_id = s.id) "
+        "ORDER BY s.creada_en DESC, s.id DESC");
+    if (auto r = correr(q, sql, {{":perfil", sqlite::texto(perfil.texto())}}, kContexto); !r) {
+        return R::fallo(std::move(r).error());
+    }
+    QList<SolicitudSinLote> lista;
+    while (q.next()) {
+        SolicitudSinLote s;
+        const auto id = SolicitudId::desdeTexto(q.value(0).toString());
+        const auto direccion = tipoDescargaDesdeTipoCfdi(q.value(1).toString());
+        if (!id || !direccion) {
+            return R::fallo(sqlite::filaIlegible(kTabla, u"tipo_cfdi"));
+        }
+        s.id = *id;
+        s.direccion = *direccion;
+        s.fechaInicialSat = q.value(2).toString();
+        s.fechaFinalSat = q.value(3).toString();
+        if (!sqlite::leerInstante(q.value(4), s.creadaEn)) {
+            return R::fallo(sqlite::filaIlegible(kTabla, u"creada_en"));
+        }
+        s.conFiltros = q.value(5).toInt() != 0;
+        lista.append(std::move(s));
+    }
+    return R::exito(std::move(lista));
+}
+
+Resultado<std::optional<UbicacionSolicitud>, ErrorPersistencia>
+SqliteLoteDescargaGuiadaRepository::ubicar(const SolicitudId& solicitud)
+{
+    using R = Resultado<std::optional<UbicacionSolicitud>, ErrorPersistencia>;
+    constexpr QStringView kContexto = u"lote_descarga_guiada.ubicar";
+    if (solicitud.esNulo()) {
+        return R::exito(std::nullopt);
+    }
+    auto conexion = sqlite::conexionLectura(m_proveedor);
+    if (!conexion) {
+        return R::fallo(std::move(conexion).error());
+    }
+    QSqlQuery q(conexion.valor());
+    q.setForwardOnly(true);
+    // El lote solo cuenta si es del mismo perfil que la solicitud.
+    const QString sql = QStringLiteral(
+        "SELECT s.perfil_sat_id, l.mes FROM solicitud_masiva s "
+        "JOIN perfil_sat ps ON ps.id = s.perfil_sat_id AND ps.eliminado_en IS NULL "
+        "LEFT JOIN lote_descarga_guiada_solicitud g ON g.solicitud_masiva_id = s.id "
+        "LEFT JOIN lote_descarga_guiada l ON l.id = g.lote_id AND l.perfil_sat_id = s.perfil_sat_id "
+        "WHERE s.id = :id AND s.eliminado_en IS NULL");
+    if (auto r = correr(q, sql, {{":id", sqlite::texto(solicitud.texto())}}, kContexto); !r) {
+        return R::fallo(std::move(r).error());
+    }
+    if (!q.next()) {
+        return R::exito(std::nullopt);
+    }
+    UbicacionSolicitud u;
+    u.solicitud = solicitud;
+    const auto perfil = PerfilId::desdeTexto(q.value(0).toString());
+    if (!perfil) {
+        return R::fallo(sqlite::filaIlegible(u"solicitud_masiva", u"perfil_sat_id"));
+    }
+    u.perfil = *perfil;
+    if (!q.value(1).isNull()) {
+        const auto mes = MesCalendario::desdeTexto(q.value(1).toString());
+        if (!mes) {
+            return R::fallo(sqlite::filaIlegible(u"lote_descarga_guiada", u"mes"));
+        }
+        u.mesLote = *mes;
+    }
+    return R::exito(std::move(u));
+}
+
 } // namespace satcfdi

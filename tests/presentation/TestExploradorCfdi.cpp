@@ -597,7 +597,7 @@ void TestExploradorCfdi::navegacionDelExplorador()
     ExploradorCfdiViewModel* explorador = g.vms.explorador();
     // Sin consulta del indice no se navega.
     QVERIFY(!app->abrirFacturas(kId));
-    QCOMPARE(app->pagina(), AppViewModel::Pagina::Lista);
+    QCOMPARE(app->pagina(), AppViewModel::Pagina::Diagnostico);
 
     g.vms.setConsultaCatalogo(&g.catalogo);
     QVERIFY(app->abrirDetalle(kId));

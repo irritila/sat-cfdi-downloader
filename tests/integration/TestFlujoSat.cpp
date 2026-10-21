@@ -348,7 +348,7 @@ void TestFlujoSat::finderDestinosExactosYSinCambios()
     f.os.resultadoFinder = OSIntegration::ResultadoFinder::Fallido;
     f.os.emitirAbrirCarpetaPaquetes();
     QTRY_COMPARE(f.root->viewModels().app()->mensajeFinder(), QStringLiteral("No se pudo abrir Finder"));
-    QCOMPARE(f.root->viewModels().app()->pagina(), AppViewModel::Pagina::Lista);
+    QCOMPARE(f.root->viewModels().app()->pagina(), AppViewModel::Pagina::Diagnostico);
 
     // Solo lectura: la base no cambio.
     QCOMPARE(volcado(rutaBase), antes);

@@ -33,8 +33,9 @@ class ExtensionCicloDeVida;
 //   os.prepararSalida() -> salida().
 //
 // - T014.4 D1: notificacionActivada del adaptador se enruta con
-//   rutaDeNotificacion(): Solicitud+Abrir -> ventana y detalle (lista sin
-//   error si ya no existe); Solicitud+MostrarEnFinder -> flujo T009.1 de la
+//   rutaDeNotificacion(): Solicitud+Abrir -> ventana y destino resuelto por
+//   AppViewModel::abrirSolicitudNotificada (Facturas del perfil y mes del
+//   lote, Diagnostico si no tiene lote, Facturas sin error si ya no existe); Solicitud+MostrarEnFinder -> flujo T009.1 de la
 //   carpeta de la solicitud (la ventana solo se trae al frente si se presento
 //   un aviso); Perfil+Abrir/AbrirPerfiles -> ventana y Perfiles SAT con ese
 //   perfil seleccionado; Ninguno o id no canonico -> solo mostrar la ventana.
@@ -47,7 +48,9 @@ class ExtensionCicloDeVida;
 // propietaria (QPointer).
 // T014.4 D1: destino de navegacion decidido para una notificacion pulsada.
 struct RutaNotificacion {
-    enum class Tipo { SoloVentana, DetalleSolicitud, FinderSolicitud, PerfilSeleccionado };
+    // SolicitudNotificada (T023.5): AppViewModel::abrirSolicitudNotificada
+    // resuelve el destino (Facturas del mes, Diagnostico o Facturas).
+    enum class Tipo { SoloVentana, SolicitudNotificada, FinderSolicitud, PerfilSeleccionado };
     Tipo tipo = Tipo::SoloVentana;
     QString id; // UUID canonico; vacio en SoloVentana
 
@@ -94,7 +97,8 @@ public slots:
     void mostrarVentana();
     void ocultarVentana();
     void enfocarVentana();
-    void nuevaSolicitud();
+    // T023.5: item "Ver facturas" del menu bar: muestra la ventana en Facturas.
+    void verFacturas();
     void solicitarSalida();
     // T014.4 D1 (conectado a OSIntegration::notificacionActivada).
     void activarNotificacion(const satcfdi::OSIntegration::DestinoNotificacion& destino,

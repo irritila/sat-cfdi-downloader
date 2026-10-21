@@ -24,6 +24,11 @@ class CredencialesSatService;
 class PerfilesSatService;
 class SolicitudesService;
 
+// T023.5: fuera de toda ruta de la app (sin pagina navegable ni propiedad
+// inicial de Main.qml). Se conserva solo para tools/video-tutorial,
+// tools/capturas-manual y FixturePerfiles; T024 lo elimina al regrabar manual
+// y video. Las descargas se crean solo con DescargaGuiadaService.
+//
 // Formulario de nueva solicitud (T002, flujo T003 DA1/DA6).
 //
 // Campos editables como texto/claves estables: perfilId (UUID), tipoDescarga

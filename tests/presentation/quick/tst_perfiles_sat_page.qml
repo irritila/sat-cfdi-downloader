@@ -240,13 +240,19 @@ TestCase {
         waitForRendering(caso)
     }
 
-    function test_volverASolicitudes() {
-        const p = crearPagina()
+    // T023.5: Perfiles es raiz; el boton regresa a Facturas.
+    // La app de FixtureFacturas tiene pantalla Facturas (con fuente).
+    function test_volverAFacturas() {
+        fixtureFacturas.reiniciar(true)
+        fixtureFacturas.app.mostrarPerfiles()
+        fixture.app.mostrarPerfiles() // carga la lista de perfiles (listarNoEliminados 0)
+        const p = createTemporaryObject(paginaComp, caso, { app: fixtureFacturas.app })
+        verify(p)
         fixture.resolverLista(0, [])
         const regresar = findChild(p, "botonRegresar")
-        compare(regresar.text, "Solicitudes")
+        compare(regresar.text, "Facturas")
         mouseClick(regresar)
-        compare(fixture.app.pagina, AppViewModel.Lista)
+        compare(fixtureFacturas.app.pagina, AppViewModel.Facturas)
     }
 
     function test_tecladoListaYAccesibilidad() {
@@ -319,8 +325,8 @@ TestCase {
     function test_validandoNavegarDescartaRespuestaTardia() {
         const r = paginaCon([{ rfc: "AAA010101AAA", nombre: "A", activo: true }], ["SinCredencial"])
         const dialogo = registrarEnValidando(r)
-        fixture.app.mostrarLista() // navega con la promesa pendiente
-        compare(fixture.app.pagina, AppViewModel.Lista)
+        fixture.app.mostrarDiagnostico() // navega con la promesa pendiente
+        compare(fixture.app.pagina, AppViewModel.Diagnostico)
         compare(fixture.eFirma.fase, EFirmaFormViewModel.Capturando)
         fixture.resolverImportacion(0, "ContrasenaIncorrecta", "Contrasena")
         wait(0)

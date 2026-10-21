@@ -217,6 +217,17 @@ struct FacturasViewModel::Impl {
     DecisionesGuiadas decisiones;
     int replanes = 0;
 
+    // T023.5: destino pedido por Historial o una notificacion antes de que
+    // los perfiles carguen, y Reintentar pendiente de la disponibilidad.
+    struct Destino {
+        QString perfil;
+        int anio = 0;
+        int mes = 0;
+        AlLlegar alLlegar = AlLlegar::Nada;
+    };
+    std::optional<Destino> destinoPendiente;
+    std::optional<std::pair<QString, MesCalendario>> reintentarAlCargar;
+
     // Anuncio: estado del mes ya anunciado para (perfil, mes).
     QString claveAnunciada;
     std::optional<EstadoFranja> estadoAnunciado;
@@ -596,6 +607,7 @@ void FacturasViewModel::cargarPerfiles()
             return;
         }
         aplicarPerfiles(std::move(r).valor());
+        aplicarDestinoPendiente();
     });
 }
 
@@ -727,6 +739,10 @@ bool FacturasViewModel::cambiarAnio(int delta)
 
 void FacturasViewModel::aplicarMes(std::optional<MesCalendario> mes, bool recargarAnio)
 {
+    if (m_impl->reintentarAlCargar
+        && (!mes || m_impl->reintentarAlCargar->second != *mes || m_impl->reintentarAlCargar->first != perfilId())) {
+        m_impl->reintentarAlCargar.reset(); // el usuario (o el destino) cambio de mes
+    }
     m_impl->mes = mes;
     ++m_impl->gen;
     m_impl->evaluacion.reset();
@@ -915,6 +931,14 @@ void FacturasViewModel::consultarDisponibilidad(bool revalidar)
             emit vistaChanged();
             actualizarMeses();
             actualizarFranja();
+            if (m_impl->reintentarAlCargar && r && m_impl->reintentarAlCargar->second == mes
+                && m_impl->reintentarAlCargar->first == perfilId()) {
+                m_impl->reintentarAlCargar.reset();
+                const FranjaMesViewModel::Datos d = m_franja->datos();
+                if (d.accion == AccionFranja::Reintentar && d.accionHabilitada) {
+                    ejecutarAccion();
+                }
+            }
         });
 }
 
@@ -1347,7 +1371,64 @@ void FacturasViewModel::terminarConError(const ErrorDescargaGuiada& e)
 void FacturasViewModel::verDetallesTecnicos()
 {
     if (m_impl->perfilActual() && m_impl->mes) {
-        emit detallesTecnicosSolicitados(perfilId(), m_impl->mes->anio(), m_impl->mes->mes());
+        emit detallesTecnicosSolicitados(perfilId(), m_impl->mes->anio(), m_impl->mes->mes(),
+                                         solicitudDiagnostico());
+    }
+}
+
+QString FacturasViewModel::solicitudDiagnostico() const
+{
+    if (!m_impl->evaluacion) {
+        return {};
+    }
+    const EvaluacionCoberturaMensual& e = *m_impl->evaluacion;
+    if (e.causa) {
+        return e.causa->solicitud.texto();
+    }
+    const TipoDescarga activa = m_direccion == Direccion::Emitidas ? TipoDescarga::Emitidos : TipoDescarga::Recibidos;
+    const TipoDescarga otra = activa == TipoDescarga::Emitidos ? TipoDescarga::Recibidos : TipoDescarga::Emitidos;
+    for (TipoDescarga d : {activa, otra}) {
+        const CoberturaDireccion& c = e.cobertura(d);
+        if (!c.solicitudesEnCurso.isEmpty()) {
+            return c.solicitudesEnCurso.constLast().texto();
+        }
+        if (!c.solicitudesAcreditadas.isEmpty()) {
+            return c.solicitudesAcreditadas.constLast().texto();
+        }
+        for (const CausaMensual& s : e.causasSuperadas) {
+            if (s.direccion == d) {
+                return s.solicitud.texto();
+            }
+        }
+    }
+    return {};
+}
+
+void FacturasViewModel::irAMes(const QString& perfilId, int anio, int mes, AlLlegar alLlegar)
+{
+    m_impl->destinoPendiente = Impl::Destino{perfilId, anio, mes, alLlegar};
+    if (m_impl->perfilesCargados) {
+        aplicarDestinoPendiente();
+    }
+}
+
+void FacturasViewModel::aplicarDestinoPendiente()
+{
+    if (!m_impl->destinoPendiente) {
+        return;
+    }
+    const Impl::Destino d = *std::exchange(m_impl->destinoPendiente, std::nullopt);
+    if (!seleccionarPerfilId(d.perfil)) {
+        return; // perfil inexistente: se conserva la seleccion vigente, sin error
+    }
+    if (!seleccionarMes(d.anio, d.mes)) {
+        return; // mes futuro o invalido: el perfil con su mes vigente
+    }
+    if (d.alLlegar == AlLlegar::Reintentar && m_impl->mes) {
+        m_impl->reintentarAlCargar = std::pair{perfilId(), *m_impl->mes};
+        // Si la disponibilidad del mes ya estaba cargada (mismo mes), se
+        // vuelve a pedir para ejecutar la accion con datos frescos.
+        consultarDisponibilidad(false);
     }
 }
 

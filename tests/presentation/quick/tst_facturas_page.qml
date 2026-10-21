@@ -185,7 +185,9 @@ TestCase {
         const combo = findChild(p, "comboPerfilFacturas")
         combo.forceActiveFocus(Qt.TabFocusReason)
         keyClick(Qt.Key_Tab)
-        verify(findChild(p, "botonPerfilesFacturas").activeFocus, "Perfiles SAT tras el perfil")
+        verify(findChild(p, "botonHistorialFacturas").activeFocus, "Historial tras el perfil")
+        keyClick(Qt.Key_Tab)
+        verify(findChild(p, "botonPerfilesFacturas").activeFocus, "Perfiles SAT tras Historial")
         // Selector de anio (chevrones habilitados) y luego los meses.
         const intermedios = []
         for (let i = 0; i < 3 && !findChild(p, "listaMeses").activeFocus; ++i) {

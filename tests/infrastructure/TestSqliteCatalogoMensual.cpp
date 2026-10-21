@@ -444,6 +444,22 @@ void TestSqliteCatalogoMensual::lotesEliminacionParcialYPerfilRecreado()
     QCOMPARE(e.p->lotesDescargaGuiada().listar(pid(e.perfil), kSeptiembre).valor().first().resultado,
              ResultadoLote::SinSolicitudesVigentes);
 
+    // T023.5: solicitudes sin lote (previas a T023 o con filtros) y ubicacion.
+    Sol filtrada;
+    filtrada.tipoComprobante = QStringLiteral("I");
+    const QString idFiltrada = e.solicitud(filtrada);
+    auto sinLote = e.p->lotesDescargaGuiada().listarSinLote(pid(e.perfil));
+    QVERIFY(sinLote);
+    QCOMPARE(sinLote.valor().size(), 1); // las vinculadas no aparecen; las eliminadas tampoco
+    QCOMPARE(sinLote.valor().first().id, sid(idFiltrada));
+    QVERIFY(sinLote.valor().first().conFiltros);
+    QCOMPARE(sinLote.valor().first().fechaInicialSat, kSeptiembre.inicioSat());
+    auto u = e.p->lotesDescargaGuiada().ubicar(sid(idO));
+    QVERIFY(u && u.valor());
+    QCOMPARE(u.valor()->mesLote, std::optional(*MesCalendario::crear(2026, 10)));
+    QVERIFY(e.p->lotesDescargaGuiada().ubicar(sid(idE)).valor() == std::nullopt); // eliminada
+    QVERIFY(!e.p->lotesDescargaGuiada().ubicar(sid(idFiltrada)).valor()->mesLote);
+
     // Perfil eliminado y recreado con el mismo RFC: los lotes se ocultan con
     // el perfil y no se reasignan al nuevo.
     QCOMPARE(ejecutarSql(e.prov(), QStringLiteral("UPDATE perfil_sat SET eliminado_en = %1 WHERE id = %2")
@@ -453,6 +469,8 @@ void TestSqliteCatalogoMensual::lotesEliminacionParcialYPerfilRecreado()
     QCOMPARE(insertarPerfilFixture(e.prov(), recreado, kRfcGenerico), QString());
     QVERIFY(e.p->lotesDescargaGuiada().listar(pid(e.perfil), std::nullopt).valor().isEmpty());
     QVERIFY(e.p->lotesDescargaGuiada().listar(pid(recreado), std::nullopt).valor().isEmpty());
+    QVERIFY(e.p->lotesDescargaGuiada().listarSinLote(pid(e.perfil)).valor().isEmpty());
+    QVERIFY(!e.p->lotesDescargaGuiada().ubicar(sid(idFiltrada)).valor());
     QCOMPARE(escalar(e.prov(), QStringLiteral("SELECT count(*) FROM lote_descarga_guiada WHERE perfil_sat_id = %1")
                                    .arg(citar(e.perfil)))
                  .toInt(),
@@ -770,6 +788,15 @@ void TestSqliteCatalogoMensual::catalogoDeduplicaPorUuidConFuenteGuiada()
     QCOMPARE(u1.solicitud, sid(idGuiada));
     QVERIFY(u1.fuenteGuiada);
     QCOMPARE(r.valor().cfdis.at(0).solicitud, sid(idManual)); // kU2 solo en la manual
+
+    // T023.5: conteos por fuente canonica, con la misma deduplicacion (la
+    // suma del mes coincide con el catalogo) y sin limitarse a un mes.
+    QVERIFY(!e.paqueteConCfdi(idManual, {{kU3, QStringLiteral("2026-10-02T10:00:00")}}).isEmpty());
+    auto c = e.p->catalogoMensual().conteosPorSolicitud(pid(e.perfil));
+    QVERIFY(c);
+    QCOMPARE(c.valor().value(sid(idGuiada)), 1);
+    QCOMPARE(c.valor().value(sid(idManual)), 2); // kU2 (septiembre) y kU3 (octubre)
+    QVERIFY(e.p->catalogoMensual().conteosPorSolicitud(PerfilId::generar()).valor().isEmpty());
 }
 
 void TestSqliteCatalogoMensual::catalogoEliminarFuenteEligeLaSiguiente()

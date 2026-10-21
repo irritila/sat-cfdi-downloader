@@ -451,6 +451,10 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
     m_preferenciasFacturas = std::make_unique<PreferenciasFacturasArchivo>(
         QDir(QFileInfo(rutaBase).absolutePath()).filePath(QStringLiteral("preferencias.ini")));
     m_viewModels->setFuenteFacturas(m_fuenteFacturas.get(), m_preferenciasFacturas.get());
+    // T023.5: Historial y destino de notificaciones de solicitud.
+    m_fuenteHistorial = std::make_unique<FuenteHistorialRoot>(*m_catalogoMensual, *m_fuenteFacturas);
+    m_viewModels->setFuenteHistorial(m_fuenteHistorial.get());
+    m_viewModels->setResolucionDestinos(m_fuenteHistorial.get());
 
     // Primera tarea del dispatcher serial: limpia generaciones huerfanas del
     // SecretStore (residuos de fallos previos). No se espera aqui; las
@@ -478,6 +482,7 @@ AppCompositionRoot::~AppCompositionRoot()
     m_renderizadorPdf.reset();
     m_archivosPdf.reset();
     m_lectorPdf.reset();
+    m_fuenteHistorial.reset(); // T023.5: antes que la fuente de Facturas y el catalogo
     m_fuenteFacturas.reset(); // T023.4: antes que sus servicios
     m_consultaPerfilesFacturas.reset();
     m_descargaGuiada.reset();  // T023.3: antes que indexador, worker, ejecutor y dispatcher
@@ -595,7 +600,7 @@ AppLifecycleController& AppCompositionRoot::iniciarCicloDeVida(OSIntegration& os
         m_accesoFinder->abrirCarpetaPaquetes().then(controlador, [app, controlador](const ResultadoAccionFinder& r) {
             if (r.estado != ResultadoAccionFinder::Estado::Mostrado) {
                 app->setMensajeFinder(r.mensaje);
-                app->mostrarLista();
+                app->mostrarDiagnostico();
                 controlador->mostrarVentana();
             }
         });

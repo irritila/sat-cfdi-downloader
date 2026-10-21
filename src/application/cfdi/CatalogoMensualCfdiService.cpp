@@ -4,6 +4,9 @@
 #include "application/persistence/PersistenceDispatcher.h"
 
 #include <QFuture>
+#include <QHash>
+
+#include <algorithm>
 
 #include <utility>
 
@@ -46,6 +49,106 @@ CatalogoMensualCfdiService::consultar(const ConsultaCatalogoMensual& consulta)
     }
     CatalogoMensualRepository* catalogo = &m_catalogo;
     return m_dispatcher.despachar<ResultadoCatalogo>([catalogo, consulta] { return catalogo->consultar(consulta); });
+}
+
+namespace {
+
+// Lectura del historial en UNA tarea del dispatcher (T023.5).
+struct LecturaHistorial {
+    QList<LoteGuiado> lotes;
+    QList<SolicitudSinLote> anteriores;
+    QHash<SolicitudId, int> conteos;
+    // Evidencia por mes con lotes; ausente si su lectura fallo.
+    QHash<QString, QList<EvidenciaSolicitudMensual>> evidencia;
+};
+
+} // namespace
+
+QFuture<CatalogoMensualCfdiService::ResultadoEntradas> CatalogoMensualCfdiService::historial(const PerfilId& perfil)
+{
+    if (perfil.esNulo()) {
+        return QtFuture::makeReadyValueFuture(ResultadoEntradas::exito({}));
+    }
+    using ResultadoLectura = Resultado<LecturaHistorial, ErrorPersistencia>;
+    LoteDescargaGuiadaRepository* lotes = &m_lotes;
+    CatalogoMensualRepository* catalogo = &m_catalogo;
+    const int version = m_indexacion.versionParser();
+    const QDateTime instante = m_reloj(); // D19: una vez, al iniciar
+    return m_dispatcher
+        .despachar<ResultadoLectura>([lotes, catalogo, perfil, version]() -> ResultadoLectura {
+            LecturaHistorial l;
+            auto rl = lotes->listar(perfil, std::nullopt);
+            if (!rl) {
+                return ResultadoLectura::fallo(std::move(rl).error());
+            }
+            l.lotes = std::move(rl).valor();
+            auto ra = lotes->listarSinLote(perfil);
+            if (!ra) {
+                return ResultadoLectura::fallo(std::move(ra).error());
+            }
+            l.anteriores = std::move(ra).valor();
+            auto rc = catalogo->conteosPorSolicitud(perfil);
+            if (!rc) {
+                return ResultadoLectura::fallo(std::move(rc).error());
+            }
+            l.conteos = std::move(rc).valor();
+            for (const LoteGuiado& lote : std::as_const(l.lotes)) {
+                const QString clave = lote.mes.texto();
+                if (l.evidencia.contains(clave)) {
+                    continue;
+                }
+                auto re = catalogo->leerEvidencia(perfil, lote.mes, version);
+                if (re) {
+                    l.evidencia.insert(clave, std::move(re).valor());
+                }
+            }
+            return ResultadoLectura::exito(std::move(l));
+        })
+        .then(this, [this, perfil, instante](ResultadoLectura r) {
+            if (!r) {
+                return ResultadoEntradas::fallo(std::move(r).error());
+            }
+            LecturaHistorial l = std::move(r).valor();
+            QHash<QString, EvaluacionCoberturaMensual> evaluaciones;
+            for (auto it = l.evidencia.begin(); it != l.evidencia.end(); ++it) {
+                const auto mes = MesCalendario::desdeTexto(it.key());
+                auto e = evaluar(perfil, *mes, instante, ResultadoEvidencia::exito(std::move(it.value())));
+                if (e) {
+                    evaluaciones.insert(it.key(), std::move(e).valor());
+                }
+            }
+            QList<EntradaHistorial> entradas;
+            entradas.reserve(l.lotes.size() + l.anteriores.size());
+            for (const LoteGuiado& lote : std::as_const(l.lotes)) {
+                const auto it = evaluaciones.constFind(lote.mes.texto());
+                entradas.append(entradaDeLote(lote, it != evaluaciones.cend() ? &it.value() : nullptr, l.conteos));
+            }
+            for (const SolicitudSinLote& s : std::as_const(l.anteriores)) {
+                entradas.append(entradaAnterior(perfil, s, l.conteos));
+            }
+            // Mas reciente primero; desempate estable por id (lote o solicitud).
+            auto id = [](const EntradaHistorial& e) {
+                return e.tipo == EntradaHistorial::Tipo::Guiada
+                           ? e.loteId
+                           : (e.diagnosticoEmitidas ? e.diagnosticoEmitidas : e.diagnosticoRecibidas)->texto();
+            };
+            std::stable_sort(entradas.begin(), entradas.end(), [&](const EntradaHistorial& a, const EntradaHistorial& b) {
+                if (a.creadoEn != b.creadoEn) {
+                    return a.creadoEn > b.creadoEn;
+                }
+                return id(a) > id(b);
+            });
+            return ResultadoEntradas::exito(std::move(entradas));
+        });
+}
+
+QFuture<CatalogoMensualCfdiService::ResultadoUbicacion> CatalogoMensualCfdiService::ubicar(const SolicitudId& solicitud)
+{
+    if (solicitud.esNulo()) {
+        return QtFuture::makeReadyValueFuture(ResultadoUbicacion::exito(std::nullopt));
+    }
+    LoteDescargaGuiadaRepository* lotes = &m_lotes;
+    return m_dispatcher.despachar<ResultadoUbicacion>([lotes, solicitud] { return lotes->ubicar(solicitud); });
 }
 
 QFuture<CatalogoMensualCfdiService::ResultadoLotes>

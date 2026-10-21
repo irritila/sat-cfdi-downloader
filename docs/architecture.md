@@ -1588,9 +1588,9 @@ classDiagram
 
 ## 10. Diagrama de navegacion UI
 
-Estado: validado.
+Estado: validado (actualizado por T023, ADR 0019 y 0020).
 
-Objetivo: mostrar como se mueve el usuario entre las vistas del MVP. Este diagrama solo cubre navegacion visible; no modela procesamiento SAT ni persistencia interna.
+Objetivo: mostrar como se mueve el usuario entre las vistas. Este diagrama solo cubre navegacion visible; no modela procesamiento SAT ni persistencia interna.
 
 ```mermaid
 flowchart TB
@@ -1603,76 +1603,64 @@ flowchart TB
         main_window["Ventana principal"]
 
         subgraph main["Navegacion principal"]
-            requests_list["Solicitudes<br/>lista principal"]
-            new_request["Nueva solicitud"]
-            request_detail["Detalle de solicitud"]
-            profiles["Perfiles SAT"]
+            invoices["Facturas<br/>perfil y mes (Cmd+1)"]
+            profiles["Perfiles SAT (Cmd+2)"]
+            history["Historial de descargas (Cmd+3)"]
         end
 
-        profile_form["Alta / edicion de perfil SAT"]
+        subgraph diag["Ir > Diagnostico"]
+            requests_list["Lista tecnica de solicitudes"]
+            request_detail["Detalle de solicitud"]
+        end
+
+        confirm["Confirmacion por direccion"]
+        profile_form["Alta / edicion de perfil SAT y e.firma"]
         confirm_delete["Confirmar eliminacion local"]
     end
 
-    manual_open -->|"muestra"| main_window
+    manual_open -->|"muestra"| invoices
     autostart -->|"inicia sin ventana"| menu_bar
-    notification -->|"abre app y enfoca solicitud"| request_detail
+    notification -->|"descarga guiada: perfil y mes"| invoices
+    notification -->|"solicitud previa o con filtros"| request_detail
 
-    menu_bar -->|"Abrir ventana"| main_window
-    menu_bar -->|"Nueva solicitud"| main_window
-    menu_bar -->|"Habilitar / deshabilitar inicio automatico"| menu_bar
-    menu_bar -->|"Pausar / reanudar"| menu_bar
+    menu_bar -->|"Mostrar ventana / Ver facturas"| invoices
     menu_bar -->|"Salir"| exit_app["Salir de la app"]
 
-    main_window --> requests_list
-    main_window --> profiles
+    invoices -->|"Descargar / Actualizar / Completar mes"| confirm
+    confirm -->|"Confirmar o cancelar"| invoices
+    invoices -->|"Registrar e.firma"| profile_form
+    invoices -->|"Ver detalles tecnicos"| request_detail
+    invoices --> history
+    invoices --> profiles
 
-    requests_list -->|"Crear"| new_request
+    history -->|"Ver facturas"| invoices
+    history -->|"Ver detalles tecnicos"| request_detail
+
     requests_list -->|"Abrir"| request_detail
-    requests_list -->|"Eliminar local"| confirm_delete
-
-    request_detail -->|"Verificar ahora"| request_detail
-    request_detail -->|"Reintentar descarga"| request_detail
     request_detail -->|"Eliminar local"| confirm_delete
-    request_detail -->|"Volver"| requests_list
-
-    new_request -->|"Solicitud creada"| requests_list
-    new_request -->|"Cancelar"| requests_list
+    request_detail -->|"Atras"| main
 
     profiles -->|"Crear / editar"| profile_form
-    profile_form -->|"Guardar"| profiles
-    profile_form -->|"Cancelar"| profiles
-
-    confirm_delete -->|"Confirmar"| requests_list
-    confirm_delete -->|"Cancelar"| request_detail
+    profile_form -->|"Guardar / Cancelar"| profiles
 ```
 
 ### Lectura del diagrama
 
-- La apertura manual siempre muestra la ventana principal.
+- La apertura manual muestra Facturas con el ultimo perfil usado y el mes anterior al actual.
+- Facturas muestra los CFDI del perfil por mes natural, con la disponibilidad del mes y una sola accion (descargar, actualizar, completar, reintentar o registrar e.firma). Solicitudes, paquetes y verificaciones no forman parte de este recorrido (T023 D3).
+- La descarga guiada crea las solicitudes SAT necesarias por debajo (ADR 0019 y 0020) y pide confirmacion por direccion solo cuando hay un duplicado que confirmar.
+- Historial lista las descargas guiadas del perfil y lleva al mes o al diagnostico.
+- Diagnostico (lista tecnica y detalle de solicitud) solo se abre desde Historial, desde "Requiere atencion" o desde el menu Ir; conserva reintento por paquete, "Mostrar en Finder" y la eliminacion local. "Atras" regresa al origen.
+- No hay pantalla para crear solicitudes manuales con filtros (T023 D6).
 - El inicio automatico solo muestra el icono de menu bar y mantiene el worker segun configuracion.
-- La pantalla principal es `Solicitudes`; desde ahi se crea una nueva solicitud o se abre el detalle.
-- `Nueva solicitud` es una pantalla dentro de la ventana principal.
-- `Detalle de solicitud` concentra acciones manuales sobre una solicitud existente.
-- `Perfiles SAT` permite alta y edicion de perfiles/e.firma.
-- El MVP no incluye pantalla de `Preferencias`; inicio automatico y pausa/reanudacion se controlan desde el menu bar.
-- La ruta de paquetes queda fija en el MVP.
-- El menu bar da accesos rapidos sin reemplazar la ventana principal.
-- Las notificaciones abren la app y enfocan el detalle de la solicitud relacionada.
+- Las notificaciones de una descarga guiada abren Facturas en su perfil y mes; las de solicitudes previas o con filtros abren su detalle; si ya no existe, abren Facturas.
 
 ### Decisiones reflejadas
 
 - No hay pantallas de usuarios, clientes, roles ni administracion comercial.
-- La UI gira alrededor de solicitudes y perfiles SAT.
+- La UI gira alrededor de las facturas del perfil y del mes; las solicitudes son mecanismo interno y diagnostico.
 - La eliminacion local requiere confirmacion.
-- Las acciones manuales no llevan a pantallas separadas; actualizan el detalle/lista.
-- La app puede ser abierta desde menu bar, apertura manual o notificacion.
-- Las opciones de inicio automatico y pausa/reanudacion viven en el menu bar.
-
-### Preguntas para revisar
-
-- Validado: `Nueva solicitud` es una pantalla dentro de la ventana principal.
-- Validado: no existe pantalla de `Preferencias` en el MVP; inicio automatico y pausa viven en el menu bar.
-- Validado: al hacer clic en una notificacion, se abre el detalle de la solicitud relacionada.
+- La app puede abrirse desde menu bar, apertura manual o notificacion.
 
 ## 11. Esquema logico de base local
 

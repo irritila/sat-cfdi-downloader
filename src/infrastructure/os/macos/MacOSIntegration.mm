@@ -510,8 +510,8 @@ void MacOSIntegration::inicializar()
         case Id::MostrarVentana:
             connect(accion, &QAction::triggered, this, intencion(&OSIntegration::mostrarVentanaSolicitada));
             break;
-        case Id::NuevaSolicitud:
-            connect(accion, &QAction::triggered, this, intencion(&OSIntegration::nuevaSolicitudSolicitada));
+        case Id::VerFacturas:
+            connect(accion, &QAction::triggered, this, intencion(&OSIntegration::verFacturasSolicitada));
             break;
         case Id::AbrirCarpetaPaquetes:
             connect(accion, &QAction::triggered, this, intencion(&OSIntegration::abrirCarpetaPaquetesSolicitada));

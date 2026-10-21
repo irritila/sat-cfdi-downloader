@@ -206,7 +206,8 @@ signals:
     void mostrarVentanaSolicitada();
     void ocultarVentanaSolicitada();
     void enfocarVentanaSolicitada();
-    void nuevaSolicitudSolicitada();
+    // T023.5: "Ver facturas" del menu bar (muestra la ventana en Facturas).
+    void verFacturasSolicitada();
     // T009.1 D1: "Abrir carpeta de paquetes" desde el menu bar.
     void abrirCarpetaPaquetesSolicitada();
     // true = pausar monitoreo; false = reanudar.

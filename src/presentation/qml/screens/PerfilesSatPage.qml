@@ -64,7 +64,7 @@ Page {
 
     function regresar() {
         dialogoEFirma.limpiarCaptura()
-        pagina.app.mostrarLista()
+        pagina.app.mostrarFacturas() // T023.5: Perfiles es raiz; regresa a Facturas
     }
 
     function editar(id) {
@@ -164,8 +164,8 @@ Page {
         id: encabezado
         titulo: qsTr("Perfiles SAT")
         mostrarRegresar: true
-        textoRegresar: qsTr("Solicitudes")
-        descripcionRegresar: qsTr("Volver a la lista de solicitudes (Escape)")
+        textoRegresar: qsTr("Facturas")
+        descripcionRegresar: qsTr("Volver a Facturas (Escape)")
         onRegresarSolicitado: pagina.regresar()
 
         BotonAccion {

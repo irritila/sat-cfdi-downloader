@@ -755,8 +755,8 @@ void TestPerfilesViewModels::navegacionPerfilesYCentinelas()
     g.f()->iniciar(PerfilId::generar().texto(), QStringLiteral("AAA010101AAA"), false);
     g.f()->seleccionarCertificado(QUrl::fromLocalFile(kRutaCer));
     g.p()->nuevo();
-    app->mostrarLista();
-    QCOMPARE(app->pagina(), AppViewModel::Pagina::Lista);
+    app->mostrarDiagnostico();
+    QCOMPARE(app->pagina(), AppViewModel::Pagina::Diagnostico);
     QVERIFY(g.f()->nombreCertificado().isEmpty());
     QCOMPARE(g.p()->modo(), Modo::Ninguno);
 

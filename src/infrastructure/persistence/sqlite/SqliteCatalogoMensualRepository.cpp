@@ -367,4 +367,38 @@ SqliteCatalogoMensualRepository::leerEvidencia(const PerfilId& perfil, MesCalend
     return R::exito(std::move(evidencia));
 }
 
+// T023.5: CFDI por solicitud fuente canonica, en todo el rango de fechas
+// (cada UUID tiene una sola fecha, asi que deduplicar sobre todo el rango
+// equivale a deduplicar mes por mes).
+Resultado<QHash<SolicitudId, int>, ErrorPersistencia>
+SqliteCatalogoMensualRepository::conteosPorSolicitud(const PerfilId& perfil)
+{
+    using R = Resultado<QHash<SolicitudId, int>, ErrorPersistencia>;
+    constexpr QStringView kContexto = u"cfdi_indexado.conteos_por_solicitud";
+    auto conexion = sqlite::conexionLectura(m_proveedor);
+    if (!conexion) {
+        return R::fallo(std::move(conexion).error());
+    }
+    QSqlQuery q(conexion.valor());
+    q.setForwardOnly(true);
+    const QString sql = cteUnicos(false) + QStringLiteral("SELECT x.sol, count(*) FROM unicos x GROUP BY x.sol");
+    if (auto r = sqlite::preparar(q, sql, kContexto); !r) {
+        return R::fallo(std::move(r).error());
+    }
+    enlazar(q, perfil, Rango{QStringLiteral("0000-01-01"), QStringLiteral("9999-12-99"), std::nullopt}, Filtros{},
+            false);
+    if (auto r = sqlite::ejecutar(q, kContexto); !r) {
+        return R::fallo(std::move(r).error());
+    }
+    QHash<SolicitudId, int> conteos;
+    while (q.next()) {
+        const auto solicitud = SolicitudId::desdeTexto(q.value(0).toString());
+        if (!solicitud) {
+            return R::fallo(sqlite::filaIlegible(u"cfdi_indexado", u"solicitud_masiva_id"));
+        }
+        conteos.insert(*solicitud, q.value(1).toInt());
+    }
+    return R::exito(std::move(conteos));
+}
+
 } // namespace satcfdi

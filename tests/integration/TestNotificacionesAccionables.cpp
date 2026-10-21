@@ -13,6 +13,7 @@
 #include "application/cfdi/IndexadorCfdi.h"
 #include "app_core/AppLifecycleController.h"
 #include "app_core/ExtensionCicloDeVida.h"
+#include "app_core/FuenteFacturasRoot.h"
 #include "app_core/IntegracionWorker.h"
 
 #include "application/estadoagregado/MonitorEstadoAgregado.h"
@@ -24,6 +25,8 @@
 #include "application/requests/SolicitudesService.h"
 #include "presentation/viewmodels/AccionesFinder.h"
 #include "presentation/viewmodels/AppViewModel.h"
+#include "presentation/viewmodels/FacturasViewModel.h"
+#include "presentation/viewmodels/FuenteHistorial.h"
 #include "presentation/viewmodels/PerfilesSatViewModel.h"
 #include "presentation/viewmodels/PresentacionViewModels.h"
 
@@ -33,9 +36,11 @@
 #include "fakes/FakeProgramador.h"
 #include "fakes/FakeSatGateway.h"
 #include "fakes/FakeSecretStore.h"
+#include "presentation/FuenteFacturasFake.h"
 
 #include <QDir>
 #include <QProcess>
+#include <QPromise>
 #include <QRegularExpression>
 #include <QSignalSpy>
 #include <QTemporaryDir>
@@ -90,6 +95,34 @@ struct FinderFalso final : AccionesFinder {
     QFuture<ResultadoAccionFinder> abrirEnVistaPrevia(const QString&) override // T015.4: sin uso aqui
     {
         return QtFuture::makeReadyValueFuture(ResultadoAccionFinder{ResultadoAccionFinder::Estado::Fallido, {}});
+    }
+};
+
+// T023.5: resolucion de destino controlable (inmediata o retenida).
+struct ResolucionFalsa final : ResolucionDestinoNotificacion {
+    DestinoNavegacion destino = DestinoNavegacion::facturas();
+    bool retener = false;
+    QStringList pedidas;
+    QList<std::shared_ptr<QPromise<DestinoNavegacion>>> promesas;
+
+    QFuture<DestinoNavegacion> resolver(const SolicitudId& solicitud) override
+    {
+        pedidas.append(solicitud.texto());
+        if (!retener) {
+            return QtFuture::makeReadyValueFuture(destino);
+        }
+        auto p = std::make_shared<QPromise<DestinoNavegacion>>();
+        p->start();
+        promesas.append(p);
+        return p->future();
+    }
+    int pendientes() const { return int(promesas.size()); }
+    void responder()
+    {
+        const auto p = promesas.takeFirst();
+        p->addResult(destino);
+        p->finish();
+        QCoreApplication::processEvents();
     }
 };
 
@@ -250,6 +283,10 @@ private slots:
     void adaptacionANotificacionLocal();
     void abrirSolicitudConAppAbiertaUOculta();
     void solicitudInexistenteAbreLaLista();
+    void destinoFacturasMesAlArrancarPorNotificacion();
+    void destinoDiagnosticoYAtrasAFacturas();
+    void destinoInexistenteAbreFacturasSinError();
+    void destinoDeUbicacionPuro();
     void perfilSeleccionadoEnPerfiles();
     void mostrarEnFinderSoloTraeVentanaConAviso();
     void destinoInvalidoSoloMuestraVentana();
@@ -268,9 +305,9 @@ void TestNotificacionesAccionables::rutaDeNotificacionPura()
     const QString per = PerfilId::generar().texto();
     const D dSol{D::Tipo::Solicitud, sol};
     const D dPer{D::Tipo::Perfil, per};
-    QCOMPARE(rutaDeNotificacion(dSol, Accion::Abrir), (RutaNotificacion{T::DetalleSolicitud, sol}));
+    QCOMPARE(rutaDeNotificacion(dSol, Accion::Abrir), (RutaNotificacion{T::SolicitudNotificada, sol}));
     QCOMPARE(rutaDeNotificacion(dSol, Accion::MostrarEnFinder), (RutaNotificacion{T::FinderSolicitud, sol}));
-    QCOMPARE(rutaDeNotificacion(dSol, Accion::AbrirPerfiles), (RutaNotificacion{T::DetalleSolicitud, sol}));
+    QCOMPARE(rutaDeNotificacion(dSol, Accion::AbrirPerfiles), (RutaNotificacion{T::SolicitudNotificada, sol}));
     QCOMPARE(rutaDeNotificacion(dPer, Accion::Abrir), (RutaNotificacion{T::PerfilSeleccionado, per}));
     QCOMPARE(rutaDeNotificacion(dPer, Accion::AbrirPerfiles), (RutaNotificacion{T::PerfilSeleccionado, per}));
     QCOMPARE(rutaDeNotificacion(dPer, Accion::MostrarEnFinder), (RutaNotificacion{T::PerfilSeleccionado, per}));
@@ -325,7 +362,7 @@ void TestNotificacionesAccionables::abrirSolicitudConAppAbiertaUOculta()
     QCOMPARE(app->solicitudSeleccionadaId(), id);
 
     // Oculta (ventana cerrada al menu bar).
-    app->mostrarLista();
+    app->mostrarDiagnostico();
     e.ventana.close();
     QVERIFY(!e.ventana.isVisible());
     e.os.simularActivacionNotificacion(FakeOSIntegration::destinoSolicitud(id));
@@ -342,8 +379,102 @@ void TestNotificacionesAccionables::solicitudInexistenteAbreLaLista()
     const QString id = SolicitudId::generar().texto();
     e.os.simularActivacionNotificacion(FakeOSIntegration::destinoSolicitud(id));
     QVERIFY(e.ventana.isVisible());
-    QTRY_COMPARE(e.vms.app()->pagina(), Pagina::Lista);
+    QTRY_COMPARE(e.vms.app()->pagina(), Pagina::Diagnostico);
     QVERIFY(e.vms.app()->mensajeFinder().isEmpty());
+}
+
+void TestNotificacionesAccionables::destinoFacturasMesAlArrancarPorNotificacion()
+{
+    // La app arranca por la notificacion de una descarga guiada: la activacion
+    // se encola, el destino se resuelve despues y Facturas abre el perfil y
+    // mes del lote aunque la seleccion inicial seria otra (perfil A, agosto).
+    Escenario e(OSIntegration::LaunchContext::LoginItem);
+    pruebasfacturas::FuenteFalsa fuente;
+    pruebasfacturas::PreferenciasMemoria preferencias;
+    ResolucionFalsa resolucion;
+    resolucion.retener = true;
+    resolucion.destino = DestinoNavegacion::facturasMes(pruebasfacturas::kPerfilB, *MesCalendario::crear(2026, 7));
+    e.vms.setFuenteFacturas(&fuente, &preferencias);
+    e.vms.setResolucionDestinos(&resolucion);
+    const QString id = SolicitudId::generar().texto();
+    e.os.simularActivacionNotificacion(FakeOSIntegration::destinoSolicitud(id));
+    QCOMPARE(e.os.activacionesEncoladas.size(), 1);
+    e.iniciar();
+    QTRY_VERIFY(e.ventana.isVisible());
+    QTRY_COMPARE(resolucion.pedidas, QStringList{id});
+    FacturasViewModel* f = e.vms.facturas();
+    QTRY_COMPARE(f->perfilId(), pruebasfacturas::kPerfilA.texto()); // seleccion inicial mientras resuelve
+    resolucion.responder();
+    QCOMPARE(e.vms.app()->pagina(), Pagina::Facturas);
+    QTRY_COMPARE(f->perfilId(), pruebasfacturas::kPerfilB.texto());
+    QCOMPARE(f->anio(), 2026);
+    QCOMPARE(f->mes(), 7);
+
+}
+
+void TestNotificacionesAccionables::destinoDiagnosticoYAtrasAFacturas()
+{
+    // Solicitud previa a T023 o con filtros: su detalle; "Atras" -> Facturas.
+    Escenario e;
+    pruebasfacturas::FuenteFalsa fuente;
+    pruebasfacturas::PreferenciasMemoria preferencias;
+    ResolucionFalsa resolucion;
+    e.vms.setFuenteFacturas(&fuente, &preferencias);
+    e.vms.setResolucionDestinos(&resolucion);
+    e.iniciar();
+    const QString id = e.primeraSolicitud();
+    resolucion.destino = DestinoNavegacion::diagnostico(*SolicitudId::desdeTexto(id));
+    e.vms.app()->mostrarPerfiles();
+    e.os.simularActivacionNotificacion(FakeOSIntegration::destinoSolicitud(id));
+    QTRY_COMPARE(e.vms.app()->pagina(), Pagina::Detalle);
+    QCOMPARE(e.vms.app()->solicitudSeleccionadaId(), id);
+    QVERIFY(e.vms.app()->puedeRegresar());
+    QCOMPARE(e.vms.app()->textoRegresar(), QStringLiteral("Facturas"));
+    e.vms.app()->regresar();
+    QCOMPARE(e.vms.app()->pagina(), Pagina::Facturas); // origen Facturas, aunque estaba en Perfiles
+    QVERIFY(!e.vms.app()->puedeRegresar());
+
+    // Diagnostico de una solicitud que ya no existe: Facturas sin error.
+    resolucion.destino = DestinoNavegacion::diagnostico(SolicitudId::generar());
+    e.os.simularActivacionNotificacion(FakeOSIntegration::destinoSolicitud(resolucion.destino.solicitud.texto()));
+    QTRY_COMPARE(e.vms.app()->pagina(), Pagina::Facturas);
+    QVERIFY(e.vms.app()->mensajeFinder().isEmpty());
+}
+
+void TestNotificacionesAccionables::destinoInexistenteAbreFacturasSinError()
+{
+    Escenario e;
+    pruebasfacturas::FuenteFalsa fuente;
+    pruebasfacturas::PreferenciasMemoria preferencias;
+    ResolucionFalsa resolucion; // Facturas
+    e.vms.setFuenteFacturas(&fuente, &preferencias);
+    e.vms.setResolucionDestinos(&resolucion);
+    e.iniciar();
+    e.vms.app()->mostrarDiagnostico();
+    e.os.simularActivacionNotificacion(FakeOSIntegration::destinoSolicitud(SolicitudId::generar().texto()));
+    QTRY_COMPARE(e.vms.app()->pagina(), Pagina::Facturas);
+    QVERIFY(e.vms.app()->mensajeFinder().isEmpty());
+    QCOMPARE(e.vms.facturas()->perfilId(), pruebasfacturas::kPerfilA.texto());
+
+    // Una navegacion explicita descarta una resolucion pendiente.
+    resolucion.retener = true;
+    resolucion.destino = DestinoNavegacion::facturasMes(pruebasfacturas::kPerfilB, *MesCalendario::crear(2026, 7));
+    e.os.simularActivacionNotificacion(FakeOSIntegration::destinoSolicitud(SolicitudId::generar().texto()));
+    QTRY_COMPARE(resolucion.pendientes(), 1);
+    e.vms.app()->mostrarPerfiles();
+    resolucion.responder();
+    QTest::qWait(20);
+    QCOMPARE(e.vms.app()->pagina(), Pagina::Perfiles);
+}
+
+void TestNotificacionesAccionables::destinoDeUbicacionPuro()
+{
+    const SolicitudId s = SolicitudId::generar();
+    const PerfilId p = PerfilId::generar();
+    const MesCalendario m = *MesCalendario::crear(2026, 9);
+    QCOMPARE(destinoDeUbicacion(std::nullopt), DestinoNavegacion::facturas());
+    QCOMPARE(destinoDeUbicacion(UbicacionSolicitud{s, p, m}), DestinoNavegacion::facturasMes(p, m));
+    QCOMPARE(destinoDeUbicacion(UbicacionSolicitud{s, p, std::nullopt}), DestinoNavegacion::diagnostico(s));
 }
 
 void TestNotificacionesAccionables::perfilSeleccionadoEnPerfiles()
@@ -521,8 +652,10 @@ void TestNotificacionesAccionables::notificacionesDelRootSonAccionables()
     QCOMPARE(f.os.peticionesFinder.last().metodo, QStringLiteral("abrirCarpetaEnFinder"));
     QVERIFY(QFileInfo(f.os.peticionesFinder.last().ruta).isDir());
 
+    // T023.5: solicitud sin lote (creada sin descarga guiada) -> Diagnostico
+    // (su detalle), resuelto contra la base real.
     f.os.simularActivacionNotificacion(destino, Accion::Abrir);
-    QCOMPARE(f.root->viewModels().app()->pagina(), Pagina::Detalle);
+    QTRY_COMPARE(f.root->viewModels().app()->pagina(), Pagina::Detalle);
     QCOMPARE(f.root->viewModels().app()->solicitudSeleccionadaId(), id->texto());
     f.os.simularActivacionNotificacion(FakeOSIntegration::destinoPerfil(perfil->texto()), Accion::AbrirPerfiles);
     QCOMPARE(f.root->viewModels().app()->pagina(), Pagina::Perfiles);

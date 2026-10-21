@@ -59,6 +59,28 @@ struct LoteGuiado {
     ResultadoLote resultado = ResultadoLote::SinSolicitudesVigentes;
 };
 
+// T023.5: solicitud visible del perfil que no pertenece a ningun lote
+// ("Descarga anterior" en el historial). Sin datos SAT ni RFC.
+struct SolicitudSinLote {
+    SolicitudId id;
+    TipoDescarga direccion = TipoDescarga::Emitidos;
+    QString fechaInicialSat; // hora Centro sin offset
+    QString fechaFinalSat;
+    QDateTime creadaEn;      // UTC
+    bool conFiltros = false; // contraparte, tipo de comprobante o complemento
+};
+
+// T023.5: donde vive una solicitud visible (para el destino de una
+// notificacion). `mesLote` solo si la solicitud esta vinculada a un lote del
+// mismo perfil.
+struct UbicacionSolicitud {
+    SolicitudId solicitud;
+    PerfilId perfil;
+    std::optional<MesCalendario> mesLote;
+
+    friend bool operator==(const UbicacionSolicitud&, const UbicacionSolicitud&) = default;
+};
+
 // Lotes de descarga guiada (migracion 007). Hilo: tareas del
 // PersistenceDispatcher (conexion por hilo).
 class LoteDescargaGuiadaRepository {
@@ -79,6 +101,15 @@ public:
     // Tx: opcional. Errores: Almacenamiento, Interno (fila ilegible).
     virtual Resultado<QList<LoteGuiado>, ErrorPersistencia> listar(const PerfilId& perfil,
                                                                    const std::optional<MesCalendario>& mes) = 0;
+
+    // T023.5: solicitudes visibles del perfil visible sin lote, creada_en
+    // DESC, id DESC. Perfil eliminado -> lista vacia. Tx: opcional. Errores:
+    // Almacenamiento, Interno.
+    virtual Resultado<QList<SolicitudSinLote>, ErrorPersistencia> listarSinLote(const PerfilId& perfil) = 0;
+
+    // T023.5: nullopt si la solicitud no existe, esta eliminada o su perfil
+    // esta eliminado. Tx: opcional. Errores: Almacenamiento, Interno.
+    virtual Resultado<std::optional<UbicacionSolicitud>, ErrorPersistencia> ubicar(const SolicitudId& solicitud) = 0;
 };
 
 } // namespace satcfdi

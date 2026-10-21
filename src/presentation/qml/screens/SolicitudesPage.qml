@@ -4,9 +4,11 @@ import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
 
-// Solicitudes (T013, traspaso "SolicitudesPage"; UX-06..UX-13).
-// - Encabezado raiz: titulo con contador y acciones Abrir carpeta de paquetes,
-//   Perfiles SAT y Nueva solicitud (primaria, al extremo).
+// Diagnostico (T023.5, "Ir > Diagnostico"): la lista tecnica de solicitudes
+// (antes Solicitudes, T013 "SolicitudesPage"; UX-06..UX-13).
+// - Encabezado: "‹ <origen>" (Atras, AppViewModel.regresar), titulo con
+//   contador y acciones Abrir carpeta de paquetes y Perfiles SAT. Sin "Nueva
+//   solicitud" (T023 D10: las descargas se inician desde Facturas).
 // - Avisos sobre la tabla: notificaciones desactivadas (AvisoEnLinea con
 //   bell-slash) y el resultado fallido de abrir la carpeta de paquetes.
 // - Tabla: encabezados de columna fijos y FilaSolicitud por solicitud (Estado,
@@ -46,8 +48,8 @@ Page {
           accion: qsTr("Perfiles SAT"), destino: "perfiles", hecho: pagina.app.primerUsoPasos[0] === true },
         { nombre: "pasoEFirma", texto: qsTr("Registra la e.firma del perfil"),
           accion: qsTr("Registrar e.firma"), destino: "perfiles", hecho: pagina.app.primerUsoPasos[1] === true },
-        { nombre: "pasoSolicitud", texto: qsTr("Crea tu primera solicitud de descarga"),
-          accion: qsTr("Nueva solicitud"), destino: "nueva", hecho: pagina.app.primerUsoPasos[2] === true }
+        { nombre: "pasoSolicitud", texto: qsTr("Descarga las facturas de un mes"),
+          accion: qsTr("Ver facturas"), destino: "facturas", hecho: pagina.app.primerUsoPasos[2] === true }
     ]
     readonly property int pasoSiguiente: pagina.pasosGuia.findIndex(p => !p.hecho)
     // Tipo del delegado de la guia (para acceder a su boton con tipo).
@@ -97,7 +99,7 @@ Page {
         else if (pagina.mostrarGuia && pagina.pasoGuia(pagina.pasoSiguiente) !== null)
             pagina.pasoGuia(pagina.pasoSiguiente).boton.forceActiveFocus(Qt.TabFocusReason)
         else
-            botonNueva.forceActiveFocus(Qt.TabFocusReason)
+            botonPerfiles.forceActiveFocus(Qt.TabFocusReason)
     }
 
     // Si la primera carga termina despues del foco inicial, el foco pasa a la
@@ -109,7 +111,7 @@ Page {
         function onEstadoChanged() {
             if (pagina.estadoAnterior === SolicitudesListModel.Cargando
                     && pagina.modelo.estado === SolicitudesListModel.ConDatos
-                    && botonNueva.activeFocus)
+                    && botonPerfiles.activeFocus)
                 Qt.callLater(pagina.enfocarListaTrasCarga)
             pagina.estadoAnterior = pagina.modelo.estado
         }
@@ -123,13 +125,13 @@ Page {
     }
     function enfocarGuiaTrasCarga() {
         const paso = pagina.pasoGuia(pagina.pasoSiguiente)
-        if (pagina.mostrarGuia && paso !== null && botonNueva.activeFocus)
+        if (pagina.mostrarGuia && paso !== null && botonPerfiles.activeFocus)
             paso.boton.forceActiveFocus(Qt.OtherFocusReason)
     }
 
     // Diferido: la lista filtrada se hace visible cuando el proxy ya tiene filas.
     function enfocarListaTrasCarga() {
-        if (lista.visible && botonNueva.activeFocus)
+        if (lista.visible && botonPerfiles.activeFocus)
             lista.forceActiveFocus(Qt.OtherFocusReason)
     }
 
@@ -155,8 +157,23 @@ Page {
             pagina.app.abrirDetalle(id)
     }
 
+    // T023.5: Escape regresa al origen (si la busqueda no lo atendio).
+    Keys.onEscapePressed: (evento) => {
+        if (pagina.app.puedeRegresar) {
+            pagina.app.regresar()
+            evento.accepted = true
+        } else {
+            evento.accepted = false
+        }
+    }
+
     header: EncabezadoPagina {
-        titulo: qsTr("Solicitudes")
+        titulo: qsTr("Diagnóstico")
+        mostrarRegresar: pagina.app.puedeRegresar
+        textoRegresar: pagina.app.textoRegresar
+        descripcionRegresar: qsTr("Regresar a %1 (Escape)").arg(pagina.app.textoRegresar)
+        atajoRegresar: ""
+        onRegresarSolicitado: pagina.app.regresar()
         contador: !pagina.conDatos ? ""
                   : filtro.hayFiltros ? qsTr("%1 de %2").arg(filtro.count).arg(pagina.modelo.count)
                   : String(pagina.modelo.count)
@@ -179,16 +196,6 @@ Page {
             descripcion: qsTr("Administrar perfiles SAT y su e.firma")
             atajo: "⌘2"
             onClicked: pagina.app.mostrarPerfiles()
-        }
-        BotonAccion {
-            id: botonNueva
-            objectName: "botonNuevaSolicitud"
-            variante: "primario"
-            icono: "plus"
-            text: qsTr("Nueva solicitud")
-            descripcion: qsTr("Abrir el formulario de nueva solicitud")
-            atajo: "⌘N"
-            onClicked: pagina.app.mostrarNueva()
         }
     }
 
@@ -506,11 +513,11 @@ Page {
                 visible: pagina.modelo.estado === SolicitudesListModel.Vacia && !pagina.mostrarGuia
                 variante: "vacio"
                 titulo: qsTr("No hay solicitudes")
-                descripcion: qsTr("Crea una solicitud para descargar del SAT los CFDI emitidos o recibidos de un contribuyente.")
-                textoAccion: qsTr("Nueva solicitud")
+                descripcion: qsTr("Las descargas se inician desde Facturas, por perfil y mes.")
+                textoAccion: qsTr("Ver facturas")
                 accionPrimaria: true
-                objectNameAccion: "botonNuevaSolicitudVacia"
-                onAccionSolicitada: pagina.app.mostrarNueva()
+                objectNameAccion: "botonVerFacturasVacia"
+                onAccionSolicitada: pagina.app.mostrarFacturas()
             }
 
             // T014.1 D1: hay solicitudes, pero ninguna coincide con los filtros.
@@ -615,8 +622,8 @@ Page {
                                         text: paso.modelData.accion
                                         descripcion: paso.modelData.texto
                                         onClicked: {
-                                            if (paso.modelData.destino === "nueva")
-                                                pagina.app.mostrarNueva()
+                                            if (paso.modelData.destino === "facturas")
+                                                pagina.app.mostrarFacturas()
                                             else
                                                 pagina.app.mostrarPerfiles()
                                         }

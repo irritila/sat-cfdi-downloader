@@ -258,17 +258,6 @@ SolicitudDetalle detalleDePrueba(const SolicitudId& id)
     return d;
 }
 
-EvaluacionDuplicado evaluacion(ClasificacionDuplicado clasificacion, MotivoDuplicado motivo)
-{
-    EvaluacionDuplicado e;
-    e.clasificacion = clasificacion;
-    e.motivo = motivo;
-    if (clasificacion != ClasificacionDuplicado::Libre) {
-        e.solicitudReferencia = SolicitudId::generar();
-    }
-    return e;
-}
-
 using ResultadoListaSol = SolicitudesService::ResultadoLista;
 using ResultadoListaPerfiles = PerfilesSatService::ResultadoLista;
 
@@ -286,37 +275,6 @@ bool resolverPerfiles(EscenarioAsincrono& e, int indice, const QList<PerfilResum
         e.credenciales.resolverResumen(base + i, estado);
     }
     return true;
-}
-
-// Escenario asincrono en la pagina "Nueva solicitud" con un perfil listo
-// seleccionado y fechas validas.
-bool prepararFormulario(EscenarioAsincrono& e)
-{
-    if (!e.cargar() || !e.activar()) {
-        return false;
-    }
-    e.solicitudes.lista.resolver(0, ResultadoListaSol::exito({}));
-    // Construir no consulta perfiles (ni el almacen de credenciales).
-    if (e.perfiles.listas.size() != 0) {
-        return false;
-    }
-    e.vms.app()->mostrarNueva();
-    if (e.perfiles.listas.size() != 1 || !resolverPerfiles(e, 0, {perfilDePrueba()})) {
-        return false;
-    }
-    NuevaSolicitudViewModel* f = e.vms.nuevaSolicitud();
-    if (!QTest::qWaitFor([&] { return f->perfilesDisponibles()->count() == 1; })) {
-        return false;
-    }
-    if (!QTest::qWaitFor([&] {
-            return e.pagina() && e.pagina()->objectName() == QStringLiteral("paginaNuevaSolicitud");
-        })) {
-        return false;
-    }
-    f->setPerfilId(perfilDePrueba().id.texto());
-    f->setFechaInicial(QStringLiteral("2026-07-01"));
-    f->setFechaFinal(QStringLiteral("2026-07-31"));
-    return f->canSubmit();
 }
 
 // T007: registra las acciones que la presentacion pide (sin worker real).
@@ -401,12 +359,8 @@ private slots:
     void cargaQmlSinWarnings();
     void ventanaArrancaOculta();
     void avisoRaizPaquetesArribaDeLasPaginas();
-    void nuevaSolicitudDesdeCppConVentanaOculta();
     void estadoVacioConDatosVacios();
     void navegacionListaADetallePorId();
-    void combosMuestranValorInicial();
-    void envioValidoAbreDetalleYApareceEnLista();
-    void envioInvalidoMuestraErrorYNoEnvia();
     void recorridoConTeclado();
     void paginasExponenTextoAccesible();
     void qmlSinImportsProhibidos();
@@ -416,14 +370,7 @@ private slots:
     void listaDescartaRespuestaTardia();
 
     // T003: perfiles y nueva solicitud
-    void sinPerfilesListosMuestraAdministrarPerfiles();
     void perfilesDescartaRespuestaTardia();
-    void duplicadoRequiereConfirmacionYSeConfirma();
-    void duplicadoRequiereConfirmacionYSeCancela();
-    void crearDevuelveRequiereConfirmacionPorCarrera();
-    void duplicadoBloqueadoMuestraError();
-    void filtroInvalidoMuestraMensajes();
-    void nuevaSolicitudDescartaRespuestasTardias();
 
     // T003: detalle
     void detalleEstadosErrorConDatosYNoEncontrada();
@@ -432,7 +379,6 @@ private slots:
     void eliminarConConfirmacion();
 
     // T007: acciones manuales, envio tras crear y textos de eventos nuevos
-    void envioTrasCrearSeEncola();
     void detalleAccionesManualesYEstadosAccesibles();
     void detalleSinAccionesNoMuestraBotones();
 
@@ -452,8 +398,6 @@ private slots:
     void filtrosLocalesDeLaLista();
     void filtroPorMesIncluyePeriodosQueCruzan();
     void conteoDePaquetesEnLaLista();
-    void atajosDePeriodoConRelojFijo();
-    void verSolicitudExistenteDesdeDuplicado();
     void atajosDeTeclado();
     void atajosDeFacturas();
     void copiarIdentificadores();
@@ -543,7 +487,7 @@ void TestPresentacion::cargaQmlSinWarnings()
     Escenario e(DemoSolicitudesService::Datos::Representativos);
     QVERIFY(e.cargar());
     QVERIFY(QTest::qWaitForWindowExposed(e.ventana));
-    QCOMPARE(e.vms.app()->pagina(), Pagina::Lista);
+    QCOMPARE(e.vms.app()->pagina(), Pagina::Diagnostico);
     QTRY_VERIFY(e.pagina() != nullptr);
     QCOMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
 
@@ -628,33 +572,6 @@ void TestPresentacion::avisoRaizPaquetesArribaDeLasPaginas()
     QCOMPARE(loader->y(), franja->height());
 }
 
-void TestPresentacion::nuevaSolicitudDesdeCppConVentanaOculta()
-{
-    Escenario e(DemoSolicitudesService::Datos::Representativos);
-    QVERIFY(e.cargar(false));
-    QTRY_COMPARE(e.vms.solicitudes()->rowCount(), 11);
-
-    // Lo que hace AppLifecycleController para "Nueva solicitud" del menu bar.
-    QVERIFY(QMetaObject::invokeMethod(e.vms.app(), "mostrarNueva")); // invocable
-    QCOMPARE(e.vms.app()->pagina(), Pagina::Nueva);
-    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaNuevaSolicitud"));
-    QVERIFY(!e.ventana->isVisible());
-    QTRY_COMPARE(e.vms.nuevaSolicitud()->perfilesDisponibles()->count(), 2);
-
-    // Despues se muestra y enfoca: el formulario queda listo con foco en perfil.
-    e.ventana->show();
-    QVERIFY(e.activar());
-    QVERIFY(e.ventana->isVisible());
-    QCOMPARE(e.pagina()->objectName(), QStringLiteral("paginaNuevaSolicitud"));
-    QVERIFY(e.item(QStringLiteral("campoPerfil"))->isVisible());
-    QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("campoPerfil"));
-
-    // Mostrar de nuevo con el formulario abierto lo reinicia sin warnings.
-    e.vms.nuevaSolicitud()->setRfcContraparte(QStringLiteral("XAXX010101000"));
-    e.vms.app()->mostrarNueva();
-    QVERIFY(e.vms.nuevaSolicitud()->rfcContraparte().isEmpty());
-}
-
 void TestPresentacion::estadoVacioConDatosVacios()
 {
     Escenario e(DemoSolicitudesService::Datos::Vacio);
@@ -669,8 +586,8 @@ void TestPresentacion::estadoVacioConDatosVacios()
     QTRY_VERIFY(vacio->isVisible());
     QVERIFY(!nombreAccesible(vacio).isEmpty());
     QVERIFY(!e.item(QStringLiteral("listaSolicitudes"))->isVisible());
-    // Sin filas, el foco inicial va a "Nueva solicitud".
-    QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("botonNuevaSolicitud"));
+    // Sin filas, el foco inicial va a "Perfiles SAT" (T023.5: sin "Nueva solicitud").
+    QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("botonPerfilesSat"));
 }
 
 void TestPresentacion::navegacionListaADetallePorId()
@@ -686,7 +603,7 @@ void TestPresentacion::navegacionListaADetallePorId()
     const QString id = terminada.data(Rol::IdRole).toString();
 
     QVERIFY(!e.vms.app()->abrirDetalle(QStringLiteral("3"))); // un indice no es identidad
-    QCOMPARE(e.vms.app()->pagina(), Pagina::Lista);
+    QCOMPARE(e.vms.app()->pagina(), Pagina::Diagnostico);
 
     QVERIFY(e.vms.app()->abrirDetalle(id));
     QCOMPARE(e.vms.app()->pagina(), Pagina::Detalle);
@@ -728,146 +645,8 @@ void TestPresentacion::navegacionListaADetallePorId()
     QMetaObject::invokeMethod(e.pagina(), "mostrarPestana", Q_ARG(QVariant, QStringLiteral("paquetes")));
     QTRY_VERIFY(e.item(QStringLiteral("sinPaquetes"))->isVisible());
 
-    e.vms.app()->mostrarLista();
+    e.vms.app()->mostrarDiagnostico();
     QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
-}
-
-void TestPresentacion::combosMuestranValorInicial()
-{
-    // T012: al abrir el formulario los ComboBox muestran el valor inicial del
-    // view model (Emitidos, Todos) sin que el usuario elija nada.
-    Escenario e(DemoSolicitudesService::Datos::Representativos);
-    QVERIFY(e.cargar());
-    QVERIFY(QTest::qWaitForWindowExposed(e.ventana));
-    e.vms.app()->mostrarNueva();
-    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaNuevaSolicitud"));
-    QCOMPARE(e.vms.nuevaSolicitud()->tipoDescarga(), QStringLiteral("Emitidos"));
-    QCOMPARE(e.vms.nuevaSolicitud()->tipoComprobante(), QString());
-
-    auto* tipo = e.item(QStringLiteral("campoTipoDescarga"));
-    auto* comprobante = e.item(QStringLiteral("campoTipoComprobante"));
-    // T013 (UX-15): el tipo de descarga es un SelectorSegmentado.
-    QTRY_COMPARE(tipo->property("valor").toString(), QStringLiteral("Emitidos"));
-    QVERIFY(e.item(QStringLiteral("segmento_Emitidos")) != nullptr);
-    QTRY_COMPARE(comprobante->property("displayText").toString(), QStringLiteral("Todos"));
-    QCOMPARE(comprobante->property("currentIndex").toInt(), 0);
-
-    // Tras reiniciar con la pagina abierta (valores sin cambio) se conservan.
-    e.vms.nuevaSolicitud()->setTipoDescarga(QStringLiteral("Recibidos"));
-    QTRY_COMPARE(tipo->property("valor").toString(), QStringLiteral("Recibidos"));
-    e.vms.app()->mostrarNueva();
-    QTRY_COMPARE(e.item(QStringLiteral("campoTipoDescarga"))->property("valor").toString(),
-                 QStringLiteral("Emitidos"));
-}
-
-void TestPresentacion::envioValidoAbreDetalleYApareceEnLista()
-{
-    Escenario e(DemoSolicitudesService::Datos::Representativos);
-    QVERIFY(e.cargar());
-    QVERIFY(QTest::qWaitForWindowExposed(e.ventana));
-    QTRY_COMPARE(e.vms.solicitudes()->rowCount(), 11);
-
-    e.vms.app()->mostrarNueva();
-    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaNuevaSolicitud"));
-
-    NuevaSolicitudViewModel* f = e.vms.nuevaSolicitud();
-    QTRY_COMPARE(f->perfilesDisponibles()->count(), 2); // solo activos
-    QVERIFY(!f->sinPerfiles());
-    QVERIFY(!e.item(QStringLiteral("seccionSinPerfiles"))->isVisible());
-    QSignalSpy enviado(f, &NuevaSolicitudViewModel::submitted);
-    f->setPerfilId(f->perfilesDisponibles()->index(0).data(PerfilesDisponiblesModel::IdRole).toString());
-    f->setTipoDescarga(QStringLiteral("Recibidos"));
-    f->setFechaInicial(QStringLiteral("2026-07-01"));
-    f->setFechaFinal(QStringLiteral("2026-07-31"));
-    f->setRfcContraparte(QStringLiteral("xaxx010101000"));
-    f->setTipoComprobante(QStringLiteral("I"));
-    f->setTipoComprobante(QStringLiteral("X")); // fuera del catalogo: se ignora
-    QCOMPARE(f->tipoComprobante(), QStringLiteral("I"));
-    QVERIFY(f->canSubmit());
-    QVERIFY(f->errorMessage().isEmpty());
-
-    QMetaObject::invokeMethod(e.item(QStringLiteral("botonCrearSolicitud")), "click");
-    QTRY_COMPARE(enviado.count(), 1);
-    const QString id = enviado.at(0).at(0).toString();
-    QCOMPARE(e.solicitudes.llamadasEvaluar, 1);
-    QCOMPARE(e.solicitudes.confirmaciones,
-             QList<ConfirmacionDuplicado>{ConfirmacionDuplicado::SinConfirmar});
-
-    QTRY_COMPARE(e.vms.app()->pagina(), Pagina::Detalle);
-    QCOMPARE(e.vms.app()->solicitudSeleccionadaId(), id);
-    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaDetalleSolicitud"));
-    QTRY_VERIFY(e.vms.detalle()->cargada());
-    QCOMPARE(e.vms.detalle()->solicitudId(), id);
-    QCOMPARE(e.vms.detalle()->fechaInicial(), QStringLiteral("2026-07-01"));
-    QCOMPARE(e.vms.detalle()->tipoDescarga(), QStringLiteral("Recibidos"));
-    QCOMPARE(e.vms.detalle()->rfcContraparte(), QStringLiteral("XAXX010101000"));
-    QCOMPARE(e.vms.detalle()->tipoComprobante(), QStringLiteral("I"));
-
-    QMetaObject::invokeMethod(e.item(QStringLiteral("botonRegresar")), "click");
-    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
-    QTRY_COMPARE(e.vms.solicitudes()->rowCount(), 12);
-    QCOMPARE(e.vms.solicitudes()->filaDe(id), 0);
-    QCOMPARE(e.vms.solicitudes()->index(0).data(Rol::EstadoResumenRole).toString(),
-             QStringLiteral("Creada"));
-    QTRY_COMPARE(e.item(QStringLiteral("listaSolicitudes"))->property("count").toInt(), 12);
-}
-
-void TestPresentacion::envioInvalidoMuestraErrorYNoEnvia()
-{
-    Escenario e(DemoSolicitudesService::Datos::Representativos);
-    QVERIFY(e.cargar());
-    QVERIFY(QTest::qWaitForWindowExposed(e.ventana));
-    e.vms.app()->mostrarNueva();
-    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaNuevaSolicitud"));
-
-    NuevaSolicitudViewModel* f = e.vms.nuevaSolicitud();
-    QTRY_COMPARE(f->perfilesDisponibles()->count(), 2);
-    QSignalSpy enviado(f, &NuevaSolicitudViewModel::submitted);
-    // T013 (UX-18): los errores de validacion van bajo su campo.
-    auto* mensaje = e.item(QStringLiteral("mensajeError"));
-    auto* filaPerfil = e.item(QStringLiteral("filaPerfil"));
-    QVERIFY(mensaje && filaPerfil);
-    QVERIFY(!mensaje->isVisible()); // formulario nuevo: sin error todavia
-    QVERIFY(filaPerfil->property("error").toString().isEmpty());
-    QVERIFY(!f->canSubmit());
-
-    // Sin perfil.
-    QMetaObject::invokeMethod(e.item(QStringLiteral("botonCrearSolicitud")), "click");
-    QVERIFY(!f->errorMessage().isEmpty());
-    QCOMPARE(f->campoConError(), QStringLiteral("perfil"));
-    QTRY_COMPARE(filaPerfil->property("error").toString(), f->errorMessage());
-    QVERIFY(!mensaje->isVisible()); // un error con campo no va en el aviso general
-    QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("campoPerfil"));
-
-    // Perfil valido, rango de fechas invertido.
-    f->setPerfilId(f->perfilesDisponibles()->index(1).data(PerfilesDisponiblesModel::IdRole).toString());
-    f->setFechaInicial(QStringLiteral("2026-08-31"));
-    f->setFechaFinal(QStringLiteral("2026-08-01"));
-    QVERIFY(!f->canSubmit());
-    QVERIFY(f->errorMessage().contains(QStringLiteral("fecha final")));
-    QCOMPARE(f->campoConError(), QStringLiteral("fechaFinal"));
-    QTRY_COMPARE(e.item(QStringLiteral("filaPeriodo"))->property("error").toString(), f->errorMessage());
-    QVERIFY(e.item(QStringLiteral("campoFechaFinal"))->property("conError").toBool());
-    f->submit();
-
-    // Fecha con formato invalido.
-    f->setFechaFinal(QStringLiteral("31/08/2026"));
-    QVERIFY(!f->canSubmit());
-    f->submit();
-
-    // Perfil inactivo o desconocido (no esta entre los disponibles).
-    f->setFechaFinal(QStringLiteral("2026-09-30"));
-    QVERIFY(f->canSubmit());
-    f->setPerfilId(QStringLiteral("00000000-0000-4000-9000-000000000003"));
-    QVERIFY(!f->canSubmit());
-    f->submit();
-
-    QCOMPARE(e.solicitudes.llamadasEvaluar, 0);
-    QCOMPARE(e.solicitudes.llamadasCrear(), 0);
-    QCOMPARE(enviado.count(), 0);
-    QCOMPARE(e.vms.app()->pagina(), Pagina::Nueva);
-    QCOMPARE(f->campoConError(), QStringLiteral("perfil"));
-    QTRY_VERIFY(!filaPerfil->property("error").toString().isEmpty());
 }
 
 void TestPresentacion::recorridoConTeclado()
@@ -891,7 +670,7 @@ void TestPresentacion::recorridoConTeclado()
     QTest::keyClick(e.ventana, Qt::Key_Tab);
     QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("botonEliminarSolicitud"));
     QTest::keyClick(e.ventana, Qt::Key_Escape);
-    QTRY_COMPARE(e.vms.app()->pagina(), Pagina::Lista);
+    QTRY_COMPARE(e.vms.app()->pagina(), Pagina::Diagnostico);
 
     // Espacio sobre la lista tambien abre el detalle; Return sobre "Regresar" vuelve.
     QTRY_VERIFY(focoDentroDe(e.ventana, QStringLiteral("listaSolicitudes")));
@@ -899,65 +678,13 @@ void TestPresentacion::recorridoConTeclado()
     QTRY_COMPARE(e.vms.app()->pagina(), Pagina::Detalle);
     QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("botonRegresar"));
     QTest::keyClick(e.ventana, Qt::Key_Return);
-    QTRY_COMPARE(e.vms.app()->pagina(), Pagina::Lista);
+    QTRY_COMPARE(e.vms.app()->pagina(), Pagina::Diagnostico);
 
-    // T013: Tab recorre las acciones del encabezado en orden (carpeta,
-    // Perfiles SAT, Nueva solicitud); Espacio activa "Nueva solicitud".
+    // T013/T023.5: Tab llega a las acciones del encabezado (Perfiles SAT es
+    // la ultima: ya no hay "Nueva solicitud").
     QTRY_VERIFY(focoDentroDe(e.ventana, QStringLiteral("listaSolicitudes")));
     QTest::keyClick(e.ventana, Qt::Key_Tab);
     QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("botonPerfilesSat"));
-    QTest::keyClick(e.ventana, Qt::Key_Tab);
-    QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("botonNuevaSolicitud"));
-    QTest::keyClick(e.ventana, Qt::Key_Space);
-    QTRY_COMPARE(e.vms.app()->pagina(), Pagina::Nueva);
-
-    // Formulario: foco inicial en perfil; flecha abajo elige el primero.
-    NuevaSolicitudViewModel* f = e.vms.nuevaSolicitud();
-    QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("campoPerfil"));
-    QTRY_COMPARE(f->perfilesDisponibles()->count(), 2);
-    QTest::keyClick(e.ventana, Qt::Key_Down);
-    QTRY_VERIFY(!f->perfilId().isEmpty());
-    QVERIFY(f->canSubmit());
-
-    // Tab recorre los campos en orden hasta "Crear solicitud" (incluye los
-    // opcionales tipo de comprobante y complemento).
-    const QStringList esperados = {
-        QStringLiteral("campoTipoDescarga"),   QStringLiteral("campoFechaInicial"),
-        QStringLiteral("campoFechaFinal"),     QStringLiteral("campoRfcContraparte"),
-        QStringLiteral("campoTipoComprobante"), QStringLiteral("campoComplemento"),
-        QStringLiteral("botonCrearSolicitud"),
-    };
-    QStringList visitados;
-    for (int i = 0; i < 16 && objectNameConFoco(e.ventana) != esperados.constLast(); ++i) {
-        QTest::keyClick(e.ventana, Qt::Key_Tab);
-        // El segmentado recibe el foco en su segmento activo (T013).
-        const QString actual = focoDentroDe(e.ventana, QStringLiteral("campoTipoDescarga"))
-                                   ? QStringLiteral("campoTipoDescarga") : objectNameConFoco(e.ventana);
-        if (esperados.contains(actual)) {
-            visitados.append(actual);
-        }
-    }
-    QCOMPARE(visitados, esperados);
-
-    // Espacio envia; se abre el detalle de la nueva solicitud.
-    QTest::keyClick(e.ventana, Qt::Key_Space);
-    QTRY_COMPARE(e.vms.app()->pagina(), Pagina::Detalle);
-    QCOMPARE(e.solicitudes.llamadasCrear(), 1);
-    const QString nuevoId = e.vms.app()->solicitudSeleccionadaId();
-    QTRY_VERIFY(e.vms.detalle()->cargada());
-    QCOMPARE(e.vms.detalle()->solicitudId(), nuevoId);
-
-    // Escape vuelve a la lista con la nueva solicitud al inicio.
-    QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("botonRegresar"));
-    QTest::keyClick(e.ventana, Qt::Key_Escape);
-    QTRY_COMPARE(e.vms.app()->pagina(), Pagina::Lista);
-    QCOMPARE(e.vms.solicitudes()->filaDe(nuevoId), 0);
-
-    // Escape desde el formulario tambien regresa.
-    e.vms.app()->mostrarNueva();
-    QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("campoPerfil"));
-    QTest::keyClick(e.ventana, Qt::Key_Escape);
-    QTRY_COMPARE(e.vms.app()->pagina(), Pagina::Lista);
 }
 
 void TestPresentacion::paginasExponenTextoAccesible()
@@ -970,8 +697,7 @@ void TestPresentacion::paginasExponenTextoAccesible()
     // Lista: pagina, lista, boton y filas con texto (no solo color).
     QVERIFY(!nombreAccesible(e.pagina()).isEmpty());
     QVERIFY(!nombreAccesible(e.item(QStringLiteral("listaSolicitudes"))).isEmpty());
-    QCOMPARE(nombreAccesible(e.item(QStringLiteral("botonNuevaSolicitud"))),
-             QStringLiteral("Nueva solicitud"));
+    QVERIFY(!e.item(QStringLiteral("botonNuevaSolicitud"))); // T023.5: sin "Nueva solicitud"
     auto* fila0 = e.item(QStringLiteral("filaSolicitud_0"));
     QVERIFY(fila0);
     const QString nombreFila = nombreAccesible(fila0);
@@ -994,20 +720,6 @@ void TestPresentacion::paginasExponenTextoAccesible()
     // Estados de carga y error tienen texto accesible aunque no esten visibles.
     QVERIFY(!nombreAccesible(e.item(QStringLiteral("estadoCargando"))).isEmpty());
     QCOMPARE(nombreAccesible(e.item(QStringLiteral("botonReintentarLista"))), QStringLiteral("Reintentar"));
-
-    // Formulario: pagina y controles.
-    e.vms.app()->mostrarNueva();
-    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaNuevaSolicitud"));
-    QVERIFY(!nombreAccesible(e.pagina()).isEmpty());
-    for (const char* control : {"campoPerfil", "campoTipoDescarga", "campoFechaInicial",
-                                "campoFechaFinal", "campoRfcContraparte", "campoTipoComprobante",
-                                "campoComplemento", "botonCrearSolicitud", "botonRegresar",
-                                "botonAdministrarPerfiles", "botonPerfilesSat"}) {
-        QVERIFY2(!nombreAccesible(e.item(QString::fromLatin1(control))).isEmpty(), control);
-    }
-    QVERIFY(!nombreAccesible(e.itemDeDialogo(QStringLiteral("dialogoDuplicado"),
-                                             QStringLiteral("dialogoDuplicadoContenido")))
-                 .isEmpty());
 
     // Detalle: pagina, secciones, badges de estado con texto y eliminar.
     QVERIFY(e.vms.app()->abrirDetalle(e.vms.solicitudes()->index(0).data(Rol::IdRole).toString()));
@@ -1074,8 +786,8 @@ void TestPresentacion::qmlSinImportsProhibidos()
         ++archivos;
     }
     // 31 .qml (Theme, Icono, componentes T013, BotonCopiar, T015.3, VisorPdfCfdi y T019) + Etiquetas.js,
-    // mas T023.4: FacturasPage, FranjaMes y ListaMesesFacturas.
-    QCOMPARE(archivos, 35);
+    // mas T023.4: FacturasPage, FranjaMes y ListaMesesFacturas; T023.5: HistorialPage.
+    QCOMPARE(archivos, 36);
 }
 
 // ---------------------------------------------------------------------------
@@ -1162,65 +874,6 @@ void TestPresentacion::listaDescartaRespuestaTardia()
 // ---------------------------------------------------------------------------
 // T003: perfiles y nueva solicitud
 
-void TestPresentacion::sinPerfilesListosMuestraAdministrarPerfiles()
-{
-    EscenarioAsincrono e;
-    QVERIFY(e.cargar());
-    QVERIFY(e.activar());
-    e.solicitudes.lista.resolver(0, ResultadoListaSol::exito({}));
-    NuevaSolicitudViewModel* f = e.vms.nuevaSolicitud();
-    QCOMPARE(e.perfiles.listas.size(), 0); // nada al construir
-
-    e.vms.app()->mostrarNueva();
-    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaNuevaSolicitud"));
-    QCOMPARE(e.perfiles.listas.size(), 1);
-    QVERIFY(f->cargandoPerfiles());
-    QVERIFY(!f->sinPerfiles()); // aun no se sabe
-
-    // Ninguno listo: inactivo con e.firma Lista, activo sin e.firma, activo vencido.
-    PerfilResumen inactivo = fakes::FakePerfilesSatService::perfil("AAA010101AAA", "Inactivo", false);
-    PerfilResumen sinEFirma = fakes::FakePerfilesSatService::perfil("BBB010101BBB", "Sin e.firma");
-    PerfilResumen vencido = fakes::FakePerfilesSatService::perfil("CCC010101CCC", "Vencido");
-    e.perfiles.listas.resolver(0, ResultadoListaPerfiles::exito({inactivo, sinEFirma, vencido}));
-    QTRY_COMPARE(e.credenciales.resumenes.size(), 3);
-    e.credenciales.resolverResumen(0, EstadoCredencial::Lista);
-    e.credenciales.resolverResumen(1, EstadoCredencial::SinCredencial);
-    e.credenciales.resolverResumen(2, EstadoCredencial::Vencida);
-    QTRY_VERIFY(f->sinPerfiles());
-    QVERIFY(!f->cargandoPerfiles());
-    QCOMPARE(f->perfilesDisponibles()->count(), 0);
-
-    // "Administrar perfiles SAT" visible y con foco; ya no existe el perfil simulado.
-    QTRY_VERIFY(e.item(QStringLiteral("seccionSinPerfiles"))->isVisible());
-    QVERIFY(e.item(QStringLiteral("seccionPerfilSimulado")) == nullptr);
-    QVERIFY(e.item(QStringLiteral("botonCrearPerfilSimulado")) == nullptr);
-    QVERIFY(!e.item(QStringLiteral("campoPerfil"))->isEnabled());
-    auto* administrar = e.item(QStringLiteral("botonAdministrarPerfiles"));
-    QCOMPARE(nombreAccesible(administrar), QStringLiteral("Administrar perfiles SAT"));
-    QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("botonAdministrarPerfiles"));
-    QVERIFY(!e.perfiles.historial.contains(QStringLiteral("crearPerfilSimulado")));
-
-    // Un perfil queda listo (credencialCambio): el selector lo ofrece.
-    e.credenciales.emitirCambio(sinEFirma.id);
-    QTRY_COMPARE(e.perfiles.listas.size(), 2);
-    QVERIFY(resolverPerfiles(e, 1, {sinEFirma}));
-    QTRY_VERIFY(!f->sinPerfiles());
-    QCOMPARE(f->perfilesDisponibles()->count(), 1);
-    QCOMPARE(f->perfilesDisponibles()->filaDe(sinEFirma.id.texto()), 0);
-    QTRY_VERIFY(!e.item(QStringLiteral("seccionSinPerfiles"))->isVisible());
-    QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("campoPerfil"));
-
-    // De vuelta sin listos, Enter en "Administrar perfiles SAT" abre Perfiles.
-    emit e.perfiles.perfilesCambiaron();
-    QTRY_COMPARE(e.perfiles.listas.size(), 3);
-    e.perfiles.listas.resolver(2, ResultadoListaPerfiles::exito({}));
-    QTRY_VERIFY(f->sinPerfiles());
-    QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("botonAdministrarPerfiles"));
-    QTest::keyClick(e.ventana, Qt::Key_Return);
-    QTRY_COMPARE(e.vms.app()->pagina(), Pagina::Perfiles);
-    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaPerfilesSat"));
-}
-
 void TestPresentacion::perfilesDescartaRespuestaTardia()
 {
     EscenarioAsincrono e;
@@ -1236,256 +889,6 @@ void TestPresentacion::perfilesDescartaRespuestaTardia()
     procesarEventos();
     QVERIFY(f->sinPerfiles());
     QCOMPARE(f->perfilesDisponibles()->count(), 0);
-}
-
-void TestPresentacion::duplicadoRequiereConfirmacionYSeConfirma()
-{
-    EscenarioAsincrono e;
-    QVERIFY(prepararFormulario(e));
-    NuevaSolicitudViewModel* f = e.vms.nuevaSolicitud();
-    QSignalSpy enviado(f, &NuevaSolicitudViewModel::submitted);
-    f->setTipoComprobante(QStringLiteral("N"));
-    f->setComplemento(QStringLiteral(" nomina12 "));
-
-    QMetaObject::invokeMethod(e.item(QStringLiteral("botonCrearSolicitud")), "click");
-    QCOMPARE(e.solicitudes.requestsEvaluar.size(), 1);
-    const NuevaSolicitudRequest evaluado = e.solicitudes.requestsEvaluar.constFirst();
-    QCOMPARE(evaluado.perfilId, perfilDePrueba().id);
-    QCOMPARE(evaluado.tipoComprobante, std::optional<QString>(QStringLiteral("N")));
-    QCOMPARE(evaluado.complemento, std::optional<QString>(QStringLiteral("nomina12")));
-    QVERIFY(f->ocupado());
-    QVERIFY(!f->canSubmit());
-    QTRY_VERIFY(!e.item(QStringLiteral("botonCrearSolicitud"))->isEnabled());
-
-    e.solicitudes.evaluacion.resolver(
-        0, SolicitudesService::ResultadoEvaluarDuplicado::exito(evaluacion(
-               ClasificacionDuplicado::RequiereConfirmacion, MotivoDuplicado::SolicitudEliminada)));
-    QTRY_VERIFY(f->confirmacionPendiente());
-    QVERIFY(!f->ocupado());
-    QVERIFY(!f->motivoDuplicado().isEmpty());
-    QVERIFY(e.solicitudes.confirmaciones.isEmpty()); // nada se crea sin confirmar
-
-    QObject* dialogo = e.dialogo(QStringLiteral("dialogoDuplicado"));
-    QVERIFY(dialogo);
-    QTRY_VERIFY(dialogo->property("opened").toBool());
-    auto* mensaje = e.itemDeDialogo(QStringLiteral("dialogoDuplicado"),
-                                    QStringLiteral("dialogoDuplicadoMensaje"));
-    QVERIFY(mensaje->property("text").toString().contains(f->motivoDuplicado()));
-    // Foco inicial en la opcion segura.
-    QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("dialogoDuplicadoCancelar"));
-    QTest::keyClick(e.ventana, Qt::Key_Tab);
-    QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("dialogoDuplicadoConfirmar"));
-
-    // Confirmar crea con el snapshot evaluado y ConfirmacionDuplicado::Confirmada.
-    QTest::keyClick(e.ventana, Qt::Key_Return);
-    QCOMPARE(e.solicitudes.confirmaciones,
-             QList<ConfirmacionDuplicado>{ConfirmacionDuplicado::Confirmada});
-    const NuevaSolicitudRequest creado = e.solicitudes.requestsCrear.constFirst();
-    QCOMPARE(creado.perfilId, evaluado.perfilId);
-    QCOMPARE(creado.fechaInicial, evaluado.fechaInicial);
-    QCOMPARE(creado.fechaFinal, evaluado.fechaFinal);
-    QCOMPARE(creado.tipoComprobante, evaluado.tipoComprobante);
-    QCOMPARE(creado.complemento, evaluado.complemento);
-    QVERIFY(!f->confirmacionPendiente());
-    QVERIFY(f->ocupado());
-    QTRY_VERIFY(!dialogo->property("visible").toBool());
-
-    const SolicitudId id = SolicitudId::generar();
-    e.solicitudes.creacion.resolver(0, SolicitudesService::ResultadoCrear::exito(id));
-    QTRY_COMPARE(enviado.count(), 1);
-    QCOMPARE(enviado.at(0).at(0).toString(), id.texto());
-    QTRY_COMPARE(e.vms.app()->pagina(), Pagina::Detalle);
-}
-
-void TestPresentacion::duplicadoRequiereConfirmacionYSeCancela()
-{
-    EscenarioAsincrono e;
-    QVERIFY(prepararFormulario(e));
-    NuevaSolicitudViewModel* f = e.vms.nuevaSolicitud();
-
-    f->submit();
-    e.solicitudes.evaluacion.resolver(
-        0, SolicitudesService::ResultadoEvaluarDuplicado::exito(evaluacion(
-               ClasificacionDuplicado::RequiereConfirmacion, MotivoDuplicado::EnvioIncierto)));
-    QObject* dialogo = e.dialogo(QStringLiteral("dialogoDuplicado"));
-    QTRY_VERIFY(dialogo->property("opened").toBool());
-    QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("dialogoDuplicadoCancelar"));
-
-    // Escape cancela: no hay creacion, el formulario se puede volver a enviar
-    // y el foco regresa a "Crear solicitud".
-    QTest::keyClick(e.ventana, Qt::Key_Escape);
-    QTRY_VERIFY(!f->confirmacionPendiente());
-    QTRY_VERIFY(!dialogo->property("visible").toBool());
-    QVERIFY(e.solicitudes.confirmaciones.isEmpty());
-    QVERIFY(f->canSubmit());
-    QVERIFY(f->errorMessage().isEmpty());
-    QCOMPARE(e.vms.app()->pagina(), Pagina::Nueva);
-    QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("botonCrearSolicitud"));
-
-    // Segundo intento: Cancelar con clic y luego Espacio sobre el boton.
-    f->submit();
-    QCOMPARE(e.solicitudes.requestsEvaluar.size(), 2);
-    e.solicitudes.evaluacion.resolver(
-        1, SolicitudesService::ResultadoEvaluarDuplicado::exito(evaluacion(
-               ClasificacionDuplicado::RequiereConfirmacion, MotivoDuplicado::EnvioIncierto)));
-    QTRY_VERIFY(dialogo->property("opened").toBool());
-    QMetaObject::invokeMethod(e.itemDeDialogo(QStringLiteral("dialogoDuplicado"),
-                                              QStringLiteral("dialogoDuplicadoCancelar")),
-                              "click");
-    QTRY_VERIFY(!f->confirmacionPendiente());
-    QVERIFY(e.solicitudes.confirmaciones.isEmpty());
-
-    // confirmarDuplicado() sin confirmacion pendiente no hace nada.
-    f->confirmarDuplicado();
-    QVERIFY(e.solicitudes.confirmaciones.isEmpty());
-}
-
-void TestPresentacion::crearDevuelveRequiereConfirmacionPorCarrera()
-{
-    EscenarioAsincrono e;
-    QVERIFY(prepararFormulario(e));
-    NuevaSolicitudViewModel* f = e.vms.nuevaSolicitud();
-
-    f->submit();
-    e.solicitudes.evaluacion.resolver(
-        0, SolicitudesService::ResultadoEvaluarDuplicado::exito(
-               evaluacion(ClasificacionDuplicado::Libre, MotivoDuplicado::SinCoincidencias)));
-    // Libre -> crear() (fachada: crearLocal SinConfirmar).
-    QTRY_COMPARE(e.solicitudes.confirmaciones.size(), 1);
-    QCOMPARE(e.solicitudes.confirmaciones.constFirst(), ConfirmacionDuplicado::SinConfirmar);
-    QVERIFY(f->ocupado());
-
-    // La transaccion reclasifica: otra solicitud equivalente aparecio.
-    e.solicitudes.creacion.resolver(
-        0, SolicitudesService::ResultadoCrear::fallo(ErrorCrear::requiereConfirmacion(evaluacion(
-               ClasificacionDuplicado::RequiereConfirmacion, MotivoDuplicado::SolicitudSinExito))));
-    QTRY_VERIFY(f->confirmacionPendiente());
-    QObject* dialogo = e.dialogo(QStringLiteral("dialogoDuplicado"));
-    QTRY_VERIFY(dialogo->property("opened").toBool());
-
-    QMetaObject::invokeMethod(e.itemDeDialogo(QStringLiteral("dialogoDuplicado"),
-                                              QStringLiteral("dialogoDuplicadoConfirmar")),
-                              "click");
-    QCOMPARE(e.solicitudes.confirmaciones.size(), 2);
-    QCOMPARE(e.solicitudes.confirmaciones.at(1), ConfirmacionDuplicado::Confirmada);
-    QCOMPARE(e.solicitudes.requestsCrear.at(1).perfilId, e.solicitudes.requestsCrear.at(0).perfilId);
-}
-
-void TestPresentacion::duplicadoBloqueadoMuestraError()
-{
-    EscenarioAsincrono e;
-    QVERIFY(prepararFormulario(e));
-    NuevaSolicitudViewModel* f = e.vms.nuevaSolicitud();
-
-    f->submit();
-    const EvaluacionDuplicado bloqueado =
-        evaluacion(ClasificacionDuplicado::Bloqueado, MotivoDuplicado::SolicitudEnCurso);
-    e.solicitudes.evaluacion.resolver(0, SolicitudesService::ResultadoEvaluarDuplicado::exito(bloqueado));
-    QTRY_VERIFY(!f->errorMessage().isEmpty());
-    QVERIFY(!f->ocupado());
-    QVERIFY(!f->confirmacionPendiente());
-    QVERIFY(e.solicitudes.confirmaciones.isEmpty()); // Bloqueado nunca se crea
-    QCOMPARE(f->solicitudExistenteId(), bloqueado.solicitudReferencia->texto());
-
-    auto* mensaje = e.item(QStringLiteral("mensajeError"));
-    QTRY_VERIFY(mensaje->isVisible());
-    QVERIFY(nombreAccesible(mensaje).contains(f->errorMessage()));
-    QVERIFY(!e.dialogo(QStringLiteral("dialogoDuplicado"))->property("visible").toBool());
-
-    // Accion para ver la solicitud existente (por id).
-    auto* ver = e.item(QStringLiteral("botonVerSolicitudExistente"));
-    QTRY_VERIFY(ver->isVisible());
-    QVERIFY(!nombreAccesible(ver).isEmpty());
-    QMetaObject::invokeMethod(ver, "click");
-    QTRY_COMPARE(e.vms.app()->pagina(), Pagina::Detalle);
-    QCOMPARE(e.vms.app()->solicitudSeleccionadaId(), bloqueado.solicitudReferencia->texto());
-}
-
-void TestPresentacion::filtroInvalidoMuestraMensajes()
-{
-    EscenarioAsincrono e;
-    QVERIFY(prepararFormulario(e));
-    NuevaSolicitudViewModel* f = e.vms.nuevaSolicitud();
-    f->setRfcContraparte(QStringLiteral("NOVALIDO"));
-
-    f->submit();
-    const QString mensaje1 = QStringLiteral("El RFC contraparte no es válido.");
-    const QString mensaje2 = QStringLiteral("El complemento contiene caracteres reservados.");
-    e.solicitudes.evaluacion.resolver(
-        0, SolicitudesService::ResultadoEvaluarDuplicado::fallo(ErrorCrear::filtroInvalido(
-               {{ErrorSolicitudCanonica::Codigo::RfcContraparteInvalido, QStringLiteral("rfc_emisor"), mensaje1},
-                {ErrorSolicitudCanonica::Codigo::CaracterReservado, QStringLiteral("complemento"), mensaje2}})));
-    QTRY_VERIFY(f->errorMessage().contains(mensaje1));
-    QVERIFY(f->errorMessage().contains(mensaje2));
-    QVERIFY(!f->ocupado());
-    // T013: el error de filtro va bajo el campo del primer filtro invalido.
-    QCOMPARE(f->campoConError(), QStringLiteral("rfcContraparte"));
-    QTRY_COMPARE(e.item(QStringLiteral("filaRfcContraparte"))->property("error").toString(), f->errorMessage());
-
-    // Tambien si el error llega desde crear() (validacion autoritativa).
-    f->setRfcContraparte(QStringLiteral("XAXX010101000"));
-    QVERIFY(f->errorMessage().isEmpty()); // editar limpia el error de servicio
-    f->submit();
-    e.solicitudes.evaluacion.resolver(
-        1, SolicitudesService::ResultadoEvaluarDuplicado::exito(
-               evaluacion(ClasificacionDuplicado::Libre, MotivoDuplicado::SinCoincidencias)));
-    QTRY_COMPARE(e.solicitudes.creacion.size(), 1);
-    e.solicitudes.creacion.resolver(
-        0, SolicitudesService::ResultadoCrear::fallo(ErrorCrear::filtroInvalido(
-               {{ErrorSolicitudCanonica::Codigo::TipoComprobanteInvalido,
-                 QStringLiteral("tipo_comprobante"), QStringLiteral("Tipo de comprobante invalido.")}})));
-    QTRY_VERIFY(f->errorMessage().contains(QStringLiteral("Tipo de comprobante invalido.")));
-    QVERIFY(!f->ocupado());
-}
-
-void TestPresentacion::nuevaSolicitudDescartaRespuestasTardias()
-{
-    EscenarioAsincrono e;
-    QVERIFY(prepararFormulario(e));
-    NuevaSolicitudViewModel* f = e.vms.nuevaSolicitud();
-    QSignalSpy enviado(f, &NuevaSolicitudViewModel::submitted);
-
-    // Evaluacion invalidada por reiniciar(): su respuesta no crea nada.
-    f->submit();
-    QVERIFY(f->ocupado());
-    f->reiniciar();
-    QVERIFY(!f->ocupado());
-    e.solicitudes.evaluacion.resolver(
-        0, SolicitudesService::ResultadoEvaluarDuplicado::exito(
-               evaluacion(ClasificacionDuplicado::Libre, MotivoDuplicado::SinCoincidencias)));
-    procesarEventos();
-    QVERIFY(e.solicitudes.confirmaciones.isEmpty());
-    QVERIFY(!f->ocupado());
-
-    // Creacion invalidada por reiniciar(): no navega ni muestra error.
-    QVERIFY(resolverPerfiles(e, e.perfiles.listas.size() - 1, {perfilDePrueba()}));
-    QTRY_COMPARE(f->perfilesDisponibles()->count(), 1);
-    f->setPerfilId(perfilDePrueba().id.texto());
-    QVERIFY(f->canSubmit());
-    f->submit();
-    e.solicitudes.evaluacion.resolver(
-        1, SolicitudesService::ResultadoEvaluarDuplicado::exito(
-               evaluacion(ClasificacionDuplicado::Libre, MotivoDuplicado::SinCoincidencias)));
-    QTRY_COMPARE(e.solicitudes.creacion.size(), 1);
-    f->reiniciar();
-    e.solicitudes.creacion.resolver(0, SolicitudesService::ResultadoCrear::exito(SolicitudId::generar()));
-    procesarEventos();
-    QCOMPARE(enviado.count(), 0);
-    QVERIFY(f->errorMessage().isEmpty());
-    QCOMPARE(e.vms.app()->pagina(), Pagina::Nueva);
-
-    // Confirmacion pendiente invalidada al editar el formulario: un
-    // RequiereConfirmacion tardio de otra evaluacion no abre el dialogo.
-    QVERIFY(resolverPerfiles(e, e.perfiles.listas.size() - 1, {perfilDePrueba()}));
-    QTRY_COMPARE(f->perfilesDisponibles()->count(), 1);
-    f->setPerfilId(perfilDePrueba().id.texto());
-    f->submit();
-    f->cancelarDuplicado(); // invalida la evaluacion en curso
-    e.solicitudes.evaluacion.resolver(
-        2, SolicitudesService::ResultadoEvaluarDuplicado::exito(evaluacion(
-               ClasificacionDuplicado::RequiereConfirmacion, MotivoDuplicado::SolicitudEliminada)));
-    procesarEventos();
-    QVERIFY(!f->confirmacionPendiente());
 }
 
 // ---------------------------------------------------------------------------
@@ -1657,7 +1060,7 @@ void TestPresentacion::eliminarConConfirmacion()
                                               QStringLiteral("dialogoEliminarConfirmar")),
                               "click");
     QCOMPARE(e.solicitudes.llamadasEliminar, 1);
-    QTRY_COMPARE(e.vms.app()->pagina(), Pagina::Lista);
+    QTRY_COMPARE(e.vms.app()->pagina(), Pagina::Diagnostico);
     QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
     QTRY_COMPARE(e.vms.solicitudes()->rowCount(), 10);
     QCOMPARE(e.vms.solicitudes()->filaDe(id), -1);
@@ -1670,27 +1073,6 @@ void TestPresentacion::eliminarConConfirmacion()
 }
 
 QTEST_MAIN(TestPresentacion)
-
-void TestPresentacion::envioTrasCrearSeEncola()
-{
-    Escenario e(DemoSolicitudesService::Datos::Representativos);
-    AccionesEspia acciones;
-    e.vms.setAccionesSolicitud(&acciones);
-    QVERIFY(e.cargar());
-    e.vms.app()->mostrarNueva();
-    NuevaSolicitudViewModel* f = e.vms.nuevaSolicitud();
-    QTRY_COMPARE(f->perfilesDisponibles()->count(), 2);
-    QSignalSpy enviado(f, &NuevaSolicitudViewModel::submitted);
-    f->setPerfilId(f->perfilesDisponibles()->index(0).data(PerfilesDisponiblesModel::IdRole).toString());
-    f->setFechaInicial(QStringLiteral("2026-07-01"));
-    f->setFechaFinal(QStringLiteral("2026-07-31"));
-    QVERIFY(f->canSubmit());
-    f->submit();
-    QTRY_COMPARE(enviado.count(), 1);
-    // D4: el envio se pide una vez, para la solicitud creada, al crearla.
-    QCOMPARE(acciones.llamadas, QStringList{QStringLiteral("enviar:") + enviado.at(0).at(0).toString()});
-    e.vms.setAccionesSolicitud(nullptr);
-}
 
 void TestPresentacion::detalleAccionesManualesYEstadosAccesibles()
 {
@@ -2196,7 +1578,7 @@ void TestPresentacion::filtrosLocalesDeLaLista()
     // Los filtros se conservan al navegar y volver.
     QVERIFY(app->abrirDetalle(esperado.constFirst()));
     QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaDetalleSolicitud"));
-    app->mostrarLista();
+    app->mostrarDiagnostico();
     QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
     filtro = filtroDeLaPagina(e);
     QVERIFY(filtro);
@@ -2312,102 +1694,6 @@ void TestPresentacion::conteoDePaquetesEnLaLista()
     QVERIFY(!en(1, "pendienteFila")->isVisible());
 }
 
-void TestPresentacion::atajosDePeriodoConRelojFijo()
-{
-    EscenarioAsincrono e;
-    QVERIFY(prepararFormulario(e));
-    NuevaSolicitudViewModel* f = e.vms.nuevaSolicitud();
-
-    // Desde la UI: "Mes anterior" en enero.
-    f->setReloj([] { return QDate(2026, 1, 15); });
-    auto* boton = e.item(QStringLiteral("botonPeriodoMesAnterior"));
-    QTRY_VERIFY(boton && boton->isVisible());
-    QVERIFY(!nombreAccesible(boton).isEmpty());
-    QMetaObject::invokeMethod(boton, "click");
-    QCOMPARE(f->fechaInicial(), QStringLiteral("2025-12-01"));
-    QCOMPARE(f->fechaFinal(), QStringLiteral("2025-12-31"));
-    QTRY_COMPARE(e.item(QStringLiteral("campoFechaInicial"))->property("text").toString(), QStringLiteral("2025-12-01"));
-    QTRY_COMPARE(e.item(QStringLiteral("campoFechaFinal"))->property("text").toString(), QStringLiteral("2025-12-31"));
-    QVERIFY(f->canSubmit());
-    QVERIFY(e.item(QStringLiteral("botonPeriodoMesActual"))->isVisible());
-    QVERIFY(e.item(QStringLiteral("botonPeriodoMismoMesAnioAnterior"))->isVisible());
-
-    struct Caso {
-        QDate hoy;
-        const char* atajo;
-        QDate inicial;
-        QDate final_;
-    };
-    const QList<Caso> casos = {
-        {QDate(2026, 1, 15), "mesActual", QDate(2026, 1, 1), QDate(2026, 1, 15)},
-        {QDate(2026, 1, 15), "mismoMesAnioAnterior", QDate(2025, 1, 1), QDate(2025, 1, 31)},
-        {QDate(2026, 3, 31), "mesActual", QDate(2026, 3, 1), QDate(2026, 3, 31)},
-        {QDate(2026, 3, 31), "mesAnterior", QDate(2026, 2, 1), QDate(2026, 2, 28)},
-        {QDate(2026, 3, 31), "mismoMesAnioAnterior", QDate(2025, 3, 1), QDate(2025, 3, 31)},
-        {QDate(2024, 2, 29), "mesAnterior", QDate(2024, 1, 1), QDate(2024, 1, 31)},
-        {QDate(2024, 2, 29), "mismoMesAnioAnterior", QDate(2023, 2, 1), QDate(2023, 2, 28)},
-        {QDate(2024, 3, 1), "mesAnterior", QDate(2024, 2, 1), QDate(2024, 2, 29)},
-        {QDate(2026, 1, 1), "mesActual", QDate(2026, 1, 1), QDate(2026, 1, 1)},
-    };
-    for (const Caso& c : casos) {
-        f->setReloj([hoy = c.hoy] { return hoy; });
-        QVERIFY(f->aplicarPeriodo(QString::fromLatin1(c.atajo)));
-        QCOMPARE(f->fechaInicial(), c.inicial.toString(Qt::ISODate));
-        QCOMPARE(f->fechaFinal(), c.final_.toString(Qt::ISODate));
-        QVERIFY2(f->canSubmit(), c.atajo);
-        QVERIFY(f->campoConError().isEmpty());
-    }
-    const QString antes = f->fechaInicial();
-    QVERIFY(!f->aplicarPeriodo(QStringLiteral("otro")));
-    QCOMPARE(f->fechaInicial(), antes);
-}
-
-void TestPresentacion::verSolicitudExistenteDesdeDuplicado()
-{
-    {
-        EscenarioAsincrono e;
-        QVERIFY(prepararFormulario(e));
-        NuevaSolicitudViewModel* f = e.vms.nuevaSolicitud();
-        f->submit();
-        const EvaluacionDuplicado eval =
-            evaluacion(ClasificacionDuplicado::RequiereConfirmacion, MotivoDuplicado::SolicitudSinExito);
-        e.solicitudes.evaluacion.resolver(0, SolicitudesService::ResultadoEvaluarDuplicado::exito(eval));
-        QTRY_VERIFY(f->confirmacionPendiente());
-        QCOMPARE(f->solicitudEquivalenteId(), eval.solicitudReferencia->texto());
-        QObject* dialogo = e.dialogo(QStringLiteral("dialogoDuplicado"));
-        QTRY_VERIFY(dialogo->property("opened").toBool());
-        auto* ver = e.itemDeDialogo(QStringLiteral("dialogoDuplicado"), QStringLiteral("dialogoDuplicadoAlternativa"));
-        QVERIFY(ver);
-        QTRY_VERIFY(ver->isVisible());
-        QCOMPARE(nombreAccesible(ver), QStringLiteral("Ver solicitud existente"));
-        QMetaObject::invokeMethod(ver, "click");
-        QTRY_COMPARE(e.vms.app()->pagina(), Pagina::Detalle);
-        QCOMPARE(e.vms.app()->solicitudSeleccionadaId(), eval.solicitudReferencia->texto());
-        QVERIFY(e.solicitudes.requestsCrear.isEmpty()); // no se crea nada
-        QVERIFY(e.solicitudes.confirmaciones.isEmpty());
-        QVERIFY(!f->confirmacionPendiente());
-    }
-    {
-        // Equivalente eliminada localmente: el boton no aparece.
-        EscenarioAsincrono e;
-        QVERIFY(prepararFormulario(e));
-        NuevaSolicitudViewModel* f = e.vms.nuevaSolicitud();
-        f->submit();
-        e.solicitudes.evaluacion.resolver(
-            0, SolicitudesService::ResultadoEvaluarDuplicado::exito(evaluacion(
-                   ClasificacionDuplicado::RequiereConfirmacion, MotivoDuplicado::SolicitudEliminada)));
-        QTRY_VERIFY(f->confirmacionPendiente());
-        QVERIFY(f->solicitudEquivalenteId().isEmpty());
-        QObject* dialogo = e.dialogo(QStringLiteral("dialogoDuplicado"));
-        QTRY_VERIFY(dialogo->property("opened").toBool());
-        QVERIFY(!e.itemDeDialogo(QStringLiteral("dialogoDuplicado"), QStringLiteral("dialogoDuplicadoAlternativa"))
-                     ->isVisible());
-        QTest::keyClick(e.ventana, Qt::Key_Escape);
-        QTRY_VERIFY(!f->confirmacionPendiente());
-        QVERIFY(e.solicitudes.confirmaciones.isEmpty());
-    }
-}
-
 void TestPresentacion::atajosDeTeclado()
 {
     EscenarioAsincrono e;
@@ -2423,7 +1709,6 @@ void TestPresentacion::atajosDeTeclado()
     QTRY_VERIFY(focoDentroDe(e.ventana, QStringLiteral("listaSolicitudes")));
 
     // ToolTips con el atajo.
-    QCOMPARE(e.item(QStringLiteral("botonNuevaSolicitud"))->property("atajo").toString(), QStringLiteral("⌘N"));
     QCOMPARE(e.item(QStringLiteral("botonPerfilesSat"))->property("atajo").toString(), QStringLiteral("⌘2"));
 
     // ⌘F enfoca la busqueda; con el campo enfocado no actua ningun otro atajo.
@@ -2431,25 +1716,15 @@ void TestPresentacion::atajosDeTeclado()
     QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("campoBusqueda"));
     atajo(e.ventana, Qt::Key_N);
     atajo(e.ventana, Qt::Key_2);
-    QCOMPARE(app->pagina(), Pagina::Lista);
+    QCOMPARE(app->pagina(), Pagina::Diagnostico);
     // ⌘1 no aplica en la lista.
     e.item(QStringLiteral("listaSolicitudes"))->forceActiveFocus();
     atajo(e.ventana, Qt::Key_1);
-    QCOMPARE(app->pagina(), Pagina::Lista);
+    QCOMPARE(app->pagina(), Pagina::Diagnostico);
 
-    // ⌘N abre Nueva solicitud; ahi ⌘N no hace nada y ⌘1 regresa (fuera de campos).
+    // T023.5: ⌘N ya no abre nada.
     atajo(e.ventana, Qt::Key_N);
-    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaNuevaSolicitud"));
-    atajo(e.ventana, Qt::Key_N);
-    QCOMPARE(app->pagina(), Pagina::Nueva);
-    e.item(QStringLiteral("campoFechaInicial"))->forceActiveFocus();
-    QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("campoFechaInicial"));
-    atajo(e.ventana, Qt::Key_1);
-    atajo(e.ventana, Qt::Key_2);
-    QCOMPARE(app->pagina(), Pagina::Nueva);
-    e.item(QStringLiteral("botonCancelarNueva"))->forceActiveFocus();
-    atajo(e.ventana, Qt::Key_1);
-    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
+    QCOMPARE(app->pagina(), Pagina::Diagnostico);
 
     // ⌘2 abre Perfiles SAT; ⌘1 regresa.
     QTRY_VERIFY(e.ventana->activeFocusItem());
@@ -2458,7 +1733,10 @@ void TestPresentacion::atajosDeTeclado()
     QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaPerfilesSat"));
     QTRY_VERIFY(e.ventana->activeFocusItem());
     e.pagina()->forceActiveFocus();
+    // T023.5: sin pantalla Facturas en esta prueba, ⌘1 no navega.
     atajo(e.ventana, Qt::Key_1);
+    QCOMPARE(app->pagina(), Pagina::Perfiles);
+    app->mostrarDiagnostico();
     QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
 
     // Detalle: ⌘R ejecuta la accion principal (Reintentar descarga si aplica).
@@ -2509,17 +1787,19 @@ void TestPresentacion::atajosDeTeclado()
     QCOMPARE(acciones.llamadas.size(), 2);
     QCOMPARE(acciones.llamadas.at(1), QStringLiteral("verificar:") + resumen.id.texto());
 
-    atajo(e.ventana, Qt::Key_1);
+    // T023.5: Escape ("Atras") regresa del detalle a su origen (Diagnostico).
+    QTest::keyClick(e.ventana, Qt::Key_Escape);
     QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
 
-    // Escape sigue regresando desde las paginas (aqui, Perfiles SAT).
+    // T023.5: Perfiles SAT es raiz; Escape va a Facturas (sin pantalla
+    // Facturas en esta prueba no navega).
     e.item(QStringLiteral("listaSolicitudes"))->forceActiveFocus();
     atajo(e.ventana, Qt::Key_2);
     QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaPerfilesSat"));
     QTRY_VERIFY(e.ventana->activeFocusItem());
     e.pagina()->forceActiveFocus();
     QTest::keyClick(e.ventana, Qt::Key_Escape);
-    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
+    QCOMPARE(app->pagina(), Pagina::Perfiles);
     e.vms.setAccionesSolicitud(nullptr);
 }
 
@@ -2705,7 +1985,7 @@ void TestPresentacion::guiaPrimerUsoPorPasos()
     // Cada paso abre su pantalla.
     QMetaObject::invokeMethod(e.item(QStringLiteral("boton_pasoPerfil")), "click");
     QTRY_COMPARE(app->pagina(), Pagina::Perfiles);
-    app->mostrarLista();
+    app->mostrarDiagnostico();
     QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
 
     // Perfil creado: paso 1 marcado. Un refresco conserva el ultimo resultado
@@ -2723,7 +2003,7 @@ void TestPresentacion::guiaPrimerUsoPorPasos()
     QCOMPARE(varianteDe(e, QStringLiteral("boton_pasoPerfil")), QStringLiteral("secundario"));
     QMetaObject::invokeMethod(e.item(QStringLiteral("boton_pasoEFirma")), "click");
     QTRY_COMPARE(app->pagina(), Pagina::Perfiles);
-    app->mostrarLista();
+    app->mostrarDiagnostico();
     QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
 
     // e.firma registrada: paso 2 marcado; el siguiente es la primera solicitud.
@@ -2732,10 +2012,9 @@ void TestPresentacion::guiaPrimerUsoPorPasos()
     consulta.resolver(2, {true, true, false});
     QTRY_COMPARE(iconoDePaso(e, QStringLiteral("pasoEFirma")), QStringLiteral("check-circle"));
     QCOMPARE(varianteDe(e, QStringLiteral("boton_pasoSolicitud")), QStringLiteral("primario"));
-    QMetaObject::invokeMethod(e.item(QStringLiteral("boton_pasoSolicitud")), "click");
-    QTRY_COMPARE(app->pagina(), Pagina::Nueva);
-    app->mostrarLista();
-    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
+    // T023.5: el paso lleva a Facturas ("Ver facturas"); sin pantalla
+    // Facturas en esta prueba no navega.
+    QCOMPARE(nombreAccesible(e.item(QStringLiteral("boton_pasoSolicitud"))), QStringLiteral("Ver facturas"));
 
     // Primera solicitud: la guia desaparece y se ve la lista.
     const int lecturas = int(e.solicitudes.lista.size());
@@ -2929,7 +2208,7 @@ void TestPresentacion::notificacionAbreDetalleExistente()
     SolicitudDetailViewModel* d = e.vms.detalle();
     const SolicitudId id = SolicitudId::generar();
 
-    app->abrirDetalleONavegarLista(id.texto());
+    app->abrirSolicitudNotificada(id.texto());
     QCOMPARE(app->pagina(), Pagina::Detalle);
     QCOMPARE(app->solicitudSeleccionadaId(), id.texto());
     QCOMPARE(d->estado(), EstadoDetalle::Cargando);
@@ -2946,7 +2225,7 @@ void TestPresentacion::notificacionAbreDetalleExistente()
 
     // Un error de lectura se muestra en el detalle (no es "no existe").
     const SolicitudId otra = SolicitudId::generar();
-    app->abrirDetalleONavegarLista(otra.texto());
+    app->abrirSolicitudNotificada(otra.texto());
     ErrorObtener fallo;
     fallo.tipo = ErrorObtener::Tipo::Persistencia;
     e.solicitudes.detalle.resolver(1, SolicitudesService::ResultadoDetalle::fallo(fallo));
@@ -2964,26 +2243,26 @@ void TestPresentacion::notificacionSolicitudInexistenteAbreLista()
     ErrorObtener noEncontrada;
     noEncontrada.tipo = ErrorObtener::Tipo::NoEncontrada;
 
-    app->abrirDetalleONavegarLista(SolicitudId::generar().texto());
+    app->abrirSolicitudNotificada(SolicitudId::generar().texto());
     QCOMPARE(app->pagina(), Pagina::Detalle);
     e.solicitudes.detalle.resolver(0, SolicitudesService::ResultadoDetalle::fallo(noEncontrada));
     QTRY_COMPARE(d->estado(), EstadoDetalle::NoEncontrada);
-    QCOMPARE(app->pagina(), Pagina::Lista);
+    QCOMPARE(app->pagina(), Pagina::Diagnostico);
     QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
     QVERIFY(app->mensajeFinder().isEmpty()); // sin error
     QVERIFY(e.item(QStringLiteral("mensajeFinderLista")));
     QVERIFY(!e.item(QStringLiteral("mensajeFinderLista"))->isVisible());
 
     // Si el usuario navega antes de que termine la carga, no se le mueve.
-    app->abrirDetalleONavegarLista(SolicitudId::generar().texto());
-    app->mostrarNueva();
+    app->abrirSolicitudNotificada(SolicitudId::generar().texto());
+    app->mostrarPerfiles();
     e.solicitudes.detalle.resolver(1, SolicitudesService::ResultadoDetalle::fallo(noEncontrada));
     QTRY_COMPARE(d->estado(), EstadoDetalle::NoEncontrada);
-    QCOMPARE(app->pagina(), Pagina::Nueva);
+    QCOMPARE(app->pagina(), Pagina::Perfiles);
 
     // Una navegacion explicita al detalle sustituye el respaldo: NoEncontrada
     // se muestra en el detalle como en T003.
-    app->abrirDetalleONavegarLista(SolicitudId::generar().texto());
+    app->abrirSolicitudNotificada(SolicitudId::generar().texto());
     const SolicitudId explicita = SolicitudId::generar();
     QVERIFY(app->abrirDetalle(explicita.texto()));
     e.solicitudes.detalle.resolver(3, SolicitudesService::ResultadoDetalle::fallo(noEncontrada));
@@ -2997,13 +2276,12 @@ void TestPresentacion::notificacionIdNoCanonicoAbreLista()
     QVERIFY(e.cargar());
     e.solicitudes.lista.resolver(0, ResultadoListaSol::exito({}));
     AppViewModel* app = e.vms.app();
-    app->mostrarNueva();
     const QString mayusculas = SolicitudId::generar().texto().toUpper();
     for (const QString& id : {QString(), QStringLiteral("no-es-uuid"), mayusculas,
                               QStringLiteral("{") + SolicitudId::generar().texto() + QStringLiteral("}")}) {
-        app->mostrarNueva();
-        app->abrirDetalleONavegarLista(id);
-        QCOMPARE(app->pagina(), Pagina::Lista);
+        app->mostrarPerfiles();
+        app->abrirSolicitudNotificada(id);
+        QCOMPARE(app->pagina(), Pagina::Diagnostico);
     }
     QCOMPARE(e.solicitudes.detalle.size(), 0); // no se consulto nada
     QVERIFY(app->solicitudSeleccionadaId().isEmpty());
@@ -3049,7 +2327,7 @@ void TestPresentacion::notificacionPerfilSeleccionadoTrasCarga()
     QCOMPARE(p->modo(), PerfilesSatViewModel::Modo::Nuevo);
 
     // Una carga fallida descarta la seleccion pendiente.
-    app->mostrarLista();
+    app->mostrarDiagnostico();
     app->mostrarPerfilSeleccionado(dos.id.texto());
     QTRY_COMPARE(e.perfiles.listas.size(), 4);
     e.perfiles.listas.resolver(3, ResultadoListaPerfiles::fallo(ErrorPersistencia::de(ErrorPersistencia::Tipo::Almacenamiento, QStringLiteral("fake"))));
@@ -3111,7 +2389,7 @@ void TestPresentacion::notificacionMostrarCarpetaSolicitudEnFinder()
     QCOMPARE(finder.llamadas, QStringList{QStringLiteral("solicitud")});
     finder.resolver(0, ResultadoAccionFinder::Estado::Mostrado);
     procesarEventos();
-    QCOMPARE(app->pagina(), Pagina::Lista);
+    QCOMPARE(app->pagina(), Pagina::Diagnostico);
     QCOMPARE(aviso.count(), 0);
     QCOMPARE(e.solicitudes.detalle.size(), 0);
 
@@ -3134,7 +2412,7 @@ void TestPresentacion::notificacionMostrarCarpetaSolicitudEnFinder()
     ErrorObtener noEncontrada;
     noEncontrada.tipo = ErrorObtener::Tipo::NoEncontrada;
     e.solicitudes.detalle.resolver(1, SolicitudesService::ResultadoDetalle::fallo(noEncontrada));
-    QTRY_COMPARE(app->pagina(), Pagina::Lista);
+    QTRY_COMPARE(app->pagina(), Pagina::Diagnostico);
     QCOMPARE(app->mensajeFinder(), QStringLiteral("Carpeta no encontrada"));
     QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
     QTRY_VERIFY(e.item(QStringLiteral("mensajeFinderLista")) && e.item(QStringLiteral("mensajeFinderLista"))->isVisible());

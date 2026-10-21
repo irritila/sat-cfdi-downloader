@@ -191,6 +191,18 @@ public:
     // Reintentar tras error de lectura.
     Q_INVOKABLE void recargar();
 
+    // T023.5 (Historial y notificaciones, desde AppViewModel): muestra ese
+    // perfil y mes. Si los perfiles aun no se cargaron (app arrancada por una
+    // notificacion) queda pendiente y sustituye a la seleccion inicial de
+    // activar(). Perfil inexistente -> se conserva la seleccion vigente (o la
+    // inicial) sin error; mes futuro o invalido -> el perfil con su mes
+    // vigente. `alLlegar` = Reintentar: cuando la disponibilidad del mes
+    // termina de cargar, si la franja ofrece Reintentar habilitado, la ejecuta
+    // una vez (igual que el boton, con sus confirmaciones). Una seleccion
+    // manual posterior descarta lo pendiente.
+    enum class AlLlegar { Nada, Reintentar };
+    void irAMes(const QString& perfilId, int anio, int mes, AlLlegar alLlegar = AlLlegar::Nada);
+
 signals:
     void perfilChanged();
     void mesChanged();
@@ -202,8 +214,11 @@ signals:
     void anuncioChanged();
     // "Registrar e.firma...": abrir Perfiles SAT con ese perfil.
     void registrarEFirmaSolicitado(const QString& perfilId);
-    // "Ver detalles tecnicos" (T023.5: Diagnostico del mes).
-    void detallesTecnicosSolicitados(const QString& perfilId, int anio, int mes);
+    // "Ver detalles tecnicos" (T023.5): `solicitudId` es la solicitud a
+    // abrir en Diagnostico (la de la causa principal; si no hay causa, la
+    // canonica mas reciente de la pestana activa, en curso o acreditada); ""
+    // si el mes no tiene ninguna -> AppViewModel abre la lista Diagnostico.
+    void detallesTecnicosSolicitados(const QString& perfilId, int anio, int mes, const QString& solicitudId);
 
 private:
     std::optional<MesCalendario> mesEnCurso() const;
@@ -225,6 +240,8 @@ private:
     void decidir(DecisionConfirmacion decision);
     void ejecutarPreplan();
     void terminarConError(const ErrorDescargaGuiada& error);
+    void aplicarDestinoPendiente();
+    QString solicitudDiagnostico() const;
 
     PerfilesDisponiblesModel* m_perfiles;
     MesesFacturasModel* m_meses;

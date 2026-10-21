@@ -19,6 +19,9 @@ class CredencialesSatService;
 class EFirmaFormViewModel;
 class ExploradorCfdiViewModel;
 class FacturasViewModel;
+class FuenteHistorial;
+class HistorialViewModel;
+class ResolucionDestinoNotificacion;
 class FuenteFacturasMes;
 class PreferenciasFacturas;
 class NuevaSolicitudViewModel;
@@ -50,6 +53,9 @@ public:
 
     AppViewModel* app() const { return m_app; }
     SolicitudesListModel* solicitudes() const { return m_solicitudes; }
+    // T023.5: fuera de toda ruta de la app (sin pagina ni propiedad inicial).
+    // Se conserva solo para tools/video-tutorial, tools/capturas-manual y
+    // FixturePerfiles; T024 la elimina al regrabar manual y video.
     NuevaSolicitudViewModel* nuevaSolicitud() const { return m_nuevaSolicitud; }
     SolicitudDetailViewModel* detalle() const { return m_detalle; }
     PerfilesSatViewModel* perfiles() const { return m_perfiles; }
@@ -57,14 +63,16 @@ public:
     ExploradorCfdiViewModel* explorador() const { return m_explorador; }
     // T023.4: pantalla Facturas (siempre existe; sin fuente queda vacia).
     FacturasViewModel* facturas() const { return m_facturas; }
+    // T023.5: pantalla Historial (siempre existe; sin fuente queda vacia).
+    HistorialViewModel* historial() const { return m_historial; }
     // T019 D8: aviso de la carpeta de paquetes; lo fija el composition root
     // antes de cargar Main.qml (sin aviso queda inactivo).
     AvisoRaizPaquetesViewModel* avisoRaizPaquetes() const { return m_avisoRaizPaquetes; }
 
-    // {"appViewModel", "solicitudesModel", "nuevaSolicitudViewModel",
+    // {"appViewModel", "solicitudesModel",
     //  "detalleViewModel", "perfilesViewModel", "eFirmaViewModel",
     //  "exploradorViewModel", "avisoRaizPaquetesViewModel",
-    //  "facturasViewModel"} para
+    //  "facturasViewModel", "historialViewModel"} para
     //  QQmlApplicationEngine::setInitialProperties.
     QVariantMap initialProperties() const;
 
@@ -88,6 +96,10 @@ public:
     // propietarios. Con fuente, Facturas es la pagina inicial y la que abre
     // AppViewModel::mostrarFacturas(); nullptr = sin pantalla Facturas.
     void setFuenteFacturas(FuenteFacturasMes* fuente, PreferenciasFacturas* preferencias);
+    // T023.5: datos del Historial y destino de notificaciones de solicitud.
+    // No propietarios; nullptr = sin Historial / sin resolucion.
+    void setFuenteHistorial(FuenteHistorial* fuente);
+    void setResolucionDestinos(ResolucionDestinoNotificacion* resolucion);
 
 private:
     void conectarPreparacionDetalle(PerfilesSatService* perfiles, CredencialesSatService* credenciales,
@@ -100,6 +112,7 @@ private:
     EFirmaFormViewModel* m_eFirma;
     ExploradorCfdiViewModel* m_explorador;
     FacturasViewModel* m_facturas;
+    HistorialViewModel* m_historial;
     AppViewModel* m_app;
     AvisoRaizPaquetesViewModel* m_avisoRaizPaquetes;
 };

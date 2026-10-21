@@ -13,6 +13,8 @@ set(_satcfdi_qml_files
     qml/screens/ExploradorCfdiPage.qml
     # T023.4: pantalla Facturas (qt-interface-engineer, corte 2).
     qml/screens/FacturasPage.qml
+    # T023.5: Historial (qt-interface-engineer, corte 3).
+    qml/screens/HistorialPage.qml
     qml/components/FranjaMes.qml
     qml/components/ListaMesesFacturas.qml
     qml/components/EFirmaDialogo.qml
@@ -115,6 +117,11 @@ qt_add_qml_module(satcfdi_presentation
         viewmodels/FacturasListModel.cpp
         viewmodels/FacturasViewModel.h
         viewmodels/FacturasViewModel.cpp
+        viewmodels/FuenteHistorial.h
+        viewmodels/HistorialListModel.h
+        viewmodels/HistorialListModel.cpp
+        viewmodels/HistorialViewModel.h
+        viewmodels/HistorialViewModel.cpp
         estilo/EstiloVisual.h
         estilo/EstiloVisual.cpp
         componentes/IconoSvg.h

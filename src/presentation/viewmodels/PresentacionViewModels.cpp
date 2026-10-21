@@ -8,6 +8,7 @@
 #include "EFirmaFormViewModel.h"
 #include "ExploradorCfdiViewModel.h"
 #include "FacturasViewModel.h"
+#include "HistorialViewModel.h"
 #include "NuevaSolicitudViewModel.h"
 #include "PerfilesSatViewModel.h"
 #include "SolicitudDetailViewModel.h"
@@ -27,7 +28,8 @@ PresentacionViewModels::PresentacionViewModels(SolicitudesService* solicitudes,
     , m_eFirma(new EFirmaFormViewModel(credenciales, this))
     , m_explorador(new ExploradorCfdiViewModel(this))
     , m_facturas(new FacturasViewModel(this))
-    , m_app(new AppViewModel(m_nuevaSolicitud, m_detalle, m_perfiles, m_eFirma, this))
+    , m_historial(new HistorialViewModel(this))
+    , m_app(new AppViewModel(m_detalle, m_perfiles, m_eFirma, this))
     , m_avisoRaizPaquetes(new AvisoRaizPaquetesViewModel(this))
 {
     // Tras registrar/reemplazar (exito o fallo) se reverifica el estado real
@@ -102,18 +104,29 @@ void PresentacionViewModels::setFuenteFacturas(FuenteFacturasMes* fuente, Prefer
     }
 }
 
+void PresentacionViewModels::setFuenteHistorial(FuenteHistorial* fuente)
+{
+    m_historial->setFuente(fuente);
+    m_app->setHistorial(fuente ? m_historial : nullptr);
+}
+
+void PresentacionViewModels::setResolucionDestinos(ResolucionDestinoNotificacion* resolucion)
+{
+    m_app->setResolucionDestinos(resolucion);
+}
+
 QVariantMap PresentacionViewModels::initialProperties() const
 {
     return {
         {QStringLiteral("appViewModel"), QVariant::fromValue(m_app)},
         {QStringLiteral("solicitudesModel"), QVariant::fromValue(m_solicitudes)},
-        {QStringLiteral("nuevaSolicitudViewModel"), QVariant::fromValue(m_nuevaSolicitud)},
         {QStringLiteral("detalleViewModel"), QVariant::fromValue(m_detalle)},
         {QStringLiteral("perfilesViewModel"), QVariant::fromValue(m_perfiles)},
         {QStringLiteral("eFirmaViewModel"), QVariant::fromValue(m_eFirma)},
         {QStringLiteral("exploradorViewModel"), QVariant::fromValue(m_explorador)},
         {QStringLiteral("avisoRaizPaquetesViewModel"), QVariant::fromValue(m_avisoRaizPaquetes)},
         {QStringLiteral("facturasViewModel"), QVariant::fromValue(m_facturas)},
+        {QStringLiteral("historialViewModel"), QVariant::fromValue(m_historial)},
     };
 }
 

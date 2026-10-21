@@ -97,7 +97,6 @@ AppViewModel* FixturePerfiles::app() const { return m_grafo->vms.app(); }
 PerfilesSatViewModel* FixturePerfiles::perfiles() const { return m_grafo->vms.perfiles(); }
 EFirmaFormViewModel* FixturePerfiles::eFirma() const { return m_grafo->vms.eFirma(); }
 SolicitudesListModel* FixturePerfiles::solicitudesModel() const { return m_grafo->vms.solicitudes(); }
-NuevaSolicitudViewModel* FixturePerfiles::nuevaSolicitud() const { return m_grafo->vms.nuevaSolicitud(); }
 SolicitudDetailViewModel* FixturePerfiles::detalle() const { return m_grafo->vms.detalle(); }
 
 void FixturePerfiles::resolverSolicitudes(int indice, const QVariantList& filas)

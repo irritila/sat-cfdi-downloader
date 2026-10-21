@@ -655,9 +655,9 @@ void TestFacturasViewModel::appViewModelFacturasPorOmision()
     SolicitudesServiceAsincrono solicitudes;
     PresentacionViewModels vms(&solicitudes, &perfiles, &credenciales);
     AppViewModel* app = vms.app();
-    QCOMPARE(app->pagina(), AppViewModel::Pagina::Lista); // sin fuente: sin Facturas
+    QCOMPARE(app->pagina(), AppViewModel::Pagina::Diagnostico); // sin fuente: sin Facturas
     app->mostrarFacturas();
-    QCOMPARE(app->pagina(), AppViewModel::Pagina::Lista);
+    QCOMPARE(app->pagina(), AppViewModel::Pagina::Diagnostico);
     FuenteFalsa fuente;
     PreferenciasMemoria preferencias;
     vms.setFuenteFacturas(&fuente, &preferencias);
@@ -669,8 +669,8 @@ void TestFacturasViewModel::appViewModelFacturasPorOmision()
     QCOMPARE(app->pagina(), AppViewModel::Pagina::Perfiles);
     app->mostrarFacturas();
     QCOMPARE(app->pagina(), AppViewModel::Pagina::Facturas);
-    emit vms.facturas()->detallesTecnicosSolicitados(kPerfilA.texto(), 2026, 8);
-    QCOMPARE(app->pagina(), AppViewModel::Pagina::Lista);
+    emit vms.facturas()->detallesTecnicosSolicitados(kPerfilA.texto(), 2026, 8, QString());
+    QCOMPARE(app->pagina(), AppViewModel::Pagina::Diagnostico);
 }
 
 void TestFacturasViewModel::preparandoConReservasSinLibres()

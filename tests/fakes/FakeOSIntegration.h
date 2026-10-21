@@ -79,7 +79,7 @@ public:
     void emitirMostrarVentana() { emit mostrarVentanaSolicitada(); }
     void emitirOcultarVentana() { emit ocultarVentanaSolicitada(); }
     void emitirEnfocarVentana() { emit enfocarVentanaSolicitada(); }
-    void emitirNuevaSolicitud() { emit nuevaSolicitudSolicitada(); }
+    void emitirVerFacturas() { emit verFacturasSolicitada(); }
     void emitirAbrirCarpetaPaquetes() { emit abrirCarpetaPaquetesSolicitada(); }
     void emitirCambioMonitoreo(bool pausar) { emit cambioMonitoreoSolicitado(pausar); }
     void emitirCambioInicioAutomatico(bool habilitar) { emit cambioInicioAutomaticoSolicitado(habilitar); }

@@ -11,6 +11,7 @@
 #include "AppViewModel.h"
 #include "FacturasViewModel.h"
 #include "FranjaMesViewModel.h"
+#include "HistorialViewModel.h"
 
 #include <QObject>
 #include <QString>
@@ -23,6 +24,8 @@ class FixtureFacturas : public QObject {
     Q_OBJECT
     Q_PROPERTY(satcfdi::AppViewModel* app READ app NOTIFY reiniciado)
     Q_PROPERTY(satcfdi::FacturasViewModel* facturas READ facturas NOTIFY reiniciado)
+    // T023.5: Historial con una FuenteHistorial sintetica (filas mixtas).
+    Q_PROPERTY(satcfdi::HistorialViewModel* historial READ historial NOTIFY reiniciado)
     // Franja suelta para probar FranjaMes con cualquier combinacion de datos.
     Q_PROPERTY(satcfdi::FranjaMesViewModel* franjaSuelta READ franjaSuelta CONSTANT)
 
@@ -32,6 +35,7 @@ public:
 
     satcfdi::AppViewModel* app() const;
     satcfdi::FacturasViewModel* facturas() const;
+    satcfdi::HistorialViewModel* historial() const;
     satcfdi::FranjaMesViewModel* franjaSuelta() const { return m_franja; }
 
     // Grafo nuevo (llamar en init(), sin objetos QML vivos del anterior).
@@ -44,6 +48,12 @@ public:
     Q_INVOKABLE void fijarEstadoMes(int mes, const QString& estado);
     // Emite datosCambiados (recarga sin vaciar la lista).
     Q_INVOKABLE void emitirDatosCambiados();
+    // Historial: "mixto" (por omision: Completa, Requiere atencion con
+    // reintento y dos direcciones, En preparacion, Sin facturas, Cubierta por
+    // otra descarga, Eliminada, eliminacion parcial y Descarga anterior de
+    // varios meses), "vacio" o "error". Emite datosCambiados del historial.
+    Q_INVOKABLE void fijarHistorial(const QString& caso);
+    Q_INVOKABLE int numHistoriales() const;
     Q_INVOKABLE int numPlanificaciones() const;
     Q_INVOKABLE int numConsultas() const;
     Q_INVOKABLE QString perfilSinEFirma() const;

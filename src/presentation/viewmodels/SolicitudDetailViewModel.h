@@ -36,7 +36,7 @@ class SolicitudesService;
 // - solicitudEliminada(id) coincidente invalida cualquier lectura en curso y
 //   pasa a NoEncontrada (una respuesta tardia no restaura el detalle).
 // - eliminar() pide confirmacion en QML; al terminar con exito emite
-//   eliminada(id) y AppViewModel regresa a la lista.
+//   eliminada(id) y AppViewModel regresa al origen ("Atras", T023.5).
 // Todas las operaciones usan tokens de generacion (DA6).
 class SolicitudDetailViewModel : public QObject {
     Q_OBJECT

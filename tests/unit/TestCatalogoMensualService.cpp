@@ -104,6 +104,10 @@ public:
         QMutexLocker b(&m_mutex);
         return Resultado<QList<EvidenciaSolicitudMensual>, ErrorPersistencia>::exito(m_evidencia);
     }
+    Resultado<QHash<SolicitudId, int>, ErrorPersistencia> conteosPorSolicitud(const PerfilId&) override
+    {
+        return Resultado<QHash<SolicitudId, int>, ErrorPersistencia>::exito({});
+    }
 
 private:
     void registrarHilo()
@@ -134,6 +138,14 @@ public:
         l.perfil = perfil;
         l.mes = mes.value_or(kSeptiembre);
         return Resultado<QList<LoteGuiado>, ErrorPersistencia>::exito({l});
+    }
+    Resultado<QList<SolicitudSinLote>, ErrorPersistencia> listarSinLote(const PerfilId&) override
+    {
+        return Resultado<QList<SolicitudSinLote>, ErrorPersistencia>::exito({});
+    }
+    Resultado<std::optional<UbicacionSolicitud>, ErrorPersistencia> ubicar(const SolicitudId&) override
+    {
+        return Resultado<std::optional<UbicacionSolicitud>, ErrorPersistencia>::exito(std::nullopt);
     }
     std::atomic<QThread*> hilo{nullptr};
 };

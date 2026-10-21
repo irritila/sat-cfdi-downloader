@@ -1,6 +1,7 @@
 #pragma once
 
 #include "presentation/viewmodels/FuenteFacturasMes.h"
+#include "presentation/viewmodels/FuenteHistorial.h"
 #include "application/persistence/PuertosPersistencia.h"
 
 #include <QSettings>
@@ -40,6 +41,27 @@ private:
     RelojUtc m_reloj;
     QTimer m_agrupar;
 };
+
+// T023.5: Historial y destino de notificaciones sobre
+// CatalogoMensualCfdiService. datosCambiados sigue al de la fuente de
+// Facturas (mismas senales agrupadas). Hilo grafico; referencias no
+// propietarias que deben vivir mas que este objeto.
+class FuenteHistorialRoot final : public FuenteHistorial, public ResolucionDestinoNotificacion {
+    Q_OBJECT
+
+public:
+    FuenteHistorialRoot(CatalogoMensualCfdiService& catalogo, FuenteFacturasMes& cambios, QObject* parent = nullptr);
+
+    QFuture<ResultadoEntradas> historial(const PerfilId& perfil) override;
+    // Inexistente o error de lectura -> Facturas (nunca falla).
+    QFuture<DestinoNavegacion> resolver(const SolicitudId& solicitud) override;
+
+private:
+    CatalogoMensualCfdiService& m_catalogo;
+};
+
+// Regla pura (pruebas): ubicacion -> destino.
+DestinoNavegacion destinoDeUbicacion(const std::optional<UbicacionSolicitud>& ubicacion);
 
 // T023.4: ultimo perfil usado, en un .ini del directorio de datos (no en las
 // preferencias del usuario de macOS: las pruebas y --data-dir quedan aislados).

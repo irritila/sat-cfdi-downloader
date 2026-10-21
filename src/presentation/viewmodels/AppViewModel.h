@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QPointer>
 #include <QString>
+#include <QList>
 #include <QVariantList>
 #include <QtQmlIntegration/qqmlintegration.h>
 
@@ -14,40 +15,58 @@ class ConsultaPrimerUso;
 class EFirmaFormViewModel;
 class ExploradorCfdiViewModel;
 class FacturasViewModel;
-class NuevaSolicitudViewModel;
+class HistorialViewModel;
+class ResolucionDestinoNotificacion;
+struct DestinoNavegacion;
 class PerfilesSatViewModel;
 class SolicitudDetailViewModel;
 
-// Navegacion del shell: pagina actual y solicitud seleccionada por id (UUID).
+// Navegacion del shell (T023.5: T023 D6, D10).
 //
-// - mostrarNueva() reinicia el formulario.
-// - abrirDetalle(id) carga el detalle por id; ids no canonicos se rechazan.
-// - NuevaSolicitudViewModel::submitted(id) abre el detalle de la nueva
-//   solicitud. La lista se refresca sola con listaCambiada.
-// - SolicitudDetailViewModel::eliminada(id) regresa a la lista.
-// - mostrarPerfiles() abre Perfiles SAT (T005.1 DA5) y recarga la lista de
-//   perfiles; al salir de Perfiles se descarta la captura de e.firma (rutas
-//   privadas incluidas) y el formulario de perfil.
-// mostrarLista(), mostrarNueva() y mostrarPerfiles() son publicas e
-// invocables desde C++ (AppLifecycleController, menu bar) y QML.
+// Paginas del recorrido normal: Facturas (Cmd+1, principal), Perfiles SAT
+// (Cmd+2) e Historial (Cmd+3). Fuera del recorrido normal, solo desde
+// Historial, "Requiere atencion" / "Ver detalles tecnicos" de Facturas, el
+// menu "Ir > Diagnostico" y las notificaciones: Diagnostico (lista tecnica de
+// solicitudes, antes SolicitudesPage) y Detalle (DetalleSolicitudPage, vista
+// de diagnostico de una solicitud). NuevaSolicitudPage ya no existe.
 //
-// T014.4 (acciones de notificacion, desde AppLifecycleController):
-// - abrirDetalleONavegarLista(id): abre el detalle; si el id no es canonico o
-//   la carga termina en NoEncontrada, queda en la lista sin error. Un error de
-//   lectura se muestra en el detalle como siempre.
-// - mostrarPerfilSeleccionado(perfilId): Perfiles SAT con ese perfil
-//   seleccionado al terminar la carga; si no existe, sin seleccion ni error.
-// - mostrarCarpetaSolicitudEnFinder(id): flujo de T009.1 (abrirCarpetaSolicitud,
-//   sin crear carpetas ni abrir ZIP). Si Finder lo muestra no navega; si no,
-//   abre el detalle con el aviso D7 (o la lista con el aviso si la solicitud
-//   ya no existe) y emite avisoFinderSolicitudPresentado() para que el
-//   controlador traiga la ventana al frente.
+// "Atras" (regresar(), Escape): pila de origenes. Facturas y Perfiles son
+// raices (vacian la pila). Abrir Historial, Diagnostico, Detalle o
+// FacturasSolicitud apila la pagina actual; si la pagina destino ya esta en la
+// pila, la pila se recorta hasta ella (sin ciclos). regresar() desapila; con
+// pila vacia va a Facturas. `paginaOrigen`/`textoRegresar` describen el
+// destino de regresar().
+//
+// Acciones:
+// - abrirDetalle(id): Detalle desde la pagina actual; ids no canonicos se
+//   rechazan. SolicitudDetailViewModel::eliminada(id) regresa al origen.
+// - FacturasViewModel::detallesTecnicosSolicitados(perfil, anio, mes,
+//   solicitudId): Detalle de esa solicitud (origen Facturas); solicitudId
+//   vacio -> Diagnostico (lista). registrarEFirmaSolicitado(perfil) ->
+//   Perfiles con ese perfil.
+// - HistorialViewModel: facturasMesSolicitadas -> Facturas en ese perfil y
+//   mes; reintentoSolicitado -> igual y ejecuta la accion del mes;
+//   diagnosticoSolicitado(id) -> Detalle (origen Historial).
+// - mostrarHistorial(): Historial del perfil seleccionado en Facturas.
+//
+// Notificaciones (T014.4 + T023.5, desde AppLifecycleController):
+// - abrirSolicitudNotificada(id): resuelve el destino con
+//   ResolucionDestinoNotificacion y llama abrirDestino(): FacturasMes ->
+//   Facturas en ese perfil y mes (FacturasViewModel::irAMes, que se aplica
+//   aunque Facturas aun no haya cargado perfiles: app arrancada por la
+//   notificacion); Diagnostico -> Detalle (origen Facturas; si la carga
+//   termina en NoEncontrada, Facturas sin error); Facturas -> Facturas con la
+//   seleccion vigente. Id no canonico -> Facturas. Una navegacion explicita
+//   posterior descarta una resolucion pendiente (token de generacion). Sin
+//   resolucion configurada, se trata como Diagnostico.
+// - mostrarPerfilSeleccionado(perfilId): Perfiles SAT con ese perfil.
+// - mostrarCarpetaSolicitudEnFinder(id): flujo de T009.1. Si Finder no lo
+//   muestra: Detalle con el aviso D7 (o Diagnostico con el aviso si la
+//   solicitud ya no existe) y avisoFinderSolicitudPresentado().
 //
 // T015.3: abrirFacturas(id) abre el explorador de CFDI de la solicitud
-// (pagina Facturas) y regresarDeFacturas() vuelve a su detalle. Al salir de
-// Facturas el explorador se desactiva (deja de recargar). Si la solicitud
-// deja de existir mientras el explorador esta abierto, se muestra el detalle
-// "no encontrada".
+// (FacturasSolicitud, desde Detalle) y regresarDeFacturas() equivale a
+// regresar() desde esa pagina.
 class AppViewModel : public QObject {
     Q_OBJECT
     QML_ELEMENT
@@ -56,6 +75,12 @@ class AppViewModel : public QObject {
     Q_PROPERTY(Pagina pagina READ pagina NOTIFY paginaChanged)
     Q_PROPERTY(QString solicitudSeleccionadaId READ solicitudSeleccionadaId
                    NOTIFY solicitudSeleccionadaIdChanged)
+    // T023.5: destino de regresar() ("Atras"). puedeRegresar es false en las
+    // raices (Facturas, Perfiles). textoRegresar: "Facturas", "Historial",
+    // "Diagnóstico", "Perfiles SAT" o "Detalles técnicos".
+    Q_PROPERTY(Pagina paginaOrigen READ paginaOrigen NOTIFY paginaChanged)
+    Q_PROPERTY(bool puedeRegresar READ puedeRegresar NOTIFY paginaChanged)
+    Q_PROPERTY(QString textoRegresar READ textoRegresar NOTIFY paginaChanged)
     // T009 D9: las notificaciones del sistema estan denegadas o no disponibles
     // (lo fija el composition root desde OSIntegration). No afecta estados.
     Q_PROPERTY(bool notificacionesDeshabilitadas READ notificacionesDeshabilitadas
@@ -83,24 +108,26 @@ class AppViewModel : public QObject {
 
 public:
     enum class Pagina {
-        Lista,
-        Nueva,
-        Detalle,
-        Perfiles,
-        FacturasSolicitud, // explorador de CFDI de una solicitud (T015.3; Diagnostico en T023.5)
         Facturas,          // T023.4: pantalla principal (Facturas por mes)
+        Historial,         // T023.5: historial de descargas del perfil (Cmd+3)
+        Perfiles,
+        Diagnostico,       // T023.5: lista tecnica de solicitudes ("Ir > Diagnostico")
+        Detalle,           // DetalleSolicitudPage (vista de diagnostico)
+        FacturasSolicitud, // explorador de CFDI de una solicitud (T015.3, desde Detalle)
     };
     Q_ENUM(Pagina)
 
     // Todos los view models son obligatorios y deben vivir mas que este objeto.
-    AppViewModel(NuevaSolicitudViewModel* nuevaSolicitud,
-                 SolicitudDetailViewModel* detalle,
+    AppViewModel(SolicitudDetailViewModel* detalle,
                  PerfilesSatViewModel* perfiles,
                  EFirmaFormViewModel* eFirma,
                  QObject* parent = nullptr);
 
     Pagina pagina() const { return m_pagina; }
     QString solicitudSeleccionadaId() const { return m_solicitudSeleccionadaId; }
+    Pagina paginaOrigen() const { return m_origenes.isEmpty() ? Pagina::Facturas : m_origenes.constLast(); }
+    bool puedeRegresar() const;
+    QString textoRegresar() const;
 
     bool notificacionesDeshabilitadas() const { return m_notificacionesDeshabilitadas; }
     void setNotificacionesDeshabilitadas(bool valor)
@@ -147,9 +174,24 @@ public:
     QVariantList primerUsoPasos() const;
     bool mostrarGuiaPrimerUso() const;
 
-    Q_INVOKABLE void mostrarLista();
-    Q_INVOKABLE void mostrarNueva();
     Q_INVOKABLE void mostrarPerfiles();
+    // T023.5: Historial (Cmd+3) del perfil de Facturas; no navega sin
+    // historial configurado.
+    Q_INVOKABLE void mostrarHistorial();
+    // T023.5: "Ir > Diagnostico" (lista tecnica de solicitudes).
+    Q_INVOKABLE void mostrarDiagnostico();
+    // T023.5: "Atras" / Escape en Historial, Diagnostico, Detalle y
+    // FacturasSolicitud. Sin efecto en las raices.
+    Q_INVOKABLE void regresar();
+    // T023.5: no propietario; nullptr = sin Historial.
+    void setHistorial(HistorialViewModel* historial);
+    // T023.5: no propietario; nullptr = las notificaciones de solicitud abren
+    // su Detalle (comportamiento de T014.4 con respaldo a Facturas).
+    void setResolucionDestinos(ResolucionDestinoNotificacion* resolucion);
+    // T023.5: Facturas en ese perfil y mes (Historial, notificaciones).
+    // `reintentar`: ejecuta la accion del mes si la franja ofrece Reintentar.
+    void abrirFacturasMes(const QString& perfilId, int anio, int mes, bool reintentar = false);
+    void abrirDestino(const DestinoNavegacion& destino);
     // T023.4: pantalla Facturas (Cmd+1). Activa el view model al entrar y lo
     // desactiva al salir.
     Q_INVOKABLE void mostrarFacturas();
@@ -166,8 +208,8 @@ public:
     // Devuelve false (sin navegar) si `id` no es un UUID canonico.
     Q_INVOKABLE bool abrirDetalle(const QString& id);
 
-    // T014.4: ver la descripcion de la clase.
-    void abrirDetalleONavegarLista(const QString& id);
+    // T014.4/T023.5: ver la descripcion de la clase.
+    void abrirSolicitudNotificada(const QString& id);
     void mostrarPerfilSeleccionado(const QString& perfilId);
     void mostrarCarpetaSolicitudEnFinder(const QString& id);
 
@@ -183,8 +225,13 @@ signals:
     void avisoFinderSolicitudPresentado();
 
 private:
+    // Raiz (Facturas, Perfiles): vacia la pila. Secundaria: apila el origen.
+    void irARaiz(Pagina pagina);
+    void irASecundaria(Pagina pagina);
     void setPagina(Pagina pagina);
-    void navegarADetalleOLista(const QString& id, const QString& avisoFinder);
+    void cargarDetalle(const QString& id);
+    void navegarADetalleConRespaldo(const QString& id, const QString& avisoFinder, Pagina respaldo);
+    void abrirDiagnosticoDe(const QString& solicitudId);
     void alCambiarEstadoDetalle();
     void cambiarFiltro(QString& campo, const QString& valor)
     {
@@ -194,21 +241,26 @@ private:
         }
     }
 
-    QPointer<NuevaSolicitudViewModel> m_nuevaSolicitud;
     QPointer<SolicitudDetailViewModel> m_detalle;
     QPointer<PerfilesSatViewModel> m_perfiles;
     QPointer<EFirmaFormViewModel> m_eFirma;
     QPointer<ExploradorCfdiViewModel> m_explorador;
     QPointer<FacturasViewModel> m_facturas;
-    Pagina m_pagina = Pagina::Lista;
+    QPointer<HistorialViewModel> m_historial;
+    ResolucionDestinoNotificacion* m_resolucion = nullptr;
+    quint64 m_genDestino = 0;
+    QList<Pagina> m_origenes; // pila de "Atras" (T023.5)
+    Pagina m_pagina = Pagina::Diagnostico;
     QString m_solicitudSeleccionadaId;
     bool m_notificacionesDeshabilitadas = false;
     AccionesFinder* m_finder = nullptr;
     QString m_mensajeFinder;
     quint64 m_genFinder = 0;
-    // T014.4: detalle abierto por una notificacion; si la carga termina en
-    // NoEncontrada se regresa a la lista (con el aviso de Finder, si hay).
+    // T014.4/T023.5: detalle abierto por una notificacion; si la carga
+    // termina en NoEncontrada se va a m_respaldo (Facturas, o Diagnostico con
+    // el aviso de Finder).
     QString m_detalleConRespaldoLista;
+    Pagina m_respaldo = Pagina::Facturas;
     QString m_avisoFinderPendiente;
     quint64 m_genFinderSolicitud = 0;
     QString m_filtroTexto;

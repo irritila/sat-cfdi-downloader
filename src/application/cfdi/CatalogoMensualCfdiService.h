@@ -1,5 +1,6 @@
 #pragma once
 
+#include "application/cfdi/HistorialDescargas.h"
 #include "application/persistence/PuertosPersistencia.h"
 #include "domain/cfdi/CoberturaMensual.h"
 #include "domain/cfdi/MesCalendario.h"
@@ -44,6 +45,8 @@ public:
     using ResultadoCatalogo = Resultado<CatalogoMensual, ErrorPersistencia>;
     using ResultadoDisponibilidad = Resultado<EvaluacionCoberturaMensual, ErrorPersistencia>;
     using ResultadoLotes = Resultado<QList<LoteGuiado>, ErrorPersistencia>;
+    using ResultadoEntradas = Resultado<QList<EntradaHistorial>, ErrorPersistencia>;
+    using ResultadoUbicacion = Resultado<std::optional<UbicacionSolicitud>, ErrorPersistencia>;
 
     enum class Revalidacion {
         No, // evalua con el indice tal como esta
@@ -67,6 +70,17 @@ public:
 
     // Historial de lotes guiados del perfil (de un mes o de todos).
     QFuture<ResultadoLotes> lotes(const PerfilId& perfil, const std::optional<MesCalendario>& mes = std::nullopt);
+
+    // T023.5: historial del perfil (HistorialDescargas.h): lotes, solicitudes
+    // sin lote y conteos por fuente en una tarea del dispatcher; despues, en
+    // este hilo, la evaluacion sin revalidar de cada mes con lotes (una por
+    // mes). Orden: creadoEn DESC (lotes y anteriores mezclados), id DESC.
+    // Perfil nulo o eliminado -> lista vacia. Un mes cuya evidencia no se pudo
+    // leer usa resultadoLote para sus lotes (no falla todo el historial).
+    QFuture<ResultadoEntradas> historial(const PerfilId& perfil);
+
+    // T023.5: ubicacion de una solicitud visible (destino de notificaciones).
+    QFuture<ResultadoUbicacion> ubicar(const SolicitudId& solicitud);
 
     // Mes en curso y mes inicial por omision (anterior al en curso; en enero,
     // diciembre del anio previo), segun el reloj inyectado; nullopt si el

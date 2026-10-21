@@ -22,4 +22,6 @@ private slots:
     void planDesactualizadoNoCrea();
     void accionNoDisponibleSeRechaza();
     void reservaParcialCreaSoloLoLibre();
+    // T023.5: historial y ubicacion de solicitudes con CatalogoMensualCfdiService.
+    void historialYUbicacionDeLotes();
 };

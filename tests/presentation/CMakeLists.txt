@@ -190,6 +190,31 @@ set_tests_properties(satcfdi_tema_tests PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )
 
+# satcfdi_historial_vm_tests (T023.5): regla del historial, HistorialViewModel
+# y navegacion de AppViewModel (Historial, Diagnostico, Atras, Facturas por mes).
+qt_add_executable(satcfdi_historial_vm_tests
+    TestHistorialViewModel.cpp
+    FuenteFacturasFake.h
+    ServiciosAsincronosFake.h
+    ../fakes/PromesasPendientes.h
+    ../fakes/FakePerfilesSatService.h
+    ../fakes/FakeCredencialesSatService.h
+)
+target_include_directories(satcfdi_historial_vm_tests PRIVATE ${PROJECT_SOURCE_DIR}/tests)
+target_link_libraries(satcfdi_historial_vm_tests PRIVATE
+    satcfdi_presentation
+    satcfdi_application
+    satcfdi_domain
+    Qt6::Quick
+    Qt6::Test
+)
+satcfdi_enable_warnings(satcfdi_historial_vm_tests)
+add_test(NAME satcfdi_historial_vm_tests COMMAND satcfdi_historial_vm_tests)
+set_tests_properties(satcfdi_historial_vm_tests PROPERTIES
+    LABELS presentation
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
 # satcfdi_facturas_vm_tests (T023.4): FacturasViewModel, franja, meses y lista
 # con una FuenteFacturasMes falsa y evaluaciones reales de cobertura.
 qt_add_executable(satcfdi_facturas_vm_tests

@@ -32,7 +32,7 @@ RutaNotificacion rutaDeNotificacion(const OSIntegration::DestinoNotificacion& de
             break;
         }
         return RutaNotificacion{accion == OSIntegration::AccionNotificacion::MostrarEnFinder ? Tipo::FinderSolicitud
-                                                                                             : Tipo::DetalleSolicitud,
+                                                                                             : Tipo::SolicitudNotificada,
                                 destino.id};
     case Destino::Perfil:
         if (!PerfilId::desdeTexto(destino.id)) {
@@ -93,8 +93,7 @@ void AppLifecycleController::iniciar()
             &AppLifecycleController::enfocarVentana);
     connect(&m_os, &OSIntegration::ocultarVentanaSolicitada, this,
             &AppLifecycleController::ocultarVentana);
-    connect(&m_os, &OSIntegration::nuevaSolicitudSolicitada, this,
-            &AppLifecycleController::nuevaSolicitud);
+    connect(&m_os, &OSIntegration::verFacturasSolicitada, this, &AppLifecycleController::verFacturas);
     connect(&m_os, &OSIntegration::cambioMonitoreoSolicitado, this,
             &AppLifecycleController::cambiarMonitoreo);
     connect(&m_os, &OSIntegration::cambioInicioAutomaticoSolicitado, this,
@@ -173,9 +172,9 @@ void AppLifecycleController::enrutar(const RutaNotificacion& ruta)
     case Tipo::SoloVentana:
         mostrarVentana();
         break;
-    case Tipo::DetalleSolicitud:
+    case Tipo::SolicitudNotificada:
         mostrarVentana();
-        m_appViewModel.abrirDetalleONavegarLista(ruta.id);
+        m_appViewModel.abrirSolicitudNotificada(ruta.id);
         break;
     case Tipo::FinderSolicitud:
         // Finder pasa al frente; la ventana solo si hay aviso (senal del VM).
@@ -217,13 +216,13 @@ void AppLifecycleController::enfocarVentana()
     m_ventana->requestActivate();
 }
 
-void AppLifecycleController::nuevaSolicitud()
+void AppLifecycleController::verFacturas()
 {
     if (m_saliendo) {
         return;
     }
     mostrarVentana();
-    m_appViewModel.mostrarNueva();
+    m_appViewModel.mostrarFacturas();
 }
 
 void AppLifecycleController::cambiarMonitoreo(bool pausar)

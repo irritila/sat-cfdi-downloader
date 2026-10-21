@@ -170,6 +170,15 @@ Page {
             Accessible.description: displayText
             onActivated: (indice) => pagina.facturas.seleccionarPerfil(indice)
         }
+        // T023.5: Historial de descargas del perfil (⌘3).
+        BotonAccion {
+            objectName: "botonHistorialFacturas"
+            visible: pagina.facturas.hayPerfiles
+            text: qsTr("Historial")
+            icono: "clock"
+            atajo: "⌘3"
+            onClicked: pagina.app.mostrarHistorial()
+        }
         BotonAccion {
             objectName: "botonPerfilesFacturas"
             text: qsTr("Perfiles SAT")
@@ -675,17 +684,23 @@ Page {
                 }
 
                 // Cargando: solo si tarda mas de 300 ms.
+                // El indicador se muestra cuando vence el Timer (no al crear la
+                // pagina): sin animaciones que arrancan y paran en el mismo
+                // cuadro si la pagina se cierra enseguida.
                 ColumnLayout {
+                    id: cargando
                     objectName: "estadoCargandoFacturas"
+                    property bool vencido: false
                     anchors.centerIn: parent
-                    visible: pagina.vista === "cargando" && !retraso.running
+                    visible: pagina.vista === "cargando" && cargando.vencido
                     spacing: Theme.espacioS
                     Accessible.role: Accessible.StaticText
                     Accessible.name: qsTr("Cargando facturas")
                     Timer {
-                        id: retraso
                         interval: 300
                         running: pagina.vista === "cargando"
+                        onRunningChanged: if (!running && pagina.vista !== "cargando") cargando.vencido = false
+                        onTriggered: cargando.vencido = true
                     }
                     BusyIndicator {
                         running: parent.visible

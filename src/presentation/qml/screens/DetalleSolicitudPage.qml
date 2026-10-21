@@ -107,8 +107,9 @@ Page {
         return true
     }
 
+    // T023.5: "Atras" vuelve al origen (Historial, Facturas o Diagnostico).
     function regresar() {
-        pagina.app.mostrarLista()
+        pagina.app.regresar()
     }
 
     function enfocarEliminar() {
@@ -169,7 +170,9 @@ Page {
                      .filter(t => t.length > 0).join(" · ")
                    : ""
         mostrarRegresar: true
-        textoRegresar: qsTr("Solicitudes")
+        textoRegresar: pagina.app.textoRegresar
+        descripcionRegresar: qsTr("Regresar a %1 (Escape)").arg(pagina.app.textoRegresar)
+        atajoRegresar: ""
         onRegresarSolicitado: pagina.regresar()
 
         // T015.3: explorador de CFDI; solo con paquetes descargados. N = CFDI
@@ -257,7 +260,7 @@ Page {
         variante: "vacio"
         titulo: qsTr("Solicitud no encontrada")
         descripcion: qsTr("La solicitud no existe o fue eliminada.")
-        textoAccion: qsTr("Solicitudes")
+        textoAccion: pagina.app.textoRegresar
         objectNameAccion: "botonVolverNoEncontrada"
         onAccionSolicitada: pagina.regresar()
     }

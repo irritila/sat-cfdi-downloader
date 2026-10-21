@@ -165,7 +165,7 @@ Page {
                      .filter(t => t.length > 0).join(" · ")
                    : ""
         mostrarRegresar: true
-        textoRegresar: qsTr("Solicitud")
+        textoRegresar: pagina.app.textoRegresar
         descripcionRegresar: qsTr("Regresar al detalle de la solicitud (Escape)")
         atajoRegresar: ""
         onRegresarSolicitado: pagina.regresar()

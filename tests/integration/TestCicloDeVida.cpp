@@ -13,6 +13,7 @@
 #include "fakes/FakeCredencialesSatService.h"
 #include "fakes/FakeOSIntegration.h"
 #include "fakes/FakeSecretStore.h"
+#include "presentation/FuenteFacturasFake.h"
 
 #include <QCoreApplication>
 #include <QQmlApplicationEngine>
@@ -104,7 +105,7 @@ private slots:
     void reflejaConfiguracionPersistidaAlArrancar();
     void cerrarVentanaLaOcultaYElProcesoSigue();
     void mostrarYActivarVentana();
-    void nuevaSolicitudMuestraYNavega();
+    void verFacturasMuestraYNavega();
     void pausaSeReflejaSoloTrasConfirmar();
     void pausaFallidaConservaEstadoConfirmado();
     void inicioAutomaticoPersisteYDespuesConfiguraLoginItem_data();
@@ -184,14 +185,21 @@ void TestCicloDeVida::mostrarYActivarVentana()
     QVERIFY(e.ventana.isVisible());
 }
 
-void TestCicloDeVida::nuevaSolicitudMuestraYNavega()
+void TestCicloDeVida::verFacturasMuestraYNavega()
 {
+    // T023.5: "Ver facturas" del menu bar muestra la ventana en Facturas.
     Escenario e(OSIntegration::LaunchContext::LoginItem);
+    pruebasfacturas::FuenteFalsa fuente;
+    pruebasfacturas::PreferenciasMemoria preferencias;
+    e.vms.setFuenteFacturas(&fuente, &preferencias);
     e.iniciarConfirmado();
-    QCOMPARE(e.vms.app()->pagina(), AppViewModel::Pagina::Lista);
-    e.os.emitirNuevaSolicitud();
+    QVERIFY(!e.ventana.isVisible());
+    e.vms.app()->mostrarDiagnostico();
+    QCOMPARE(e.vms.app()->pagina(), AppViewModel::Pagina::Diagnostico);
+    e.os.emitirVerFacturas();
     QVERIFY(e.ventana.isVisible());
-    QCOMPARE(e.vms.app()->pagina(), AppViewModel::Pagina::Nueva);
+    QCOMPARE(e.vms.app()->pagina(), AppViewModel::Pagina::Facturas);
+    QVERIFY(!e.vms.app()->puedeRegresar());
 }
 
 void TestCicloDeVida::pausaSeReflejaSoloTrasConfirmar()

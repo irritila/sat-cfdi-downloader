@@ -78,7 +78,7 @@ Orden: T023.1 > T023.2 > T023.3 y T023.4 (en paralelo cuando T023.2 cierre sus c
 
 ## Criterios de aceptacion
 
-- [ ] T023.1 a T023.5 completadas.
+- [x] T023.1 a T023.5 completadas.
 - [ ] Prueba manual del usuario con un perfil real sobre la app productiva: un mes cerrado ya descargado se ve con sus facturas y 3 CFDI coinciden con su XML (UUID, RFC emisor, total); la descarga de un mes nuevo se completa sin ver "solicitud", "paquete" ni "verificacion" fuera de Diagnostico.
 
 ## Verificacion

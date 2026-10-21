@@ -122,7 +122,7 @@ private slots:
             }
         }
         QCOMPARE(visibles, (QStringList{
-                               QStringLiteral("Mostrar ventana"), QStringLiteral("Nueva solicitud…"),
+                               QStringLiteral("Mostrar ventana"), QStringLiteral("Ver facturas"),
                                QStringLiteral("Abrir carpeta de paquetes"), QStringLiteral("---"),
                                QStringLiteral("Monitoreo activo"), QStringLiteral("Pausar monitoreo"),
                                QStringLiteral("---"), QStringLiteral("Abrir al iniciar sesión"),
@@ -132,6 +132,9 @@ private slots:
                                QStringLiteral("Solicitar permiso de notificaciones"), QStringLiteral("---"),
                                QStringLiteral("Salir de Archivo Fiscal")}));
         QVERIFY(!entrada(Id::EstadoMonitoreo, estado).habilitada);
+        // T023.5: "Ver facturas" navega sin pedir datos (sin "…") y siempre esta disponible.
+        QVERIFY(entrada(Id::VerFacturas, estado).visible);
+        QVERIFY(entrada(Id::VerFacturas, estado).habilitada);
         estado.monitoreo.pendientes = 2;
         estado.monitoreoPausado = true;
         estado.preferenciaLoginItem = true;
@@ -162,7 +165,9 @@ private slots:
         using L = satcfdi::OSIntegration::LoginItemStatus;
         using N = satcfdi::OSIntegration::NotificationStatus;
         const QStringList prohibidas{QStringLiteral("..."), QStringLiteral("sesion"), QStringLiteral("notificacion "),
-                                     QStringLiteral("aprobacion"), QStringLiteral("pausado")};
+                                     QStringLiteral("aprobacion"), QStringLiteral("pausado"),
+                                     // T023.5: ningun item lleva a Nueva solicitud ni usa "solicitud".
+                                     QStringLiteral("solicitud")};
         for (E::Fase f : {E::Fase::Pausado, E::Fase::ActivoEnEspera, E::Fase::Ejecutando, E::Fase::Deteniendo,
                           E::Fase::Detenido}) {
             for (E::Actividad a : {E::Actividad::Ninguna, E::Actividad::Enviando, E::Actividad::Verificando,

@@ -711,38 +711,18 @@ QList<Escenario> escenarios()
                                  {QStringLiteral("seleccionado"), QStringLiteral("demo.cer")}});
          }},
         {QStringLiteral("04-nueva-solicitud.png"), QStringLiteral("Captura"),
-         [](const QString& r) {
-             return capturaApp(r, [](Grafo& g, QQuickWindow*) {
-                 g.vms->app()->mostrarNueva();
-                 esperar(300);
-                 NuevaSolicitudViewModel* f = g.vms->nuevaSolicitud();
-                 // Estado inicial real del formulario: Emitidos y tipo de
-                 // comprobante "Todos" (sin forzar valores en los ComboBox).
-                 f->setPerfilId(perfilListo().id.texto());
-                 f->setFechaInicial(QStringLiteral("2026-09-01"));
-                 f->setFechaFinal(QStringLiteral("2026-09-30"));
-                 return f->canSubmit();
-             });
+         [](const QString&) {
+             // T023.5: NuevaSolicitudPage ya no tiene ruta en la app; T024
+             // regraba el manual sin esta captura.
+             qWarning("captura obsoleta (T023.5): Nueva solicitud ya no es navegable");
+             return false;
          }},
         {QStringLiteral("05-duplicado.png"), QStringLiteral("Captura"),
-         [](const QString& r) {
-             return capturaApp(r, [](Grafo& g, QQuickWindow*) {
-                 EvaluacionDuplicado e;
-                 e.clasificacion = ClasificacionDuplicado::RequiereConfirmacion;
-                 e.motivo = MotivoDuplicado::TerminadaSinPaquetes;
-                 e.solicitudReferencia = solicitudId(2);
-                 g.solicitudes.evaluacion = e;
-                 g.vms->app()->mostrarNueva();
-                 esperar(300);
-                 NuevaSolicitudViewModel* f = g.vms->nuevaSolicitud();
-                 // Emitidos (valor inicial): el duplicado se evalua sobre los
-                 // mismos filtros que el usuario captura por defecto.
-                 f->setPerfilId(perfilListo().id.texto());
-                 f->setFechaInicial(QStringLiteral("2026-09-02"));
-                 f->setFechaFinal(QStringLiteral("2026-09-02"));
-                 f->submit();
-                 return true;
-             });
+         [](const QString&) {
+             // T023.5: NuevaSolicitudPage ya no tiene ruta en la app; T024
+             // regraba el manual sin esta captura.
+             qWarning("captura obsoleta (T023.5): Nueva solicitud ya no es navegable");
+             return false;
          }},
         {QStringLiteral("06-lista.png"), QStringLiteral("Captura"),
          [](const QString& r) {

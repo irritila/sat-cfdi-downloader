@@ -50,7 +50,7 @@ void TestOSIntegration::intencionesSeEmitenConArgumentos()
     QSignalSpy mostrar(&os, &OSIntegration::mostrarVentanaSolicitada);
     QSignalSpy ocultar(&os, &OSIntegration::ocultarVentanaSolicitada);
     QSignalSpy enfocar(&os, &OSIntegration::enfocarVentanaSolicitada);
-    QSignalSpy nueva(&os, &OSIntegration::nuevaSolicitudSolicitada);
+    QSignalSpy verFacturas(&os, &OSIntegration::verFacturasSolicitada);
     QSignalSpy monitoreo(&os, &OSIntegration::cambioMonitoreoSolicitado);
     QSignalSpy inicio(&os, &OSIntegration::cambioInicioAutomaticoSolicitado);
     QSignalSpy permiso(&os, &OSIntegration::permisoNotificacionesSolicitado);
@@ -61,7 +61,7 @@ void TestOSIntegration::intencionesSeEmitenConArgumentos()
     os.emitirMostrarVentana();
     os.emitirOcultarVentana();
     os.emitirEnfocarVentana();
-    os.emitirNuevaSolicitud();
+    os.emitirVerFacturas();
     os.emitirCambioMonitoreo(true);
     os.emitirCambioMonitoreo(false);
     os.emitirCambioInicioAutomatico(true);
@@ -73,7 +73,7 @@ void TestOSIntegration::intencionesSeEmitenConArgumentos()
     QCOMPARE(mostrar.count(), 1);
     QCOMPARE(ocultar.count(), 1);
     QCOMPARE(enfocar.count(), 1);
-    QCOMPARE(nueva.count(), 1);
+    QCOMPARE(verFacturas.count(), 1);
     QCOMPARE(monitoreo.count(), 2);
     QCOMPARE(monitoreo.at(0).at(0).toBool(), true);
     QCOMPARE(monitoreo.at(1).at(0).toBool(), false);

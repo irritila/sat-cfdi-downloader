@@ -13,7 +13,6 @@
 #include "AppViewModel.h"
 #include "EFirmaFormViewModel.h"
 #include "PerfilesSatViewModel.h"
-#include "NuevaSolicitudViewModel.h"
 #include "PresentacionViewModels.h"
 #include "SolicitudDetailViewModel.h"
 #include "SolicitudesListModel.h"
@@ -33,7 +32,6 @@ class FixturePerfiles : public QObject {
     Q_PROPERTY(satcfdi::EFirmaFormViewModel* eFirma READ eFirma NOTIFY reiniciado)
     // T013: resto del grafo, para pruebas y revision visual de las pantallas.
     Q_PROPERTY(satcfdi::SolicitudesListModel* solicitudesModel READ solicitudesModel NOTIFY reiniciado)
-    Q_PROPERTY(satcfdi::NuevaSolicitudViewModel* nuevaSolicitud READ nuevaSolicitud NOTIFY reiniciado)
     Q_PROPERTY(satcfdi::SolicitudDetailViewModel* detalle READ detalle NOTIFY reiniciado)
 
 public:
@@ -44,7 +42,6 @@ public:
     satcfdi::PerfilesSatViewModel* perfiles() const;
     satcfdi::EFirmaFormViewModel* eFirma() const;
     satcfdi::SolicitudesListModel* solicitudesModel() const;
-    satcfdi::NuevaSolicitudViewModel* nuevaSolicitud() const;
     satcfdi::SolicitudDetailViewModel* detalle() const;
 
     // Lista de solicitudes (listar() `indice`) con filas

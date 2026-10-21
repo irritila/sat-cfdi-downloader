@@ -16,13 +16,14 @@ ApplicationWindow {
 
     required property AppViewModel appViewModel
     required property SolicitudesListModel solicitudesModel
-    required property NuevaSolicitudViewModel nuevaSolicitudViewModel
     required property SolicitudDetailViewModel detalleViewModel
     required property PerfilesSatViewModel perfilesViewModel
     required property EFirmaFormViewModel eFirmaViewModel
     required property ExploradorCfdiViewModel exploradorViewModel
     // T023.4: pantalla principal Facturas (por perfil y mes).
     required property FacturasViewModel facturasViewModel
+    // T023.5: historial de descargas del perfil (⌘3).
+    required property HistorialViewModel historialViewModel
     // T019 D8: aviso de la carpeta de paquetes (inactivo si no hay aviso).
     required property AvisoRaizPaquetesViewModel avisoRaizPaquetesViewModel
 
@@ -57,8 +58,8 @@ ApplicationWindow {
     // pagina actual dentro de su propio manejador de clic o tecla.
     function componentePara(pagina) {
         switch (pagina) {
-        case AppViewModel.Nueva:
-            return nuevaComponente
+        case AppViewModel.Historial:
+            return historialComponente
         case AppViewModel.Detalle:
             return detalleComponente
         case AppViewModel.Perfiles:
@@ -68,7 +69,7 @@ ApplicationWindow {
         case AppViewModel.FacturasSolicitud:
             return facturasSolicitudComponente
         default:
-            return listaComponente
+            return listaComponente // Diagnostico: lista tecnica de descargas
         }
     }
 
@@ -92,13 +93,13 @@ ApplicationWindow {
     // - ⌘R tampoco actua con foco en texto de solo lectura;
     // - ⌘⌫ solo abre la confirmacion de eliminar (nunca elimina).
     readonly property SolicitudesPage paginaLista: paginaActual.item as SolicitudesPage
-    readonly property NuevaSolicitudPage paginaNueva: paginaActual.item as NuevaSolicitudPage
+    readonly property HistorialPage paginaHistorial: paginaActual.item as HistorialPage
     readonly property DetalleSolicitudPage paginaDetalle: paginaActual.item as DetalleSolicitudPage
     readonly property PerfilesSatPage paginaPerfiles: paginaActual.item as PerfilesSatPage
     readonly property ExploradorCfdiPage paginaExplorador: paginaActual.item as ExploradorCfdiPage
     readonly property FacturasPage paginaFacturas: paginaActual.item as FacturasPage
 
-    readonly property bool dialogoAbierto: (ventana.paginaNueva !== null && ventana.paginaNueva.dialogoAbierto)
+    readonly property bool dialogoAbierto: (ventana.paginaHistorial !== null && ventana.paginaHistorial.dialogoAbierto)
                                            || (ventana.paginaDetalle !== null && ventana.paginaDetalle.dialogoAbierto)
                                            || (ventana.paginaPerfiles !== null && ventana.paginaPerfiles.dialogoAbierto)
                                            || (ventana.paginaExplorador !== null && ventana.paginaExplorador.dialogoAbierto)
@@ -111,31 +112,11 @@ ApplicationWindow {
                                                  || (ventana.edicionConFoco !== null && !ventana.edicionConFoco.readOnly)
     readonly property bool atajosActivos: !ventana.dialogoAbierto && !ventana.campoEditableConFoco
 
-    function regresarDePagina() {
-        if (ventana.paginaNueva !== null)
-            ventana.paginaNueva.regresar()
-        else if (ventana.paginaDetalle !== null)
-            ventana.paginaDetalle.regresar()
-        else if (ventana.paginaPerfiles !== null)
-            ventana.paginaPerfiles.regresar()
-        else if (ventana.paginaExplorador !== null)
-            ventana.paginaExplorador.regresar()
-    }
+    // T023 D10: vista tecnica (Diagnostico, su detalle y el explorador por
+    // solicitud). T023.5: ninguna ruta lleva a NuevaSolicitudPage (sin ⌘N).
+    readonly property bool enDiagnostico: ventana.paginaLista !== null || ventana.paginaDetalle !== null
+                                          || ventana.paginaExplorador !== null
 
-    // T023 D10: fuera del recorrido principal. Paginas de la vista tecnica
-    // provisional (Ir > Diagnostico) hasta que T023.5 las sustituya.
-    readonly property bool enDiagnostico: ventana.paginaLista !== null || ventana.paginaNueva !== null
-                                          || ventana.paginaDetalle !== null || ventana.paginaExplorador !== null
-
-    // ⌘N solo desde la lista provisional de Diagnostico (D10); no es global.
-    Action {
-        id: accionNueva
-        objectName: "atajoNuevaSolicitud"
-        text: qsTr("Nueva solicitud")
-        shortcut: "Ctrl+N"
-        enabled: ventana.atajosActivos && ventana.paginaLista !== null
-        onTriggered: ventana.appViewModel.mostrarNueva()
-    }
     Action {
         id: accionBuscar
         objectName: "atajoBuscar"
@@ -215,25 +196,24 @@ ApplicationWindow {
         text: qsTr("Facturas")
         shortcut: "Ctrl+1"
         enabled: ventana.atajosActivos && paginaActual.item !== null && ventana.paginaFacturas === null
-        // Desde Nueva solicitud pasa primero por su regresar() (T014.1). Sin
-        // pantalla Facturas (sin fuente: pruebas o arranque sin datos),
-        // mostrarFacturas() no navega y ⌘1 conserva el regreso de T014.1.
-        onTriggered: {
-            const desdeNueva = ventana.paginaNueva !== null
-            if (desdeNueva)
-                ventana.paginaNueva.regresar()
-            ventana.appViewModel.mostrarFacturas()
-            if (!desdeNueva && ventana.appViewModel.pagina !== AppViewModel.Facturas)
-                ventana.regresarDePagina()
-        }
+        onTriggered: ventana.appViewModel.mostrarFacturas()
     }
-    // Lista de descargas (vista tecnica hasta T023.5); sin atajo.
+    // T023.5: ⌘3 Historial de descargas del perfil.
+    Action {
+        id: accionHistorial
+        objectName: "atajoHistorial"
+        text: qsTr("Historial")
+        shortcut: "Ctrl+3"
+        enabled: ventana.atajosActivos && paginaActual.item !== null && ventana.paginaHistorial === null
+        onTriggered: ventana.appViewModel.mostrarHistorial()
+    }
+    // "Ir > Diagnostico": lista tecnica de descargas; "Atras" vuelve al origen.
     Action {
         id: accionDiagnostico
         objectName: "accionDiagnostico"
         text: qsTr("Diagnóstico")
         enabled: ventana.atajosActivos && paginaActual.item !== null && ventana.paginaLista === null
-        onTriggered: ventana.appViewModel.mostrarLista()
+        onTriggered: ventana.appViewModel.mostrarDiagnostico()
     }
 
     // Menu de la app con los atajos: solo con el menu nativo de macOS (en
@@ -255,10 +235,10 @@ ApplicationWindow {
                 // oculto de Qt y ⌘[ cambia con el teclado latinoamericano).
                 MenuItem { action: accionRegresar }
                 MenuItem { action: accionPerfiles }
+                MenuItem { action: accionHistorial }
                 MenuSeparator { }
                 MenuItem { action: accionDiagnostico }
-                // Acciones de la vista tecnica: solo visibles en ella (D10).
-                MenuItem { action: accionNueva; visible: ventana.enDiagnostico }
+                // "Eliminar…" solo en el detalle de diagnostico.
                 MenuItem { action: accionEliminar; visible: ventana.paginaDetalle !== null }
             }
         }
@@ -298,10 +278,10 @@ ApplicationWindow {
         }
     }
     Component {
-        id: nuevaComponente
-        NuevaSolicitudPage {
+        id: historialComponente
+        HistorialPage {
             app: ventana.appViewModel
-            formulario: ventana.nuevaSolicitudViewModel
+            historial: ventana.historialViewModel
         }
     }
     Component {

@@ -6,6 +6,7 @@
 #include "fakes/FakePerfilesSatService.h"
 
 #include "FuenteFacturasMes.h"
+#include "FuenteHistorial.h"
 #include "PresentacionViewModels.h"
 #include "domain/cfdi/CoberturaMensual.h"
 
@@ -242,6 +243,68 @@ private:
     bool m_conPerfiles;
 };
 
+// Historial sintetico del perfil XAXX010101000 (T023.5).
+class HistorialSintetico final : public FuenteHistorial {
+public:
+    QString caso = QStringLiteral("mixto");
+    int consultas = 0;
+
+    void cambiar() { emit datosCambiados(PerfilId()); }
+
+    QFuture<ResultadoEntradas> historial(const PerfilId& perfil) override
+    {
+        ++consultas;
+        if (caso == QLatin1String("error")) {
+            return QtFuture::makeReadyValueFuture(ResultadoEntradas::fallo(ErrorPersistencia::de(ErrorPersistencia::Tipo::Almacenamiento, QStringLiteral("prueba"))));
+        }
+        QList<EntradaHistorial> r;
+        if (caso == QLatin1String("mixto")) {
+            auto entrada = [&](int mes, int dia, ResultadoHistorial resultado, int emitidas, int recibidas) {
+                EntradaHistorial e;
+                e.loteId = QStringLiteral("lote-%1").arg(mes);
+                e.perfil = perfil;
+                e.mes = MesCalendario::crear(2026, mes);
+                e.creadoEn = QDateTime(QDate(2026, mes == 12 ? 12 : mes + 1, dia), QTime(15, 12), QTimeZone::UTC);
+                e.resultado = resultado;
+                e.emitidas = emitidas;
+                e.recibidas = recibidas;
+                e.tieneEmitidas = true;
+                e.tieneRecibidas = true;
+                e.diagnosticoEmitidas = SolicitudId::generar();
+                e.diagnosticoRecibidas = SolicitudId::generar();
+                return e;
+            };
+            r.append(entrada(9, 3, ResultadoHistorial::EnPreparacion, 0, 0));
+            r.append(entrada(8, 4, ResultadoHistorial::Completa, 34, 36));
+            EntradaHistorial parcial = entrada(7, 5, ResultadoHistorial::Completa, 35, 57);
+            parcial.eliminacionParcial = true;
+            r.append(parcial);
+            EntradaHistorial atencion = entrada(6, 2, ResultadoHistorial::RequiereAtencion, 32, 0);
+            atencion.puedeReintentar = true;
+            r.append(atencion);
+            EntradaHistorial cubierta = entrada(5, 10, ResultadoHistorial::NoCompletada, 0, 0);
+            cubierta.tieneEmitidas = false;
+            cubierta.diagnosticoEmitidas.reset();
+            r.append(cubierta);
+            EntradaHistorial eliminada = entrada(4, 2, ResultadoHistorial::Eliminada, 0, 0);
+            r.append(eliminada);
+            r.append(entrada(2, 4, ResultadoHistorial::SinFacturas, 0, 0));
+            EntradaHistorial anterior;
+            anterior.tipo = EntradaHistorial::Tipo::Anterior;
+            anterior.perfil = perfil;
+            anterior.desde = QDate(2026, 1, 1);
+            anterior.hasta = QDate(2026, 3, 15);
+            anterior.creadoEn = QDateTime(QDate(2026, 3, 20), QTime(16, 0), QTimeZone::UTC);
+            anterior.resultado = ResultadoHistorial::Anterior;
+            anterior.emitidas = 12;
+            anterior.tieneEmitidas = true;
+            anterior.diagnosticoEmitidas = SolicitudId::generar();
+            r.append(anterior);
+        }
+        return QtFuture::makeReadyValueFuture(ResultadoEntradas::exito(r));
+    }
+};
+
 class PreferenciasEnMemoria final : public PreferenciasFacturas {
 public:
     std::optional<QString> ultimoPerfil() const override { return m_id; }
@@ -258,8 +321,11 @@ struct FixtureFacturas::Grafo {
         : fuente(conPerfiles)
     {
         vms.setFuenteFacturas(&fuente, &preferencias);
+        vms.setFuenteHistorial(&historial);
         vms.facturas()->setIntervaloBusqueda(0);
     }
+
+    HistorialSintetico historial;
 
     fakes::FakePerfilesSatService perfiles;
     fakes::FakeCredencialesSatService credenciales;
@@ -280,6 +346,15 @@ FixtureFacturas::~FixtureFacturas() = default;
 
 AppViewModel* FixtureFacturas::app() const { return m_grafo->vms.app(); }
 FacturasViewModel* FixtureFacturas::facturas() const { return m_grafo->vms.facturas(); }
+HistorialViewModel* FixtureFacturas::historial() const { return m_grafo->vms.historial(); }
+
+void FixtureFacturas::fijarHistorial(const QString& caso)
+{
+    m_grafo->historial.caso = caso;
+    m_grafo->historial.cambiar();
+}
+
+int FixtureFacturas::numHistoriales() const { return m_grafo->historial.consultas; }
 
 void FixtureFacturas::reiniciar(bool conPerfiles)
 {

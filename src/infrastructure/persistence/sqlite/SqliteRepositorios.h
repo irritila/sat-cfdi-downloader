@@ -137,6 +137,7 @@ public:
     Resultado<CatalogoMensual, ErrorPersistencia> consultar(const ConsultaCatalogoMensual& consulta) override;
     Resultado<QList<EvidenciaSolicitudMensual>, ErrorPersistencia>
     leerEvidencia(const PerfilId& perfil, MesCalendario mes, int versionParser) override;
+    Resultado<QHash<SolicitudId, int>, ErrorPersistencia> conteosPorSolicitud(const PerfilId& perfil) override;
 
 private:
     SqliteConnectionProvider& m_proveedor;
@@ -151,6 +152,8 @@ public:
     Resultado<Exito, ErrorPersistencia> insertar(const NuevoLoteGuiado& lote) override;
     Resultado<QList<LoteGuiado>, ErrorPersistencia> listar(const PerfilId& perfil,
                                                            const std::optional<MesCalendario>& mes) override;
+    Resultado<QList<SolicitudSinLote>, ErrorPersistencia> listarSinLote(const PerfilId& perfil) override;
+    Resultado<std::optional<UbicacionSolicitud>, ErrorPersistencia> ubicar(const SolicitudId& solicitud) override;
 
 private:
     SqliteConnectionProvider& m_proveedor;

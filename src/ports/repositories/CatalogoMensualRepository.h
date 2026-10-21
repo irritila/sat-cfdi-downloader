@@ -10,6 +10,7 @@
 #include "ports/persistence/ErrorPersistencia.h"
 #include "ports/repositories/CfdiCatalogRepository.h"
 
+#include <QHash>
 #include <QList>
 #include <QString>
 
@@ -86,6 +87,12 @@ public:
     // Orden: creada_en, id; paquetes por id.
     virtual Resultado<QList<EvidenciaSolicitudMensual>, ErrorPersistencia>
     leerEvidencia(const PerfilId& perfil, MesCalendario mes, int versionParser) = 0;
+
+    // T023.5: CFDI del perfil (todos los meses, con fecha) por solicitud
+    // fuente canonica, con la misma deduplicacion que consultar(): la suma por
+    // mes coincide con conteos.emitidos + conteos.recibidos del mes sin
+    // filtros. Solicitudes sin CFDI no aparecen.
+    virtual Resultado<QHash<SolicitudId, int>, ErrorPersistencia> conteosPorSolicitud(const PerfilId& perfil) = 0;
 };
 
 } // namespace satcfdi

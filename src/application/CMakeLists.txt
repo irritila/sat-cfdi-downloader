@@ -18,6 +18,8 @@ qt_add_library(satcfdi_application STATIC
     # T023.2: catalogo mensual, disponibilidad del mes y lotes guiados.
     cfdi/ProgresoIndexacionCfdi.h
     cfdi/CatalogoMensualCfdiService.h
+    cfdi/HistorialDescargas.h
+    cfdi/HistorialDescargas.cpp
     cfdi/CatalogoMensualCfdiService.cpp
     # T023.3: descarga guiada por mes y tramos.
     cfdi/DescargaGuiadaService.h
@@ -41,6 +43,7 @@ qt_add_library(satcfdi_application STATIC
     operaciones/MensajesOperacionSat.cpp
     operaciones/SaneamientoOperacion.h
     operaciones/SaneamientoOperacion.cpp
+    notificaciones/DestinoNavegacion.h
     notificaciones/Notificador.h
     estadoagregado/EstadoAgregado.h
     estadoagregado/EstadoAgregado.cpp

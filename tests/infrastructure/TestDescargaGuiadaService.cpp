@@ -2,6 +2,7 @@
 
 #include "SqlitePruebasComun.h"
 
+#include "application/cfdi/CatalogoMensualCfdiService.h"
 #include "application/cfdi/DescargaGuiadaService.h"
 #include "application/cfdi/ProgresoIndexacionCfdi.h"
 #include "application/logging/RegexLogSanitizer.h"
@@ -504,4 +505,76 @@ void TestDescargaGuiadaService::reservaParcialCreaSoloLoLibre()
     QCOMPARE(columna(e.p->proveedor(), QStringLiteral("SELECT fecha_inicial_sat || ' ' || fecha_final_sat FROM "
                                                       "solicitud_masiva WHERE estado_local = 'Creada'")),
              QStringList{QStringLiteral("2026-09-21T00:00:00 2026-09-24T23:59:59")});
+}
+
+void TestDescargaGuiadaService::historialYUbicacionDeLotes()
+{
+    Entorno e;
+    QVERIFY(e.preparar());
+    CatalogoMensualCfdiService catalogo(*e.dispatcher, e.p->catalogoMensual(), e.p->lotesDescargaGuiada(),
+                                        e.indexacion, [&e] { return e.ahora; });
+    // Descarga guiada de septiembre (lote con emitidas y recibidas) y una
+    // solicitud previa a T023 sin lote (agosto, Terminada).
+    auto pre = e.planificar(kSeptiembre);
+    QVERIFY(pre);
+    auto ej = e.ejecutar(pre.valor());
+    QVERIFY(ej && ej.valor().loteId);
+    const SolicitudId emitida = ej.valor().creadas.at(0);
+    const QString anterior = e.fixture(TipoDescarga::Recibidos, QStringLiteral("2026-08-01T00:00:00"),
+                                       QStringLiteral("2026-08-31T23:59:59"), QStringLiteral("Terminada"));
+    QVERIFY(!anterior.isEmpty());
+
+    auto h = esperar(catalogo.historial(e.pid()));
+    QVERIFY(h && *h);
+    QCOMPARE(h->valor().size(), 2);
+    const EntradaHistorial& lote = h->valor().at(0); // creado ahora (20 oct): mas reciente
+    QCOMPARE(lote.tipo, EntradaHistorial::Tipo::Guiada);
+    QCOMPARE(lote.loteId, *ej.valor().loteId);
+    QCOMPARE(lote.mes, std::optional(kSeptiembre));
+    QCOMPARE(lote.resultado, ResultadoHistorial::EnPreparacion);
+    QVERIFY(lote.tieneEmitidas && lote.tieneRecibidas);
+    QVERIFY(!lote.eliminacionParcial);
+    QVERIFY(lote.diagnosticoEmitidas && lote.diagnosticoRecibidas);
+    const EntradaHistorial& previa = h->valor().at(1);
+    QCOMPARE(previa.tipo, EntradaHistorial::Tipo::Anterior);
+    QCOMPARE(previa.resultado, ResultadoHistorial::Anterior);
+    QCOMPARE(previa.mes, std::optional(*MesCalendario::crear(2026, 8)));
+    QCOMPARE(previa.diagnosticoRecibidas, SolicitudId::desdeTexto(anterior));
+
+    // Ubicacion para notificaciones.
+    auto u = esperar(catalogo.ubicar(emitida));
+    QVERIFY(u && *u && u->valor());
+    QCOMPARE(u->valor()->perfil, e.pid());
+    QCOMPARE(u->valor()->mesLote, std::optional(kSeptiembre));
+    u = esperar(catalogo.ubicar(*SolicitudId::desdeTexto(anterior)));
+    QVERIFY(u && *u && u->valor() && !u->valor()->mesLote);
+    u = esperar(catalogo.ubicar(SolicitudId::generar()));
+    QVERIFY(u && *u && !u->valor());
+
+    // Eliminacion parcial: la fila conserva mes y fecha y lo indica.
+    QCOMPARE(ejecutarSql(e.p->proveedor(), QStringLiteral("UPDATE solicitud_masiva SET eliminado_en = %1 WHERE id = %2")
+                                               .arg(citar(kAhora), citar(emitida.texto()))),
+             QString());
+    h = esperar(catalogo.historial(e.pid()));
+    QVERIFY(h && *h);
+    QCOMPARE(h->valor().at(0).loteId, *ej.valor().loteId);
+    QCOMPARE(h->valor().at(0).mes, std::optional(kSeptiembre));
+    QVERIFY(h->valor().at(0).eliminacionParcial);
+    QVERIFY(!h->valor().at(0).tieneEmitidas);
+    QVERIFY(!h->valor().at(0).diagnosticoEmitidas);
+    u = esperar(catalogo.ubicar(emitida));
+    QVERIFY(u && *u && !u->valor()); // eliminada -> Facturas
+
+    // Perfil eliminado y recreado con el mismo RFC: sus lotes no aparecen.
+    QCOMPARE(ejecutarSql(e.p->proveedor(), QStringLiteral("UPDATE perfil_sat SET eliminado_en = %1 WHERE id = %2")
+                                               .arg(citar(kAhora), citar(e.perfil))),
+             QString());
+    const QString recreado = uuid::generarCanonico();
+    QCOMPARE(insertarPerfilFixture(e.p->proveedor(), recreado, kRfc), QString());
+    h = esperar(catalogo.historial(e.pid()));
+    QVERIFY(h && *h && h->valor().isEmpty());
+    h = esperar(catalogo.historial(*PerfilId::desdeTexto(recreado)));
+    QVERIFY(h && *h && h->valor().isEmpty());
+    u = esperar(catalogo.ubicar(*SolicitudId::desdeTexto(anterior)));
+    QVERIFY(u && *u && !u->valor());
 }
