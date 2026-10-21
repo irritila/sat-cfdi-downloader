@@ -54,6 +54,7 @@ Ejemplo: `T001-modelo-fisico-sqlite.md`.
 | [T023.3](T023.3-descarga-guiada.md) | Completada | Descarga guiada por mes y tramos |
 | [T023.4](T023.4-pantalla-facturas.md) | Completada | Pantalla Facturas |
 | [T023.5](T023.5-historial-diagnostico-notificaciones.md) | Completada | Historial, diagnostico, notificaciones y menu bar |
+| [T023.6](T023.6-sin-facturas-5004.md) | Pendiente | Periodo sin facturas (Rechazada 5004) no es error |
 | [T024](T024-vocabulario-y-materiales-flujo-facturas.md) | Pendiente | Vocabulario y materiales del flujo centrado en facturas |
 
 ## Estados

@@ -36,6 +36,7 @@ Lo que el usuario necesita es: elegir un perfil fiscal, ver sus facturas emitida
 | D17 | Un mes cerrado con cobertura incompleta (por ejemplo, del 1 al 10) ofrece "Completar mes": una descarga por cada hueco no cubierto hasta el fin del mes (ADR 0020). Nunca se repite un rango ya cubierto. Los meses cerrados completos no se actualizan. | Aprobada por usuario | Ronda 04 (calidad); enmienda de huecos aprobada 2026-10-20. |
 | D18 | T023 es epica con T023.1 (prototipo y ADR), T023.2 (fundamentos de catalogo y disponibilidad), T023.3 (descarga guiada), T023.4 (pantalla Facturas) y T023.5 (historial, diagnostico, notificaciones y menu bar). | Aprobada por usuario | Ronda 04. |
 | D21 | Huecos y causas superadas (ADR 0020): con algun tramo acreditado el mes es Disponibles parcialmente aunque no empiece el dia 1; un fallo deja de poner el mes en Requiere atencion si descargas posteriores de la misma direccion cubren integramente su tramo (queda en Diagnostico). | Aprobada por usuario | Desarrollo T023.2, 2026-10-20. |
+| D22 | Una solicitud Rechazada con `CodigoEstadoSolicitud` 5004 (sin informacion) acredita su tramo como conjunto vacio y no es causa de atencion; Rechazada con otro codigo sigue siendolo. | Aprobada por usuario | Prueba manual de T023.5, 2026-10-21; `docs/web-service.md` 6.2. Implementa T023.6. |
 | D20 | La lista de CFDI muestra solo la contraparte: Receptor en Emitidas y Emisor en Recibidas; el propio perfil no se repite. | Aprobada por usuario | Revision del prototipo T023.1, 2026-10-20. |
 | D11 | Cobertura por direccion: solo acreditan solicitudes canonicas (mismo perfil, direccion, CFDI/Vigente, sin filtros, rango dentro del mes, no eliminadas) terminadas con todos sus paquetes descargados, ZIP presente y legible e indice completo, o terminadas con conjunto de paquetes vacio persistido por la verificacion SAT. La cobertura es la union contigua de tramos desde el dia 1 a las 00:00:00; un tramo despues de un hueco no la extiende. La frontera objetivo es el fin del mes (cerrado) o cualquier instante de hoy (en curso): una cobertura que termina en un dia anterior a hoy no alcanza la frontera. Estados con precedencia: Requiere atencion (EnvioIncierto, EnvioFallido, ErrorSat, Rechazada, Vencida, 5002, 5005, paquete Error o Vencido, ZIP faltante o ilegible, indice ilegible u origen no disponible, indexacion pendiente sin trabajo programado) > Preparando (solicitud Creada, Enviando, Enviada, Aceptada o EnProceso, paquete descargandose, indexacion programada) > Disponibles (ambas direcciones cubiertas hasta la frontera) > Disponibles parcialmente (alguna cobertura en al menos una direccion, sin trabajo ni error) > Sin descargar (ninguna cobertura). | Recomendacion tecnica | Rondas 02 y 04. Las solicitudes con filtros o rango no canonico no acreditan cobertura, pero sus CFDI aparecen en el catalogo. |
 | D12 | La descarga guiada planifica ambas direcciones en una transaccion antes de crear nada. Por direccion: si la cobertura ya alcanza la frontera, no hace nada; si hay una solicitud canonica en curso, la reutiliza; si falta un tramo, calcula el siguiente desde el fin de la cobertura contigua y solo entonces aplica `evaluarDuplicado`: `RequiereConfirmacion` pide confirmacion explicita una vez por direccion (cancelar no afecta a la otra direccion), `Bloqueado` reutiliza. Con 5002 en una direccion, la otra se crea si esta libre, el mes queda en Requiere atencion y no se ofrece recrear la afectada; con 5005 se lleva al diagnostico. Repetir la accion mientras hay trabajo en curso no crea nada. Solo la accion del usuario crea solicitudes. | Recomendacion tecnica | Rondas 02 y 04; ADR 0015 y 0018. Tramos distintos producen `dedup_key` distintas. |
@@ -54,8 +55,9 @@ Lo que el usuario necesita es: elegir un perfil fiscal, ver sus facturas emitida
 | [T023.3](T023.3-descarga-guiada.md) | Descarga guiada por mes y tramos |
 | [T023.4](T023.4-pantalla-facturas.md) | Pantalla Facturas productiva |
 | [T023.5](T023.5-historial-diagnostico-notificaciones.md) | Historial, diagnostico, notificaciones y menu bar |
+| [T023.6](T023.6-sin-facturas-5004.md) | Periodo sin facturas (Rechazada 5004) no es error |
 
-Orden: T023.1 > T023.2 > T023.3 y T023.4 (en paralelo cuando T023.2 cierre sus contratos) > T023.5.
+Orden: T023.1 > T023.2 > T023.3 y T023.4 (en paralelo cuando T023.2 cierre sus contratos) > T023.5 > T023.6.
 
 ## Alcance
 
@@ -78,7 +80,7 @@ Orden: T023.1 > T023.2 > T023.3 y T023.4 (en paralelo cuando T023.2 cierre sus c
 
 ## Criterios de aceptacion
 
-- [x] T023.1 a T023.5 completadas.
+- [ ] T023.1 a T023.6 completadas (T023.1 a T023.5 al 2026-10-21).
 - [ ] Prueba manual del usuario con un perfil real sobre la app productiva: un mes cerrado ya descargado se ve con sus facturas y 3 CFDI coinciden con su XML (UUID, RFC emisor, total); la descarga de un mes nuevo se completa sin ver "solicitud", "paquete" ni "verificacion" fuera de Diagnostico.
 
 ## Verificacion
