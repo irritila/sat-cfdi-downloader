@@ -10,6 +10,8 @@
 #include <QString>
 
 #include <functional>
+#include <QUuid>
+
 #include <memory>
 #include <optional>
 
@@ -66,6 +68,9 @@ class SqliteCopiaRespaldo;
 class FuenteRespaldoLocal;
 namespace respaldo {
 class FuenteRespaldo;
+class DestinoRespaldo;
+class RespaldoService;
+class ContenedorRespaldo;
 }
 
 // Composition root de T003: unico lugar que elige implementaciones concretas y
@@ -184,6 +189,14 @@ public:
     respaldo::FuenteRespaldo& fuenteRespaldo() const;
     // T025.2: limpieza de stagings huerfanos encolada al construir (dispatcher).
     QFuture<int> limpiezaRespaldoInicial() const { return m_limpiezaRespaldoInicial; }
+    // T025.3: "Respaldar ahora" (sin UI, KEK provista por el llamador) y el
+    // destino POSIX para una carpeta elegida.
+    respaldo::RespaldoService& respaldoService() const { return *m_respaldoService; }
+    // Id local de la instalacion (lo crea en preferencias.ini la primera vez).
+    // Hilo grafico.
+    QUuid idInstalacion() const;
+    // D21: el .partial va en <datos>/respaldo/parciales si comparte volumen.
+    std::shared_ptr<respaldo::DestinoRespaldo> crearDestinoRespaldo(const QString& carpetaAbsoluta) const;
     ConfiguracionAppService& configuracion() const;
     CredencialesSatService& credenciales() const;
     // Reconciliacion encolada al construir (T005, DA5).
@@ -277,6 +290,10 @@ private:
     std::unique_ptr<OperacionExecutor> m_ejecutor;
     // T025.2: fuente de captura del respaldo (se destruye antes que el ejecutor).
     std::unique_ptr<FuenteRespaldoLocal> m_fuenteRespaldo;
+    // T025.3 (se destruye antes que la fuente: cerrar() espera su trabajo).
+    mutable QUuid m_idInstalacion;
+    QString m_rutaPreferencias;
+    std::unique_ptr<respaldo::RespaldoService> m_respaldoService;
     std::unique_ptr<WorkerLocal> m_worker;
     std::unique_ptr<ExtensionWorker> m_extensionWorker;
     std::unique_ptr<AccionesWorker> m_accionesWorker;

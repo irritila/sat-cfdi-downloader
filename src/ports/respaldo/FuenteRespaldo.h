@@ -22,6 +22,7 @@
 #include <QStringList>
 #include <QtGlobal>
 
+#include <functional>
 #include <optional>
 #include <utility>
 
@@ -155,6 +156,11 @@ public:
     // mitad de un respaldo). Devuelve cuantos borro. No llamar con una
     // captura en curso (D18: un respaldo a la vez; al arrancar no hay otro).
     virtual int limpiarHuerfanos() = 0;
+
+    // T025.3: limpieza autonoma (equivale a limpiar()) que no depende de la
+    // vida de esta instancia. La usa el servicio de respaldo para limpiar una
+    // captura que termina despues de que el servicio la abandono al cerrar.
+    virtual std::function<void(const CapturaRespaldo&)> limpiadorAutonomo() const = 0;
 };
 
 // --- Puertos de infraestructura (implementados sobre SQLite) -----------------

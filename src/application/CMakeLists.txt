@@ -70,6 +70,9 @@ qt_add_library(satcfdi_application STATIC
     # T025.2: alimenta un EscritorRespaldo con una captura (sin archivos).
     respaldo/AlimentadorRespaldo.h
     respaldo/AlimentadorRespaldo.cpp
+    # T025.3: "Respaldar ahora" (hilo propio, D18, retencion D17).
+    respaldo/RespaldoService.h
+    respaldo/RespaldoService.cpp
     persistence/PersistenceDispatcher.h
     persistence/PersistenceDispatcher.cpp
     persistence/PuertosPersistencia.h

@@ -39,6 +39,8 @@ Hoy toda la informacion vive solo en el equipo (ADR 0002, 0004). Un respaldo a u
 | D19 | T025 es epica con T025.1 a T025.6, cada una con su ciclo de desarrollo. | Aprobada por usuario | Ronda 03; usuario 2026-10-21. |
 | D17 | Retencion solo sobre archivos `AFB1` validos creados por esta instalacion (id de instalacion en la cabecera), ordenados por (fecha UTC, id aleatorio); archivos ajenos, enlaces y `.partial` no cuentan ni se borran. Un fallo al depurar no invalida el respaldo publicado. | Recomendacion tecnica | Ronda 03 calidad. |
 | D18 | Un solo respaldo a la vez: un manual o diario solicitado durante otro en curso no inicia otro. | Recomendacion tecnica | Ronda 03 calidad. |
+| D20 | Retencion con registro local de lo publicado (nombre, idRespaldo, fecha, tamano, identificador de archivo) fuera de SQLite y del respaldo; la app nunca descarga una copia para decidir: autentica la cabecera solo si el archivo esta en disco y, si esta solo en la nube, borra solo lo que coincide con su registro. | Aprobada por usuario | Revision macOS de T025.3, 2026-10-21. |
+| D21 | El `.partial` se escribe en los datos de la app y se publica con rename exclusivo entre carpetas; si la carpeta destino esta en otro volumen, se escribe dentro de ella como antes. | Aprobada por usuario | Revision macOS de T025.3, 2026-10-21. |
 | D15 | Dos ADR: "Respaldo cifrado a carpeta sincronizada del usuario" (enmienda acotada a ADR 0004) y "Restauracion transaccional al arranque"; README y requirements aclaran que un backend propio sigue fuera de alcance. | Recomendacion tecnica | Ronda 02. |
 
 ## Subtareas

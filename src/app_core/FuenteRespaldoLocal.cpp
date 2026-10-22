@@ -272,6 +272,18 @@ int FuenteRespaldoLocal::limpiarHuerfanos()
     return m_estado->limpiarHuerfanos();
 }
 
+std::function<void(const CapturaRespaldo&)> FuenteRespaldoLocal::limpiadorAutonomo() const
+{
+    const QString raiz = raizStaging();
+    return [estado = m_estado, raiz](const CapturaRespaldo& captura) {
+        const QFileInfo info(captura.staging);
+        if (!captura.staging.isEmpty() && QDir::cleanPath(info.absolutePath()) == QDir::cleanPath(raiz)
+            && info.fileName().startsWith(QString::fromLatin1(kPrefijoCaptura))) {
+            estado->terminar(captura.staging);
+        }
+    };
+}
+
 std::function<int()> FuenteRespaldoLocal::tareaLimpiezaHuerfanos() const
 {
     return [estado = m_estado] { return estado->limpiarHuerfanos(); };

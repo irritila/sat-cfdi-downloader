@@ -36,6 +36,8 @@ qt_add_library(satcfdi_ports STATIC
     # T025.2: captura consistente para el respaldo.
     respaldo/FuenteRespaldo.h
     respaldo/FuenteRespaldo.cpp
+    # T025.3: destino del respaldo.
+    respaldo/DestinoRespaldo.h
 )
 
 set_target_properties(satcfdi_ports PROPERTIES AUTOMOC ON)

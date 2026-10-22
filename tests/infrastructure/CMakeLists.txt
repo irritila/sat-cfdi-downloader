@@ -93,6 +93,26 @@ add_test(NAME satcfdi_respaldo_captura_tests COMMAND satcfdi_respaldo_captura_te
 set_tests_properties(satcfdi_respaldo_captura_tests PROPERTIES LABELS "infrastructure;respaldo" TIMEOUT 300)
 satcfdi_enable_warnings(satcfdi_respaldo_captura_tests)
 
+# T025.3: RespaldoService con el contenedor AFB1 real, el destino POSIX real
+# (QTemporaryDir) y FakeDestinoRespaldo con inyeccion de errores. Captura
+# sintetica, sin SQLite.
+qt_add_executable(satcfdi_respaldo_servicio_tests
+    TestRespaldoService.cpp
+    ../fakes/FakeDestinoRespaldo.h
+    ../fakes/FakeProgramador.h
+)
+set_target_properties(satcfdi_respaldo_servicio_tests PROPERTIES AUTOMOC ON)
+target_include_directories(satcfdi_respaldo_servicio_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
+target_link_libraries(satcfdi_respaldo_servicio_tests PRIVATE
+    satcfdi_application
+    satcfdi_crypto
+    satcfdi_storage
+    Qt6::Test
+)
+add_test(NAME satcfdi_respaldo_servicio_tests COMMAND satcfdi_respaldo_servicio_tests)
+set_tests_properties(satcfdi_respaldo_servicio_tests PROPERTIES LABELS "infrastructure;respaldo" TIMEOUT 300)
+satcfdi_enable_warnings(satcfdi_respaldo_servicio_tests)
+
 # T015.1: LectorZipLibzip (puerto CfdiArchiveReader) con ZIP generados en la
 # prueba con libzip sobre QTemporaryDir. Ejecutable propio: no enlaza SQL y
 # es el unico target de pruebas que usa libzip directamente.

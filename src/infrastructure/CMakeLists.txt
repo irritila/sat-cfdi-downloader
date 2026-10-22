@@ -136,6 +136,9 @@ qt_add_library(satcfdi_storage STATIC
     storage/PosixFileOps.cpp
     storage/FilesystemPackageStorage.h
     storage/FilesystemPackageStorage.cpp
+    # T025.3 (D8): destino del respaldo (carpeta elegida por el usuario).
+    storage/DestinoRespaldoPosix.h
+    storage/DestinoRespaldoPosix.cpp
 )
 target_include_directories(satcfdi_storage PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/..

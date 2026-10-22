@@ -19,6 +19,10 @@
 #include "application/operaciones/OperacionExecutor.h"
 #include "application/notificaciones/ServicioNotificaciones.h"
 #include "app_core/FuenteRespaldoLocal.h"
+#include "app_core/IdInstalacionRespaldo.h"
+#include "application/respaldo/RespaldoService.h"
+#include "infrastructure/crypto/ContenedorRespaldoOpenSsl.h"
+#include "infrastructure/storage/DestinoRespaldoPosix.h"
 #include "application/estadoagregado/MonitorEstadoAgregado.h"
 #include "application/operaciones/OperacionesSatProductivo.h"
 #include "application/paquetes/AccesoPaquetesService.h"
@@ -246,6 +250,20 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
         // compartido (no el objeto) y nunca toca una captura activa, asi que una
         // captura inmediata no necesita esperarla.
         m_limpiezaRespaldoInicial = m_dispatcher->despachar<int>(m_fuenteRespaldo->tareaLimpiezaHuerfanos());
+
+        // T025.3: id local (preferencias.ini, seccion respaldo; no se
+        // respalda). Perezoso: se crea al primer respaldo o limpieza, no al
+        // arrancar (arrancar no escribe en el directorio de datos).
+        m_rutaPreferencias = QDir(QFileInfo(rutaBase).absolutePath()).filePath(QStringLiteral("preferencias.ini"));
+        respaldo::RespaldoService::Opciones opcionesServicio;
+        opcionesServicio.proveedorIdInstalacion = [this] { return idInstalacion(); };
+        // D20: registro local de lo publicado, en los datos de la app (ni en
+        // SQLite ni en el respaldo). Se crea al primer respaldo.
+        opcionesServicio.registro = std::make_shared<RegistroPublicadosJson>(
+            QDir(QFileInfo(rutaBase).absolutePath()).filePath(QStringLiteral("respaldo/publicados.json")));
+        opcionesServicio.reloj = reloj;
+        m_respaldoService = std::make_unique<respaldo::RespaldoService>(
+            *m_fuenteRespaldo, std::make_shared<crypto::ContenedorRespaldoOpenSsl>(), std::move(opcionesServicio));
     }
     m_worker = std::make_unique<WorkerLocal>(*m_ejecutor, *m_configuracionService, *programadorWorker, reloj);
     m_extensionWorker = std::make_unique<ExtensionWorker>(*m_worker, *m_ejecutor);
@@ -530,6 +548,8 @@ AppCompositionRoot::~AppCompositionRoot()
     // T025.2: la limpieza inicial termina antes de soltar la fuente (no usa
     // `this`, pero asi el cierre no deja borrados a medias).
     m_limpiezaRespaldoInicial.waitForFinished();
+    // T025.3: cancela, abandona una captura pendiente y une su hilo.
+    m_respaldoService.reset();
     m_fuenteRespaldo.reset(); // antes que el ejecutor; sus capturas en curso retienen su estado
     m_ejecutor.reset(); // ~OperacionExecutor: cancela, espera y cierra su conexion en su hilo
     m_copiaRespaldo.reset();
@@ -557,6 +577,21 @@ AppCompositionRoot::~AppCompositionRoot()
     // 3. Repositorios y proveedor.
     m_sanitizer.reset();
     m_persistencia.reset();
+}
+
+QUuid AppCompositionRoot::idInstalacion() const
+{
+    if (m_idInstalacion.isNull()) {
+        m_idInstalacion = obtenerOCrearIdInstalacion(m_rutaPreferencias);
+    }
+    return m_idInstalacion;
+}
+
+std::shared_ptr<respaldo::DestinoRespaldo> AppCompositionRoot::crearDestinoRespaldo(const QString& carpetaAbsoluta) const
+{
+    DestinoRespaldoPosix::Opciones o;
+    o.carpetaParciales = QDir(QFileInfo(m_rutaPreferencias).absolutePath()).filePath(QStringLiteral("respaldo/parciales"));
+    return std::make_shared<DestinoRespaldoPosix>(carpetaAbsoluta, std::move(o));
 }
 
 respaldo::FuenteRespaldo& AppCompositionRoot::fuenteRespaldo() const

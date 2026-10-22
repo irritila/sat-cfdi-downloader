@@ -71,6 +71,7 @@ public:
     QFuture<Resultado<respaldo::CapturaRespaldo, respaldo::ErrorCaptura>> capturar() override;
     Resultado<Exito, respaldo::ErrorCaptura> limpiar(const respaldo::CapturaRespaldo& captura) override;
     int limpiarHuerfanos() override;
+    std::function<void(const respaldo::CapturaRespaldo&)> limpiadorAutonomo() const override;
 
     // Tarea autocontenida (sin `this`) para encolar la limpieza inicial en otro
     // hilo; segura aunque esta instancia se destruya antes de que corra.

@@ -6,6 +6,7 @@
 
 #include "app_core/AppBootstrapper.h"
 #include "app_core/AppCompositionRoot.h"
+#include "application/respaldo/RespaldoService.h"
 #include "app_core/FuenteRespaldoLocal.h"
 #include "application/logging/RegexLogSanitizer.h"
 #include "application/operaciones/OperacionExecutor.h"
@@ -833,6 +834,39 @@ private slots:
         QCOMPARE(e.fuente->limpiarHuerfanos(), 1); // borra el enlace, no su destino
         QVERIFY(QFileInfo::exists(fuera));
         QVERIFY(!QFileInfo(e.raizStaging()).isSymLink());
+    }
+
+    void idInstalacionLocalPersisteYNoSeRespalda()
+    {
+        QTemporaryDir tmp;
+        QVERIFY(tmp.isValid());
+        AppBootstrapper::Opciones opciones;
+        opciones.directorioDatos = tmp.filePath(QStringLiteral("datos"));
+        const auto arranque = AppBootstrapper(opciones).preparar();
+        QVERIFY(arranque);
+        fakes::FakeSecretStore secretos;
+        fakes::FakeOperacionesSat sat;
+        OpcionesMonitoreo m;
+        m.operacionesSat = &sat;
+        QUuid primero;
+        {
+            AppCompositionRoot root(arranque.valor().rutaBase, secretos, m);
+            primero = root.idInstalacion();
+            QVERIFY(!primero.isNull());
+            auto c = root.fuenteRespaldo().capturar();
+            QVERIFY(QTest::qWaitFor([&] { return c.isFinished(); }, 30000));
+            QVERIFY(c.result());
+            // El ini tiene respaldo/idInstalacion, pero la captura no lo copia.
+            for (const auto& entrada : c.result().valor().entradas) {
+                QVERIFY(entrada.tipo != EntradaCaptura::Tipo::Preferencias);
+            }
+            QVERIFY(root.fuenteRespaldo().limpiar(c.result().valor()));
+        }
+        const QString ini = QDir(opciones.directorioDatos).filePath(QStringLiteral("preferencias.ini"));
+        QCOMPARE(QSettings(ini, QSettings::IniFormat).value(QStringLiteral("respaldo/idInstalacion")).toString(),
+                 primero.toString(QUuid::WithoutBraces));
+        AppCompositionRoot otra(arranque.valor().rutaBase, secretos, m);
+        QCOMPARE(otra.idInstalacion(), primero);
     }
 
     void limpiezaDeHuerfanosAlArrancar()

@@ -17,6 +17,9 @@ qt_add_library(satcfdi_app_core STATIC
     # T025.2: captura consistente para el respaldo (staging y preferencias).
     FuenteRespaldoLocal.h
     FuenteRespaldoLocal.cpp
+    # T025.3: id de instalacion local para reconocer los respaldos propios.
+    IdInstalacionRespaldo.h
+    IdInstalacionRespaldo.cpp
     AppLifecycleController.h
     ArranqueProceso.h
     ArranqueProceso.cpp
@@ -55,6 +58,8 @@ target_link_libraries(satcfdi_app_core
         satcfdi_infrastructure
         # T008: FilesystemPackageStorage (raiz de paquetes, D8).
         satcfdi_storage
+        # T025.3: contenedor AFB1 del respaldo (OpenSSL 3.2+).
+        satcfdi_crypto
         # T009: SatGatewayProductivo (lo usa el adaptador OperacionesSat
         # productivo en el hilo del ejecutor; nunca desde el hilo grafico).
         satcfdi_sat
