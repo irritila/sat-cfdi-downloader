@@ -67,6 +67,9 @@ qt_add_library(satcfdi_application STATIC
     primeruso/ConsultaPrimerUsoPersistida.h
     primeruso/ConsultaPrimerUsoPersistida.cpp
     paquetes/AccesoPaquetesService.cpp
+    # T025.2: alimenta un EscritorRespaldo con una captura (sin archivos).
+    respaldo/AlimentadorRespaldo.h
+    respaldo/AlimentadorRespaldo.cpp
     persistence/PersistenceDispatcher.h
     persistence/PersistenceDispatcher.cpp
     persistence/PuertosPersistencia.h

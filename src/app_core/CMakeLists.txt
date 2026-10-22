@@ -14,6 +14,9 @@ qt_add_library(satcfdi_app_core STATIC
     # T023.4: fuente de Facturas y preferencia del ultimo perfil.
     FuenteFacturasRoot.h
     FuenteFacturasRoot.cpp
+    # T025.2: captura consistente para el respaldo (staging y preferencias).
+    FuenteRespaldoLocal.h
+    FuenteRespaldoLocal.cpp
     AppLifecycleController.h
     ArranqueProceso.h
     ArranqueProceso.cpp
@@ -38,6 +41,8 @@ target_include_directories(satcfdi_app_core PUBLIC
 # El canal de instancia unica usa el mismo identificador que el bundle.
 target_compile_definitions(satcfdi_app_core PRIVATE
     SATCFDI_BUNDLE_ID="${SATCFDI_BUNDLE_IDENTIFIER}"
+    # T025.2: version de la app en los metadatos del respaldo.
+    SATCFDI_VERSION_APP="${PROJECT_VERSION}"
 )
 
 target_link_libraries(satcfdi_app_core

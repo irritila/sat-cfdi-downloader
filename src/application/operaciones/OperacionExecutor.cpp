@@ -13,6 +13,7 @@
 #include "ports/repositories/SolicitudMasivaRepository.h"
 #include "ports/repositories/UnitOfWork.h"
 
+#include <QElapsedTimer>
 #include <QHash>
 #include <QLoggingCategory>
 #include <QMetaObject>
@@ -1578,6 +1579,28 @@ QFuture<ExistenciaArchivo> OperacionExecutor::consultarExistencia(const QString&
             emit existenciaConsultada(rutaRelativa, ExistenciaArchivo::ErrorComprobacion);
             return ExistenciaArchivo::ErrorComprobacion;
         });
+}
+
+QFuture<Resultado<qint64, respaldo::ErrorCaptura>> OperacionExecutor::copiarBaseParaRespaldo(const QString& rutaDestino)
+{
+    using ResultadoCopia = Resultado<qint64, respaldo::ErrorCaptura>;
+    using CategoriaCaptura = respaldo::ErrorCaptura::Categoria;
+    return m_impl->encolar<ResultadoCopia>(
+        PrioridadOperacion::Manual, std::nullopt,
+        [this, rutaDestino](const SenalCancelacion&) {
+            if (!m_impl->p.copiaBase) {
+                return ResultadoCopia::fallo(respaldo::ErrorCaptura::de(CategoriaCaptura::EjecutorNoDisponible, QStringLiteral("sin_copia_base")));
+            }
+            QElapsedTimer cronometro;
+            cronometro.start();
+            auto r = m_impl->p.copiaBase->copiarA(rutaDestino);
+            const qint64 ms = cronometro.elapsed();
+            if (!r) {
+                return ResultadoCopia::fallo(std::move(r).error());
+            }
+            return ResultadoCopia::exito(ms);
+        },
+        [] { return ResultadoCopia::fallo(respaldo::ErrorCaptura::de(CategoriaCaptura::EjecutorNoDisponible, QStringLiteral("detenido"))); });
 }
 
 QFuture<QList<std::pair<PerfilId, EstadoCredencial>>>

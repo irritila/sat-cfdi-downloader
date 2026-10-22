@@ -767,6 +767,20 @@ private:
     bool m_finalVisto = false;
 };
 
+respaldo::HuellaArchivo huellaDe(const struct stat& st)
+{
+    respaldo::HuellaArchivo h;
+    h.tamano = static_cast<quint64>(st.st_size);
+#if defined(__APPLE__)
+    h.mtimeNs = static_cast<qint64>(st.st_mtimespec.tv_sec) * 1'000'000'000 + st.st_mtimespec.tv_nsec;
+#else
+    h.mtimeNs = static_cast<qint64>(st.st_mtim.tv_sec) * 1'000'000'000 + st.st_mtim.tv_nsec;
+#endif
+    h.inodo = static_cast<quint64>(st.st_ino);
+    h.dispositivo = static_cast<quint64>(st.st_dev);
+    return h;
+}
+
 bool mismoMtime(const struct stat& a, const struct stat& b)
 {
 #if defined(__APPLE__)
@@ -1028,7 +1042,8 @@ public:
     }
 
     ResultadoVacio agregarArchivo(const QString& rutaRelativa, const QString& raizFuente,
-                                  const QString& rutaRelativaFuente, const Cancelacion& cancelacion) override
+                                  const QString& rutaRelativaFuente, const Cancelacion& cancelacion,
+                                  const std::optional<respaldo::HuellaArchivo>& esperada) override
     {
         const QByteArray rutaUtf8 = rutaRelativa.toUtf8();
         if (auto r = admitir(rutaRelativa, rutaUtf8); !r) {
@@ -1039,6 +1054,9 @@ public:
             return ResultadoVacio::fallo(std::move(abierta).error());
         }
         FuenteAbierta fuente = std::move(abierta).valor();
+        if (esperada && !(huellaDe(fuente.estado) == *esperada)) {
+            return falla(C::FuenteCambio, "fuente.huella");
+        }
         if (auto e = errorRuta(m_rutas.agregar(rutaRelativa))) {
             return ResultadoVacio::fallo(*e);
         }

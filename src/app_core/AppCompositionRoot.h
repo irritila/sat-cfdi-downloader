@@ -62,6 +62,11 @@ class PresentacionViewModels;
 class SolicitudesService;
 class SolicitudesServicePersistido;
 class SqlitePersistencia;
+class SqliteCopiaRespaldo;
+class FuenteRespaldoLocal;
+namespace respaldo {
+class FuenteRespaldo;
+}
 
 // Composition root de T003: unico lugar que elige implementaciones concretas y
 // arma persistencia SQLite -> dispatcher -> servicios persistidos -> view
@@ -175,6 +180,10 @@ public:
     // como `~/...`. Lo consume el view model del aviso (presentacion).
     const std::optional<AvisoRaizPaquetes>& avisoRaizPaquetes() const noexcept { return m_avisoRaizPaquetes; }
     WorkerLocal& worker() const { return *m_worker; }
+    // T025.2: captura consistente para el respaldo (sin servicio ni UI aun).
+    respaldo::FuenteRespaldo& fuenteRespaldo() const;
+    // T025.2: limpieza de stagings huerfanos encolada al construir (dispatcher).
+    QFuture<int> limpiezaRespaldoInicial() const { return m_limpiezaRespaldoInicial; }
     ConfiguracionAppService& configuracion() const;
     CredencialesSatService& credenciales() const;
     // Reconciliacion encolada al construir (T005, DA5).
@@ -262,7 +271,12 @@ private:
     std::optional<AvisoRaizPaquetes> m_avisoRaizPaquetes;
     std::unique_ptr<Programador> m_programadorEjecutorPropio;
     std::unique_ptr<Programador> m_programadorWorkerPropio;
+    // T025.2: copia de la base (puerto del ejecutor y lector); vive mas que el
+    // ejecutor.
+    std::unique_ptr<SqliteCopiaRespaldo> m_copiaRespaldo;
     std::unique_ptr<OperacionExecutor> m_ejecutor;
+    // T025.2: fuente de captura del respaldo (se destruye antes que el ejecutor).
+    std::unique_ptr<FuenteRespaldoLocal> m_fuenteRespaldo;
     std::unique_ptr<WorkerLocal> m_worker;
     std::unique_ptr<ExtensionWorker> m_extensionWorker;
     std::unique_ptr<AccionesWorker> m_accionesWorker;
@@ -271,6 +285,7 @@ private:
     std::unique_ptr<AccesoPaquetesEjecutor> m_accesoPaquetes;
     std::unique_ptr<AccesoFinder> m_accesoFinder;
     bool m_monitoreoIniciado = false;
+    QFuture<int> m_limpiezaRespaldoInicial;
     std::unique_ptr<PresentacionViewModels> m_viewModels;
     std::unique_ptr<AppLifecycleController> m_controlador;
     std::unique_ptr<QQmlApplicationEngine> m_engine;

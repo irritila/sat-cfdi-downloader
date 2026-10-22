@@ -58,7 +58,7 @@ Ejemplo: `T001-modelo-fisico-sqlite.md`.
 | [T024](T024-vocabulario-y-materiales-flujo-facturas.md) | Pendiente | Vocabulario y materiales del flujo centrado en facturas |
 | [T025](T025-respaldo-en-la-nube.md) | Pendiente | Respaldo cifrado en la nube del usuario (epica) |
 | [T025.1](T025.1-formato-y-cifrado-respaldo.md) | Completada | Formato y cifrado del respaldo |
-| [T025.2](T025.2-captura-consistente.md) | Pendiente | Captura consistente de los datos |
+| [T025.2](T025.2-captura-consistente.md) | Completada | Captura consistente de los datos |
 | [T025.3](T025.3-respaldo-manual.md) | Pendiente | Respaldo manual a la carpeta elegida |
 | [T025.4](T025.4-respaldo-diario.md) | Pendiente | Configuracion y respaldo diario |
 | [T025.5](T025.5-restauracion.md) | Pendiente | Restauracion transaccional |

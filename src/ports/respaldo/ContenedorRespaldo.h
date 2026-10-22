@@ -37,6 +37,7 @@
 #include <cstddef>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <utility>
 
 QT_BEGIN_NAMESPACE
@@ -311,6 +312,18 @@ inline bool esRutaRelativaValida(QStringView ruta)
     return QString::fromUtf8(texto.toUtf8()) == texto;
 }
 
+// T025.2 (D11): huella de una fuente al congelar la captura. Si se pasa a
+// agregarArchivo y el archivo abierto no coincide (tamano, mtime en ns, inodo,
+// dispositivo), la fuente cambio despues de congelarse: FuenteCambio.
+struct HuellaArchivo {
+    quint64 tamano = 0;
+    qint64 mtimeNs = 0;
+    quint64 inodo = 0;
+    quint64 dispositivo = 0;
+
+    bool operator==(const HuellaArchivo&) const = default;
+};
+
 // Escritor en streaming de un respaldo. Lo crea ContenedorRespaldo::crearEscritor,
 // que ya escribio la cabecera. Orden: agregar*/anotarFaltante en cualquier
 // combinacion y finalizar() una vez. Tras el primer error el escritor queda
@@ -329,11 +342,13 @@ public:
     // sigue (FuenteInvalida); un FIFO o dispositivo tampoco. Si cambian tamano,
     // mtime o inodo durante la lectura, o desaparece, FuenteCambio (D11). Si no
     // existe al abrirla, FuenteFaltante (el llamador decide si anota un
-    // faltante). Errores previos a escribir (ruta, fuente, limite) no dejan el
-    // escritor fallido.
+    // faltante). Con `esperada` (T025.2), una fuente cuya huella al abrirla no
+    // coincide da FuenteCambio ("fuente.huella"). Errores previos a escribir
+    // (ruta, fuente, huella, limite) no dejan el escritor fallido.
     virtual Resultado<Exito, ErrorRespaldo> agregarArchivo(const QString& rutaRelativa, const QString& raizFuente,
                                                            const QString& rutaRelativaFuente,
-                                                           const Cancelacion& cancelacion = {}) = 0;
+                                                           const Cancelacion& cancelacion = {},
+                                                           const std::optional<HuellaArchivo>& esperada = std::nullopt) = 0;
 
     // Entrada pequena desde memoria (p. ej. preferencias filtradas, T025.2).
     virtual Resultado<Exito, ErrorRespaldo> agregarDatos(const QString& rutaRelativa, const QByteArray& datos) = 0;

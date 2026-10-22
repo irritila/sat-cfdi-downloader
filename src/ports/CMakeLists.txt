@@ -33,6 +33,9 @@ qt_add_library(satcfdi_ports STATIC
     repositories/LoteDescargaGuiadaRepository.h
     # T025.1: contenedor de respaldo cifrado AFB1.
     respaldo/ContenedorRespaldo.h
+    # T025.2: captura consistente para el respaldo.
+    respaldo/FuenteRespaldo.h
+    respaldo/FuenteRespaldo.cpp
 )
 
 set_target_properties(satcfdi_ports PROPERTIES AUTOMOC ON)

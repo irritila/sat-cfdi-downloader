@@ -33,6 +33,9 @@ qt_add_library(satcfdi_infrastructure STATIC
     persistence/sqlite/SqliteOperacionesSolicitudRepository.cpp
     persistence/sqlite/SqlitePersistencia.h
     persistence/sqlite/SqlitePersistencia.cpp
+    # T025.2: VACUUM INTO y lectura de la copia para el respaldo.
+    persistence/sqlite/SqliteCopiaRespaldo.h
+    persistence/sqlite/SqliteCopiaRespaldo.cpp
 )
 
 # Migraciones embebidas: `:/migrations/00N_*.sql` (lista en SqliteMigrationRunner.cpp).

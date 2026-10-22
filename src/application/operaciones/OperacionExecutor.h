@@ -8,6 +8,7 @@
 #include "domain/operaciones/TransicionNotificable.h"
 #include "domain/perfiles/PerfilId.h"
 #include "domain/solicitudes/SolicitudId.h"
+#include "ports/respaldo/FuenteRespaldo.h"
 #include "ports/secrets/SecretStoreTypes.h"
 
 #include <QFuture>
@@ -49,6 +50,10 @@ struct PuertosEjecutor {
     // diagnostico) y consultarExistencia devuelve ErrorComprobacion.
     PaqueteSolicitudRepository* paquetes = nullptr;
     PackageStorage* almacenamiento = nullptr;
+    // T025.2 (D10, aditivo): copia de la base para el respaldo, con la conexion
+    // del hilo del ejecutor. nullptr = copiarBaseParaRespaldo() falla con
+    // EjecutorNoDisponible.
+    respaldo::CopiaBaseDatos* copiaBase = nullptr;
 };
 
 // Ejecutor serial de operaciones criticas (T007 D5, ADR 0014/0016/0018).
@@ -157,6 +162,14 @@ public:
     // su conexion, EN ORDEN de cola (prioridad Automatica). Solo lecturas del
     // repositorio de operaciones; sin puerto ni transaccion.
     QFuture<void> leer(std::function<void(OperacionesSolicitudRepository&)> lectura);
+
+    // T025.2 (D10): copia consistente de la base (VACUUM INTO `rutaDestino`)
+    // en el hilo del ejecutor, prioridad Manual: corre detras de la operacion
+    // en curso y ninguna operacion SAT o SQLite se solapa con ella. Sin
+    // transaccion, estados, LogSolicitud ni senales. Devuelve la duracion de
+    // la operacion (pausa del ejecutor) en ms. Detenido o sin puerto:
+    // EjecutorNoDisponible.
+    QFuture<Resultado<qint64, respaldo::ErrorCaptura>> copiarBaseParaRespaldo(const QString& rutaDestino);
 
     // --- Ciclo de vida -------------------------------------------------------
 

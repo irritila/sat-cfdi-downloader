@@ -18,6 +18,7 @@
 #include "application/logging/RegexLogSanitizer.h"
 #include "application/operaciones/OperacionExecutor.h"
 #include "application/notificaciones/ServicioNotificaciones.h"
+#include "app_core/FuenteRespaldoLocal.h"
 #include "application/estadoagregado/MonitorEstadoAgregado.h"
 #include "application/operaciones/OperacionesSatProductivo.h"
 #include "application/paquetes/AccesoPaquetesService.h"
@@ -33,6 +34,7 @@
 #include "infrastructure/cfdi/xml/ParserCfdi.h"
 #include "infrastructure/cfdi/zip/ArchivosZipCfdiFs.h"
 #include "infrastructure/cfdi/zip/LectorZipLibzip.h"
+#include "infrastructure/persistence/sqlite/SqliteCopiaRespaldo.h"
 #include "infrastructure/persistence/sqlite/SqlitePersistencia.h"
 #include "infrastructure/storage/FilesystemPackageStorage.h"
 #include "infrastructure/sat/SatGatewayProductivo.h"
@@ -221,10 +223,30 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
     }
 
     SqlitePersistencia* persistencia = m_persistencia.get();
+    m_copiaRespaldo = std::make_unique<SqliteCopiaRespaldo>(p);
     PuertosEjecutor puertosEjecutor{p.solicitudes(), p.logs(), p.operaciones(), p.unidadDeTrabajo(), *m_sanitizer,
                                     *sat, [persistencia] { persistencia->cerrarConexionDelHiloActual(); },
-                                    &p.paquetes(), m_packageStorage};
+                                    &p.paquetes(), m_packageStorage, m_copiaRespaldo.get()};
     m_ejecutor = std::make_unique<OperacionExecutor>(std::move(puertosEjecutor), reloj, *programadorEjecutor);
+    // T025.2: captura del respaldo. Staging en <directorio de la base>/respaldo-tmp.
+    {
+        FuenteRespaldoLocal::Opciones opcionesRespaldo;
+        opcionesRespaldo.directorioDatos = QFileInfo(rutaBase).absolutePath();
+        opcionesRespaldo.raizPaquetes = m_raizPaquetes;
+        opcionesRespaldo.rutaPreferencias =
+            QDir(opcionesRespaldo.directorioDatos).filePath(QStringLiteral("preferencias.ini"));
+        opcionesRespaldo.versionApp = QStringLiteral(SATCFDI_VERSION_APP);
+        opcionesRespaldo.reloj = reloj;
+        // El lector (sin estado) se comparte con las continuaciones de captura,
+        // que pueden terminar despues del root.
+        m_fuenteRespaldo = std::make_unique<FuenteRespaldoLocal>(
+            *m_ejecutor, std::make_shared<SqliteLectorCopiaRespaldo>(), std::move(opcionesRespaldo));
+        // Stagings de un proceso anterior que termino a mitad de un respaldo:
+        // se borran fuera del hilo grafico. La tarea retiene el estado
+        // compartido (no el objeto) y nunca toca una captura activa, asi que una
+        // captura inmediata no necesita esperarla.
+        m_limpiezaRespaldoInicial = m_dispatcher->despachar<int>(m_fuenteRespaldo->tareaLimpiezaHuerfanos());
+    }
     m_worker = std::make_unique<WorkerLocal>(*m_ejecutor, *m_configuracionService, *programadorWorker, reloj);
     m_extensionWorker = std::make_unique<ExtensionWorker>(*m_worker, *m_ejecutor);
     m_accionesWorker = std::make_unique<AccionesWorker>(*m_worker);
@@ -505,7 +527,12 @@ AppCompositionRoot::~AppCompositionRoot()
         m_worker->detener();
     }
     m_worker.reset();
+    // T025.2: la limpieza inicial termina antes de soltar la fuente (no usa
+    // `this`, pero asi el cierre no deja borrados a medias).
+    m_limpiezaRespaldoInicial.waitForFinished();
+    m_fuenteRespaldo.reset(); // antes que el ejecutor; sus capturas en curso retienen su estado
     m_ejecutor.reset(); // ~OperacionExecutor: cancela, espera y cierra su conexion en su hilo
+    m_copiaRespaldo.reset();
     m_programadorWorkerPropio.reset();
     m_programadorEjecutorPropio.reset();
     QObject::disconnect(m_conexionInvalidarSesion);
@@ -530,6 +557,11 @@ AppCompositionRoot::~AppCompositionRoot()
     // 3. Repositorios y proveedor.
     m_sanitizer.reset();
     m_persistencia.reset();
+}
+
+respaldo::FuenteRespaldo& AppCompositionRoot::fuenteRespaldo() const
+{
+    return *m_fuenteRespaldo;
 }
 
 bool AppCompositionRoot::cargar()
