@@ -5,6 +5,11 @@ namespace satcfdi {
 // Destructor fuera de linea: ancla la vtable y el codigo MOC en satcfdi_ports.
 OSIntegration::~OSIntegration() = default;
 
+OSIntegration::ResultadoRelanzamiento OSIntegration::solicitarRelanzamiento()
+{
+    return ResultadoRelanzamiento::NoSoportado;
+}
+
 std::unique_ptr<OSIntegration::ActividadSistema> OSIntegration::iniciarActividadSistema(MotivoActividad motivo)
 {
     Q_UNUSED(motivo);

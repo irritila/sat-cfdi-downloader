@@ -1,5 +1,7 @@
 #include "AppCompositionRoot.h"
 
+#include <QCoreApplication>
+
 #include "AccesoFinder.h"
 #include "AppLifecycleController.h"
 #include "IntegracionWorker.h"
@@ -21,6 +23,10 @@
 #include "app_core/FuenteRespaldoLocal.h"
 #include "app_core/IdInstalacionRespaldo.h"
 #include "app_core/ConfiguracionRespaldoIni.h"
+#include "app_core/AreaRestauracionLocal.h"
+#include "app_core/DatosPreviosRestauracion.h"
+#include "application/respaldo/RestauracionService.h"
+#include "infrastructure/persistence/sqlite/SqliteBaseRestauracion.h"
 #include "application/respaldo/GestorRespaldo.h"
 #include "application/respaldo/ProgramadorRespaldoDiario.h"
 #include "application/respaldo/RespaldoService.h"
@@ -306,7 +312,29 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
 #endif
         m_programadorDiario = std::make_unique<respaldo::ProgramadorRespaldoDiario>(*m_gestorRespaldo, *programadorRespaldo,
                                                                                   reloj, diario);
+
+        // T025.5: restauracion. Staging y marcador junto a la base y en el
+        // volumen de la raiz efectiva de paquetes (T019).
+        respaldo::RestauracionService::Dependencias restauracion;
+        restauracion.contenedor = contenedor;
+        restauracion.area = std::make_shared<AreaRestauracionLocal>(
+            AreaRestauracionLocal::Opciones{QFileInfo(rutaBase).absolutePath(), m_raizPaquetes, {}});
+        restauracion.base = std::make_shared<SqliteBaseRestauracion>();
+        restauracion.detenerApp = [this] { return detenerParaRestaurar(); };
+        restauracion.relanzar = [this] {
+            return m_os && m_os->solicitarRelanzamiento() == OSIntegration::ResultadoRelanzamiento::Programado;
+        };
+        restauracion.salir = [this] {
+            if (m_controlador) {
+                m_controlador->solicitarSalida();
+            } else {
+                QCoreApplication::exit(0);
+            }
+        };
+        m_restauracion = std::make_unique<respaldo::RestauracionService>(std::move(restauracion));
     }
+    m_restauracionAlArrancar = monitoreo.restauracionAlArrancar;
+    m_directorioDatos = QFileInfo(rutaBase).absolutePath();
     m_worker = std::make_unique<WorkerLocal>(*m_ejecutor, *m_configuracionService, *programadorWorker, reloj);
     m_extensionWorker = std::make_unique<ExtensionWorker>(*m_worker, *m_ejecutor);
     m_accionesWorker = std::make_unique<AccionesWorker>(*m_worker);
@@ -541,7 +569,10 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
     // Primera tarea del dispatcher serial: limpia generaciones huerfanas del
     // SecretStore (residuos de fallos previos). No se espera aqui; las
     // operaciones de credencial posteriores se encolan detras.
-    m_reconciliacionInicial = m_credencialesService->reconciliar();
+    // T025.5 (D22): con datos previos de una restauracion sin descartar no se
+    // borran generaciones (las referencia la base de pre-restauracion).
+    m_reconciliacionInicial = m_credencialesService->reconciliarSalvo(
+        [datos = m_directorioDatos] { return datos_previos_restauracion::bloqueanReconciliacion(datos); });
 }
 
 AppCompositionRoot::~AppCompositionRoot()
@@ -550,6 +581,7 @@ AppCompositionRoot::~AppCompositionRoot()
     m_engine.reset();
     m_controlador.reset();
     m_viewModels.reset();
+    m_restauracion.reset(); // T025.5: sus callbacks usan este root
 
     // T007: el ejecutor termina antes que el dispatcher (y su hilo cierra su
     // propia conexion). Si la salida explicita ya lo detuvo, es inmediato.
@@ -624,6 +656,95 @@ AppCompositionRoot::~AppCompositionRoot()
     // 3. Repositorios y proveedor.
     m_sanitizer.reset();
     m_persistencia.reset();
+}
+
+QString claveEstable(ResultadoDescarteDatosPrevios::Estado e)
+{
+    using E = ResultadoDescarteDatosPrevios::Estado;
+    switch (e) {
+    case E::Descartados: return QStringLiteral("descartados");
+    case E::SinDatosPrevios: return QStringLiteral("sin_datos_previos");
+    case E::Incompleto: return QStringLiteral("incompleto");
+    case E::ErrorReconciliacion: return QStringLiteral("error_reconciliacion");
+    }
+    return QStringLiteral("incompleto");
+}
+
+QFuture<bool> AppCompositionRoot::hayDatosPrevios() const
+{
+    return QtFuture::makeReadyVoidFuture().then(QtFuture::Launch::Async, [datos = m_directorioDatos] {
+        return datos_previos_restauracion::bloqueanReconciliacion(datos);
+    });
+}
+
+QFuture<ResultadoDescarteDatosPrevios> AppCompositionRoot::descartarDatosPrevios()
+{
+    using R = ResultadoDescarteDatosPrevios;
+    const QString datos = m_directorioDatos;
+    CredencialesSatServicePersistido* credenciales = m_credencialesService.get();
+    return QtFuture::makeReadyVoidFuture()
+        .then(QtFuture::Launch::Async,
+              [datos] {
+                  const auto d = datos_previos_restauracion::descartar(datos);
+                  R r;
+                  r.carpetasBorradas = d.borradas;
+                  r.carpetasAjenas = d.ajenas;
+                  r.estado = d.fallidas > 0 ? R::Estado::Incompleto
+                             : d.borradas > 0 ? R::Estado::Descartados
+                                              : R::Estado::SinDatosPrevios;
+                  if (r.estado == R::Estado::Incompleto) {
+                      r.diagnostico = QStringLiteral("datos_previos.borrar");
+                  }
+                  qInfo("restauracion: datos previos descartados (%d carpetas; %d ajenas intactas)", d.borradas, d.ajenas);
+                  return r;
+              })
+        .then(credenciales,
+              [credenciales, datos](R r) -> QFuture<R> {
+                  if (r.estado != R::Estado::Descartados) {
+                      return QtFuture::makeReadyValueFuture(r);
+                  }
+                  return credenciales
+                      ->reconciliarSalvo([datos] { return datos_previos_restauracion::bloqueanReconciliacion(datos); })
+                      .then([r](CredencialesSatService::ResultadoReconciliacion c) mutable {
+                          if (c) {
+                              r.generacionesEliminadas = c.valor().generacionesEliminadas;
+                          } else {
+                              r.estado = R::Estado::ErrorReconciliacion;
+                              r.diagnostico = QStringLiteral("credencial.reconciliar");
+                          }
+                          return r;
+                      });
+              })
+        .unwrap();
+}
+
+QFuture<void> AppCompositionRoot::detenerParaRestaurar()
+{
+    // T025.5: nada que escriba debe seguir. El worker deja de programar y
+    // encolar; el respaldo (diario, gestor y servicio) se cierra; el indice y
+    // la vista previa se detienen; el ejecutor rechaza operaciones nuevas,
+    // pide YA la cancelacion cooperativa de la actual (plazo 0) y el future se
+    // completa cuando su hilo termino (sus resultados posteriores no se
+    // aplican: ADR 0018).
+    if (m_worker) {
+        m_worker->detener();
+    }
+    if (m_programadorDiario) {
+        m_programadorDiario.reset();
+    }
+    if (m_gestorRespaldo) {
+        m_gestorRespaldo->cerrar();
+    }
+    if (m_respaldoService) {
+        m_respaldoService->cerrar();
+    }
+    if (m_indexadorCfdi) {
+        m_indexadorCfdi->detener();
+    }
+    if (m_previsualizacionCfdi) {
+        m_previsualizacionCfdi->detener();
+    }
+    return m_ejecutor->detener(std::chrono::milliseconds(0));
 }
 
 QUuid AppCompositionRoot::idInstalacion() const

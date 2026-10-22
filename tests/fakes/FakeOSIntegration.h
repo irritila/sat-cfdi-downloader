@@ -25,6 +25,9 @@
 //   iniciarActividadSistema() devuelve un token que cuenta en
 //   actividadesActivas() mientras vive (thread-safe; el token puede vivir mas
 //   que el fake) y registra el motivo en motivosActividad.
+// - T025.5: solicitarRelanzamiento() cuenta en relanzamientosSolicitados()
+//   y devuelve `resultadoRelanzamiento` (Programado por omision). No se
+//   registra en `comandos` ni relanza nada.
 // Sin AppKit, permisos reales, timers ni sleeps.
 
 #include "ports/OSIntegration.h"
@@ -106,6 +109,15 @@ public:
         emit sistemaDesperto();
         return true;
     }
+
+    // T025.5: relanzamiento tras salir.
+    ResultadoRelanzamiento resultadoRelanzamiento = ResultadoRelanzamiento::Programado;
+    ResultadoRelanzamiento solicitarRelanzamiento() override
+    {
+        ++m_relanzamientos;
+        return resultadoRelanzamiento;
+    }
+    int relanzamientosSolicitados() const { return m_relanzamientos; }
 
     // T025.4: actividad de sistema.
     std::unique_ptr<ActividadSistema> iniciarActividadSistema(MotivoActividad motivo) override
@@ -347,6 +359,7 @@ private:
         std::shared_ptr<std::atomic<int>> m_contador;
     };
     std::shared_ptr<std::atomic<int>> m_actividades = std::make_shared<std::atomic<int>>(0);
+    int m_relanzamientos = 0;
     mutable QMutex m_mutexActividad;
     QList<MotivoActividad> m_motivosActividad;
 

@@ -38,3 +38,4 @@ Un ADR aceptado no se edita para cambiar la decision central. Si una decision ca
 | [0019](0019-cobertura-mensual-guiada-cfdi.md) | Accepted | Cobertura mensual guiada de CFDI: tramos, estados del mes, descarga guiada, catalogo y lotes (modificado por ADR 0020) |
 | [0020](0020-huecos-y-causas-superadas-cobertura-mensual.md) | Accepted | Huecos y causas superadas en la cobertura mensual (modifica ADR 0019) |
 | [0021](0021-respaldo-cifrado-a-carpeta-sincronizada.md) | Accepted | Respaldo cifrado a carpeta sincronizada del usuario (enmienda acotada a ADR 0004) |
+| [0022](0022-restauracion-transaccional-al-arranque.md) | Accepted | Restauracion transaccional al arranque: staging verificado, marcador con diario de fases y sustitucion antes de T019 y SQLite |

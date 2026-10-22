@@ -13,6 +13,9 @@
 #include <QFileInfo>
 #include <QMessageBox>
 
+#include <cstdio>
+#include <unistd.h>
+
 namespace {
 
 // Error fatal de arranque: no se carga QML contra una base no lista.
@@ -28,7 +31,7 @@ int errorFatal(const QString& mensaje)
 // Punto de entrada de satcfdi_app (T004). Orden obligatorio:
 // 1. QApplication e identidad Qt.  2. Argumentos.  3. Instancia unica (la
 // secundaria envia ActivateWindow y termina con 0 sin tocar SQLite).
-// 4. Bootstrap SQLite.  5. Composition root, OSIntegration y
+// 3b. Restauracion pendiente (T025.5).  4. Bootstrap SQLite (con T019).  5. Composition root, OSIntegration y
 // AppLifecycleController.  Cerrar la ventana la oculta; solo Salir termina.
 int main(int argc, char* argv[])
 {
@@ -51,8 +54,12 @@ int main(int argc, char* argv[])
     // despues de adquirir la instancia unica y antes de crear el worker.
     satcfdi::AppBootstrapper::Opciones arranque = std::move(opciones).valor();
     satcfdi::AppBootstrapper::configurarRaizPaquetes(arranque, QDir::homePath());
+    // T025.5 (D13): una restauracion solicitada se aplica tras adquirir la
+    // instancia unica y antes de T019, SQLite y el worker (prepararProceso).
+    const satcfdi::AplicadorRestauracion restauracion = satcfdi::aplicadorRestauracionPosix(
+        arranque.directorioDatos, !arranque.directorioDatos.isEmpty(), QDir::homePath());
     const satcfdi::AppBootstrapper bootstrapper(std::move(arranque));
-    const auto preparacion = satcfdi::prepararProceso(instancia, bootstrapper);
+    const auto preparacion = satcfdi::prepararProceso(instancia, bootstrapper, restauracion);
     switch (preparacion.tipo) {
     case satcfdi::PreparacionProceso::Tipo::Lista:
         break;
@@ -95,13 +102,30 @@ int main(int argc, char* argv[])
     monitoreo.raizPaquetes = preparacion.arranque.raizPaquetes;
     // T019 D8: aviso de conflicto o fallo de la carpeta de paquetes (UI).
     monitoreo.avisoRaizPaquetes = preparacion.arranque.resolucionRaizPaquetes.aviso;
-    satcfdi::AppCompositionRoot root(preparacion.arranque.rutaBase, *secretStore, monitoreo);
-    if (!root.cargar()) {
-        return 1;
+    if (preparacion.restauracion.estado != satcfdi::ResultadoRestauracionArranque::Estado::SinMarcador) {
+        monitoreo.restauracionAlArrancar = preparacion.restauracion;
     }
+    int codigo = 0;
+    {
+        satcfdi::AppCompositionRoot root(preparacion.arranque.rutaBase, *secretStore, monitoreo);
+        if (!root.cargar()) {
+            return 1;
+        }
 
-    QApplication::setQuitOnLastWindowClosed(false);
-    root.iniciarCicloDeVida(*os, &instancia);
+        QApplication::setQuitOnLastWindowClosed(false);
+        root.iniciarCicloDeVida(*os, &instancia);
 
-    return QApplication::exec();
+        codigo = QApplication::exec();
+    } // el root cierra el ejecutor, el dispatcher y la base
+
+    // T025.5 R2: un hilo de restauracion puede seguir bloqueado leyendo un
+    // archivo que el proveedor no entrega (fileproviderd). Ya con la base
+    // cerrada, se termina sin destructores estaticos para no esperar ni
+    // destruir objetos que ese hilo aun referencia.
+    if (satcfdi::debeTerminarSinDestructores()) {
+        qWarning("salida inmediata: hilo de restauracion aun bloqueado en lectura");
+        std::fflush(nullptr);
+        ::_exit(codigo);
+    }
+    return codigo;
 }

@@ -431,6 +431,12 @@ CredencialesSatServicePersistido::eliminar(const PerfilId& perfilId)
 
 QFuture<CredencialesSatService::ResultadoReconciliacion> CredencialesSatServicePersistido::reconciliar()
 {
+    return reconciliarSalvo({});
+}
+
+QFuture<CredencialesSatService::ResultadoReconciliacion>
+CredencialesSatServicePersistido::reconciliarSalvo(std::function<bool()> omitir)
+{
     CredencialSatRepository* credenciales = &m_credenciales;
     SecretStore* store = &m_secretStore;
     const Registro registro = m_registro;
@@ -438,6 +444,12 @@ QFuture<CredencialesSatService::ResultadoReconciliacion> CredencialesSatServiceP
     return m_dispatcher.despachar<ResultadoReconciliacion>([=]() -> ResultadoReconciliacion {
         using R = ResultadoReconciliacion;
         const QMutexLocker bloqueo(exclusion.get());
+        if (omitir && omitir()) {
+            // T025.5 (D22): hay datos previos de una restauracion; sus
+            // generaciones no se borran hasta que el usuario los descarte.
+            qInfo("credencial.reconciliar: omitida (datos previos de una restauracion sin descartar)");
+            return R::exito(ResumenReconciliacion{});
+        }
         auto vigentes = credenciales->listarReferenciasVigentes();
         if (!vigentes) {
             // Sin lista confiable no se borra nada.

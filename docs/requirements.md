@@ -494,6 +494,17 @@ Eliminar solicitud local no modifica SAT ni borra paquetes ZIP automaticamente e
 
 La aplicacion no debe borrar paquetes ZIP automaticamente. La limpieza de archivos queda bajo control del usuario.
 
+### RF-020 Restaurar un respaldo
+
+El usuario puede restaurar un respaldo cifrado (T025, ADR 0021 y ADR 0022) en la misma u otra Mac:
+
+- La app verifica todo el archivo antes de tocar nada (D5). Rechaza un respaldo de una version de la base mas nueva que la app y migra uno anterior (D13).
+- La restauracion sustituye los datos locales; no los fusiona. La sustitucion ocurre en el siguiente arranque, despues de que la app se detiene y se vuelve a abrir.
+- Los datos anteriores se conservan en carpetas `pre-restauracion-<fecha>`, en la carpeta de datos y junto a la carpeta de paquetes. Quedan hasta que el usuario los descarte.
+- La e.firma no se restaura (D3): los perfiles restaurados requieren registrarla de nuevo y no se hacen llamadas SAT hasta entonces.
+- Mientras existan datos previos sin descartar, la e.firma anterior se conserva en el almacen seguro del equipo (D22).
+- La configuracion del respaldo de este equipo (seccion `respaldo`, id de instalacion y registro de copias publicadas) no se sustituye (D14, D20).
+
 ## 14. Requerimientos no funcionales
 
 ### RNF-001 Simplicidad

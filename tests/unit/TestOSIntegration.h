@@ -26,4 +26,6 @@ private slots:
     void despertarSoloEntreInicializarYSalida();
     void actividadDeSistemaViveConElToken();
     void fakesDePlataformaDelRespaldo();
+    // T025.5: relanzamiento tras salir.
+    void relanzamientoContratoYFake();
 };

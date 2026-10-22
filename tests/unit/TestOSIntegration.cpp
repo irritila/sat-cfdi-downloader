@@ -410,3 +410,40 @@ void TestOSIntegration::fakesDePlataformaDelRespaldo()
     QCOMPARE(carpeta.crearReferencia(QStringLiteral("relativa")).error().categoria,
              ErrorCarpetaRespaldo::Categoria::RutaInvalida);
 }
+
+void TestOSIntegration::relanzamientoContratoYFake()
+{
+    using RR = OSIntegration::ResultadoRelanzamiento;
+    QCOMPARE(claves(QMetaEnum::fromType<RR>()), (QStringList{"Programado", "NoSoportado", "Fallido"}));
+
+    FakeOSIntegration os;
+    QCOMPARE(os.relanzamientosSolicitados(), 0);
+    QCOMPARE(os.solicitarRelanzamiento(), RR::Programado);
+    QCOMPARE(os.relanzamientosSolicitados(), 1);
+    os.resultadoRelanzamiento = RR::Fallido;
+    QCOMPARE(os.solicitarRelanzamiento(), RR::Fallido);
+    QCOMPARE(os.relanzamientosSolicitados(), 2);
+    QVERIFY(!os.comandos.contains(QStringLiteral("solicitarRelanzamiento")));
+
+    // Implementacion por omision del puerto (plataformas sin soporte).
+    class SinRelanzamiento final : public OSIntegration {
+    public:
+        void inicializar() override {}
+        LaunchContext launchContext() const override { return LaunchContext::Manual; }
+        LoginItemStatus loginItemStatus() const override { return LoginItemStatus::Unavailable; }
+        NotificationStatus notificationStatus() const override { return NotificationStatus::Unavailable; }
+        void configurarLoginItem(bool) override {}
+        void solicitarPermisoNotificaciones() override {}
+        void enviarNotificacionPrueba(const QString&, const QString&) override {}
+        void notificar(const NotificacionLocal&) override {}
+        void mostrarEnFinder(const QString&, const QString&) override {}
+        void abrirCarpetaEnFinder(const QString&, const QString&) override {}
+        void abrirEnVistaPrevia(const QString&, const QString&) override {}
+        void reflejarPreferenciaLoginItem(bool) override {}
+        void reflejarMonitoreoPausado(bool) override {}
+        void reflejarEstadoMonitoreo(const EstadoMonitoreo&) override {}
+        void reflejarEstadoIcono(EstadoIcono) override {}
+        void prepararSalida() override {}
+    } sinRelanzamiento;
+    QCOMPARE(sinRelanzamiento.solicitarRelanzamiento(), RR::NoSoportado);
+}

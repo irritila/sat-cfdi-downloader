@@ -43,6 +43,9 @@ qt_add_library(satcfdi_ports STATIC
     # T025.4: KEK en el almacen seguro y referencia a la carpeta de respaldo.
     respaldo/AlmacenKekRespaldo.h
     respaldo/CarpetaRespaldoSistema.h
+    # T025.5: restauracion (origen, base en staging, area y marcador).
+    respaldo/Restauracion.h
+    respaldo/Restauracion.cpp
 )
 
 set_target_properties(satcfdi_ports PROPERTIES AUTOMOC ON)

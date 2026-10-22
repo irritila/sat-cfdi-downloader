@@ -1,6 +1,7 @@
 #pragma once
 
 #include "app_core/MigracionRaizPaquetes.h"
+#include "app_core/RestauracionArranque.h"
 #include "application/persistence/PuertosPersistencia.h"
 #include "application/profiles/CredencialesSatService.h"
 #include "domain/perfiles/PerfilId.h"
@@ -74,12 +75,31 @@ class DestinoRespaldo;
 class RespaldoService;
 class ContenedorRespaldo;
 class GestorRespaldo;
+class RestauracionService;
 class ProgramadorRespaldoDiario;
 class AlmacenKekRespaldo;
 class CarpetaRespaldoSistema;
 struct EstadoRespaldoGestor;
 struct ResultadoRespaldo;
 }
+
+// T025.5 (D22): resultado de AppCompositionRoot::descartarDatosPrevios().
+struct ResultadoDescarteDatosPrevios {
+    enum class Estado {
+        Descartados,          // carpetas propias borradas y e.firma reconciliada
+        SinDatosPrevios,      // no habia carpetas propias (las ajenas no se tocan)
+        Incompleto,           // alguna carpeta propia no se pudo borrar: no se reconcilia
+        ErrorReconciliacion,  // borradas, pero la reconciliacion fallo (nada se borro del almacen)
+    };
+
+    Estado estado = Estado::SinDatosPrevios;
+    int carpetasBorradas = 0;
+    int carpetasAjenas = 0;         // `pre-restauracion-*` sin marca o enlazadas (intactas)
+    int generacionesEliminadas = 0; // de la reconciliacion
+    QString diagnostico;            // ASCII estable
+};
+
+QString claveEstable(ResultadoDescarteDatosPrevios::Estado e);
 
 // Composition root de T003: unico lugar que elige implementaciones concretas y
 // arma persistencia SQLite -> dispatcher -> servicios persistidos -> view
@@ -162,6 +182,9 @@ struct OpcionesMonitoreo {
     QString directorioTemporalPdf;
     // Limite de la cache en bytes. 0 = 200 MB (D7). Las pruebas lo reducen.
     qint64 limiteCachePdfBytes = 0;
+    // T025.5: resultado de la restauracion aplicada al arrancar
+    // (PreparacionProceso::restauracion); main lo pasa tal cual para T025.6.
+    std::optional<ResultadoRestauracionArranque> restauracionAlArrancar;
 };
 
 class AppCompositionRoot {
@@ -214,6 +237,26 @@ public:
     respaldo::GestorRespaldo& gestorRespaldo() const { return *m_gestorRespaldo; }
     respaldo::ProgramadorRespaldoDiario& programadorRespaldoDiario() const { return *m_programadorDiario; }
     QFuture<respaldo::ResultadoRespaldo> respaldarAhora();
+    // T025.5: preparar y solicitar una restauracion (sin UI aun: T025.6).
+    respaldo::RestauracionService& restauracion() const { return *m_restauracion; }
+    // T025.5: lo que hizo el arranque con una restauracion pendiente.
+    const std::optional<ResultadoRestauracionArranque>& restauracionAlArrancar() const noexcept
+    {
+        return m_restauracionAlArrancar;
+    }
+    // T025.5: detiene worker, respaldo, indice, vista previa y ejecutor
+    // (cancelacion inmediata). Lo usa RestauracionService::solicitar().
+    QFuture<void> detenerParaRestaurar();
+    // T025.5 (D22): hay carpetas `pre-restauracion-*` propias sin descartar
+    // (mientras existan no se reconcilia la e.firma). Fuera del hilo grafico;
+    // el future se completa en un hilo del pool.
+    QFuture<bool> hayDatosPrevios() const;
+    // T025.5 (D22): borra (sin seguir enlaces) solo las `pre-restauracion-*`
+    // creadas por la restauracion y, si ya no queda ninguna, reconcilia la
+    // e.firma (borra del almacen las generaciones que la base vigente no
+    // referencia). E/S en un hilo del pool; reconciliacion en el dispatcher.
+    // Llamar desde el hilo grafico.
+    QFuture<ResultadoDescarteDatosPrevios> descartarDatosPrevios();
     respaldo::EstadoRespaldoGestor estadoRespaldo() const;
     // Arranque del respaldo (en iniciarMonitoreo): configuracion, KEK
     // huerfanas, .partial propios y primera evaluacion del diario.
@@ -326,6 +369,10 @@ private:
     std::unique_ptr<respaldo::GestorRespaldo> m_gestorRespaldo;
     std::unique_ptr<respaldo::ProgramadorRespaldoDiario> m_programadorDiario;
     QFuture<int> m_arranqueRespaldo;
+    // T025.5 (se destruye primero: sus callbacks usan el root).
+    std::unique_ptr<respaldo::RestauracionService> m_restauracion;
+    std::optional<ResultadoRestauracionArranque> m_restauracionAlArrancar;
+    QString m_directorioDatos;
     std::unique_ptr<WorkerLocal> m_worker;
     std::unique_ptr<ExtensionWorker> m_extensionWorker;
     std::unique_ptr<AccionesWorker> m_accionesWorker;

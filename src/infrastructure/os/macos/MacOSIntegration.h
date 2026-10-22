@@ -73,6 +73,10 @@ public:
     // con un motivo fijo; cualquier hilo.
     std::unique_ptr<ActividadSistema> iniciarActividadSistema(MotivoActividad motivo) override;
 
+    // T025.5: proceso auxiliar separado (/bin/sh, ver Relanzamiento.h) que
+    // espera a que termine este pid y luego `open -n <bundle> --args ...`.
+    ResultadoRelanzamiento solicitarRelanzamiento() override;
+
     void prepararSalida() override;
 
 protected:

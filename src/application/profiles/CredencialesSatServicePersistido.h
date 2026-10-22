@@ -65,6 +65,11 @@ public:
     QFuture<ResultadoResumen> obtenerResumen(const PerfilId& perfilId) override;
     QFuture<ResultadoEliminacion> eliminar(const PerfilId& perfilId) override;
     QFuture<ResultadoReconciliacion> reconciliar() override;
+    // T025.5 (D22): como reconciliar(), pero `omitir` se evalua dentro de la
+    // tarea (hilo del dispatcher, bajo la exclusion): si devuelve true no se
+    // toca el almacen, se registra una linea saneada y el resultado es exito
+    // con contadores en cero.
+    QFuture<ResultadoReconciliacion> reconciliarSalvo(std::function<bool()> omitir);
     ResultadoMaterial obtenerMaterialFirma(const PerfilId& perfilId) override;
 
     // AccesoCredencialSat (T009 D5): hilo de trabajo, bajo `m_exclusion`.

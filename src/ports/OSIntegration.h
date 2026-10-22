@@ -141,6 +141,12 @@ public:
         ActividadSistema& operator=(const ActividadSistema&) = delete;
     };
 
+    // T025.5: resultado de solicitarRelanzamiento(). Programado = el
+    // relanzamiento quedo en manos de un proceso auxiliar que espera a que
+    // este proceso termine; no garantiza que la nueva instancia arranque.
+    enum class ResultadoRelanzamiento { Programado, NoSoportado, Fallido };
+    Q_ENUM(ResultadoRelanzamiento)
+
     using QObject::QObject;
     ~OSIntegration() override;
 
@@ -224,6 +230,26 @@ public:
     // desde cualquier hilo (el respaldo corre fuera del hilo grafico) y no
     // toca estado del adaptador. Implementacion por omision: token no-op.
     virtual std::unique_ptr<ActividadSistema> iniciarActividadSistema(MotivoActividad motivo);
+
+    // T025.5: pide al SO que, cuando ESTE proceso termine, vuelva a abrir la
+    // app una sola vez con los mismos argumentos (p. ej. --data-dir). Solo
+    // programa: el llamador debe salir despues por el flujo ordenado
+    // (AppLifecycleController::solicitarSalida). La nueva instancia arranca
+    // cuando el pid actual ya no existe, asi que encuentra libre el canal de
+    // SingleInstanceCoordinator; si para entonces otra instancia ya es la
+    // primaria (apertura manual), la relanzada queda como secundaria y sale,
+    // nunca hay dos primarias. Si el proceso no termina dentro de un plazo
+    // (macOS: 120 s), no se relanza.
+    // Uso en la restauracion: el marcador debe ser durable ANTES de llamar;
+    // si el relanzamiento falla o no ocurre, el marcador se aplica en el
+    // siguiente arranque manual.
+    // Hilo grafico. Idempotente: una segunda llamada devuelve el resultado de
+    // la primera sin programar otro relanzamiento. Implementacion por
+    // omision: NoSoportado. macOS tambien devuelve NoSoportado, sin programar
+    // nada, si la app corre trasladada (App Translocation, R6): la UI debe
+    // pedir que el usuario la mueva (p. ej. a Aplicaciones) y la reabra; el
+    // marcador se aplica en ese arranque manual.
+    virtual ResultadoRelanzamiento solicitarRelanzamiento();
 
     // Retira el menu bar y deja de emitir intenciones antes de terminar el
     // proceso. Idempotente. Despues solo se permite destruir el adaptador.

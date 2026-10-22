@@ -61,7 +61,7 @@ Ejemplo: `T001-modelo-fisico-sqlite.md`.
 | [T025.2](T025.2-captura-consistente.md) | Completada | Captura consistente de los datos |
 | [T025.3](T025.3-respaldo-manual.md) | Completada | Respaldo manual a la carpeta elegida |
 | [T025.4](T025.4-respaldo-diario.md) | Completada | Configuracion y respaldo diario |
-| [T025.5](T025.5-restauracion.md) | Pendiente | Restauracion transaccional |
+| [T025.5](T025.5-restauracion.md) | Completada | Restauracion transaccional |
 | [T025.6](T025.6-ui-y-documentacion-respaldo.md) | Pendiente | UI y documentacion del respaldo |
 
 ## Estados

@@ -36,6 +36,9 @@ qt_add_library(satcfdi_infrastructure STATIC
     # T025.2: VACUUM INTO y lectura de la copia para el respaldo.
     persistence/sqlite/SqliteCopiaRespaldo.h
     persistence/sqlite/SqliteCopiaRespaldo.cpp
+    # T025.5: validacion, migracion y borrado de credenciales de la copia restaurada.
+    persistence/sqlite/SqliteBaseRestauracion.h
+    persistence/sqlite/SqliteBaseRestauracion.cpp
 )
 
 # Migraciones embebidas: `:/migrations/00N_*.sql` (lista en SqliteMigrationRunner.cpp).
@@ -89,6 +92,9 @@ if(APPLE)
         os/macos/ActividadSistemaMacOS.mm
         os/macos/CarpetaRespaldoMacOS.h
         os/macos/CarpetaRespaldoMacOS.mm
+        # T025.5: comando del auxiliar de relanzamiento (C++ puro).
+        os/macos/Relanzamiento.h
+        os/macos/Relanzamiento.cpp
     )
 
     set_target_properties(satcfdi_os_macos PROPERTIES AUTOMOC ON)
@@ -145,6 +151,17 @@ if(APPLE)
     add_test(NAME satcfdi_os_macos_respaldo_tests COMMAND satcfdi_os_macos_respaldo_tests)
     set_tests_properties(satcfdi_os_macos_respaldo_tests PROPERTIES LABELS "unit;macos;respaldo")
     satcfdi_enable_warnings(satcfdi_os_macos_respaldo_tests)
+
+    # T025.5: comando del auxiliar de relanzamiento, ejecutado de verdad con
+    # un pid y un "ejecutable" sinteticos (sin lanzar la app ni `open`).
+    qt_add_executable(satcfdi_os_macos_relanzamiento_tests
+        os/macos/tests/TestRelanzamiento.cpp
+    )
+    set_target_properties(satcfdi_os_macos_relanzamiento_tests PROPERTIES AUTOMOC ON)
+    target_link_libraries(satcfdi_os_macos_relanzamiento_tests PRIVATE satcfdi_os_macos Qt6::Test)
+    add_test(NAME satcfdi_os_macos_relanzamiento_tests COMMAND satcfdi_os_macos_relanzamiento_tests)
+    set_tests_properties(satcfdi_os_macos_relanzamiento_tests PROPERTIES LABELS "unit;macos;restauracion" TIMEOUT 60)
+    satcfdi_enable_warnings(satcfdi_os_macos_relanzamiento_tests)
 endif()
 
 # --- T008 corte A (core-infra): almacenamiento local de paquetes ZIP --------

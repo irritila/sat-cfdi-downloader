@@ -23,6 +23,17 @@ qt_add_library(satcfdi_app_core STATIC
     # T025.4: configuracion del respaldo en preferencias.ini.
     ConfiguracionRespaldoIni.h
     ConfiguracionRespaldoIni.cpp
+    # T025.5: restauracion (marcador durable, staging, origen y arranque).
+    ArchivosRestauracion.h
+    ArchivosRestauracion.cpp
+    MarcadorRestauracion.h
+    MarcadorRestauracion.cpp
+    AreaRestauracionLocal.h
+    AreaRestauracionLocal.cpp
+    RestauracionArranque.h
+    RestauracionArranque.cpp
+    DatosPreviosRestauracion.h
+    DatosPreviosRestauracion.cpp
     AppLifecycleController.h
     ArranqueProceso.h
     ArranqueProceso.cpp

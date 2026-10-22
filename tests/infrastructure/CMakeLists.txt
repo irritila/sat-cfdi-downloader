@@ -135,6 +135,37 @@ add_test(NAME satcfdi_respaldo_gestor_tests COMMAND satcfdi_respaldo_gestor_test
 set_tests_properties(satcfdi_respaldo_gestor_tests PROPERTIES LABELS "infrastructure;respaldo" TIMEOUT 300)
 satcfdi_enable_warnings(satcfdi_respaldo_gestor_tests)
 
+# T025.5: restauracion transaccional. Captura real (T025.2), contenedor AFB1
+# real (T025.1), SQLite real, AreaRestauracionLocal, RestauracionArranque,
+# ejecutor real con SAT falso y el root real con FakeSatGateway. Datos
+# sinteticos en QTemporaryDir.
+qt_add_executable(satcfdi_respaldo_restauracion_tests
+    TestRestauracion.cpp
+    SqlitePruebasComun.h
+    ../fakes/FakeOperacionesSat.h
+    ../fakes/FakeOSIntegration.h
+    ../fakes/FakeProgramador.h
+    ../fakes/FakeSatGateway.h
+    ../fakes/FakeSecretStore.h
+)
+set_target_properties(satcfdi_respaldo_restauracion_tests PROPERTIES AUTOMOC ON)
+target_include_directories(satcfdi_respaldo_restauracion_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
+target_link_libraries(satcfdi_respaldo_restauracion_tests PRIVATE
+    satcfdi_app_core
+    satcfdi_crypto
+    satcfdi_storage
+    Qt6::Gui
+    Qt6::Sql
+    Qt6::Test
+)
+add_test(NAME satcfdi_respaldo_restauracion_tests COMMAND satcfdi_respaldo_restauracion_tests)
+set_tests_properties(satcfdi_respaldo_restauracion_tests PROPERTIES
+    LABELS "infrastructure;respaldo;restauracion"
+    TIMEOUT 600
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+satcfdi_enable_warnings(satcfdi_respaldo_restauracion_tests)
+
 # T015.1: LectorZipLibzip (puerto CfdiArchiveReader) con ZIP generados en la
 # prueba con libzip sobre QTemporaryDir. Ejecutable propio: no enlaza SQL y
 # es el unico target de pruebas que usa libzip directamente.

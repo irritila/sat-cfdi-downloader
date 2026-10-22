@@ -78,6 +78,9 @@ qt_add_library(satcfdi_application STATIC
     respaldo/GestorRespaldo.cpp
     respaldo/ProgramadorRespaldoDiario.h
     respaldo/ProgramadorRespaldoDiario.cpp
+    # T025.5: restauracion transaccional (preparar y solicitar).
+    respaldo/RestauracionService.h
+    respaldo/RestauracionService.cpp
     persistence/PersistenceDispatcher.h
     persistence/PersistenceDispatcher.cpp
     persistence/PuertosPersistencia.h

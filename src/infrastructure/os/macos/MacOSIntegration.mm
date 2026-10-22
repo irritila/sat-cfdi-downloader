@@ -10,6 +10,7 @@
 #include "infrastructure/os/macos/IconoMenuBar.h"
 #include "infrastructure/os/macos/MacOSIntegration.h"
 #include "infrastructure/os/macos/MacOSMapeos.h"
+#include "infrastructure/os/macos/Relanzamiento.h"
 #include "infrastructure/os/MenuBarDefinicion.h"
 
 #include <QAction>
@@ -29,11 +30,13 @@
 #include <QPair>
 #include <QPixmap>
 #include <QPointer>
+#include <QProcess>
 #include <QSystemTrayIcon>
 #include <QTimer>
 #include <QWindow>
 
 #include <cerrno>
+#include <optional>
 #include <utility>
 
 #if !__has_feature(objc_arc)
@@ -402,6 +405,8 @@ struct MacOSIntegration::Impl {
     id observadorActivacion = nil;
     // T025.4: NSWorkspaceDidWakeNotification (centro de NSWorkspace).
     id observadorDespertar = nil;
+    // T025.5: resultado del primer solicitarRelanzamiento() (idempotente).
+    std::optional<OSIntegration::ResultadoRelanzamiento> relanzamiento;
     // Serializa register/unregister/status: resultados en orden de llamada.
     dispatch_queue_t colaLoginItem = nil;
 };
@@ -1173,6 +1178,45 @@ std::unique_ptr<OSIntegration::ActividadSistema> MacOSIntegration::iniciarActivi
     // Sin estado del adaptador: seguro desde cualquier hilo.
     qCInfo(lcMacOS) << "Actividad de sistema iniciada; motivo" << motivo;
     return macos::iniciarActividadSistemaMacOS(motivo);
+}
+
+// --- Relanzamiento (T025.5) -------------------------------------------------
+
+OSIntegration::ResultadoRelanzamiento MacOSIntegration::solicitarRelanzamiento()
+{
+    if (d->relanzamiento) {
+        return *d->relanzamiento;
+    }
+    NSString* rutaBundle = [NSBundle mainBundle].bundlePath;
+    const QString bundle = d->hayBundle && rutaBundle != nil && [rutaBundle hasSuffix:@".app"]
+        ? QString::fromNSString(rutaBundle)
+        : QString();
+    const std::optional<macos::ComandoRelanzamiento> comando = macos::construirComandoRelanzamiento(
+        QCoreApplication::applicationPid(), bundle, QCoreApplication::applicationFilePath(),
+        macos::argumentosParaRelanzar(QCoreApplication::arguments()));
+    if (!comando) {
+        // R6: App Translocation; el usuario debe mover la app y reabrirla.
+        d->relanzamiento = ResultadoRelanzamiento::NoSoportado;
+        qCWarning(lcMacOS) << "Relanzamiento no soportado: la app corre trasladada (App Translocation)";
+        return *d->relanzamiento;
+    }
+
+    QProcess auxiliar;
+    auxiliar.setProgram(comando->programa);
+    auxiliar.setArguments(comando->argumentos);
+    auxiliar.setStandardInputFile(QProcess::nullDevice());
+    auxiliar.setStandardOutputFile(QProcess::nullDevice());
+    auxiliar.setStandardErrorFile(QProcess::nullDevice());
+    qint64 pidAuxiliar = 0;
+    const bool iniciado = auxiliar.startDetached(&pidAuxiliar);
+    d->relanzamiento = iniciado ? ResultadoRelanzamiento::Programado : ResultadoRelanzamiento::Fallido;
+    // Sin rutas ni argumentos en el log.
+    if (iniciado) {
+        qCInfo(lcMacOS) << "Relanzamiento programado; modo" << (bundle.isEmpty() ? "ejecutable" : "bundle");
+    } else {
+        qCWarning(lcMacOS) << "No se pudo iniciar el auxiliar de relanzamiento";
+    }
+    return *d->relanzamiento;
 }
 
 void MacOSIntegration::prepararSalida()
