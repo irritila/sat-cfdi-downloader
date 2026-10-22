@@ -41,6 +41,8 @@ namespace satcfdi {
 //   constructor (antes de terminar el arranque de AppKit) para recibir la
 //   respuesta que lanza la app; las respuestas previas a inicializar() se
 //   encolan. Las categorias con botones se registran en inicializar().
+// - T025.4: NSWorkspaceDidWakeNotification -> sistemaDesperto(), observado
+//   entre inicializar() y prepararSalida().
 class MacOSIntegration final : public OSIntegration {
     Q_OBJECT
 
@@ -66,6 +68,10 @@ public:
     void reflejarMonitoreoPausado(bool pausado) override;
     void reflejarEstadoMonitoreo(const EstadoMonitoreo& estado) override;
     void reflejarEstadoIcono(EstadoIcono estado) override;
+
+    // T025.4: NSProcessInfo beginActivityWithOptions:NSActivityUserInitiated
+    // con un motivo fijo; cualquier hilo.
+    std::unique_ptr<ActividadSistema> iniciarActividadSistema(MotivoActividad motivo) override;
 
     void prepararSalida() override;
 

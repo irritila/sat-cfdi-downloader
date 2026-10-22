@@ -160,8 +160,16 @@ public:
     // estar montado. Idempotente.
     virtual Resultado<Exito, ErrorDestino> abrir() = 0;
 
-    // "dev:ino" de la carpeta abierta (para el registro D20); vacio si no abrio.
+    // Identidad de la carpeta abierta para el registro D20; vacio si no abrio.
+    // T025.4 (N2): "vol:<UUID de volumen>:<ino>" si se conoce el UUID (estable
+    // entre montajes); si no, "dev:ino" como en T025.3.
     virtual QString identidad() const = 0;
+    // N2: true si identidad() no depende de st_dev; entonces el registro no
+    // compara el dispositivo de cada archivo (cambia entre montajes).
+    virtual bool identidadEstable() const { return false; }
+    // Forma "dev:ino" de T025.3 de la carpeta abierta, para migrar entradas
+    // antiguas del registro cuando hoy coinciden con esta misma carpeta.
+    virtual QString identidadLegada() const { return identidad(); }
 
     // Reabre la ruta y compara st_dev/st_ino con la carpeta abierta.
     virtual Resultado<Exito, ErrorDestino> comprobarIdentidad() = 0;

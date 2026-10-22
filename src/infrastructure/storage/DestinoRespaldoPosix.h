@@ -48,6 +48,9 @@ public:
         std::function<QString(int fd)> rutaDeDescriptor;
         std::function<void()> trasDesvincularPrueba;
         bool simularParcialesEnOtroVolumen = false;
+        // T025.4 (N2): UUID del volumen (de la referencia de la carpeta). Vacio
+        // = identidad "dev:ino" como en T025.3.
+        QString uuidVolumen;
     };
 
     explicit DestinoRespaldoPosix(QString carpetaAbsoluta);
@@ -61,6 +64,8 @@ public:
 
     Resultado<Exito, respaldo::ErrorDestino> abrir() override;
     QString identidad() const override;
+    bool identidadEstable() const override;
+    QString identidadLegada() const override;
     Resultado<Exito, respaldo::ErrorDestino> comprobarIdentidad() override;
     Resultado<respaldo::EstadoDestino, respaldo::ErrorDestino> validar(quint64 bytesNecesarios) override;
     Resultado<std::unique_ptr<respaldo::ArchivoParcial>, respaldo::ErrorDestino>

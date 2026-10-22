@@ -1,13 +1,16 @@
 #include "OSIntegrationFactory.h"
+#include "RespaldoPlataformaFactory.h"
 #include "SecretStoreFactory.h"
 #include "app_core/AppBootstrapper.h"
 #include "app_core/ArranqueProceso.h"
 #include "app_core/AppCompositionRoot.h"
+#include "app_core/IdInstalacionRespaldo.h"
 #include "app_core/SingleInstanceCoordinator.h"
 #include "presentation/estilo/EstiloVisual.h"
 
 #include <QApplication>
 #include <QDir>
+#include <QFileInfo>
 #include <QMessageBox>
 
 namespace {
@@ -74,7 +77,21 @@ int main(int argc, char* argv[])
         return errorFatal(QStringLiteral("El almacen de credenciales no esta disponible en esta "
                                          "plataforma."));
     }
+    // T025.4: KEK del respaldo y carpeta por bookmark; los posee main y viven
+    // mas que el root. El almacen se acota al id de instalacion (seguridad 1).
+    // obtenerOCrearIdInstalacion escribe preferencias.ini solo en el primer
+    // arranque de la instalacion (si el id falta), antes de construir el root:
+    // es el mismo id que el root usara despues (lo lee del mismo ini). El
+    // composition root sigue sin escribir archivos al construirse.
+    const QUuid idInstalacion = satcfdi::obtenerOCrearIdInstalacion(
+        QDir(QFileInfo(preparacion.arranque.rutaBase).absolutePath()).filePath(QStringLiteral("preferencias.ini")));
+    const std::unique_ptr<satcfdi::respaldo::AlmacenKekRespaldo> almacenKek =
+        satcfdi::crearAlmacenKekRespaldo(idInstalacion);
+    const std::unique_ptr<satcfdi::respaldo::CarpetaRespaldoSistema> carpetaRespaldo =
+        satcfdi::crearCarpetaRespaldoSistema();
     satcfdi::OpcionesMonitoreo monitoreo;
+    monitoreo.almacenKekRespaldo = almacenKek.get();
+    monitoreo.carpetaRespaldoSistema = carpetaRespaldo.get();
     monitoreo.raizPaquetes = preparacion.arranque.raizPaquetes;
     // T019 D8: aviso de conflicto o fallo de la carpeta de paquetes (UI).
     monitoreo.avisoRaizPaquetes = preparacion.arranque.resolucionRaizPaquetes.aviso;

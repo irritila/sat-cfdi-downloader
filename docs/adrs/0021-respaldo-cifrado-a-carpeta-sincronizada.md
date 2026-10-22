@@ -79,7 +79,11 @@ Formato propio en streaming, implementado con OpenSSL >= 3.2 en `infrastructure/
 ### KEK guardada y clave de recuperacion
 
 - La KEK de contrasena que T025.4 guarda en Keychain (ThisDeviceOnly, no sincronizable) abre todos los respaldos hechos con esa contrasena y su sal, pasados y futuros, sin pedir la contrasena. Quien obtenga esa KEK tiene el mismo alcance que quien conoce la contrasena. Por eso nunca sale del equipo ni se escribe en logs.
-- La app no guarda la clave de recuperacion: solo su KEK derivada, y solo si T025.4 lo requiere. T025.6 la muestra una vez para imprimirla o copiarla y no persiste su forma formateada (ni en preferencias, ni en logs, ni en el portapapeles mas alla de la accion explicita del usuario).
+- Para el respaldo diario sin intervencion (D4), T025.4 guarda en Keychain la KEK de contrasena vigente y la KEK derivada de la clave de recuperacion, como items del data protection keychain no sincronizables y AfterFirstUnlockThisDeviceOnly, acotados a la instalacion. Nunca se guardan la contrasena ni la clave de recuperacion formateada. Al cambiar la contrasena se borra la KEK anterior.
+- Consecuencia aceptada: quien lea el Keychain de este equipo con la sesion desbloqueada abre todos los respaldos hechos con esa clave de recuperacion, incluidos los de contrasenas anteriores. Ese mismo acceso ya permite leer en claro la base y los paquetes locales. Para retirar ese alcance hay que generar una clave de recuperacion nueva, y eso solo protege las copias futuras (D16). Una envoltura de recuperacion asimetrica, que no requiera la KEK en el equipo, queda como posible suite 2 de AFB1.
+- La reconciliacion solo borra items de esta instalacion, y solo cuando la configuracion se leyo y sus dos referencias son validas.
+- Nota: la `PeticionRespaldo` con las KEK pasa por el hilo grafico por el contrato de `RespaldoService` (respaldar() se invoca desde ahi), sin derivar ni descifrar en ese hilo, y no se copia (se mueve).
+- T025.6 muestra la clave de recuperacion una vez para imprimirla o copiarla y no persiste su forma formateada (ni en preferencias, ni en logs, ni en el portapapeles mas alla de la accion explicita del usuario).
 
 ### Responsabilidades fuera del contenedor
 

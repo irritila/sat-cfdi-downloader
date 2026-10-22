@@ -1,6 +1,10 @@
 #include "TestOSIntegration.h"
 
+#include "fakes/FakeAlmacenKekRespaldo.h"
+#include "fakes/FakeCarpetaRespaldoSistema.h"
 #include "fakes/FakeOSIntegration.h"
+
+#include <thread>
 
 #include <QCoreApplication>
 #include <QMetaEnum>
@@ -301,4 +305,108 @@ void TestOSIntegration::senalesDeEstadoCruzanConexionEncolada()
     QCoreApplication::processEvents(); // entrega los eventos ya encolados
     QCOMPARE(recibido, LS::RequiresApproval);
     QCOMPARE(permiso, NS::Denied);
+}
+
+void TestOSIntegration::despertarSoloEntreInicializarYSalida()
+{
+    FakeOSIntegration os;
+    QSignalSpy despertar(&os, &OSIntegration::sistemaDesperto);
+    QVERIFY(!os.emitirDespertar());
+    os.inicializar();
+    QVERIFY(os.emitirDespertar());
+    QVERIFY(os.emitirDespertar());
+    os.prepararSalida();
+    QVERIFY(!os.emitirDespertar());
+    QCOMPARE(despertar.count(), 2);
+}
+
+void TestOSIntegration::actividadDeSistemaViveConElToken()
+{
+    using M = OSIntegration::MotivoActividad;
+    std::unique_ptr<OSIntegration::ActividadSistema> sobreviviente;
+    {
+        FakeOSIntegration os;
+        QCOMPARE(os.actividadesActivas(), 0);
+        {
+            auto a = os.iniciarActividadSistema(M::Respaldo);
+            QVERIFY(a);
+            QCOMPARE(os.actividadesActivas(), 1);
+            // Desde otro hilo (el respaldo no corre en el grafico).
+            std::thread hilo([&os] {
+                auto b = os.iniciarActividadSistema(M::Respaldo);
+                Q_UNUSED(b);
+            });
+            hilo.join();
+            QCOMPARE(os.actividadesActivas(), 1);
+        }
+        QCOMPARE(os.actividadesActivas(), 0);
+        QCOMPARE(os.actividadesIniciadas(), 2);
+        QCOMPARE(os.motivosActividad(), (QList<M>{M::Respaldo, M::Respaldo}));
+        // El token puede vivir mas que el adaptador.
+        sobreviviente = os.iniciarActividadSistema(M::Respaldo);
+        QCOMPARE(os.actividadesActivas(), 1);
+    }
+    sobreviviente.reset();
+
+    // Implementacion por omision del puerto: token no-op, nunca nulo.
+    class Minima final : public OSIntegration {
+    public:
+        void inicializar() override {}
+        LaunchContext launchContext() const override { return LaunchContext::Manual; }
+        LoginItemStatus loginItemStatus() const override { return LoginItemStatus::Unavailable; }
+        NotificationStatus notificationStatus() const override { return NotificationStatus::Unavailable; }
+        void configurarLoginItem(bool) override {}
+        void solicitarPermisoNotificaciones() override {}
+        void enviarNotificacionPrueba(const QString&, const QString&) override {}
+        void notificar(const NotificacionLocal&) override {}
+        void mostrarEnFinder(const QString&, const QString&) override {}
+        void abrirCarpetaEnFinder(const QString&, const QString&) override {}
+        void abrirEnVistaPrevia(const QString&, const QString&) override {}
+        void reflejarPreferenciaLoginItem(bool) override {}
+        void reflejarMonitoreoPausado(bool) override {}
+        void reflejarEstadoMonitoreo(const EstadoMonitoreo&) override {}
+        void reflejarEstadoIcono(EstadoIcono) override {}
+        void prepararSalida() override {}
+    } minima;
+    QVERIFY(minima.iniciarActividadSistema(M::Respaldo));
+}
+
+void TestOSIntegration::fakesDePlataformaDelRespaldo()
+{
+    using namespace satcfdi::respaldo;
+    fakes::FakeAlmacenKekRespaldo almacen;
+    BufferSecreto clave(kTamanoKek);
+    const auto ref = almacen.guardar(KekRespaldo::desdeBytes(
+        KekRespaldo::Tipo::Contrasena, ParametrosKdf::predeterminados(QByteArray(int(kTamanoSal), 'x')),
+        std::move(clave)));
+    QVERIFY(ref.esExito());
+    QVERIFY(almacen.cargar(ref.valor()).esExito());
+    almacen.fallarEn(fakes::FakeAlmacenKekRespaldo::Operacion::Cargar, ErrorAlmacenKek::Categoria::AlmacenBloqueado);
+    QCOMPARE(almacen.cargar(ref.valor()).error().categoria, ErrorAlmacenKek::Categoria::AlmacenBloqueado);
+    QCOMPARE(almacen.guardar(KekRespaldo{}).error().categoria, ErrorAlmacenKek::Categoria::KekInvalida);
+    almacen.quitarFallos();
+
+    // Ambitos: otro fake sobre el mismo llavero no ve ni borra lo ajeno.
+    fakes::FakeAlmacenKekRespaldo otro(QStringLiteral("7e6d5c4b-3a29-4180-9f8e-7d6c5b4a3928"), almacen.llavero());
+    QCOMPARE(otro.cargar(ref.valor()).error().categoria, ErrorAlmacenKek::Categoria::NoEncontrada);
+    QVERIFY(otro.listar().valor().isEmpty());
+    QVERIFY(otro.borrar(ref.valor()).esExito());
+    QVERIFY(almacen.cargar(ref.valor()).esExito());
+    QCOMPARE(almacen.llavero()->cantidadTotal(), 1);
+    fakes::FakeAlmacenKekRespaldo invalido(QString(), almacen.llavero());
+    QCOMPARE(invalido.listar().error(), satcfdi::respaldo::errorAmbitoInvalido());
+
+    fakes::FakeCarpetaRespaldoSistema carpeta;
+    carpeta.fijarCanonica(QStringLiteral("/Users/demo/Dropbox"),
+                          QStringLiteral("/Users/demo/Library/CloudStorage/Dropbox"));
+    const auto r = carpeta.crearReferencia(QStringLiteral("/Users/demo/Dropbox"));
+    QVERIFY(r.esExito());
+    QCOMPARE(r.valor().rutaCanonica, QStringLiteral("/Users/demo/Library/CloudStorage/Dropbox"));
+    QCOMPARE(carpeta.resolver(r.valor().bookmark).valor().rutaCanonica, r.valor().rutaCanonica);
+    carpeta.fijarResolucion(r.valor().bookmark, {QStringLiteral("/Users/demo/Otra"), r.valor().uuidVolumen, true});
+    QVERIFY(carpeta.resolver(r.valor().bookmark).valor().obsoleto);
+    carpeta.fallarResolver(r.valor().bookmark, ErrorCarpetaRespaldo::Categoria::NoResuelve);
+    QCOMPARE(carpeta.resolver(r.valor().bookmark).error().categoria, ErrorCarpetaRespaldo::Categoria::NoResuelve);
+    QCOMPARE(carpeta.crearReferencia(QStringLiteral("relativa")).error().categoria,
+             ErrorCarpetaRespaldo::Categoria::RutaInvalida);
 }

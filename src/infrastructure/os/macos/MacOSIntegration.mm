@@ -6,6 +6,7 @@
 #import <ServiceManagement/ServiceManagement.h>
 #import <UserNotifications/UserNotifications.h>
 
+#include "infrastructure/os/macos/ActividadSistemaMacOS.h"
 #include "infrastructure/os/macos/IconoMenuBar.h"
 #include "infrastructure/os/macos/MacOSIntegration.h"
 #include "infrastructure/os/macos/MacOSMapeos.h"
@@ -399,6 +400,8 @@ struct MacOSIntegration::Impl {
 
     SatCfdiManejadorNativo* manejador = nil;
     id observadorActivacion = nil;
+    // T025.4: NSWorkspaceDidWakeNotification (centro de NSWorkspace).
+    id observadorDespertar = nil;
     // Serializa register/unregister/status: resultados en orden de llamada.
     dispatch_queue_t colaLoginItem = nil;
 };
@@ -622,6 +625,20 @@ void MacOSIntegration::inicializar()
                 usingBlock:^(NSNotification*) {
                     if (MacOSIntegration* adaptador = guardia.data()) {
                         adaptador->refrescarEstadosDelSistema();
+                    }
+                }];
+
+    // T025.4 (D4): despertar del reposo. Las notificaciones de NSWorkspace
+    // van a su propio centro, no al por defecto.
+    d->observadorDespertar = [[[NSWorkspace sharedWorkspace] notificationCenter]
+        addObserverForName:NSWorkspaceDidWakeNotification
+                    object:nil
+                     queue:[NSOperationQueue mainQueue]
+                usingBlock:^(NSNotification*) {
+                    MacOSIntegration* adaptador = guardia.data();
+                    if (adaptador != nullptr && !adaptador->d->saliendo) {
+                        qCInfo(lcMacOS) << "El sistema desperto del reposo";
+                        emit adaptador->sistemaDesperto();
                     }
                 }];
 
@@ -1149,6 +1166,15 @@ bool MacOSIntegration::eventFilter(QObject* objeto, QEvent* evento)
     return OSIntegration::eventFilter(objeto, evento);
 }
 
+// --- Actividad de sistema (T025.4) ------------------------------------------
+
+std::unique_ptr<OSIntegration::ActividadSistema> MacOSIntegration::iniciarActividadSistema(MotivoActividad motivo)
+{
+    // Sin estado del adaptador: seguro desde cualquier hilo.
+    qCInfo(lcMacOS) << "Actividad de sistema iniciada; motivo" << motivo;
+    return macos::iniciarActividadSistemaMacOS(motivo);
+}
+
 void MacOSIntegration::prepararSalida()
 {
     if (d->saliendo) {
@@ -1174,6 +1200,10 @@ void MacOSIntegration::prepararSalida()
     if (d->observadorActivacion != nil) {
         [[NSNotificationCenter defaultCenter] removeObserver:d->observadorActivacion];
         d->observadorActivacion = nil;
+    }
+    if (d->observadorDespertar != nil) {
+        [[[NSWorkspace sharedWorkspace] notificationCenter] removeObserver:d->observadorDespertar];
+        d->observadorDespertar = nil;
     }
     if (UNUserNotificationCenter* centro = centroNotificaciones(d->hayBundle)) {
         if (centro.delegate == d->manejador) {

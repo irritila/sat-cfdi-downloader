@@ -12,6 +12,7 @@
 #include <functional>
 #include <QUuid>
 
+#include <chrono>
 #include <memory>
 #include <optional>
 
@@ -66,11 +67,18 @@ class SolicitudesServicePersistido;
 class SqlitePersistencia;
 class SqliteCopiaRespaldo;
 class FuenteRespaldoLocal;
+class ConfiguracionRespaldoIni;
 namespace respaldo {
 class FuenteRespaldo;
 class DestinoRespaldo;
 class RespaldoService;
 class ContenedorRespaldo;
+class GestorRespaldo;
+class ProgramadorRespaldoDiario;
+class AlmacenKekRespaldo;
+class CarpetaRespaldoSistema;
+struct EstadoRespaldoGestor;
+struct ResultadoRespaldo;
 }
 
 // Composition root de T003: unico lugar que elige implementaciones concretas y
@@ -120,6 +128,16 @@ struct OpcionesMonitoreo {
     // pasa resolverRaiz(dataDir, home) (D8).
     PackageStorage* packageStorage = nullptr;
     QString raizPaquetes;
+    // T025.4: almacen de KEK (Keychain) y referencia de carpeta (bookmark).
+    // Nulos = plataforma sin respaldo diario (el gestor informa NoDisponible).
+    // main los crea en macOS; las pruebas inyectan fakes.
+    respaldo::AlmacenKekRespaldo* almacenKekRespaldo = nullptr;
+    respaldo::CarpetaRespaldoSistema* carpetaRespaldoSistema = nullptr;
+    // T025.4: programador del respaldo diario. Nulo = ProgramadorQt propio.
+    Programador* programadorRespaldo = nullptr;
+    // Intervalo del diario (0 = 24 h). En Debug, la variable de entorno
+    // SATCFDI_RESPALDO_INTERVALO_PRUEBA_S lo reemplaza (verificacion manual).
+    std::chrono::seconds intervaloRespaldoDiario{0};
     // T019 D8: aviso de la resolucion de la raiz (ArranquePreparado::
     // resolucionRaizPaquetes.aviso); main lo pasa tal cual. Vacio = sin aviso.
     std::optional<AvisoRaizPaquetes> avisoRaizPaquetes;
@@ -192,6 +210,14 @@ public:
     // T025.3: "Respaldar ahora" (sin UI, KEK provista por el llamador) y el
     // destino POSIX para una carpeta elegida.
     respaldo::RespaldoService& respaldoService() const { return *m_respaldoService; }
+    // T025.4: configuracion, "respaldar ahora" y estado para T025.6.
+    respaldo::GestorRespaldo& gestorRespaldo() const { return *m_gestorRespaldo; }
+    respaldo::ProgramadorRespaldoDiario& programadorRespaldoDiario() const { return *m_programadorDiario; }
+    QFuture<respaldo::ResultadoRespaldo> respaldarAhora();
+    respaldo::EstadoRespaldoGestor estadoRespaldo() const;
+    // Arranque del respaldo (en iniciarMonitoreo): configuracion, KEK
+    // huerfanas, .partial propios y primera evaluacion del diario.
+    QFuture<int> arranqueRespaldo() const { return m_arranqueRespaldo; }
     // Id local de la instalacion (lo crea en preferencias.ini la primera vez).
     // Hilo grafico.
     QUuid idInstalacion() const;
@@ -294,6 +320,12 @@ private:
     mutable QUuid m_idInstalacion;
     QString m_rutaPreferencias;
     std::unique_ptr<respaldo::RespaldoService> m_respaldoService;
+    // T025.4 (destruccion: diario -> gestor -> servicio).
+    std::unique_ptr<ConfiguracionRespaldoIni> m_configuracionRespaldo;
+    std::unique_ptr<Programador> m_programadorRespaldoPropio;
+    std::unique_ptr<respaldo::GestorRespaldo> m_gestorRespaldo;
+    std::unique_ptr<respaldo::ProgramadorRespaldoDiario> m_programadorDiario;
+    QFuture<int> m_arranqueRespaldo;
     std::unique_ptr<WorkerLocal> m_worker;
     std::unique_ptr<ExtensionWorker> m_extensionWorker;
     std::unique_ptr<AccionesWorker> m_accionesWorker;

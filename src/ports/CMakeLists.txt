@@ -38,6 +38,11 @@ qt_add_library(satcfdi_ports STATIC
     respaldo/FuenteRespaldo.cpp
     # T025.3: destino del respaldo.
     respaldo/DestinoRespaldo.h
+    # T025.4: configuracion local del respaldo.
+    respaldo/ConfiguracionRespaldo.h
+    # T025.4: KEK en el almacen seguro y referencia a la carpeta de respaldo.
+    respaldo/AlmacenKekRespaldo.h
+    respaldo/CarpetaRespaldoSistema.h
 )
 
 set_target_properties(satcfdi_ports PROPERTIES AUTOMOC ON)

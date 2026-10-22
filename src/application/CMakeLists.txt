@@ -73,6 +73,11 @@ qt_add_library(satcfdi_application STATIC
     # T025.3: "Respaldar ahora" (hilo propio, D18, retencion D17).
     respaldo/RespaldoService.h
     respaldo/RespaldoService.cpp
+    # T025.4: configuracion (carpeta, KEK) y respaldo diario.
+    respaldo/GestorRespaldo.h
+    respaldo/GestorRespaldo.cpp
+    respaldo/ProgramadorRespaldoDiario.h
+    respaldo/ProgramadorRespaldoDiario.cpp
     persistence/PersistenceDispatcher.h
     persistence/PersistenceDispatcher.cpp
     persistence/PuertosPersistencia.h

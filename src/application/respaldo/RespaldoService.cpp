@@ -429,6 +429,18 @@ void RespaldoService::Impl::depurar(DestinoRespaldo& destino, const PeticionResp
         return;
     }
     const QString carpeta = destino.identidad();
+    // N2 (T025.4): entradas antiguas "dev:ino" que HOY son esta misma carpeta
+    // se migran a la identidad estable; cualquier otra antigua se ignora (no
+    // coincide con nada y nunca provoca un borrado).
+    const QString legada = destino.identidadLegada();
+    if (destino.identidadEstable() && !legada.isEmpty() && legada != carpeta) {
+        for (EntradaPublicada& pub : registro.publicados) {
+            if (pub.carpeta == legada) {
+                pub.carpeta = carpeta;
+            }
+        }
+    }
+    const bool compararDispositivo = !destino.identidadEstable();
     struct Copia {
         QDateTime fecha;
         QByteArray id;
@@ -477,7 +489,7 @@ void RespaldoService::Impl::depurar(DestinoRespaldo& destino, const PeticionResp
             const EntradaPublicada* coincidencia = nullptr;
             for (const EntradaPublicada& pub : registro.publicados) {
                 if (pub.carpeta == carpeta && pub.nombre == e.nombre && pub.tamano == e.tamano
-                    && pub.dispositivo == e.dispositivo && pub.inodo == e.inodo) {
+                    && (!compararDispositivo || pub.dispositivo == e.dispositivo) && pub.inodo == e.inodo) {
                     coincidencia = &pub;
                     break;
                 }

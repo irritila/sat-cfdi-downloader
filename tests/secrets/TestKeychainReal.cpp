@@ -6,10 +6,15 @@
 
 #include "FixturesEFirma.h"
 
+#include "infrastructure/secrets/macos/AlmacenKekRespaldoMacOS.h"
 #include "infrastructure/secrets/macos/KeychainApiMacOS.h"
 #include "infrastructure/secrets/macos/MacOSSecretStore.h"
 
+#include <CoreFoundation/CoreFoundation.h>
+#include <Security/Security.h>
+
 #include <QRandomGenerator>
+#include <QUuid>
 #include <QTest>
 
 using namespace satcfdi;
@@ -20,6 +25,7 @@ class TestKeychainReal : public QObject {
 
 private:
     QString m_bundle;
+    const QString m_ambitoKek = QUuid::createUuid().toString(QUuid::WithoutBraces);
     std::shared_ptr<secrets::KeychainApiMacOS> m_api = std::make_shared<secrets::KeychainApiMacOS>();
 
     bool noAplica(std::int32_t status) const
@@ -41,7 +47,8 @@ private slots:
         // Barrido del namespace aislado (best effort).
         for (const QString& servicio : {m_bundle + QStringLiteral(".efirma.v1.password"),
                                         m_bundle + QStringLiteral(".efirma.v1.wrapping-key"),
-                                        m_bundle + QStringLiteral(".api")}) {
+                                        m_bundle + QStringLiteral(".api"),
+                                        m_bundle + QStringLiteral(".respaldo.v1.kek.") + m_ambitoKek}) {
             QStringList cuentas;
             if (m_api->listarCuentas(servicio, cuentas) == os::kSuccess) {
                 for (const QString& c : std::as_const(cuentas)) {
@@ -97,6 +104,73 @@ private slots:
         QVERIFY(rec.esExito());
         QCOMPARE(rec.valor().generacionesEliminadas, 1);
         QCOMPARE(store.obtenerEstado(ref, fixtures::ahoraVigente()).valor(), EstadoCredencial::MaterialFaltante);
+    }
+
+    // T025.4 (D4): ida y vuelta de la KEK del respaldo y atributos del item
+    // leidos del propio Keychain: no sincronizable y ThisDeviceOnly.
+    void kekRespaldoNoSincronizableThisDeviceOnly()
+    {
+        using namespace satcfdi::respaldo;
+        secrets::AlmacenKekRespaldoMacOS almacen(m_bundle, m_ambitoKek, m_api);
+        QByteArray sal(int(kTamanoSal), '\x5a');
+        BufferSecreto clave(kTamanoKek);
+        for (std::size_t i = 0; i < kTamanoKek; ++i) {
+            clave.datos()[i] = static_cast<std::uint8_t>(0x30 + i);
+        }
+        const KekRespaldo kek = KekRespaldo::desdeBytes(KekRespaldo::Tipo::Contrasena,
+                                                        ParametrosKdf::predeterminados(sal), std::move(clave));
+        QVERIFY(kek.valida());
+        const auto ref = almacen.guardar(kek);
+        if (!ref.esExito() && ref.error().codigoNativo && noAplica(*ref.error().codigoNativo)) {
+            QSKIP(qPrintable(QStringLiteral("Keychain real no aplica (OSStatus %1)").arg(*ref.error().codigoNativo)));
+        }
+        QVERIFY(ref.esExito());
+
+        const auto cargada = almacen.cargar(ref.valor());
+        QVERIFY(cargada.esExito());
+        QCOMPARE(cargada.valor().parametros(), kek.parametros());
+        QVERIFY(cargada.valor().clave().igualA(kek.clave().datos(), kek.clave().tamano()));
+
+        // Atributos tal como los guardo Keychain (consulta independiente del
+        // adaptador; kSecAttrSynchronizableAny para no filtrar por el valor).
+        CFMutableDictionaryRef q = CFDictionaryCreateMutable(kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks,
+                                                             &kCFTypeDictionaryValueCallBacks);
+        CFStringRef servicio = almacen.servicio().toCFString();
+        CFStringRef cuenta = ref.valor().texto().toCFString();
+        CFDictionarySetValue(q, kSecClass, kSecClassGenericPassword);
+        CFDictionarySetValue(q, kSecAttrService, servicio);
+        CFDictionarySetValue(q, kSecAttrAccount, cuenta);
+        CFDictionarySetValue(q, kSecUseDataProtectionKeychain, kCFBooleanTrue);
+        CFDictionarySetValue(q, kSecAttrSynchronizable, kSecAttrSynchronizableAny);
+        CFDictionarySetValue(q, kSecReturnAttributes, kCFBooleanTrue);
+        CFDictionarySetValue(q, kSecMatchLimit, kSecMatchLimitOne);
+        CFTypeRef resultado = nullptr;
+        const OSStatus status = SecItemCopyMatching(q, &resultado);
+        CFRelease(q);
+        CFRelease(servicio);
+        CFRelease(cuenta);
+        QCOMPARE(status, errSecSuccess);
+        QVERIFY(resultado != nullptr && CFGetTypeID(resultado) == CFDictionaryGetTypeID());
+        const auto atributos = static_cast<CFDictionaryRef>(resultado);
+        const CFTypeRef sincronizable = CFDictionaryGetValue(atributos, kSecAttrSynchronizable);
+        const CFTypeRef accesible = CFDictionaryGetValue(atributos, kSecAttrAccessible);
+        // Ausente equivale a no sincronizable; si viene, debe ser false.
+        const bool noSincronizable = sincronizable == nullptr
+            || (CFGetTypeID(sincronizable) == CFBooleanGetTypeID()
+                && !CFBooleanGetValue(static_cast<CFBooleanRef>(sincronizable)))
+            || (CFGetTypeID(sincronizable) == CFNumberGetTypeID() && [&] {
+                   int v = -1;
+                   CFNumberGetValue(static_cast<CFNumberRef>(sincronizable), kCFNumberIntType, &v);
+                   return v == 0;
+               }());
+        const bool thisDeviceOnly =
+            accesible != nullptr && CFEqual(accesible, kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly);
+        CFRelease(resultado);
+        QVERIFY(noSincronizable);
+        QVERIFY(thisDeviceOnly);
+
+        QVERIFY(almacen.borrar(ref.valor()).esExito());
+        QCOMPARE(almacen.cargar(ref.valor()).error().categoria, ErrorAlmacenKek::Categoria::NoEncontrada);
     }
 };
 

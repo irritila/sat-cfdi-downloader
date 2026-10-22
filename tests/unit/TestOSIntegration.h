@@ -22,4 +22,8 @@ private slots:
     void comandosPendientesSeCompletanBajoControl();
     void reflejarYPrepararSalidaSoloRegistran();
     void senalesDeEstadoCruzanConexionEncolada();
+    // T025.4: despertar del sistema, actividad de sistema y fakes del respaldo.
+    void despertarSoloEntreInicializarYSalida();
+    void actividadDeSistemaViveConElToken();
+    void fakesDePlataformaDelRespaldo();
 };

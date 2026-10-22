@@ -20,6 +20,9 @@ qt_add_library(satcfdi_app_core STATIC
     # T025.3: id de instalacion local para reconocer los respaldos propios.
     IdInstalacionRespaldo.h
     IdInstalacionRespaldo.cpp
+    # T025.4: configuracion del respaldo en preferencias.ini.
+    ConfiguracionRespaldoIni.h
+    ConfiguracionRespaldoIni.cpp
     AppLifecycleController.h
     ArranqueProceso.h
     ArranqueProceso.cpp

@@ -20,6 +20,9 @@
 #include "application/notificaciones/ServicioNotificaciones.h"
 #include "app_core/FuenteRespaldoLocal.h"
 #include "app_core/IdInstalacionRespaldo.h"
+#include "app_core/ConfiguracionRespaldoIni.h"
+#include "application/respaldo/GestorRespaldo.h"
+#include "application/respaldo/ProgramadorRespaldoDiario.h"
 #include "application/respaldo/RespaldoService.h"
 #include "infrastructure/crypto/ContenedorRespaldoOpenSsl.h"
 #include "infrastructure/storage/DestinoRespaldoPosix.h"
@@ -262,8 +265,47 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
         opcionesServicio.registro = std::make_shared<RegistroPublicadosJson>(
             QDir(QFileInfo(rutaBase).absolutePath()).filePath(QStringLiteral("respaldo/publicados.json")));
         opcionesServicio.reloj = reloj;
-        m_respaldoService = std::make_unique<respaldo::RespaldoService>(
-            *m_fuenteRespaldo, std::make_shared<crypto::ContenedorRespaldoOpenSsl>(), std::move(opcionesServicio));
+        auto contenedor = std::make_shared<crypto::ContenedorRespaldoOpenSsl>();
+        m_respaldoService = std::make_unique<respaldo::RespaldoService>(*m_fuenteRespaldo, contenedor,
+                                                                        std::move(opcionesServicio));
+
+        // T025.4: configuracion local, KEK y diario.
+        m_configuracionRespaldo = std::make_unique<ConfiguracionRespaldoIni>(m_rutaPreferencias);
+        respaldo::GestorRespaldo::Dependencias dependencias;
+        dependencias.configuracion = m_configuracionRespaldo.get();
+        dependencias.almacenKek = monitoreo.almacenKekRespaldo;
+        dependencias.carpetas = monitoreo.carpetaRespaldoSistema;
+        dependencias.contenedor = contenedor;
+        dependencias.servicio = m_respaldoService.get();
+        const QString parciales =
+            QDir(QFileInfo(rutaBase).absolutePath()).filePath(QStringLiteral("respaldo/parciales"));
+        dependencias.fabricaDestino = [parciales](const QString& ruta, const QString& uuidVolumen) {
+            DestinoRespaldoPosix::Opciones o;
+            o.carpetaParciales = parciales;
+            o.uuidVolumen = uuidVolumen;
+            return std::shared_ptr<respaldo::DestinoRespaldo>(std::make_shared<DestinoRespaldoPosix>(ruta, std::move(o)));
+        };
+        dependencias.reloj = reloj;
+        m_gestorRespaldo = std::make_unique<respaldo::GestorRespaldo>(std::move(dependencias));
+        Programador* programadorRespaldo = monitoreo.programadorRespaldo;
+        if (!programadorRespaldo) {
+            m_programadorRespaldoPropio = std::make_unique<ProgramadorQt>(reloj);
+            programadorRespaldo = m_programadorRespaldoPropio.get();
+        }
+        respaldo::ProgramadorRespaldoDiario::Opciones diario;
+        if (monitoreo.intervaloRespaldoDiario.count() > 0) {
+            diario.intervalo = monitoreo.intervaloRespaldoDiario;
+        }
+#if !defined(NDEBUG)
+        // Solo Debug: verificacion manual del despertar y de `pmset` antes de
+        // T025.6 (p. ej. 120 s). Nunca en Release.
+        if (const int prueba = qEnvironmentVariableIntValue("SATCFDI_RESPALDO_INTERVALO_PRUEBA_S"); prueba > 0) {
+            diario.intervalo = std::chrono::seconds(prueba);
+            diario.esperaTrasFallo = std::chrono::seconds(prueba);
+        }
+#endif
+        m_programadorDiario = std::make_unique<respaldo::ProgramadorRespaldoDiario>(*m_gestorRespaldo, *programadorRespaldo,
+                                                                                  reloj, diario);
     }
     m_worker = std::make_unique<WorkerLocal>(*m_ejecutor, *m_configuracionService, *programadorWorker, reloj);
     m_extensionWorker = std::make_unique<ExtensionWorker>(*m_worker, *m_ejecutor);
@@ -548,8 +590,13 @@ AppCompositionRoot::~AppCompositionRoot()
     // T025.2: la limpieza inicial termina antes de soltar la fuente (no usa
     // `this`, pero asi el cierre no deja borrados a medias).
     m_limpiezaRespaldoInicial.waitForFinished();
+    // T025.4: diario y gestor antes que el servicio (el gestor une su hilo).
+    m_programadorDiario.reset();
+    m_gestorRespaldo.reset();
+    m_programadorRespaldoPropio.reset();
     // T025.3: cancela, abandona una captura pendiente y une su hilo.
     m_respaldoService.reset();
+    m_configuracionRespaldo.reset();
     m_fuenteRespaldo.reset(); // antes que el ejecutor; sus capturas en curso retienen su estado
     m_ejecutor.reset(); // ~OperacionExecutor: cancela, espera y cierra su conexion en su hilo
     m_copiaRespaldo.reset();
@@ -616,6 +663,21 @@ void AppCompositionRoot::iniciarMonitoreo()
     m_worker->iniciar(); // recuperacion (D9) y primer ciclo
     m_avisoVencimiento->iniciar(); // T014.3: al arrancar y cada 24 h
     m_indexadorCfdi->iniciar();    // T015.2 (a)+(d): pasada inicial del indice
+    // T025.4: configuracion, KEK huerfanas, .partial propios (fuera del hilo
+    // grafico) y despues la primera evaluacion del diario.
+    respaldo::ProgramadorRespaldoDiario* diario = m_programadorDiario.get();
+    m_arranqueRespaldo = m_gestorRespaldo->iniciar();
+    m_arranqueRespaldo.then(m_programadorDiario.get(), [diario](int) { diario->evaluar(); });
+}
+
+QFuture<respaldo::ResultadoRespaldo> AppCompositionRoot::respaldarAhora()
+{
+    return m_gestorRespaldo->respaldarAhora();
+}
+
+respaldo::EstadoRespaldoGestor AppCompositionRoot::estadoRespaldo() const
+{
+    return m_gestorRespaldo->estado();
 }
 
 ConsultaPrimerUso& AppCompositionRoot::consultaPrimerUso() const
@@ -640,6 +702,10 @@ AppLifecycleController& AppCompositionRoot::iniciarCicloDeVida(OSIntegration& os
     // T009: notificaciones (credencial aqui; las de solicitud las decide el
     // servicio de aplicacion) y aviso de notificaciones deshabilitadas.
     m_os = &os;
+    // T025.4: actividad de sistema durante cada respaldo y diario al despertar.
+    m_gestorRespaldo->fijarOS(&os);
+    QObject::connect(&os, &OSIntegration::sistemaDesperto, m_programadorDiario.get(),
+                     &respaldo::ProgramadorRespaldoDiario::evaluar);
     m_notificador->setOS(&os);
     m_accesoFinder->setOS(&os);
     AppViewModel* app = m_viewModels->app();

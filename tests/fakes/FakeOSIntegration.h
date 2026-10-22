@@ -20,16 +20,25 @@
 //   inicializar(); despues de inicializar() se emite de inmediato; tras
 //   prepararSalida() se descarta. reflejarEstadoIcono() guarda el historial en
 //   estadosIcono/estadoIcono (no en `comandos`).
+// - T025.4: emitirDespertar() simula NSWorkspaceDidWakeNotification (solo
+//   entre inicializar() y prepararSalida(), como el adaptador real).
+//   iniciarActividadSistema() devuelve un token que cuenta en
+//   actividadesActivas() mientras vive (thread-safe; el token puede vivir mas
+//   que el fake) y registra el motivo en motivosActividad.
 // Sin AppKit, permisos reales, timers ni sleeps.
 
 #include "ports/OSIntegration.h"
 
 #include <QList>
 #include <QMetaObject>
+#include <QMutex>
+#include <QMutexLocker>
 #include <QPair>
 #include <QString>
 #include <QStringList>
 
+#include <atomic>
+#include <memory>
 #include <optional>
 #include <utility>
 
@@ -87,6 +96,37 @@ public:
     void emitirNotificacionPrueba() { emit notificacionPruebaSolicitada(); }
     void emitirSalir() { emit salirSolicitado(); }
     void emitirActivarVentana() { emit activarVentanaSolicitada(); }
+    // T025.4: despertar del sistema. Devuelve false si el adaptador real no
+    // la habria emitido (antes de inicializar() o tras prepararSalida()).
+    bool emitirDespertar()
+    {
+        if (!inicializado || salidaPreparada) {
+            return false;
+        }
+        emit sistemaDesperto();
+        return true;
+    }
+
+    // T025.4: actividad de sistema.
+    std::unique_ptr<ActividadSistema> iniciarActividadSistema(MotivoActividad motivo) override
+    {
+        {
+            QMutexLocker l(&m_mutexActividad);
+            m_motivosActividad.append(motivo);
+        }
+        return std::make_unique<ActividadFake>(m_actividades);
+    }
+    int actividadesActivas() const { return m_actividades->load(); }
+    int actividadesIniciadas() const
+    {
+        QMutexLocker l(&m_mutexActividad);
+        return int(m_motivosActividad.size());
+    }
+    QList<MotivoActividad> motivosActividad() const
+    {
+        QMutexLocker l(&m_mutexActividad);
+        return m_motivosActividad;
+    }
 
     // T014.4: respuesta del usuario a una notificacion.
     void simularActivacionNotificacion(const DestinoNotificacion& destino,
@@ -294,6 +334,22 @@ public:
     }
 
 private:
+    class ActividadFake final : public ActividadSistema {
+    public:
+        explicit ActividadFake(std::shared_ptr<std::atomic<int>> contador)
+            : m_contador(std::move(contador))
+        {
+            ++*m_contador;
+        }
+        ~ActividadFake() override { --*m_contador; }
+
+    private:
+        std::shared_ptr<std::atomic<int>> m_contador;
+    };
+    std::shared_ptr<std::atomic<int>> m_actividades = std::make_shared<std::atomic<int>>(0);
+    mutable QMutex m_mutexActividad;
+    QList<MotivoActividad> m_motivosActividad;
+
     static QString texto(bool b) { return b ? QStringLiteral("true") : QStringLiteral("false"); }
 
     void resolverLoginItem(bool habilitar)

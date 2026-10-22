@@ -53,6 +53,18 @@ if(APPLE)
     set_tests_properties(satcfdi_secrets_macos_tests PROPERTIES LABELS "secrets;infrastructure")
     satcfdi_enable_warnings(satcfdi_secrets_macos_tests)
 
+    # T025.4: AlmacenKekRespaldoMacOS con FakeKeychainApi (formato, errores,
+    # servicio propio). La ida y vuelta real vive en satcfdi_keychain_real_tests.
+    qt_add_executable(satcfdi_kek_respaldo_tests
+        TestAlmacenKekRespaldo.cpp
+        FakeKeychainApi.h
+    )
+    set_target_properties(satcfdi_kek_respaldo_tests PROPERTIES AUTOMOC ON)
+    target_link_libraries(satcfdi_kek_respaldo_tests PRIVATE satcfdi_secrets_macos Qt6::Test)
+    add_test(NAME satcfdi_kek_respaldo_tests COMMAND satcfdi_kek_respaldo_tests)
+    set_tests_properties(satcfdi_kek_respaldo_tests PROPERTIES LABELS "secrets;infrastructure;respaldo")
+    satcfdi_enable_warnings(satcfdi_kek_respaldo_tests)
+
     # Keychain real (DA8): apagado por defecto. Requiere sesion grafica y, para
     # el data protection keychain, ejecutable firmado con entitlements; si no,
     # la prueba hace QSKIP.
@@ -64,7 +76,9 @@ if(APPLE)
         )
         set_target_properties(satcfdi_keychain_real_tests PROPERTIES AUTOMOC ON)
         target_compile_definitions(satcfdi_keychain_real_tests PRIVATE ${_satcfdi_fixtures_defs})
-        target_link_libraries(satcfdi_keychain_real_tests PRIVATE satcfdi_secrets_macos Qt6::Test)
+        # Security/CoreFoundation: T025.4 lee los atributos del item de la KEK.
+        target_link_libraries(satcfdi_keychain_real_tests PRIVATE satcfdi_secrets_macos Qt6::Test
+                              "-framework Security" "-framework CoreFoundation")
         satcfdi_enable_warnings(satcfdi_keychain_real_tests)
 
         # Firma (T005 corte G): con las tres opciones de firma de la raiz, la

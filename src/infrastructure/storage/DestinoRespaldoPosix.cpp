@@ -483,6 +483,22 @@ QString DestinoRespaldoPosix::identidad() const
     if (!m_estado->carpeta.valido()) {
         return {};
     }
+    if (identidadEstable()) {
+        return QStringLiteral("vol:%1:%2").arg(m_estado->opciones.uuidVolumen).arg(m_estado->inodo);
+    }
+    return identidadLegada();
+}
+
+bool DestinoRespaldoPosix::identidadEstable() const
+{
+    return !m_estado->opciones.uuidVolumen.isEmpty();
+}
+
+QString DestinoRespaldoPosix::identidadLegada() const
+{
+    if (!m_estado->carpeta.valido()) {
+        return {};
+    }
     return QStringLiteral("%1:%2").arg(m_estado->dispositivo).arg(m_estado->inodo);
 }
 

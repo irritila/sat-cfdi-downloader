@@ -5,6 +5,8 @@
 #include <QObject>
 #include <QString>
 
+#include <memory>
+
 namespace satcfdi {
 
 // Puerto de integracion con el sistema operativo (ADR 0009, T004): menu bar,
@@ -119,6 +121,26 @@ public:
         friend bool operator==(const NotificacionLocal&, const NotificacionLocal&) = default;
     };
 
+    // T025.4 (ADR 0009): motivo de una actividad de sistema. El adaptador lo
+    // traduce a un texto fijo sin datos personales (visible en
+    // `pmset -g assertions`).
+    enum class MotivoActividad { Respaldo };
+    Q_ENUM(MotivoActividad)
+
+    // T025.4: token RAII de una actividad de sistema. Mientras vive, el SO no
+    // aplica App Nap ni el reposo por inactividad al proceso (macOS:
+    // NSProcessInfo beginActivityWithOptions:NSActivityUserInitiated); al
+    // destruirse la termina. Move-only por unique_ptr; puede destruirse en
+    // cualquier hilo y vivir mas que el adaptador. La clase base es el token
+    // no-op (plataformas sin soporte).
+    class ActividadSistema {
+    public:
+        ActividadSistema() = default;
+        virtual ~ActividadSistema() = default;
+        ActividadSistema(const ActividadSistema&) = delete;
+        ActividadSistema& operator=(const ActividadSistema&) = delete;
+    };
+
     using QObject::QObject;
     ~OSIntegration() override;
 
@@ -197,6 +219,12 @@ public:
     // crear el icono).
     virtual void reflejarEstadoIcono(EstadoIcono estado) = 0;
 
+    // T025.4: inicia una actividad de sistema que dura lo que viva el token
+    // devuelto (nunca nulo). EXCEPCION a la regla de hilo: se puede llamar
+    // desde cualquier hilo (el respaldo corre fuera del hilo grafico) y no
+    // toca estado del adaptador. Implementacion por omision: token no-op.
+    virtual std::unique_ptr<ActividadSistema> iniciarActividadSistema(MotivoActividad motivo);
+
     // Retira el menu bar y deja de emitir intenciones antes de terminar el
     // proceso. Idempotente. Despues solo se permite destruir el adaptador.
     virtual void prepararSalida() = 0;
@@ -223,6 +251,11 @@ signals:
     void salirSolicitado();
     // Reapertura (kAEReopenApplication) o ActivateWindow de segunda instancia.
     void activarVentanaSolicitada();
+    // T025.4 (D4): el sistema desperto del reposo (macOS:
+    // NSWorkspaceDidWakeNotification). Hilo grafico; solo entre inicializar()
+    // y prepararSalida(). Puede llegar mas de una vez seguida: quien la
+    // consume decide si hay algo vencido y evita ejecuciones duplicadas.
+    void sistemaDesperto();
     // T014.4 D1: el usuario respondio a una notificacion. Pulsar el cuerpo
     // -> Abrir; botones -> MostrarEnFinder / AbrirPerfiles. Siempre en el
     // hilo grafico. El destino se reconstruye desde la notificacion y se

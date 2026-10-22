@@ -84,6 +84,11 @@ if(APPLE)
         os/macos/IconoMenuBar.cpp
         os/macos/MacOSIntegration.h
         os/macos/MacOSIntegration.mm
+        # T025.4: actividad de sistema y bookmark de la carpeta de respaldo.
+        os/macos/ActividadSistemaMacOS.h
+        os/macos/ActividadSistemaMacOS.mm
+        os/macos/CarpetaRespaldoMacOS.h
+        os/macos/CarpetaRespaldoMacOS.mm
     )
 
     set_target_properties(satcfdi_os_macos PROPERTIES AUTOMOC ON)
@@ -104,6 +109,7 @@ if(APPLE)
             Qt6::Gui
             Qt6::Widgets
             "-framework AppKit"
+            "-framework Foundation"
             "-framework ServiceManagement"
             "-framework UserNotifications"
     )
@@ -123,6 +129,22 @@ if(APPLE)
     add_test(NAME satcfdi_os_macos_tests COMMAND satcfdi_os_macos_tests)
     set_tests_properties(satcfdi_os_macos_tests PROPERTIES LABELS "unit;macos")
     satcfdi_enable_warnings(satcfdi_os_macos_tests)
+
+    # T025.4: bookmark/ruta canonica de la carpeta de respaldo y actividad de
+    # sistema reales (QTemporaryDir, sin permisos ni bundle).
+    qt_add_executable(satcfdi_os_macos_respaldo_tests
+        os/macos/tests/TestPlataformaRespaldoMacOS.cpp
+    )
+    set_target_properties(satcfdi_os_macos_respaldo_tests PROPERTIES AUTOMOC ON)
+    target_link_libraries(satcfdi_os_macos_respaldo_tests PRIVATE
+        satcfdi_os_macos
+        Qt6::Test
+        "-framework IOKit"
+        "-framework CoreFoundation"
+    )
+    add_test(NAME satcfdi_os_macos_respaldo_tests COMMAND satcfdi_os_macos_respaldo_tests)
+    set_tests_properties(satcfdi_os_macos_respaldo_tests PROPERTIES LABELS "unit;macos;respaldo")
+    satcfdi_enable_warnings(satcfdi_os_macos_respaldo_tests)
 endif()
 
 # --- T008 corte A (core-infra): almacenamiento local de paquetes ZIP --------
@@ -206,6 +228,9 @@ if(APPLE)
         secrets/macos/DirectorioCredenciales.cpp
         secrets/macos/MacOSSecretStore.h
         secrets/macos/MacOSSecretStore.cpp
+        # T025.4: KEK del respaldo en Keychain.
+        secrets/macos/AlmacenKekRespaldoMacOS.h
+        secrets/macos/AlmacenKekRespaldoMacOS.cpp
     )
     target_include_directories(satcfdi_secrets_macos PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/..

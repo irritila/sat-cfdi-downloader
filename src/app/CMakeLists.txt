@@ -8,6 +8,9 @@ qt_add_executable(satcfdi_app MACOSX_BUNDLE
     OSIntegrationFactory.cpp
     SecretStoreFactory.h
     SecretStoreFactory.cpp
+    # T025.4: KEK del respaldo (Keychain) y carpeta (bookmark).
+    RespaldoPlataformaFactory.h
+    RespaldoPlataformaFactory.cpp
 )
 
 # Bundle id efectivo para los servicios Keychain del SecretStore.
