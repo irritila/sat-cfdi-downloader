@@ -31,6 +31,8 @@ qt_add_library(satcfdi_ports STATIC
     # T023.2: catalogo mensual y lotes de descarga guiada.
     repositories/CatalogoMensualRepository.h
     repositories/LoteDescargaGuiadaRepository.h
+    # T025.1: contenedor de respaldo cifrado AFB1.
+    respaldo/ContenedorRespaldo.h
 )
 
 set_target_properties(satcfdi_ports PROPERTIES AUTOMOC ON)

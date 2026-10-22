@@ -37,3 +37,4 @@ Un ADR aceptado no se edita para cambiar la decision central. Si una decision ca
 | [0018](0018-frontera-operaciones-sat-y-worker.md) | Accepted | Definir `OperacionesSat`, el ejecutor serial y el ciclo de vida del worker |
 | [0019](0019-cobertura-mensual-guiada-cfdi.md) | Accepted | Cobertura mensual guiada de CFDI: tramos, estados del mes, descarga guiada, catalogo y lotes (modificado por ADR 0020) |
 | [0020](0020-huecos-y-causas-superadas-cobertura-mensual.md) | Accepted | Huecos y causas superadas en la cobertura mensual (modifica ADR 0019) |
+| [0021](0021-respaldo-cifrado-a-carpeta-sincronizada.md) | Accepted | Respaldo cifrado a carpeta sincronizada del usuario (enmienda acotada a ADR 0004) |

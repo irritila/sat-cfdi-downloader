@@ -13,6 +13,7 @@ Decisiones actuales:
 - Usuario objetivo: un unico usuario local, actuando como contador.
 - Plataforma: aplicacion desktop para macOS.
 - Backend remoto: fuera de alcance por ahora.
+- Respaldo: copia cifrada con contrasena del usuario a una carpeta que el elige (por ejemplo, su carpeta de iCloud Drive o Dropbox); la sube el cliente de su proveedor. No es un backend propio ni contradice el punto anterior ([ADR 0021](docs/adrs/0021-respaldo-cifrado-a-carpeta-sincronizada.md)).
 - Operacion: multiples contribuyentes/RFC o perfiles SAT administrados por el usuario.
 - Autenticacion SAT: e.firma, certificado, llave privada y contrasena manejados de forma segura en el equipo local. No se asume CSD para descarga masiva salvo confirmacion oficial.
 - Flujo principal: crear solicitudes de descarga masiva, consultar estado y descargar paquetes ZIP disponibles.

@@ -157,7 +157,8 @@ if(APPLE AND NOT OPENSSL_ROOT_DIR)
         endif()
     endforeach()
 endif()
-find_package(OpenSSL 3 REQUIRED COMPONENTS Crypto)
+# T025.1 (D12): minimo 3.2 por Argon2id del respaldo.
+find_package(OpenSSL 3.2 REQUIRED COMPONENTS Crypto)
 
 # satcfdi_crypto: validacion de e.firma (X.509 DER, PKCS#8 DER cifrado, RFC por
 # OID 2.5.4.45, regla OU/CSD, vigencia) y contenedor AEAD v1 (DA6, DS1-DS4).
@@ -168,6 +169,10 @@ qt_add_library(satcfdi_crypto STATIC
     crypto/EFirmaOpenSsl.cpp
     crypto/ContenedorCredencial.h
     crypto/ContenedorCredencial.cpp
+    # T025.1: contenedor de respaldo AFB1 (ADR 0021).
+    crypto/ContenedorRespaldoFormato.h
+    crypto/ContenedorRespaldoOpenSsl.h
+    crypto/ContenedorRespaldoOpenSsl.cpp
 )
 target_include_directories(satcfdi_crypto PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/..

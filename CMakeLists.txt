@@ -100,7 +100,8 @@ if(APPLE AND NOT OPENSSL_ROOT_DIR)
         endif()
     endforeach()
 endif()
-find_package(OpenSSL 3 REQUIRED COMPONENTS Crypto)
+# T025.1 (D12): 3.2 es el minimo con Argon2id (EVP_KDF "ARGON2ID").
+find_package(OpenSSL 3.2 REQUIRED COMPONENTS Crypto)
 
 # libzip (T015.1, T015 D4): lector de paquetes ZIP de CFDI (QZipReader es
 # privado). Config CMake de Homebrew (`brew install libzip`), target

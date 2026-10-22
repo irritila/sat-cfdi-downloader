@@ -60,7 +60,7 @@ El MVP incluye:
 
 Queda fuera del MVP:
 
-- Backend remoto.
+- Backend remoto. Un respaldo cifrado a una carpeta elegida por el usuario (que su proveedor de nube sincroniza) no es un backend propio y no contradice este punto (T025, ADR 0021).
 - Multiusuario.
 - Roles y permisos.
 - Portal para terceros.

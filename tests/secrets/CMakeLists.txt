@@ -29,6 +29,17 @@ add_test(NAME satcfdi_crypto_tests COMMAND satcfdi_crypto_tests)
 set_tests_properties(satcfdi_crypto_tests PROPERTIES LABELS "secrets;infrastructure")
 satcfdi_enable_warnings(satcfdi_crypto_tests)
 
+# T025.1: contenedor de respaldo AFB1 (ADR 0021). Datos sinteticos en
+# QTemporaryDir. La prueba de 3 GB solo corre con SATCFDI_RESPALDO_PRUEBA_3GB=1.
+qt_add_executable(satcfdi_respaldo_tests
+    TestContenedorRespaldo.cpp
+)
+set_target_properties(satcfdi_respaldo_tests PROPERTIES AUTOMOC ON)
+target_link_libraries(satcfdi_respaldo_tests PRIVATE satcfdi_crypto Qt6::Test)
+add_test(NAME satcfdi_respaldo_tests COMMAND satcfdi_respaldo_tests)
+set_tests_properties(satcfdi_respaldo_tests PROPERTIES LABELS "secrets;infrastructure;respaldo" TIMEOUT 300)
+satcfdi_enable_warnings(satcfdi_respaldo_tests)
+
 if(APPLE)
     qt_add_executable(satcfdi_secrets_macos_tests
         TestMacOSSecretStore.cpp
