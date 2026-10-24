@@ -447,3 +447,82 @@ void TestOSIntegration::relanzamientoContratoYFake()
     } sinRelanzamiento;
     QCOMPARE(sinRelanzamiento.solicitarRelanzamiento(), RR::NoSoportado);
 }
+
+void TestOSIntegration::impresionContratoYFake()
+{
+    using RI = OSIntegration::ResultadoImpresion;
+    QCOMPARE(claves(QMetaEnum::fromType<RI>()), (QStringList{"Enviado", "Cancelado", "NoSoportado", "Fallido"}));
+
+    const QString titulo = QStringLiteral("Clave de recuperación");
+    const QString clave = QStringLiteral("ABCD EFGH JKMN PQRS TVWX YZ01 2345 6789 ABCD EFGH JKMN PQRS TVWX YZ01");
+    FakeOSIntegration os;
+    QCOMPARE(os.impresionesSolicitadas(), 0);
+    QCOMPARE(os.imprimirTexto(titulo, clave), RI::Enviado);
+    QCOMPARE(os.impresionesSolicitadas(), 1);
+    QCOMPARE(os.ultimoTituloImpreso, titulo);
+    QCOMPARE(os.ultimoTextoImpreso, clave);
+    os.resultadoImpresion = RI::Cancelado;
+    QCOMPARE(os.imprimirTexto(titulo, clave), RI::Cancelado);
+    QCOMPARE(os.impresionesSolicitadas(), 2);
+    QVERIFY(!os.comandos.contains(QStringLiteral("imprimirTexto")));
+
+    // Implementacion por omision del puerto.
+    class SinImpresion final : public OSIntegration {
+    public:
+        void inicializar() override {}
+        LaunchContext launchContext() const override { return LaunchContext::Manual; }
+        LoginItemStatus loginItemStatus() const override { return LoginItemStatus::Unavailable; }
+        NotificationStatus notificationStatus() const override { return NotificationStatus::Unavailable; }
+        void configurarLoginItem(bool) override {}
+        void solicitarPermisoNotificaciones() override {}
+        void enviarNotificacionPrueba(const QString&, const QString&) override {}
+        void notificar(const NotificacionLocal&) override {}
+        void mostrarEnFinder(const QString&, const QString&) override {}
+        void abrirCarpetaEnFinder(const QString&, const QString&) override {}
+        void abrirEnVistaPrevia(const QString&, const QString&) override {}
+        void reflejarPreferenciaLoginItem(bool) override {}
+        void reflejarMonitoreoPausado(bool) override {}
+        void reflejarEstadoMonitoreo(const EstadoMonitoreo&) override {}
+        void reflejarEstadoIcono(EstadoIcono) override {}
+        void prepararSalida() override {}
+    } sinImpresion;
+    QCOMPARE(sinImpresion.imprimirTexto(titulo, clave), RI::NoSoportado);
+}
+
+void TestOSIntegration::copiaSecretaContratoYFake()
+{
+    using RC = OSIntegration::ResultadoCopiaSecreta;
+    QCOMPARE(claves(QMetaEnum::fromType<RC>()), (QStringList{"Copiado", "NoSoportado", "Fallido"}));
+    QCOMPARE(OSIntegration::kSegundosBorradoPortapapeles, 90);
+
+    const QString clave = QStringLiteral("ABCD EFGH JKMN PQRS TVWX YZ01 2345 6789 ABCD EFGH JKMN PQRS TVWX YZ01");
+    FakeOSIntegration os;
+    QCOMPARE(os.copiarTextoSecreto(clave), RC::Copiado);
+    QCOMPARE(os.copiasSecretasSolicitadas(), 1);
+    QCOMPARE(os.ultimoTextoSecretoCopiado, clave);
+    os.resultadoCopiaSecreta = RC::Fallido;
+    QCOMPARE(os.copiarTextoSecreto(clave), RC::Fallido);
+    QCOMPARE(os.copiasSecretasSolicitadas(), 2);
+    QVERIFY(!os.comandos.contains(QStringLiteral("copiarTextoSecreto")));
+
+    class SinPortapapeles final : public OSIntegration {
+    public:
+        void inicializar() override {}
+        LaunchContext launchContext() const override { return LaunchContext::Manual; }
+        LoginItemStatus loginItemStatus() const override { return LoginItemStatus::Unavailable; }
+        NotificationStatus notificationStatus() const override { return NotificationStatus::Unavailable; }
+        void configurarLoginItem(bool) override {}
+        void solicitarPermisoNotificaciones() override {}
+        void enviarNotificacionPrueba(const QString&, const QString&) override {}
+        void notificar(const NotificacionLocal&) override {}
+        void mostrarEnFinder(const QString&, const QString&) override {}
+        void abrirCarpetaEnFinder(const QString&, const QString&) override {}
+        void abrirEnVistaPrevia(const QString&, const QString&) override {}
+        void reflejarPreferenciaLoginItem(bool) override {}
+        void reflejarMonitoreoPausado(bool) override {}
+        void reflejarEstadoMonitoreo(const EstadoMonitoreo&) override {}
+        void reflejarEstadoIcono(EstadoIcono) override {}
+        void prepararSalida() override {}
+    } sinPortapapeles;
+    QCOMPARE(sinPortapapeles.copiarTextoSecreto(clave), RC::NoSoportado);
+}

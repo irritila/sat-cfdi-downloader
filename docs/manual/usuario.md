@@ -29,7 +29,8 @@ Contenido:
 6. [Paquetes en Finder](#6-paquetes-en-finder)
 7. [Menu bar](#7-menu-bar)
 8. [Notificaciones de macOS](#8-notificaciones-de-macos)
-9. [Mensajes frecuentes y cómo resolverlos](#9-mensajes-frecuentes-y-cómo-resolverlos)
+9. [Respaldo y restauración](#9-respaldo-y-restauración)
+10. [Mensajes frecuentes y cómo resolverlos](#10-mensajes-frecuentes-y-cómo-resolverlos)
 
 ## 1. Perfiles SAT y e.firma
 
@@ -158,7 +159,7 @@ nueva se valida. Si falla, la actual sigue registrada sin cambios." Pulsa
 falla, el mensaje termina con "La e.firma anterior sigue registrada sin
 cambios." y la lista vuelve a mostrar el estado real de la e.firma anterior.
 
-Los errores al registrar o reemplazar están en la [sección 9](#9-mensajes-frecuentes-y-cómo-resolverlos).
+Los errores al registrar o reemplazar están en la [sección 10](#10-mensajes-frecuentes-y-cómo-resolverlos).
 
 ## 2. Crear una nueva solicitud y resolver duplicados
 
@@ -617,7 +618,158 @@ Para comprobar las notificaciones usa **Enviar notificación de prueba** en el
 menu bar. Si las desactivas en Ajustes del Sistema, la app sigue funcionando
 igual; solo deja de avisar y la lista muestra un aviso.
 
-## 9. Mensajes frecuentes y cómo resolverlos
+## 9. Respaldo y restauración
+
+Archivo Fiscal puede guardar una copia cifrada de tus datos (perfiles,
+solicitudes, historial y paquetes ZIP) en una carpeta que tú eliges, por
+ejemplo una carpeta de iCloud Drive o de Dropbox. La app solo copia el
+respaldo a esa carpeta; el servicio de nube, si la sincroniza, se encarga de lo
+demás por su cuenta. Por eso la app dice "copiado a la carpeta" y no puede confirmar qué hizo
+tu servicio de nube con el archivo.
+
+Abre la pantalla con **Ir > Respaldo** o con ⌘4. **‹ Atrás** (o la tecla
+Escape) regresa a la pantalla de la que venías.
+
+> Las capturas de esta sección se agregarán cuando se regraben el manual y el
+> video tutorial (T024).
+
+### Elegir la carpeta
+
+En **Carpeta**, pulsa **Elegir carpeta…** y elige la carpeta en el selector de
+macOS, por ejemplo `/Users/usuario/Library/Mobile Documents/com~apple~CloudDocs/Respaldos`
+o `/Users/usuario/Dropbox/Respaldos`. La pantalla muestra solo el nombre de la
+carpeta ("Las copias se guardan en «Respaldos».") y la app confirma con
+"Carpeta del respaldo guardada.". Puedes cambiarla después con **Cambiar
+carpeta…**.
+
+Elige una carpeta en un disco de tu Mac o en un disco externo con formato de
+macOS. Un disco con formato exFAT no es compatible.
+
+### Contraseña y clave de recuperación
+
+Los respaldos siempre se cifran. En **Contraseña**, pulsa **Crear
+contraseña…**, escríbela dos veces y pulsa **Crear contraseña**. La contraseña
+debe tener al menos 12 caracteres. Archivo Fiscal
+no guarda tu contraseña en texto: la protege en el llavero de macOS de este
+equipo.
+
+Al crearla, la app muestra **Guarda tu clave de recuperación**. Con esa clave
+puedes abrir tus respaldos si olvidas la contraseña:
+
+- No se volverá a mostrar después de que confirmes que la guardaste. Este
+  diálogo no se cierra con Escape: cuando la hayas guardado, pulsa **Ya la
+  guardé**.
+- **Copiar** la deja en el portapapeles de este equipo durante 90 segundos;
+  después se borra y no pasa a tus otros dispositivos.
+- **Imprimir…** abre el panel de impresión de macOS. Ese panel también permite
+  **Guardar como PDF** o abrirla en Vista Previa, y la cola de impresión puede
+  conservar una copia. Archivo Fiscal no la guarda. Lo más seguro es anotarla o
+  imprimirla y guardar el papel en un lugar seguro.
+- Si sales de Respaldo antes de pulsar **Ya la guardé** (por ejemplo, desde el
+  menu bar o una notificación), la clave no se pierde: la ventana muestra
+  **Guarda tu clave de recuperación** y **Ver la clave** vuelve a abrir el
+  diálogo.
+- Si pierdes la contraseña y también la clave de recuperación, no podrás
+  abrir tus respaldos.
+
+### Cambiar la contraseña
+
+Pulsa **Cambiar contraseña…**. Elige si te identificas con la **Contraseña
+anterior** o con la **Clave de recuperación**, escríbela y después escribe dos
+veces la contraseña nueva, de al menos 12 caracteres. La clave de recuperación **no cambia**: la app
+confirma con "Contraseña cambiada. Tu clave de recuperación sigue siendo la
+misma.". Las copias anteriores se abren con la contraseña anterior o con la
+clave; las nuevas, con la contraseña nueva o con la clave.
+
+### Respaldo diario
+
+Activa **Respaldar una vez al día mientras la aplicación esté abierta** para
+que la app haga un respaldo cada día por su cuenta. Mientras falte algo, la
+pantalla lo indica: "El respaldo diario empezará cuando elijas una carpeta." o
+"El respaldo diario empezará cuando crees una contraseña.". El resultado del
+último respaldo, manual o diario, se muestra en la pantalla al volver a
+abrirla.
+
+### Respaldar ahora
+
+Con la carpeta y la contraseña listas, pulsa **Respaldar ahora**. Mientras
+trabaja, la pantalla muestra el paso ("Preparando la copia de tus datos…",
+"Cifrando y copiando a la carpeta…", "Terminando la copia…", "Depurando
+copias anteriores…") y una barra de progreso. Solo corre un respaldo a la vez.
+
+Al terminar verás uno de estos avisos:
+
+- **Respaldo copiado a la carpeta**, con la fecha y el tamaño: la copia
+  cifrada quedó en la carpeta elegida.
+- **Respaldo copiado a la carpeta, con avisos**: la copia es válida, pero
+  debajo se explica algo que conviene revisar, por ejemplo "2 paquetes ya no
+  estaban en este equipo y no se incluyeron." o "La copia es válida, pero
+  algunas copias anteriores requieren revisión manual.".
+- **No se creó el respaldo**, con la causa (ver [Respaldo y
+  restauración](#respaldo-y-restauración) en Mensajes frecuentes). Tus datos
+  no cambian.
+
+La app conserva las últimas 5 copias y borra las anteriores que ella misma
+creó.
+
+### Copias que hay que borrar a mano
+
+Si una copia anterior no está descargada en este equipo (por ejemplo, porque
+usaste **Quitar descarga** en iCloud Drive) y la app no tiene registro de
+ella, no la borra. En ese caso aparece **Revisa la carpeta del respaldo** con
+el texto "Hay 2 copias anteriores que no están descargadas en este equipo y
+Archivo Fiscal no puede confirmar que sean suyas, así que no se borraron. Si
+ya no las necesitas, bórralas a mano desde la carpeta.". Abre la carpeta en
+Finder y borra las copias que ya no necesites.
+
+### Restaurar un respaldo
+
+Restaurar **sustituye** los datos de este equipo por los del respaldo; no los
+combina. Puedes restaurar en la misma Mac o en otra.
+
+1. En **Restaurar**, pulsa **Restaurar un respaldo…** y luego **Elegir
+   archivo…**. El selector se abre en la carpeta del respaldo, si ya la
+   elegiste. Elige el archivo `.afbak` del respaldo, por ejemplo en
+   `/Users/usuario/Dropbox/Respaldos`.
+2. Escribe la contraseña o la clave de recuperación de ese respaldo y pulsa
+   **Verificar respaldo**. La app revisa todo el archivo antes de tocar nada;
+   si está en la nube, puede tardar mientras se descarga. Puedes pulsar
+   **Cancelar verificación** (o Escape) en cualquier momento.
+3. Revisa el resumen: **Fecha del respaldo**, **Identificador**, **Contenido**
+   (por ejemplo "2 perfiles, 5 solicitudes y 1 paquete.") y la versión con la
+   que se creó. Si no es el respaldo que buscas, pulsa **Descartar**.
+4. Pulsa **Restaurar y reiniciar…** y confirma con **Restaurar y reiniciar**.
+   La app se cierra y debería abrirse sola para aplicar la restauración.
+
+Si la app no se abre sola, ábrela de nuevo: la restauración se aplica en cuanto
+la abras. Si al pulsar Restaurar y reiniciar la app avisa "La aplicación se
+cerrará y no podrá abrirse sola.", ábrela tú cuando se cierre. Al abrirse muestra arriba de la ventana **Restauración aplicada**, con
+la fecha del respaldo; pulsa **Entendido** para cerrar el aviso. Si el
+respaldo preparado cambió o no se pudo completar la restauración, el aviso dice
+**Restauración descartada** o **Restauración revertida** y tus datos actuales
+no se modifican.
+
+La e.firma **no** se restaura. Después de restaurar, registra de nuevo la
+e.firma de cada perfil en Perfiles SAT (ver [Registrar la
+e.firma](#registrar-la-efirma)); hasta entonces la app no se comunica con el
+SAT para ese perfil. La configuración del respaldo de este equipo (carpeta,
+contraseña y respaldo diario) tampoco cambia.
+
+### Datos anteriores a una restauración
+
+Al restaurar, tus datos anteriores no se borran: se guardan aparte en carpetas
+`pre-restauracion-<fecha>`. Mientras existan, la ventana muestra el aviso
+**Hay datos anteriores a una restauración** y las e.firmas anteriores se
+conservan en el llavero de macOS. El botón **Revisar en Respaldo** del aviso
+abre la pantalla Respaldo.
+
+Cuando ya no los necesites, pulsa **Descartar datos anteriores…** en Respaldo y
+confirma con **Descartar**. No se puede deshacer. Solo se borran las carpetas
+que creó Archivo Fiscal; cualquier otra carpeta con un nombre parecido, o que
+sea un enlace, queda intacta y la app te avisa para que la revises a mano.
+Después se limpian del llavero las e.firmas anteriores.
+
+## 10. Mensajes frecuentes y cómo resolverlos
 
 ### e.firma (al registrar o reemplazar)
 
@@ -669,6 +821,38 @@ contraseña.
 | Carpeta de paquetes no encontrada / No se pudo abrir Finder | Revisa que la carpeta exista e intenta de nuevo. |
 | PDF no encontrado / No se pudo abrir Vista Previa | Regresa a la lista y vuelve a abrir la factura; la app genera el PDF otra vez. |
 | No se pudo guardar el PDF. Revisa que la carpeta exista y tengas permiso de escritura. | Elige otra carpeta en **Guardar PDF…**. |
+
+### Respaldo y restauración
+
+| Mensaje | Qué hacer |
+| --- | --- |
+| La carpeta elegida no está disponible. Conéctala o espera a que esté descargada e inténtalo de nuevo. | Conecta el disco externo o espera a que la carpeta de la nube esté descargada y pulsa **Respaldar ahora**. |
+| No se puede escribir de forma segura en la carpeta elegida. Revisa sus permisos o elige otra carpeta. | Revisa que la carpeta sea tuya y que tengas permiso de escritura, o elige otra. |
+| El disco de la carpeta elegida no es compatible con el respaldo (por ejemplo, un disco con formato exFAT). Elige una carpeta en otro disco. | Elige una carpeta en un disco con formato de macOS. |
+| No hay espacio suficiente en la carpeta elegida para el respaldo. | Libera espacio en ese disco o elige otra carpeta. |
+| No se pudo copiar el respaldo a la carpeta elegida. Inténtalo de nuevo. | Pulsa **Respaldar ahora** otra vez. |
+| Tus datos cambiaron mientras se copiaban. No se guardó ningún respaldo; inténtalo de nuevo. | Pulsa **Respaldar ahora** otra vez. |
+| No se pudo preparar la copia cifrada en este equipo. Revisa que la contraseña del respaldo esté configurada e inténtalo de nuevo. | Revisa **Contraseña** en Respaldo y pulsa **Respaldar ahora**. |
+| La copia se hizo, pero no se pudo guardar este resultado; al reabrir la aplicación no se mostrará. / No se pudo guardar este resultado; al reabrir la aplicación no se mostrará. | El respaldo no se ve afectado; solo ese aviso no aparecerá al volver a abrir la app. Si se repite, revisa el espacio libre del disco. |
+| Ya hay un respaldo en curso. Espera a que termine. | Espera; solo corre un respaldo a la vez. |
+| No se pudo usar la carpeta elegida. Revisa que esté disponible o elige otra carpeta. | Elige la carpeta otra vez. |
+| No se pudo acceder al llavero de macOS. Desbloquea tu sesión e inténtalo de nuevo. | Desbloquea tu sesión o permite el acceso en el aviso de macOS. |
+| La contraseña debe tener al menos 12 caracteres. / La contraseña nueva debe tener al menos 12 caracteres. | Usa una contraseña más larga; por ejemplo, una frase de varias palabras. |
+| Las contraseñas no coinciden. / Las contraseñas nuevas no coinciden. | Escribe la misma contraseña en los dos campos. |
+| La contraseña anterior o la clave de recuperación no es correcta. | Escríbela de nuevo; puedes usar la otra opción (contraseña anterior o clave). |
+| La contraseña o la clave de recuperación no es correcta. | Escribe la contraseña o la clave de ese respaldo; si cambiaste la contraseña, usa la que tenías cuando se creó o la clave. |
+| La clave de recuperación no tiene un formato válido. | Revisa la clave; puedes escribirla con o sin guiones. |
+| No se pudo leer el archivo elegido. Si está en la nube, espera a que se descargue e inténtalo de nuevo. | Descarga el archivo en Finder y verifica otra vez. |
+| El respaldo no se pudo verificar. Tus datos no se modificaron. | El archivo está dañado o no es un respaldo de Archivo Fiscal; usa otra copia. |
+| Este respaldo lo creó una versión más reciente de Archivo Fiscal. Actualiza la aplicación para restaurarlo. | Actualiza Archivo Fiscal y restaura de nuevo. |
+| No hay espacio suficiente en el disco para preparar la restauración. Tus datos no se modificaron. | Libera espacio en disco e intenta de nuevo. |
+| El respaldo cambió después de verificarlo. Vuelve a elegirlo para verificarlo otra vez. | Elige el archivo y verifica otra vez. |
+| Ya hay una restauración pendiente; se aplicará al abrir de nuevo la aplicación. | Sal de la app y ábrela otra vez. |
+| La aplicación se cerrará y no podrá abrirse sola. Ábrela de nuevo para aplicar la restauración. | Abre Archivo Fiscal cuando se cierre. |
+| La aplicación se reiniciará sin cambiar tus datos. Puedes intentarlo de nuevo. | Cuando se abra, repite la restauración. |
+| No se descartaron todos los datos anteriores | Pulsa **Descartar datos anteriores…** otra vez; las e.firmas anteriores se conservan hasta terminar. |
+| Datos anteriores descartados, con avisos | Los datos se borraron, pero no se terminaron de limpiar las e.firmas anteriores del llavero; tus perfiles actuales no se ven afectados. |
+| Hay N carpetas «pre-restauracion» que Archivo Fiscal no creó o que son enlaces; no se tocaron. Revísalas a mano. | Revisa esas carpetas en Finder y bórralas tú si ya no las necesitas. |
 
 ### Otros
 

@@ -504,6 +504,16 @@ El usuario puede restaurar un respaldo cifrado (T025, ADR 0021 y ADR 0022) en la
 - La e.firma no se restaura (D3): los perfiles restaurados requieren registrarla de nuevo y no se hacen llamadas SAT hasta entonces.
 - Mientras existan datos previos sin descartar, la e.firma anterior se conserva en el almacen seguro del equipo (D22).
 - La configuracion del respaldo de este equipo (seccion `respaldo`, id de instalacion y registro de copias publicadas) no se sustituye (D14, D20).
+- Antes de confirmar, la pantalla Respaldo muestra la fecha y el identificador autenticados del respaldo y su contenido; al confirmar, la app se cierra y deberia abrirse sola (si no, el usuario la abre). Al arrancar se informa si la restauracion se aplico, se descarto o se revirtio, y un aviso persistente ofrece "Descartar datos anteriores" mientras existan datos previos (T025.6).
+
+### RF-021 Respaldo cifrado
+
+El usuario respalda sus datos desde la pantalla Respaldo (Ir > Respaldo, ⌘4; T025, ADR 0021, T025.6):
+
+- Elige una carpeta con el dialogo del sistema (por ejemplo, su carpeta de iCloud Drive o Dropbox); la app escribe ahi una copia cifrada y el proveedor la sincroniza. La UI dice "copiado a la carpeta", nunca "subido".
+- Crea una contrasena de al menos 12 caracteres (D23). Al crearla, la app muestra una clave de recuperacion que se puede copiar (solo a este equipo, se borra del portapapeles a los 90 s) o imprimir, y que no se vuelve a mostrar despues de confirmar que se guardo. Cambiar la contrasena conserva la clave (D16).
+- "Respaldar ahora" y respaldo diario opcional (D4) con progreso, resultado y advertencias (paquetes faltantes, copias que hay que borrar a mano, resultado no guardado). Se conservan las 5 copias propias mas recientes (D6, D17).
+- La e.firma, los logs y los temporales nunca se respaldan (D3, D7).
 
 ## 14. Requerimientos no funcionales
 

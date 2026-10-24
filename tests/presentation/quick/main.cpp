@@ -7,6 +7,7 @@
 #include "FixtureExplorador.h"
 #include "FixtureFacturas.h"
 #include "FixturePerfiles.h"
+#include "FixtureRespaldo.h"
 
 #include <QQmlContext>
 #include <QQmlEngine>
@@ -25,6 +26,8 @@ public slots:
         engine->rootContext()->setContextProperty(QStringLiteral("fixtureAvisoRaiz"), new FixtureAvisoRaiz(engine));
         // T023.4: pantalla Facturas.
         engine->rootContext()->setContextProperty(QStringLiteral("fixtureFacturas"), new FixtureFacturas(engine));
+        // T025.6: pagina Respaldo y franja de avisos de restauracion.
+        engine->rootContext()->setContextProperty(QStringLiteral("fixtureRespaldo"), new FixtureRespaldo(engine));
     }
 };
 

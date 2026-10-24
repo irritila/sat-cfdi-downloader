@@ -93,6 +93,9 @@ struct EstadoRespaldoGestor {
     std::optional<QDateTime> ultimoExitoUtc;
     std::optional<QDateTime> ultimoIntentoUtc;
     QString ultimoResultado;
+    // T025.6 (C6): resumen saneado del ultimo respaldo terminado (persistido;
+    // disponible al abrir la app tras un diario).
+    std::optional<ResumenUltimoRespaldo> ultimoResumen;
     PendienteDiario pendienteDiario = PendienteDiario::Ninguno;
 };
 
@@ -159,8 +162,20 @@ public:
 
     void cerrar();
 
+    // T025.6 (C6): resumen saneado de `r` terminado en `finUtc`: estado y
+    // categorias de error como claves estables, conteos y banderas; sin
+    // diagnostico, rutas ni nombre publicado. Pura.
+    static ResumenUltimoRespaldo resumenDe(const ResultadoRespaldo& r, const QDateTime& finUtc);
+
 signals:
     void estadoCambiado();
+    // T025.6 (C6): al terminar cada respaldo manual o diario que llego a
+    // ejecutarse o a validarse (no se emite para YaEnCurso ni Detenido), en el
+    // hilo grafico, despues de persistir el resumen y de actualizar estado().
+    void respaldoTerminado(const satcfdi::respaldo::ResumenUltimoRespaldo& resumen);
+    // T025.6: progreso del respaldo en curso, reexpuesto desde RespaldoService
+    // y entregado en el hilo grafico (conexion encolada).
+    void progreso(satcfdi::respaldo::RespaldoService::Fase fase, quint64 bytes, quint64 total);
 
 private:
     struct Impl;

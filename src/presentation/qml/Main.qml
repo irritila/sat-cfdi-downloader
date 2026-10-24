@@ -26,6 +26,8 @@ ApplicationWindow {
     required property HistorialViewModel historialViewModel
     // T019 D8: aviso de la carpeta de paquetes (inactivo si no hay aviso).
     required property AvisoRaizPaquetesViewModel avisoRaizPaquetesViewModel
+    // T025.6: pagina Respaldo (⌘4) y franja de avisos de restauracion.
+    required property RespaldoViewModel respaldoViewModel
 
     width: 960
     height: 640
@@ -60,6 +62,8 @@ ApplicationWindow {
         switch (pagina) {
         case AppViewModel.Historial:
             return historialComponente
+        case AppViewModel.Respaldo:
+            return respaldoComponente
         case AppViewModel.Detalle:
             return detalleComponente
         case AppViewModel.Perfiles:
@@ -94,12 +98,14 @@ ApplicationWindow {
     // - ⌘⌫ solo abre la confirmacion de eliminar (nunca elimina).
     readonly property SolicitudesPage paginaLista: paginaActual.item as SolicitudesPage
     readonly property HistorialPage paginaHistorial: paginaActual.item as HistorialPage
+    readonly property RespaldoPage paginaRespaldo: paginaActual.item as RespaldoPage
     readonly property DetalleSolicitudPage paginaDetalle: paginaActual.item as DetalleSolicitudPage
     readonly property PerfilesSatPage paginaPerfiles: paginaActual.item as PerfilesSatPage
     readonly property ExploradorCfdiPage paginaExplorador: paginaActual.item as ExploradorCfdiPage
     readonly property FacturasPage paginaFacturas: paginaActual.item as FacturasPage
 
     readonly property bool dialogoAbierto: (ventana.paginaHistorial !== null && ventana.paginaHistorial.dialogoAbierto)
+                                           || (ventana.paginaRespaldo !== null && ventana.paginaRespaldo.dialogoAbierto)
                                            || (ventana.paginaDetalle !== null && ventana.paginaDetalle.dialogoAbierto)
                                            || (ventana.paginaPerfiles !== null && ventana.paginaPerfiles.dialogoAbierto)
                                            || (ventana.paginaExplorador !== null && ventana.paginaExplorador.dialogoAbierto)
@@ -207,6 +213,15 @@ ApplicationWindow {
         enabled: ventana.atajosActivos && paginaActual.item !== null && ventana.paginaHistorial === null
         onTriggered: ventana.appViewModel.mostrarHistorial()
     }
+    // T025.6 (C1): ⌘4 Respaldo; "Atras" vuelve al origen.
+    Action {
+        id: accionRespaldo
+        objectName: "atajoRespaldo"
+        text: qsTr("Respaldo")
+        shortcut: "Ctrl+4"
+        enabled: ventana.atajosActivos && paginaActual.item !== null && ventana.paginaRespaldo === null
+        onTriggered: ventana.appViewModel.mostrarRespaldo()
+    }
     // "Ir > Diagnostico": lista tecnica de descargas; "Atras" vuelve al origen.
     Action {
         id: accionDiagnostico
@@ -236,6 +251,7 @@ ApplicationWindow {
                 MenuItem { action: accionRegresar }
                 MenuItem { action: accionPerfiles }
                 MenuItem { action: accionHistorial }
+                MenuItem { action: accionRespaldo }
                 MenuSeparator { }
                 MenuItem { action: accionDiagnostico }
                 // "Eliminar…" solo en el detalle de diagnostico.
@@ -259,12 +275,25 @@ ApplicationWindow {
         height: implicitHeight
     }
 
+    // T025.6 (C1): resultado de la restauracion al arrancar y datos previos.
+    // Su accion solo navega a Respaldo (el descarte se confirma alli).
+    FranjaAvisosRespaldo {
+        id: franjaAvisosRespaldo
+        respaldo: ventana.respaldoViewModel
+        enRespaldo: ventana.paginaRespaldo !== null
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: franjaAvisoRaiz.bottom
+        height: implicitHeight
+        onRevisarSolicitado: ventana.appViewModel.mostrarRespaldo()
+    }
+
     Loader {
         id: paginaActual
         objectName: "paginaActual"
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.top: franjaAvisoRaiz.bottom
+        anchors.top: franjaAvisosRespaldo.bottom
         anchors.bottom: parent.bottom
         focus: true
         Component.onCompleted: ventana.actualizarPagina()
@@ -282,6 +311,13 @@ ApplicationWindow {
         HistorialPage {
             app: ventana.appViewModel
             historial: ventana.historialViewModel
+        }
+    }
+    Component {
+        id: respaldoComponente
+        RespaldoPage {
+            app: ventana.appViewModel
+            respaldo: ventana.respaldoViewModel
         }
     }
     Component {

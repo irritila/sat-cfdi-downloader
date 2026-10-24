@@ -8,8 +8,10 @@
 
 #include "infrastructure/os/macos/ActividadSistemaMacOS.h"
 #include "infrastructure/os/macos/IconoMenuBar.h"
+#include "infrastructure/os/macos/ImpresionTextoMacOS.h"
 #include "infrastructure/os/macos/MacOSIntegration.h"
 #include "infrastructure/os/macos/MacOSMapeos.h"
+#include "infrastructure/os/macos/PortapapelesSecretoMacOS.h"
 #include "infrastructure/os/macos/Relanzamiento.h"
 #include "infrastructure/os/MenuBarDefinicion.h"
 
@@ -407,6 +409,8 @@ struct MacOSIntegration::Impl {
     id observadorDespertar = nil;
     // T025.5: resultado del primer solicitarRelanzamiento() (idempotente).
     std::optional<OSIntegration::ResultadoRelanzamiento> relanzamiento;
+    // T025.6 H1/M1: portapapeles del texto secreto (perezoso; hijo del adaptador).
+    macos::PortapapelesSecretoMacOS* portapapeles = nullptr;
     // Serializa register/unregister/status: resultados en orden de llamada.
     dispatch_queue_t colaLoginItem = nil;
 };
@@ -1180,6 +1184,36 @@ std::unique_ptr<OSIntegration::ActividadSistema> MacOSIntegration::iniciarActivi
     return macos::iniciarActividadSistemaMacOS(motivo);
 }
 
+// --- Impresion (T025.6 C4) --------------------------------------------------
+
+OSIntegration::ResultadoImpresion MacOSIntegration::imprimirTexto(const QString& titulo, const QString& texto)
+{
+    if (d->saliendo) {
+        return ResultadoImpresion::Fallido;
+    }
+    const ResultadoImpresion r = macos::imprimirTextoMacOS(titulo, texto);
+    // Solo el resultado: nunca el titulo ni el texto.
+    qCInfo(lcMacOS) << "Impresion de texto terminada:" << r;
+    return r;
+}
+
+// --- Portapapeles secreto (T025.6 H1/M1) -----------------------------------
+
+OSIntegration::ResultadoCopiaSecreta MacOSIntegration::copiarTextoSecreto(const QString& texto)
+{
+    if (d->saliendo || texto.isEmpty()) {
+        return ResultadoCopiaSecreta::Fallido;
+    }
+    if (d->portapapeles == nullptr) {
+        d->portapapeles = new macos::PortapapelesSecretoMacOS(
+            QString(), std::chrono::seconds(kSegundosBorradoPortapapeles), this);
+    }
+    const ResultadoCopiaSecreta r =
+        d->portapapeles->copiar(texto) ? ResultadoCopiaSecreta::Copiado : ResultadoCopiaSecreta::Fallido;
+    qCInfo(lcMacOS) << "Copia de texto secreto al portapapeles:" << r; // nunca el texto
+    return r;
+}
+
 // --- Relanzamiento (T025.5) -------------------------------------------------
 
 OSIntegration::ResultadoRelanzamiento MacOSIntegration::solicitarRelanzamiento()
@@ -1237,6 +1271,10 @@ void MacOSIntegration::prepararSalida()
         [[NSAppleEventManager sharedAppleEventManager] removeEventHandlerForEventClass:kCoreEventClass
                                                                           andEventID:kAEReopenApplication];
         d->manejadorReaperturaInstalado = false;
+    }
+    // T025.6 H1/M1: no dejar la clave en el portapapeles al salir.
+    if (d->portapapeles != nullptr && d->portapapeles->borrarSiSigueSiendoNuestro()) {
+        qCInfo(lcMacOS) << "Portapapeles secreto borrado al salir";
     }
     d->manejador.alReabrir = nil;
     d->manejador.alResponder = nil;

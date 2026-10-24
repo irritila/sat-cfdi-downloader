@@ -2,6 +2,7 @@
 
 #include "app_core/MigracionRaizPaquetes.h"
 #include "app_core/RestauracionArranque.h"
+#include "presentation/viewmodels/PuertosRespaldoPresentacion.h"
 #include "application/persistence/PuertosPersistencia.h"
 #include "application/profiles/CredencialesSatService.h"
 #include "domain/perfiles/PerfilId.h"
@@ -68,6 +69,9 @@ class SolicitudesServicePersistido;
 class SqlitePersistencia;
 class SqliteCopiaRespaldo;
 class FuenteRespaldoLocal;
+class ControlRespaldoGestor;
+class ControlRestauracionServicio;
+class DatosPreviosRestauracionRoot;
 class ConfiguracionRespaldoIni;
 namespace respaldo {
 class FuenteRespaldo;
@@ -257,6 +261,18 @@ public:
     // referencia). E/S en un hilo del pool; reconciliacion en el dispatcher.
     // Llamar desde el hilo grafico.
     QFuture<ResultadoDescarteDatosPrevios> descartarDatosPrevios();
+
+    // T025.6 (C2, corte B): adaptadores de los puertos de presentacion del
+    // respaldo. Viven mientras el root; hilo grafico.
+    ControlRespaldoPresentacion& controlRespaldoPresentacion() const;
+    ControlRestauracionPresentacion& controlRestauracionPresentacion() const;
+    DatosPreviosRestauracionPresentacion& datosPreviosRestauracionPresentacion() const;
+    // C4: OSIntegration::imprimirTexto (el `os` de iniciarCicloDeVida). true
+    // solo con Enviado; false sin `os`, Cancelado, NoSoportado o Fallido.
+    ImpresionTexto impresionTexto();
+    // H1/M1: OSIntegration::copiarTextoSecreto (portapapeles con marca de
+    // dato sensible). true solo con Copiado; false sin `os`.
+    CopiaTextoSecreto copiaTextoSecreto();
     respaldo::EstadoRespaldoGestor estadoRespaldo() const;
     // Arranque del respaldo (en iniciarMonitoreo): configuracion, KEK
     // huerfanas, .partial propios y primera evaluacion del diario.
@@ -372,6 +388,10 @@ private:
     // T025.5 (se destruye primero: sus callbacks usan el root).
     std::unique_ptr<respaldo::RestauracionService> m_restauracion;
     std::optional<ResultadoRestauracionArranque> m_restauracionAlArrancar;
+    // T025.6: adaptadores de presentacion (se destruyen antes que los servicios).
+    std::unique_ptr<ControlRespaldoGestor> m_controlRespaldo;
+    std::unique_ptr<ControlRestauracionServicio> m_controlRestauracion;
+    std::unique_ptr<DatosPreviosRestauracionRoot> m_datosPreviosPresentacion;
     QString m_directorioDatos;
     std::unique_ptr<WorkerLocal> m_worker;
     std::unique_ptr<ExtensionWorker> m_extensionWorker;

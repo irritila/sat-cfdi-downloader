@@ -95,6 +95,12 @@ if(APPLE)
         # T025.5: comando del auxiliar de relanzamiento (C++ puro).
         os/macos/Relanzamiento.h
         os/macos/Relanzamiento.cpp
+        # T025.6 C4: impresion nativa de texto en memoria.
+        os/macos/ImpresionTextoMacOS.h
+        os/macos/ImpresionTextoMacOS.mm
+        # T025.6 H1/M1: copia segura de texto secreto al portapapeles.
+        os/macos/PortapapelesSecretoMacOS.h
+        os/macos/PortapapelesSecretoMacOS.mm
     )
 
     set_target_properties(satcfdi_os_macos PROPERTIES AUTOMOC ON)
@@ -151,6 +157,29 @@ if(APPLE)
     add_test(NAME satcfdi_os_macos_respaldo_tests COMMAND satcfdi_os_macos_respaldo_tests)
     set_tests_properties(satcfdi_os_macos_respaldo_tests PROPERTIES LABELS "unit;macos;respaldo")
     satcfdi_enable_warnings(satcfdi_os_macos_respaldo_tests)
+
+    # T025.6 H1/M1: portapapeles secreto sobre un NSPasteboard con nombre
+    # propio (no toca el del usuario) y plazo de borrado corto.
+    qt_add_executable(satcfdi_os_macos_portapapeles_tests
+        os/macos/tests/TestPortapapelesSecreto.mm
+    )
+    set_target_properties(satcfdi_os_macos_portapapeles_tests PROPERTIES AUTOMOC ON)
+    target_compile_options(satcfdi_os_macos_portapapeles_tests PRIVATE $<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>)
+    target_link_libraries(satcfdi_os_macos_portapapeles_tests PRIVATE satcfdi_os_macos Qt6::Test "-framework AppKit")
+    add_test(NAME satcfdi_os_macos_portapapeles_tests COMMAND satcfdi_os_macos_portapapeles_tests)
+    set_tests_properties(satcfdi_os_macos_portapapeles_tests PROPERTIES LABELS "unit;macos;respaldo")
+    satcfdi_enable_warnings(satcfdi_os_macos_portapapeles_tests)
+
+    # T025.6 C4: impresion de texto renderizada a PDF en memoria (sin panel,
+    # impresora ni archivos).
+    qt_add_executable(satcfdi_os_macos_impresion_tests
+        os/macos/tests/TestImpresionTexto.cpp
+    )
+    set_target_properties(satcfdi_os_macos_impresion_tests PROPERTIES AUTOMOC ON)
+    target_link_libraries(satcfdi_os_macos_impresion_tests PRIVATE satcfdi_os_macos Qt6::Test)
+    add_test(NAME satcfdi_os_macos_impresion_tests COMMAND satcfdi_os_macos_impresion_tests)
+    set_tests_properties(satcfdi_os_macos_impresion_tests PROPERTIES LABELS "unit;macos;respaldo")
+    satcfdi_enable_warnings(satcfdi_os_macos_impresion_tests)
 
     # T025.5: comando del auxiliar de relanzamiento, ejecutado de verdad con
     # un pid y un "ejecutable" sinteticos (sin lanzar la app ni `open`).

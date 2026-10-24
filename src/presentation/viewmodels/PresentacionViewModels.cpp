@@ -11,6 +11,7 @@
 #include "HistorialViewModel.h"
 #include "NuevaSolicitudViewModel.h"
 #include "PerfilesSatViewModel.h"
+#include "RespaldoViewModel.h"
 #include "SolicitudDetailViewModel.h"
 #include "SolicitudesListModel.h"
 
@@ -31,7 +32,9 @@ PresentacionViewModels::PresentacionViewModels(SolicitudesService* solicitudes,
     , m_historial(new HistorialViewModel(this))
     , m_app(new AppViewModel(m_detalle, m_perfiles, m_eFirma, this))
     , m_avisoRaizPaquetes(new AvisoRaizPaquetesViewModel(this))
+    , m_respaldo(new RespaldoViewModel(this))
 {
+    m_app->setRespaldo(m_respaldo);
     // Tras registrar/reemplazar (exito o fallo) se reverifica el estado real
     // del perfil: un reemplazo fallido muestra la credencial anterior.
     connect(m_eFirma, &EFirmaFormViewModel::operacionTerminada, m_perfiles,
@@ -115,6 +118,31 @@ void PresentacionViewModels::setResolucionDestinos(ResolucionDestinoNotificacion
     m_app->setResolucionDestinos(resolucion);
 }
 
+void PresentacionViewModels::setControlRespaldo(ControlRespaldoPresentacion* control)
+{
+    m_respaldo->setControlRespaldo(control);
+}
+
+void PresentacionViewModels::setControlRestauracion(ControlRestauracionPresentacion* control)
+{
+    m_respaldo->setControlRestauracion(control);
+}
+
+void PresentacionViewModels::setDatosPreviosRestauracion(DatosPreviosRestauracionPresentacion* datos)
+{
+    m_respaldo->setDatosPrevios(datos);
+}
+
+void PresentacionViewModels::setImpresionTexto(ImpresionTexto impresion)
+{
+    m_respaldo->setImpresion(std::move(impresion));
+}
+
+void PresentacionViewModels::setCopiaTextoSecreto(CopiaTextoSecreto copia)
+{
+    m_respaldo->setCopiaSecreta(std::move(copia));
+}
+
 QVariantMap PresentacionViewModels::initialProperties() const
 {
     return {
@@ -127,6 +155,7 @@ QVariantMap PresentacionViewModels::initialProperties() const
         {QStringLiteral("avisoRaizPaquetesViewModel"), QVariant::fromValue(m_avisoRaizPaquetes)},
         {QStringLiteral("facturasViewModel"), QVariant::fromValue(m_facturas)},
         {QStringLiteral("historialViewModel"), QVariant::fromValue(m_historial)},
+        {QStringLiteral("respaldoViewModel"), QVariant::fromValue(m_respaldo)},
     };
 }
 

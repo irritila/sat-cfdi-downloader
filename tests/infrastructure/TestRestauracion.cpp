@@ -14,6 +14,7 @@
 #include "app_core/MarcadorRestauracion.h"
 #include "app_core/MigracionRaizPaquetes.h"
 #include "app_core/RestauracionArranque.h"
+#include "app_core/RespaldoPresentacionRoot.h"
 #include "app_core/SingleInstanceCoordinator.h"
 #include "application/logging/RegexLogSanitizer.h"
 #include "application/operaciones/OperacionExecutor.h"
@@ -39,6 +40,7 @@
 #include <QGuiApplication>
 #include <QMutex>
 #include <QSettings>
+#include <QSignalSpy>
 #include <QStandardPaths>
 #include <QTest>
 #include <QThread>
@@ -1684,6 +1686,51 @@ private slots:
         QVERIFY2(r, r ? "" : qPrintable(r.error().diagnostico));
         QVERIFY(QFileInfo::exists(QDir(m.stagingExtraccion).filePath(QStringLiteral("doc.txt"))));
         QVERIFY(!QFileInfo::exists(m.stagingDatos));
+    }
+
+    // T025.6 (corte B): el root crea los adaptadores de presentacion y un
+    // respaldo terminado llega al puerto con su resultado saneado.
+    void rootExponeLosPuertosDePresentacionDelRespaldo()
+    {
+        QTemporaryDir tmp;
+        QVERIFY(tmp.isValid());
+        AppBootstrapper::Opciones o;
+        o.directorioDatos = tmp.filePath(QStringLiteral("datos"));
+        const auto arranque = AppBootstrapper(o).preparar();
+        QVERIFY(arranque);
+        fakes::FakeSecretStore secretos;
+        fakes::FakeOperacionesSat sat;
+        OpcionesMonitoreo m;
+        m.operacionesSat = &sat;
+        m.raizPaquetes = arranque.valor().raizPaquetes;
+        AppCompositionRoot root(arranque.valor().rutaBase, secretos, m);
+        ControlRespaldoPresentacion& control = root.controlRespaldoPresentacion();
+        QVERIFY(!control.estado().disponible); // sin almacen de KEK ni bookmarks
+        QVERIFY(!control.ultimoResultado().has_value());
+        QSignalSpy terminados(&control, &ControlRespaldoPresentacion::respaldoTerminado);
+        auto f = control.respaldarAhora(); // sin carpeta: error previo al servicio
+        QVERIFY(QTest::qWaitFor([&] { return f.isFinished(); }, 10000));
+        QVERIFY(!f.result().exito());
+        QVERIFY(QTest::qWaitFor([&] { return terminados.size() == 1; }, 10000));
+        const auto r = terminados.at(0).at(0).value<ResultadoRespaldoPresentacion>();
+        QCOMPARE(r.estado, f.result().estado);
+        QVERIFY(control.ultimoResultado().has_value());
+        QCOMPARE(control.ultimoResultado()->estado, r.estado);
+        QVERIFY(!r.avisoPersistencia); // el ini se guardo
+        // Q1: el aviso de persistencia viaja del resumen al puerto.
+        respaldo::ResumenUltimoRespaldo resumen;
+        resumen.fechaUtc = QDateTime(QDate(2026, 10, 22), QTime(9, 0), QTimeZone::UTC);
+        resumen.estado = respaldo::claveEstable(respaldo::ResultadoRespaldo::Estado::Exito);
+        resumen.avisoPersistencia = true;
+        const auto proyectado = resultadoDesdeResumen(resumen);
+        QVERIFY(proyectado.has_value());
+        QVERIFY(proyectado->avisoPersistencia);
+        QVERIFY(!root.controlRestauracionPresentacion().preparada());
+        QCOMPARE(root.datosPreviosRestauracionPresentacion().restauracionAlArrancar().estado,
+                 ResultadoArranquePresentacion::Estado::Ninguno);
+        QVERIFY(!root.impresionTexto()(QStringLiteral("Clave"), QStringLiteral("texto"))); // sin OS
+        auto fin = root.ejecutor().detener(std::chrono::milliseconds(0));
+        QVERIFY(QTest::qWaitFor([&] { return fin.isFinished(); }, 10000));
     }
 
     void preRestauracionNoChocaConUnaExistente()

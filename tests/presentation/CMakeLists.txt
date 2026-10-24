@@ -138,6 +138,8 @@ qt_add_executable(satcfdi_presentation_quicktests
     quick/FixtureFacturas.h
     quick/FixtureFacturas.cpp
     quick/FixtureAvisoRaiz.h
+    quick/FixtureRespaldo.h
+    RespaldoFakes.h
     ConsultaCatalogoFake.h
     PrevisualizacionFake.h
     ServiciosAsincronosFake.h
@@ -236,6 +238,29 @@ target_link_libraries(satcfdi_facturas_vm_tests PRIVATE
 satcfdi_enable_warnings(satcfdi_facturas_vm_tests)
 add_test(NAME satcfdi_facturas_vm_tests COMMAND satcfdi_facturas_vm_tests)
 set_tests_properties(satcfdi_facturas_vm_tests PROPERTIES
+    LABELS presentation
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
+# satcfdi_respaldo_vm_tests (T025.6): RespaldoViewModel con fakes de los
+# puertos de presentacion (respaldo, restauracion, datos previos) y el
+# catalogo de mensajes del respaldo (sin "subido", rutas ni secretos).
+qt_add_executable(satcfdi_respaldo_vm_tests
+    TestRespaldoViewModel.cpp
+    RespaldoFakes.h
+    ../fakes/PromesasPendientes.h
+)
+target_include_directories(satcfdi_respaldo_vm_tests PRIVATE ${PROJECT_SOURCE_DIR}/tests)
+target_link_libraries(satcfdi_respaldo_vm_tests PRIVATE
+    satcfdi_presentation
+    satcfdi_application
+    satcfdi_domain
+    Qt6::Gui
+    Qt6::Test
+)
+satcfdi_enable_warnings(satcfdi_respaldo_vm_tests)
+add_test(NAME satcfdi_respaldo_vm_tests COMMAND satcfdi_respaldo_vm_tests)
+set_tests_properties(satcfdi_respaldo_vm_tests PROPERTIES
     LABELS presentation
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )

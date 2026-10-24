@@ -28,6 +28,13 @@
 // - T025.5: solicitarRelanzamiento() cuenta en relanzamientosSolicitados()
 //   y devuelve `resultadoRelanzamiento` (Programado por omision). No se
 //   registra en `comandos` ni relanza nada.
+// - T025.6 C4: imprimirTexto() no imprime ni escribe nada: cuenta en
+//   impresionesSolicitadas(), guarda titulo y texto de la ultima (solo para
+//   comprobarlos en pruebas con datos sinteticos) y devuelve
+//   `resultadoImpresion` (Enviado por omision). No se registra en `comandos`.
+// - T025.6 H1/M1: copiarTextoSecreto() no toca el portapapeles: cuenta en
+//   copiasSecretasSolicitadas(), guarda el ultimo texto (datos sinteticos) y
+//   devuelve `resultadoCopiaSecreta` (Copiado por omision).
 // Sin AppKit, permisos reales, timers ni sleeps.
 
 #include "ports/OSIntegration.h"
@@ -118,6 +125,30 @@ public:
         return resultadoRelanzamiento;
     }
     int relanzamientosSolicitados() const { return m_relanzamientos; }
+
+    // T025.6 H1/M1: copia segura simulada.
+    ResultadoCopiaSecreta resultadoCopiaSecreta = ResultadoCopiaSecreta::Copiado;
+    ResultadoCopiaSecreta copiarTextoSecreto(const QString& texto) override
+    {
+        ++m_copiasSecretas;
+        ultimoTextoSecretoCopiado = texto;
+        return resultadoCopiaSecreta;
+    }
+    int copiasSecretasSolicitadas() const { return m_copiasSecretas; }
+    QString ultimoTextoSecretoCopiado;
+
+    // T025.6 C4: impresion nativa simulada.
+    ResultadoImpresion resultadoImpresion = ResultadoImpresion::Enviado;
+    ResultadoImpresion imprimirTexto(const QString& titulo, const QString& texto) override
+    {
+        ++m_impresiones;
+        ultimoTituloImpreso = titulo;
+        ultimoTextoImpreso = texto;
+        return resultadoImpresion;
+    }
+    int impresionesSolicitadas() const { return m_impresiones; }
+    QString ultimoTituloImpreso;
+    QString ultimoTextoImpreso;
 
     // T025.4: actividad de sistema.
     std::unique_ptr<ActividadSistema> iniciarActividadSistema(MotivoActividad motivo) override
@@ -360,6 +391,8 @@ private:
     };
     std::shared_ptr<std::atomic<int>> m_actividades = std::make_shared<std::atomic<int>>(0);
     int m_relanzamientos = 0;
+    int m_impresiones = 0;
+    int m_copiasSecretas = 0;
     mutable QMutex m_mutexActividad;
     QList<MotivoActividad> m_motivosActividad;
 

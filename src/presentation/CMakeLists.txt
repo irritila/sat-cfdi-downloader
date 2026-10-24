@@ -15,6 +15,13 @@ set(_satcfdi_qml_files
     qml/screens/FacturasPage.qml
     # T023.5: Historial (qt-interface-engineer, corte 3).
     qml/screens/HistorialPage.qml
+    # T025.6: respaldo y restauracion.
+    qml/screens/RespaldoPage.qml
+    qml/components/FranjaAvisosRespaldo.qml
+    qml/components/DialogoRespaldoBase.qml
+    qml/components/DialogoContrasenaRespaldo.qml
+    qml/components/DialogoClaveRecuperacion.qml
+    qml/components/DialogoRestaurarRespaldo.qml
     qml/components/FranjaMes.qml
     qml/components/ListaMesesFacturas.qml
     qml/components/EFirmaDialogo.qml
@@ -132,6 +139,10 @@ qt_add_qml_module(satcfdi_presentation
         viewmodels/PresentacionViewModels.cpp
         viewmodels/AvisoRaizPaquetesViewModel.h
         viewmodels/AvisoRaizPaquetesViewModel.cpp
+        # T025.6: respaldo y restauracion (puertos de presentacion y view model).
+        viewmodels/PuertosRespaldoPresentacion.h
+        viewmodels/RespaldoViewModel.h
+        viewmodels/RespaldoViewModel.cpp
 )
 
 # Includes: "presentation/viewmodels/X.h" desde src/, y "X.h" para el codigo

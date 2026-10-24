@@ -16,6 +16,7 @@ class EFirmaFormViewModel;
 class ExploradorCfdiViewModel;
 class FacturasViewModel;
 class HistorialViewModel;
+class RespaldoViewModel;
 class ResolucionDestinoNotificacion;
 struct DestinoNavegacion;
 class PerfilesSatViewModel;
@@ -114,6 +115,7 @@ public:
         Diagnostico,       // T023.5: lista tecnica de solicitudes ("Ir > Diagnostico")
         Detalle,           // DetalleSolicitudPage (vista de diagnostico)
         FacturasSolicitud, // explorador de CFDI de una solicitud (T015.3, desde Detalle)
+        Respaldo,          // T025.6: respaldo y restauracion (Cmd+4, secundaria como Historial)
     };
     Q_ENUM(Pagina)
 
@@ -178,6 +180,12 @@ public:
     // T023.5: Historial (Cmd+3) del perfil de Facturas; no navega sin
     // historial configurado.
     Q_INVOKABLE void mostrarHistorial();
+    // T025.6 (C1): pagina Respaldo (Cmd+4, "Ir > Respaldo" y la franja de
+    // avisos de restauracion). Secundaria: "Atras" vuelve al origen. Sin view
+    // model de respaldo no navega.
+    Q_INVOKABLE void mostrarRespaldo();
+    // T025.6: no propietario; nullptr = sin pagina Respaldo.
+    void setRespaldo(RespaldoViewModel* respaldo);
     // T023.5: "Ir > Diagnostico" (lista tecnica de solicitudes).
     Q_INVOKABLE void mostrarDiagnostico();
     // T023.5: "Atras" / Escape en Historial, Diagnostico, Detalle y
@@ -247,6 +255,7 @@ private:
     QPointer<ExploradorCfdiViewModel> m_explorador;
     QPointer<FacturasViewModel> m_facturas;
     QPointer<HistorialViewModel> m_historial;
+    QPointer<RespaldoViewModel> m_respaldoVm;
     ResolucionDestinoNotificacion* m_resolucion = nullptr;
     quint64 m_genDestino = 0;
     QList<Pagina> m_origenes; // pila de "Atras" (T023.5)

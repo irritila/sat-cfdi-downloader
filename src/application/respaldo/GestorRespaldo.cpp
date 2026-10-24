@@ -4,6 +4,7 @@
 #include <QPromise>
 #include <QThread>
 
+#include <algorithm>
 #include <variant>
 
 namespace satcfdi::respaldo {
@@ -152,9 +153,22 @@ struct GestorRespaldo::Impl {
         bool coincide = guardado;
         if (auto releida = d.configuracion->cargar()) {
             const ConfiguracionRespaldo& r = releida.valor().configuracion;
+            // Q1: tambien el ultimo resultado y su resumen (sin el aviso, que
+            // solo vive en memoria).
+            const auto sinAviso = [](std::optional<ResumenUltimoRespaldo> x) {
+                if (x) {
+                    x->avisoPersistencia = false;
+                }
+                return x;
+            };
             coincide = r.kekContrasena == cfg.kekContrasena && r.kekRecuperacion == cfg.kekRecuperacion
                 && r.bookmark == cfg.bookmark && r.rutaCanonica == cfg.rutaCanonica
-                && r.diarioActivado == cfg.diarioActivado;
+                && r.diarioActivado == cfg.diarioActivado && r.ultimoIntentoUtc == cfg.ultimoIntentoUtc
+                && r.ultimoExitoUtc == cfg.ultimoExitoUtc && r.ultimoResultado == cfg.ultimoResultado
+                && sinAviso(r.ultimoResumen) == sinAviso(cfg.ultimoResumen);
+            if (coincide && cfg.ultimoResumen) {
+                cfg.ultimoResumen->avisoPersistencia = false; // ya quedo guardado
+            }
             cfgIntegra = releida.valor().integra;
         } else {
             cfgIntegra = false;
@@ -202,6 +216,7 @@ struct GestorRespaldo::Impl {
                 espejo.ultimoExitoUtc = c.ultimoExitoUtc;
                 espejo.ultimoIntentoUtc = c.ultimoIntentoUtc;
                 espejo.ultimoResultado = c.ultimoResultado;
+                espejo.ultimoResumen = c.ultimoResumen;
                 emit q->estadoCambiado();
             },
             Qt::QueuedConnection);
@@ -305,15 +320,25 @@ struct GestorRespaldo::Impl {
             Qt::QueuedConnection);
     }
 
-    void registrar(const ResultadoRespaldo& r)
+    // Hilo propio. Persiste el resultado y su resumen saneado (C6); el espejo
+    // se publica (encolado) antes de que `terminar` emita respaldoTerminado.
+    ResumenUltimoRespaldo registrar(const ResultadoRespaldo& r)
     {
+        asegurarCargada();
         const QDateTime ahora = d.reloj().toUTC();
         cfg.ultimoIntentoUtc = ahora;
         cfg.ultimoResultado = claveEstable(r.estado);
         if (r.exito()) {
             cfg.ultimoExitoUtc = ahora;
         }
-        (void)persistir();
+        cfg.ultimoResumen = GestorRespaldo::resumenDe(r, ahora);
+        // Q1: si no quedo guardado (el ini releido no coincide), el espejo y
+        // respaldoTerminado lo dicen para que la UI no afirme lo contrario.
+        if (!persistir()) {
+            cfg.ultimoResumen->avisoPersistencia = true;
+            publicarEspejo();
+        }
+        return *cfg.ultimoResumen;
     }
 };
 
@@ -325,6 +350,40 @@ GestorRespaldo::GestorRespaldo(Dependencias dependencias, QObject* parent)
     m_impl->contexto->moveToThread(&m_impl->hilo);
     QObject::connect(&m_impl->hilo, &QThread::finished, m_impl->contexto, &QObject::deleteLater);
     m_impl->hilo.start();
+    qRegisterMetaType<satcfdi::respaldo::ResumenUltimoRespaldo>();
+    // El servicio emite desde su hilo: la conexion (contexto `this`) es
+    // encolada y el gestor reemite en el hilo grafico.
+    if (m_impl->d.servicio) {
+        QObject::connect(m_impl->d.servicio, &RespaldoService::progreso, this,
+                         [this](RespaldoService::Fase fase, quint64 bytes, quint64 total) {
+                             emit progreso(fase, bytes, total);
+                         });
+    }
+}
+
+ResumenUltimoRespaldo GestorRespaldo::resumenDe(const ResultadoRespaldo& r, const QDateTime& finUtc)
+{
+    ResumenUltimoRespaldo s;
+    s.fechaUtc = finUtc.toUTC();
+    s.estado = claveEstable(r.estado);
+    s.bytesDatos = r.bytesDatos;
+    s.faltantes = std::max(0, r.faltantes);
+    s.omitidos = std::max(0, r.omitidos);
+    s.depurados = std::max(0, r.depurados);
+    s.copiasSinRegistro = std::max(0, r.copiasSinRegistro);
+    s.duplicadosProveedor = std::max(0, r.duplicadosProveedor);
+    s.avisoDepuracion = r.avisoDepuracion;
+    s.avisoRegistro = r.avisoRegistro;
+    if (r.errorDestino) {
+        s.errorDestino = claveEstable(*r.errorDestino);
+    }
+    if (r.errorCaptura) {
+        s.errorCaptura = claveEstable(*r.errorCaptura);
+    }
+    if (r.errorContenedor) {
+        s.errorContenedor = claveEstable(*r.errorContenedor);
+    }
+    return s;
 }
 
 GestorRespaldo::~GestorRespaldo()
@@ -602,15 +661,19 @@ QFuture<ResultadoRespaldo> GestorRespaldo::respaldarAhora()
     QFuture<ResultadoRespaldo> futuro = promesa->future();
     promesa->start();
     // Termina en el hilo grafico: suelta la actividad y el indicador.
-    auto terminar = [impl, promesa, actividad](ResultadoRespaldo r) mutable {
+    auto terminar = [impl, promesa, actividad](ResultadoRespaldo r,
+                                               std::optional<ResumenUltimoRespaldo> resumen) mutable {
         QMetaObject::invokeMethod(
             impl->q,
-            [impl, promesa, actividad, r]() mutable {
+            [impl, promesa, actividad, r, resumen]() mutable {
                 actividad.reset();
                 impl->espejo.enCurso = false;
                 promesa->addResult(r);
                 promesa->finish();
                 emit impl->q->estadoCambiado();
+                if (resumen) {
+                    emit impl->q->respaldoTerminado(*resumen);
+                }
             },
             Qt::QueuedConnection);
     };
@@ -619,8 +682,8 @@ QFuture<ResultadoRespaldo> GestorRespaldo::respaldarAhora()
         [impl, terminar]() mutable {
             auto preparado = impl->preparar();
             if (auto* r = std::get_if<ResultadoRespaldo>(&preparado)) {
-                impl->registrar(*r);
-                terminar(*r);
+                const auto resumen = impl->registrar(*r);
+                terminar(*r, resumen);
                 return;
             }
             auto peticion = std::get<std::shared_ptr<PeticionRespaldo>>(preparado);
@@ -629,13 +692,14 @@ QFuture<ResultadoRespaldo> GestorRespaldo::respaldarAhora()
                 impl->q,
                 [impl, peticion, terminar]() mutable {
                     if (!impl->d.servicio) {
-                        terminar(resultadoPrevio(Estado::ErrorContenedor, QStringLiteral("respaldo.no_disponible")));
+                        terminar(resultadoPrevio(Estado::ErrorContenedor, QStringLiteral("respaldo.no_disponible")),
+                                 std::nullopt);
                         return;
                     }
                     impl->d.servicio->respaldar(std::move(*peticion))
                         .then(impl->contexto, [impl, terminar](ResultadoRespaldo r) mutable {
-                            impl->registrar(r);
-                            terminar(r);
+                            const auto resumen = impl->registrar(r);
+                            terminar(r, resumen);
                         });
                 },
                 Qt::QueuedConnection);

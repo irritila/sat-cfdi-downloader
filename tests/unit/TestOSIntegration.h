@@ -28,4 +28,8 @@ private slots:
     void fakesDePlataformaDelRespaldo();
     // T025.5: relanzamiento tras salir.
     void relanzamientoContratoYFake();
+    // T025.6 C4: impresion nativa de texto.
+    void impresionContratoYFake();
+    // T025.6 H1/M1: copia segura al portapapeles.
+    void copiaSecretaContratoYFake();
 };

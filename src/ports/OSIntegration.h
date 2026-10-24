@@ -147,6 +147,23 @@ public:
     enum class ResultadoRelanzamiento { Programado, NoSoportado, Fallido };
     Q_ENUM(ResultadoRelanzamiento)
 
+    // T025.6 C4: resultado de imprimirTexto(). Enviado = el usuario confirmo
+    // el dialogo del sistema (imprimir o su "Guardar como PDF"); Cancelado =
+    // lo cerro sin imprimir o la impresion fallo (AppKit no los distingue);
+    // NoSoportado = plataforma sin impresion nativa; Fallido = no se pudo
+    // preparar la impresion (sin NSApp, texto vacio).
+    enum class ResultadoImpresion { Enviado, Cancelado, NoSoportado, Fallido };
+    Q_ENUM(ResultadoImpresion)
+
+    // T025.6 H1/M1: resultado de copiarTextoSecreto(). Copiado = el texto
+    // esta en el portapapeles del sistema; NoSoportado = plataforma sin copia
+    // segura (el llamador NO debe recurrir a QClipboard); Fallido = el SO
+    // rechazo la escritura o el texto esta vacio.
+    enum class ResultadoCopiaSecreta { Copiado, NoSoportado, Fallido };
+    Q_ENUM(ResultadoCopiaSecreta)
+    // Plazo tras el que se borra el texto copiado si sigue en el portapapeles.
+    static constexpr int kSegundosBorradoPortapapeles = 90;
+
     using QObject::QObject;
     ~OSIntegration() override;
 
@@ -250,6 +267,31 @@ public:
     // pedir que el usuario la mueva (p. ej. a Aplicaciones) y la reabra; el
     // marcador se aplica en ese arranque manual.
     virtual ResultadoRelanzamiento solicitarRelanzamiento();
+
+    // T025.6 C4 (D6 "imprimible"): imprime `texto` (p. ej. la clave de
+    // recuperacion) bajo `titulo` con el dialogo de impresion del sistema.
+    // Reglas: la app no escribe ningun archivo (ni temporal) ni registra el
+    // texto o el titulo; la vista vive solo en memoria y su contenido se
+    // vacia al terminar (best effort: las copias inmutables de NSString/
+    // QString no se pueden sobrescribir). Lo que haga el sistema despues
+    // (cola de impresion, "Guardar como PDF") lo decide el usuario en el
+    // dialogo nativo.
+    // Hilo grafico. SINCRONO: muestra el panel de impresion app-modal
+    // (NSPrintOperation runOperation, patron nativo como QMessageBox::exec) y
+    // vuelve al cerrarlo; mientras tanto el bucle de eventos sigue atendiendo
+    // eventos (no congela la app, pero el llamador debe tolerar reentrada).
+    // Implementacion por omision: NoSoportado.
+    virtual ResultadoImpresion imprimirTexto(const QString& titulo, const QString& texto);
+
+    // T025.6 H1/M1: copia un texto secreto (la clave de recuperacion) al
+    // portapapeles SIN salir del equipo: no se publica en el Portapapeles
+    // universal (Handoff), se marca oculto y transitorio para los gestores de
+    // portapapeles (convencion nspasteboard.org) y se borra a los
+    // kSegundosBorradoPortapapeles si nadie copio otra cosa despues. Al salir
+    // la app (prepararSalida) se borra con la misma regla. Una copia nueva
+    // reinicia el plazo. Nunca registra el texto.
+    // Hilo grafico; no bloquea. Implementacion por omision: NoSoportado.
+    virtual ResultadoCopiaSecreta copiarTextoSecreto(const QString& texto);
 
     // Retira el menu bar y deja de emitir intenciones antes de terminar el
     // proceso. Idempotente. Despues solo se permite destruir el adaptador.

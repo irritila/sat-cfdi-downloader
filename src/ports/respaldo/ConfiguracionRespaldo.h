@@ -22,6 +22,31 @@
 
 namespace satcfdi::respaldo {
 
+// T025.6 (C6): resumen saneado del ultimo respaldo terminado (manual o
+// diario), para mostrarlo al abrir la app. Solo claves estables, conteos y
+// banderas: nunca diagnostico libre, rutas, nombre publicado ni ids.
+struct ResumenUltimoRespaldo {
+    QDateTime fechaUtc;      // fin del respaldo (UTC, ms)
+    QString estado;          // claveEstable(ResultadoRespaldo::Estado)
+    quint64 bytesDatos = 0;
+    int faltantes = 0;           // ZIP que ya faltaban al congelar (D11)
+    int omitidos = 0;            // ruta_local invalida (no se copiaron)
+    int depurados = 0;           // copias propias borradas por la retencion (D17)
+    int copiasSinRegistro = 0;   // D20: sin descargar y sin registro (no se tocan)
+    int duplicadosProveedor = 0; // ids repetidos avisados por primera vez
+    bool avisoDepuracion = false;
+    bool avisoRegistro = false;
+    // Categoria del error, como clave estable; vacia si no aplica.
+    QString errorDestino;    // claveEstable(ErrorDestino::Categoria)
+    QString errorCaptura;    // claveEstable(ErrorCaptura::Categoria)
+    QString errorContenedor; // claveEstable(ErrorRespaldo::Categoria)
+    // T025.6 (Q1): SOLO en memoria (nunca se escribe ni se lee del ini). true
+    // si este resumen no se pudo guardar: al reabrir la app no se vera.
+    bool avisoPersistencia = false;
+
+    bool operator==(const ResumenUltimoRespaldo&) const = default;
+};
+
 struct ConfiguracionRespaldo {
     // Carpeta (CarpetaRespaldoSistema::crearReferencia).
     QString rutaCanonica;
@@ -38,6 +63,9 @@ struct ConfiguracionRespaldo {
     std::optional<QDateTime> ultimoIntentoUtc;
     std::optional<QDateTime> ultimoExitoUtc;
     QString ultimoResultado; // claveEstable(ResultadoRespaldo::Estado) o diagnostico del gestor
+    // T025.6 (C6): ausente si nunca hubo respaldo o si lo guardado no es
+    // valido (una lectura corrupta lo deja ausente; no afecta `integra`).
+    std::optional<ResumenUltimoRespaldo> ultimoResumen;
 
     bool carpetaConfigurada() const noexcept { return !bookmark.isEmpty() && !rutaCanonica.isEmpty(); }
     bool contrasenaConfigurada() const noexcept { return !kekContrasena.nula() && !kekRecuperacion.nula(); }

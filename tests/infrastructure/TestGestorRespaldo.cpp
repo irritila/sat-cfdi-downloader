@@ -24,6 +24,7 @@
 #include <QPromise>
 #include <QRegularExpression>
 #include <QSettings>
+#include <QSignalSpy>
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTest>
@@ -178,6 +179,26 @@ public:
 private:
     AlmacenConfiguracionRespaldo& m_real;
     bool m_escribe;
+};
+
+// Q1 (T025.6): conmuta entre guardar de verdad, fallar al guardar y reportar
+// exito sin escribir. `real` se fija despues de Entorno::preparar().
+class ConfiguracionConmutable final : public AlmacenConfiguracionRespaldo {
+public:
+    enum class Modo { Normal, FallaAlGuardar, ExitoSinEscribir };
+    AlmacenConfiguracionRespaldo* real = nullptr;
+    std::atomic<Modo> modo{Modo::Normal};
+    Resultado<ConfiguracionLeida, ErrorConfiguracionRespaldo> cargar() override { return real->cargar(); }
+    Resultado<Exito, ErrorConfiguracionRespaldo> guardar(const ConfiguracionRespaldo& c) override
+    {
+        switch (modo.load()) {
+        case Modo::Normal: return real->guardar(c);
+        case Modo::FallaAlGuardar:
+            return Resultado<Exito, ErrorConfiguracionRespaldo>::fallo(ErrorConfiguracionRespaldo::de(QStringLiteral("prueba")));
+        case Modo::ExitoSinEscribir: return Resultado<Exito, ErrorConfiguracionRespaldo>::exito(Exito{});
+        }
+        return real->guardar(c);
+    }
 };
 
 class ConfiguracionQueFalla final : public AlmacenConfiguracionRespaldo {
@@ -740,6 +761,175 @@ private slots:
         e.programador.avanzarHasta(*e.diario->proximaEvaluacionUtc());
         QCOMPARE(e.diario->ejecucionesLanzadas(), 2);
         QVERIFY(QTest::qWaitFor([&] { return e.publicados().size() == 1; }, 10000));
+    }
+
+    // --- T025.6 C6: resumen del ultimo respaldo y progreso -----------------------
+    void resumenDelUltimoRespaldoManualYDiario()
+    {
+        Entorno e;
+        QVERIFY(e.preparar());
+        esperar(e.gestor->iniciar());
+        QVERIFY(!e.configurarTodo().isEmpty());
+        QSignalSpy terminados(e.gestor.get(), &GestorRespaldo::respaldoTerminado);
+        QSignalSpy progreso(e.gestor.get(), &GestorRespaldo::progreso);
+        QThread* hiloProgreso = nullptr;
+        QObject::connect(e.gestor.get(), &GestorRespaldo::progreso, e.gestor.get(),
+                         [&](RespaldoService::Fase, quint64, quint64) { hiloProgreso = QThread::currentThread(); });
+
+        const ResultadoRespaldo r = esperar(e.gestor->respaldarAhora());
+        QVERIFY(r.exito());
+        QVERIFY(QTest::qWaitFor([&] { return terminados.size() == 1; }, 5000));
+        const auto resumen = terminados.at(0).at(0).value<ResumenUltimoRespaldo>();
+        QCOMPARE(resumen.estado, claveEstable(r.estado));
+        QCOMPARE(resumen.fechaUtc, e.reloj.ahora());
+        QCOMPARE(resumen.bytesDatos, r.bytesDatos);
+        QVERIFY(resumen.bytesDatos > 0);
+        QVERIFY(resumen.errorDestino.isEmpty() && resumen.errorCaptura.isEmpty() && resumen.errorContenedor.isEmpty());
+        QVERIFY(progreso.size() >= 2);
+        QCOMPARE(hiloProgreso, QThread::currentThread());
+        // Espejo para la UI y persistido en la seccion `respaldo`.
+        QVERIFY(e.gestor->estado().ultimoResumen.has_value());
+        QCOMPARE(*e.gestor->estado().ultimoResumen, resumen);
+        auto leida = e.configuracionIni->cargar();
+        QVERIFY(leida && leida.valor().integra);
+        QCOMPARE(leida.valor().configuracion.ultimoResumen, std::optional(resumen));
+        // Saneado: ni nombre publicado, ni rutas, ni diagnostico.
+        const QByteArray ini = leer(e.rutaIni());
+        QVERIFY(!r.nombrePublicado.isEmpty());
+        QVERIFY(!ini.contains(r.nombrePublicado.toUtf8()));
+        QVERIFY(!ini.contains("XAXX010101000"));
+        QSettings s(e.rutaIni(), QSettings::IniFormat);
+        s.beginGroup(QStringLiteral("respaldo/ultimo/resumen"));
+        for (const QString& k : s.childKeys()) {
+            QVERIFY2(!s.value(k).toString().contains(QLatin1Char('/')), qPrintable(k));
+        }
+        s.endGroup();
+
+        // Diario fallido: tambien publica, con la categoria como clave estable.
+        const QByteArray bookmark = leida.valor().configuracion.bookmark;
+        e.carpetas.fallarResolver(bookmark, ErrorCarpetaRespaldo::Categoria::NoResuelve);
+        e.reloj.fijar(e.reloj.ahora().addDays(2));
+        QVERIFY(esperar(e.gestor->activarDiario(true)));
+        QVERIFY(QTest::qWaitFor([&] { return terminados.size() == 2; }, 10000));
+        const auto fallido = terminados.at(1).at(0).value<ResumenUltimoRespaldo>();
+        QCOMPARE(fallido.estado, claveEstable(Estado::ErrorDestino));
+        QVERIFY(!fallido.errorDestino.isEmpty());
+        QVERIFY(QTest::qWaitFor([&] { return e.gestor->estado().ultimoResumen == std::optional(fallido); }, 5000));
+
+        // YaEnCurso no publica.
+        e.carpetas.fijarResolucion(bookmark, CarpetaRespaldoResuelta{e.nube, kUuidVolumen, false});
+        QVERIFY(e.esperarLibre());
+        e.fuente->pendiente = true;
+        auto enCurso = e.gestor->respaldarAhora();
+        QCOMPARE(claveEstable(esperar(e.gestor->respaldarAhora()).estado), claveEstable(Estado::YaEnCurso));
+        QVERIFY(QTest::qWaitFor([&] { return e.servicio->enCurso(); }, 5000));
+        e.fuente->liberar();
+        QVERIFY(esperar(enCurso).exito());
+        QVERIFY(QTest::qWaitFor([&] { return terminados.size() == 3; }, 5000));
+        QTest::qWait(30);
+        QCOMPARE(terminados.size(), qsizetype(3));
+    }
+
+    void resumenCorruptoSeLeeTolerante()
+    {
+        Entorno e;
+        QVERIFY(e.preparar());
+        esperar(e.gestor->iniciar());
+        QVERIFY(!e.configurarTodo().isEmpty());
+        QVERIFY(esperar(e.gestor->respaldarAhora()).exito());
+        QVERIFY(e.esperarLibre());
+        {
+            // Campos corruptos: se leen como 0/false/vacio.
+            QSettings s(e.rutaIni(), QSettings::IniFormat);
+            s.setValue(QStringLiteral("respaldo/ultimo/resumen/faltantes"), QStringLiteral("abc"));
+            s.setValue(QStringLiteral("respaldo/ultimo/resumen/depurados"), QStringLiteral("-4"));
+            s.setValue(QStringLiteral("respaldo/ultimo/resumen/bytesDatos"), QStringLiteral("1e9"));
+            s.setValue(QStringLiteral("respaldo/ultimo/resumen/avisoRegistro"), QStringLiteral("1"));
+            s.setValue(QStringLiteral("respaldo/ultimo/resumen/errorDestino"), QStringLiteral("/Users/usuario/x"));
+            s.sync();
+        }
+        auto leida = e.configuracionIni->cargar();
+        QVERIFY(leida && leida.valor().integra);
+        QVERIFY(leida.valor().configuracion.ultimoResumen.has_value());
+        const ResumenUltimoRespaldo& r = *leida.valor().configuracion.ultimoResumen;
+        QCOMPARE(r.faltantes, 0);
+        QCOMPARE(r.depurados, 0);
+        QCOMPARE(r.bytesDatos, quint64(0));
+        QVERIFY(!r.avisoRegistro);
+        QVERIFY(r.errorDestino.isEmpty());
+        {
+            // Estado o fecha invalidos: sin resumen, y la configuracion sigue integra.
+            QSettings s(e.rutaIni(), QSettings::IniFormat);
+            s.setValue(QStringLiteral("respaldo/ultimo/resumen/estado"), QStringLiteral("Exito; rm -rf"));
+            s.sync();
+        }
+        leida = e.configuracionIni->cargar();
+        QVERIFY(leida && leida.valor().integra);
+        QVERIFY(!leida.valor().configuracion.ultimoResumen.has_value());
+        {
+            QSettings s(e.rutaIni(), QSettings::IniFormat);
+            s.setValue(QStringLiteral("respaldo/ultimo/resumen/estado"), QStringLiteral("exito"));
+            s.setValue(QStringLiteral("respaldo/ultimo/resumen/fecha"), QStringLiteral("ayer"));
+            s.sync();
+        }
+        leida = e.configuracionIni->cargar();
+        QVERIFY(leida && leida.valor().integra);
+        QVERIFY(!leida.valor().configuracion.ultimoResumen.has_value());
+        // La reconciliacion de KEK sigue (configuracion integra): no borra las vigentes.
+        const int antes = static_cast<int>(e.almacenReal.listar().valor().size());
+        Entorno* pe = &e;
+        e.diario.reset();
+        e.gestor.reset();
+        GestorRespaldo::Dependencias d;
+        d.configuracion = pe->configuracion;
+        d.almacenKek = &pe->almacen;
+        d.carpetas = &pe->carpetas;
+        d.contenedor = pe->contenedor;
+        d.servicio = pe->servicio.get();
+        d.reloj = pe->reloj.funcion();
+        GestorRespaldo otro(std::move(d));
+        esperar(otro.iniciar());
+        QCOMPARE(static_cast<int>(e.almacenReal.listar().valor().size()), antes);
+        QVERIFY(!otro.estado().ultimoResumen.has_value());
+    }
+
+    // Q1: si el resumen no quedo guardado, el espejo y respaldoTerminado lo
+    // avisan; al guardarse despues, el aviso desaparece.
+    void resumenNoGuardadoSeAvisa()
+    {
+        ConfiguracionConmutable conmutable;
+        Entorno e;
+        QVERIFY(e.preparar(&conmutable));
+        conmutable.real = e.configuracionIni.get();
+        esperar(e.gestor->iniciar());
+        QVERIFY(!e.configurarTodo().isEmpty());
+        QSignalSpy terminados(e.gestor.get(), &GestorRespaldo::respaldoTerminado);
+        using M = ConfiguracionConmutable::Modo;
+        int esperado = 0;
+        for (M modo : {M::FallaAlGuardar, M::ExitoSinEscribir}) {
+            conmutable.modo = modo;
+            e.reloj.fijar(e.reloj.ahora().addSecs(60));
+            QVERIFY(esperar(e.gestor->respaldarAhora()).exito());
+            ++esperado;
+            QVERIFY(QTest::qWaitFor([&] { return terminados.size() == esperado; }, 5000));
+            const auto r = terminados.last().at(0).value<ResumenUltimoRespaldo>();
+            QVERIFY(r.avisoPersistencia);
+            QVERIFY(e.gestor->estado().ultimoResumen.has_value());
+            QVERIFY(e.gestor->estado().ultimoResumen->avisoPersistencia);
+            // En disco no hay resumen: nunca se guardo.
+            QVERIFY(!e.configuracionIni->cargar().valor().configuracion.ultimoResumen.has_value());
+        }
+        conmutable.modo = M::Normal;
+        e.reloj.fijar(e.reloj.ahora().addSecs(60));
+        QVERIFY(esperar(e.gestor->respaldarAhora()).exito());
+        QVERIFY(QTest::qWaitFor([&] { return terminados.size() == 3; }, 5000));
+        const auto ok = terminados.last().at(0).value<ResumenUltimoRespaldo>();
+        QVERIFY(!ok.avisoPersistencia);
+        QVERIFY(!e.gestor->estado().ultimoResumen->avisoPersistencia);
+        const auto guardado = e.configuracionIni->cargar().valor().configuracion.ultimoResumen;
+        QVERIFY(guardado.has_value());
+        QVERIFY(!guardado->avisoPersistencia); // nunca se persiste
+        QCOMPARE(*guardado, ok);
     }
 
     void respaldoManualMantieneLaActividadDeSistema()

@@ -2,6 +2,7 @@
 
 #include "application/persistence/PuertosPersistencia.h"
 #include "AvisoRaizPaquetesViewModel.h"
+#include "PuertosRespaldoPresentacion.h"
 
 #include <QObject>
 #include <QVariantMap>
@@ -27,6 +28,7 @@ class PreferenciasFacturas;
 class NuevaSolicitudViewModel;
 class PerfilesSatService;
 class PerfilesSatViewModel;
+class RespaldoViewModel;
 class SolicitudDetailViewModel;
 class SolicitudesListModel;
 class SolicitudesService;
@@ -68,11 +70,14 @@ public:
     // T019 D8: aviso de la carpeta de paquetes; lo fija el composition root
     // antes de cargar Main.qml (sin aviso queda inactivo).
     AvisoRaizPaquetesViewModel* avisoRaizPaquetes() const { return m_avisoRaizPaquetes; }
+    // T025.6: pagina Respaldo y franja de avisos de restauracion (siempre
+    // existe; sin puertos queda "no disponible").
+    RespaldoViewModel* respaldo() const { return m_respaldo; }
 
     // {"appViewModel", "solicitudesModel",
     //  "detalleViewModel", "perfilesViewModel", "eFirmaViewModel",
     //  "exploradorViewModel", "avisoRaizPaquetesViewModel",
-    //  "facturasViewModel", "historialViewModel"} para
+    //  "facturasViewModel", "historialViewModel", "respaldoViewModel"} para
     //  QQmlApplicationEngine::setInitialProperties.
     QVariantMap initialProperties() const;
 
@@ -100,6 +105,17 @@ public:
     // No propietarios; nullptr = sin Historial / sin resolucion.
     void setFuenteHistorial(FuenteHistorial* fuente);
     void setResolucionDestinos(ResolucionDestinoNotificacion* resolucion);
+    // T025.6 (C2): puertos del respaldo, la restauracion y los datos previos.
+    // No propietarios; deben vivir mas que este objeto. nullptr = la parte
+    // correspondiente de la pagina Respaldo queda "no disponible". Con el
+    // control de respaldo, AppViewModel::mostrarRespaldo() navega.
+    void setControlRespaldo(ControlRespaldoPresentacion* control);
+    void setControlRestauracion(ControlRestauracionPresentacion* control);
+    void setDatosPreviosRestauracion(DatosPreviosRestauracionPresentacion* datos);
+    // C4: impresion de la clave de recuperacion (vacia = sin "Imprimir…").
+    void setImpresionTexto(ImpresionTexto impresion);
+    // H1: copia de la clave de recuperacion (vacia = sin "Copiar").
+    void setCopiaTextoSecreto(CopiaTextoSecreto copia);
 
 private:
     void conectarPreparacionDetalle(PerfilesSatService* perfiles, CredencialesSatService* credenciales,
@@ -115,6 +131,7 @@ private:
     HistorialViewModel* m_historial;
     AppViewModel* m_app;
     AvisoRaizPaquetesViewModel* m_avisoRaizPaquetes;
+    RespaldoViewModel* m_respaldo;
 };
 
 } // namespace satcfdi

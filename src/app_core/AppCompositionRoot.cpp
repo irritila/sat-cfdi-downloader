@@ -25,6 +25,7 @@
 #include "app_core/ConfiguracionRespaldoIni.h"
 #include "app_core/AreaRestauracionLocal.h"
 #include "app_core/DatosPreviosRestauracion.h"
+#include "app_core/RespaldoPresentacionRoot.h"
 #include "application/respaldo/RestauracionService.h"
 #include "infrastructure/persistence/sqlite/SqliteBaseRestauracion.h"
 #include "application/respaldo/GestorRespaldo.h"
@@ -332,6 +333,12 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
             }
         };
         m_restauracion = std::make_unique<respaldo::RestauracionService>(std::move(restauracion));
+
+        // T025.6 (corte B): adaptadores de presentacion.
+        m_controlRespaldo = std::make_unique<ControlRespaldoGestor>(
+            *m_gestorRespaldo, monitoreo.almacenKekRespaldo != nullptr && monitoreo.carpetaRespaldoSistema != nullptr);
+        m_controlRestauracion = std::make_unique<ControlRestauracionServicio>(*m_restauracion);
+        m_datosPreviosPresentacion = std::make_unique<DatosPreviosRestauracionRoot>(*this);
     }
     m_restauracionAlArrancar = monitoreo.restauracionAlArrancar;
     m_directorioDatos = QFileInfo(rutaBase).absolutePath();
@@ -564,6 +571,13 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
     // T023.5: Historial y destino de notificaciones de solicitud.
     m_fuenteHistorial = std::make_unique<FuenteHistorialRoot>(*m_catalogoMensual, *m_fuenteFacturas);
     m_viewModels->setFuenteHistorial(m_fuenteHistorial.get());
+    // T025.6 (C2): pagina Respaldo y franja de avisos. Antes de cargar():
+    // initialProperties ya incluye respaldoViewModel.
+    m_viewModels->setControlRespaldo(m_controlRespaldo.get());
+    m_viewModels->setControlRestauracion(m_controlRestauracion.get());
+    m_viewModels->setDatosPreviosRestauracion(m_datosPreviosPresentacion.get());
+    m_viewModels->setImpresionTexto(impresionTexto());
+    m_viewModels->setCopiaTextoSecreto(copiaTextoSecreto());
     m_viewModels->setResolucionDestinos(m_fuenteHistorial.get());
 
     // Primera tarea del dispatcher serial: limpia generaciones huerfanas del
@@ -581,6 +595,10 @@ AppCompositionRoot::~AppCompositionRoot()
     m_engine.reset();
     m_controlador.reset();
     m_viewModels.reset();
+    // T025.6: adaptadores de presentacion antes que sus servicios.
+    m_datosPreviosPresentacion.reset();
+    m_controlRestauracion.reset();
+    m_controlRespaldo.reset();
     m_restauracion.reset(); // T025.5: sus callbacks usan este root
 
     // T007: el ejecutor termina antes que el dispatcher (y su hilo cierra su
@@ -668,6 +686,39 @@ QString claveEstable(ResultadoDescarteDatosPrevios::Estado e)
     case E::ErrorReconciliacion: return QStringLiteral("error_reconciliacion");
     }
     return QStringLiteral("incompleto");
+}
+
+ControlRespaldoPresentacion& AppCompositionRoot::controlRespaldoPresentacion() const
+{
+    return *m_controlRespaldo;
+}
+
+ControlRestauracionPresentacion& AppCompositionRoot::controlRestauracionPresentacion() const
+{
+    return *m_controlRestauracion;
+}
+
+DatosPreviosRestauracionPresentacion& AppCompositionRoot::datosPreviosRestauracionPresentacion() const
+{
+    return *m_datosPreviosPresentacion;
+}
+
+ImpresionTexto AppCompositionRoot::impresionTexto()
+{
+    return [this](const QString& titulo, const QString& texto) {
+        if (!m_os) {
+            return false;
+        }
+        const auto r = m_os->imprimirTexto(titulo, texto);
+        return r == OSIntegration::ResultadoImpresion::Enviado;
+    };
+}
+
+CopiaTextoSecreto AppCompositionRoot::copiaTextoSecreto()
+{
+    return [this](const QString& texto) {
+        return m_os && m_os->copiarTextoSecreto(texto) == OSIntegration::ResultadoCopiaSecreta::Copiado;
+    };
 }
 
 QFuture<bool> AppCompositionRoot::hayDatosPrevios() const

@@ -77,6 +77,14 @@ public:
     // espera a que termine este pid y luego `open -n <bundle> --args ...`.
     ResultadoRelanzamiento solicitarRelanzamiento() override;
 
+    // T025.6 C4: NSPrintOperation sobre un NSTextView en memoria (ver
+    // ImpresionTextoMacOS.h).
+    ResultadoImpresion imprimirTexto(const QString& titulo, const QString& texto) override;
+
+    // T025.6 H1/M1: NSPasteboard general, CurrentHostOnly, tipos oculto y
+    // transitorio, borrado a los 90 s (PortapapelesSecretoMacOS).
+    ResultadoCopiaSecreta copiarTextoSecreto(const QString& texto) override;
+
     void prepararSalida() override;
 
 protected:

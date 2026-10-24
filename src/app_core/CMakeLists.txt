@@ -34,6 +34,9 @@ qt_add_library(satcfdi_app_core STATIC
     RestauracionArranque.cpp
     DatosPreviosRestauracion.h
     DatosPreviosRestauracion.cpp
+    # T025.6 (corte B): adaptadores de los puertos de presentacion del respaldo.
+    RespaldoPresentacionRoot.h
+    RespaldoPresentacionRoot.cpp
     AppLifecycleController.h
     ArranqueProceso.h
     ArranqueProceso.cpp

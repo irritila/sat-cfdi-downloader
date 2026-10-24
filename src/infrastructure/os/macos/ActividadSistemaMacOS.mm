@@ -14,9 +14,8 @@ namespace {
 
 class ActividadMacOS final : public OSIntegration::ActividadSistema {
 public:
-    explicit ActividadMacOS(OSIntegration::MotivoActividad motivo)
-        : m_actividad([[NSProcessInfo processInfo] beginActivityWithOptions:NSActivityUserInitiated
-                                                                     reason:textoMotivoActividad(motivo).toNSString()])
+    ActividadMacOS(NSActivityOptions opciones, NSString* motivo)
+        : m_actividad([[NSProcessInfo processInfo] beginActivityWithOptions:opciones reason:motivo])
     {
     }
     ~ActividadMacOS() override
@@ -43,7 +42,13 @@ QString textoMotivoActividad(OSIntegration::MotivoActividad motivo)
 
 std::unique_ptr<OSIntegration::ActividadSistema> iniciarActividadSistemaMacOS(OSIntegration::MotivoActividad motivo)
 {
-    return std::make_unique<ActividadMacOS>(motivo);
+    return std::make_unique<ActividadMacOS>(NSActivityUserInitiated, textoMotivoActividad(motivo).toNSString());
+}
+
+std::unique_ptr<OSIntegration::ActividadSistema> iniciarActividadSinBloquearReposoMacOS()
+{
+    return std::make_unique<ActividadMacOS>(NSActivityUserInitiatedAllowingIdleSystemSleep,
+                                            @(kMotivoActividadPortapapeles));
 }
 
 } // namespace satcfdi::macos

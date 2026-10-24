@@ -7,6 +7,7 @@
 #include "FuenteHistorial.h"
 #include "HistorialViewModel.h"
 #include "PerfilesSatViewModel.h"
+#include "RespaldoViewModel.h"
 #include "SolicitudDetailViewModel.h"
 
 #include "application/notificaciones/DestinoNavegacion.h"
@@ -74,6 +75,7 @@ QString AppViewModel::textoRegresar() const
 {
     switch (paginaOrigen()) {
     case Pagina::Historial: return QStringLiteral("Historial");
+    case Pagina::Respaldo: return QStringLiteral("Respaldo");
     case Pagina::Perfiles: return QStringLiteral("Perfiles SAT");
     case Pagina::Diagnostico: return QStringLiteral("Diagnóstico");
     case Pagina::Detalle: return QStringLiteral("Detalles técnicos");
@@ -152,6 +154,18 @@ void AppViewModel::mostrarHistorial()
         m_historial->mostrarPerfil(m_facturas->perfilId(), m_facturas->perfilRfc(), m_facturas->perfilNombre());
     }
     irASecundaria(Pagina::Historial);
+}
+
+void AppViewModel::mostrarRespaldo()
+{
+    if (m_respaldoVm) {
+        irASecundaria(Pagina::Respaldo);
+    }
+}
+
+void AppViewModel::setRespaldo(RespaldoViewModel* respaldo)
+{
+    m_respaldoVm = respaldo;
 }
 
 void AppViewModel::mostrarDiagnostico()
@@ -435,6 +449,7 @@ void AppViewModel::setPagina(Pagina pagina)
     }
     const bool entraFacturas = m_pagina != Pagina::Facturas && pagina == Pagina::Facturas;
     const bool entraHistorial = m_pagina != Pagina::Historial && pagina == Pagina::Historial;
+    const bool entraRespaldo = m_pagina != Pagina::Respaldo && pagina == Pagina::Respaldo;
     if (m_pagina != pagina) {
         m_pagina = pagina;
         emit paginaChanged();
@@ -444,6 +459,9 @@ void AppViewModel::setPagina(Pagina pagina)
     }
     if (entraHistorial && m_historial) {
         m_historial->activar();
+    }
+    if (entraRespaldo && m_respaldoVm) {
+        m_respaldoVm->activar();
     }
 }
 

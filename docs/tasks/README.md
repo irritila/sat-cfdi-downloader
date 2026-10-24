@@ -56,13 +56,13 @@ Ejemplo: `T001-modelo-fisico-sqlite.md`.
 | [T023.5](T023.5-historial-diagnostico-notificaciones.md) | Completada | Historial, diagnostico, notificaciones y menu bar |
 | [T023.6](T023.6-sin-facturas-5004.md) | Completada | Periodo sin facturas (Rechazada 5004) no es error |
 | [T024](T024-vocabulario-y-materiales-flujo-facturas.md) | Pendiente | Vocabulario y materiales del flujo centrado en facturas |
-| [T025](T025-respaldo-en-la-nube.md) | Pendiente | Respaldo cifrado en la nube del usuario (epica) |
+| [T025](T025-respaldo-en-la-nube.md) | Completada | Respaldo cifrado en la nube del usuario (epica) |
 | [T025.1](T025.1-formato-y-cifrado-respaldo.md) | Completada | Formato y cifrado del respaldo |
 | [T025.2](T025.2-captura-consistente.md) | Completada | Captura consistente de los datos |
 | [T025.3](T025.3-respaldo-manual.md) | Completada | Respaldo manual a la carpeta elegida |
 | [T025.4](T025.4-respaldo-diario.md) | Completada | Configuracion y respaldo diario |
 | [T025.5](T025.5-restauracion.md) | Completada | Restauracion transaccional |
-| [T025.6](T025.6-ui-y-documentacion-respaldo.md) | Pendiente | UI y documentacion del respaldo |
+| [T025.6](T025.6-ui-y-documentacion-respaldo.md) | Completada | UI y documentacion del respaldo |
 
 ## Estados
 

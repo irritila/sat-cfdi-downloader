@@ -4,6 +4,7 @@
 #include "app_core/AppBootstrapper.h"
 #include "app_core/ArranqueProceso.h"
 #include "app_core/AppCompositionRoot.h"
+#include "app_core/AppLifecycleController.h"
 #include "app_core/IdInstalacionRespaldo.h"
 #include "app_core/SingleInstanceCoordinator.h"
 #include "presentation/estilo/EstiloVisual.h"
@@ -113,7 +114,14 @@ int main(int argc, char* argv[])
         }
 
         QApplication::setQuitOnLastWindowClosed(false);
-        root.iniciarCicloDeVida(*os, &instancia);
+        satcfdi::AppLifecycleController& ciclo = root.iniciarCicloDeVida(*os, &instancia);
+        // T025.6 C7: tras una restauracion aplicada la ventana se muestra y se
+        // activa al frente aunque el arranque fuera por Login Item u oculto
+        // (iniciar() solo la muestra con LaunchContext::Manual). Mostrarla pasa
+        // la app a modo Regular y la activa (MacOSIntegration, ADR 0009).
+        if (preparacion.restauracion.estado == satcfdi::ResultadoRestauracionArranque::Estado::Aplicada) {
+            ciclo.mostrarVentana();
+        }
 
         codigo = QApplication::exec();
     } // el root cierra el ejecutor, el dispatcher y la base
