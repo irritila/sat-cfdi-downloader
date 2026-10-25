@@ -117,6 +117,11 @@ if(APPLE AND NOT libzip_DIR)
 endif()
 find_package(libzip REQUIRED)
 
+# T026.1 (C2): zlib explicita (SDK de macOS) para el escritor ZIP de la
+# exportacion (deflate raw y CRC32) y sus pruebas; target ZLIB::ZLIB. No se
+# confia en la carga transitiva desde libzip.
+find_package(ZLIB REQUIRED)
+
 # T015.4 (T015 D8): qrcodegen (MIT) como biblioteca estatica de terceros, sin
 # -Werror. Solo la enlaza satcfdi_cfdi_pdf.
 add_subdirectory(third_party/qrcodegen)

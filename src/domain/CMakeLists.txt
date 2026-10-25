@@ -67,6 +67,9 @@ qt_add_library(satcfdi_domain STATIC
     # T023.3: plan puro de la descarga guiada y oferta.
     cfdi/PlanDescargaGuiada.h
     cfdi/PlanDescargaGuiada.cpp
+    # T026.1: alcance, plan, nombres y omitidas de la exportacion de facturas.
+    cfdi/ExportacionFacturas.h
+    cfdi/ExportacionFacturas.cpp
 )
 
 # Convencion de includes: rutas relativas a src/, por ejemplo

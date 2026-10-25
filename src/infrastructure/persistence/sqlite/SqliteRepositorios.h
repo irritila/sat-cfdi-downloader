@@ -138,6 +138,8 @@ public:
     Resultado<QList<EvidenciaSolicitudMensual>, ErrorPersistencia>
     leerEvidencia(const PerfilId& perfil, MesCalendario mes, int versionParser) override;
     Resultado<QHash<SolicitudId, int>, ErrorPersistencia> conteosPorSolicitud(const PerfilId& perfil) override;
+    Resultado<InstantaneaExportacion, ErrorPersistencia>
+    capturarParaExportar(const PerfilId& perfil, const QList<MesCalendario>& meses, int versionParser) override;
 
 private:
     SqliteConnectionProvider& m_proveedor;

@@ -108,6 +108,23 @@ public:
     {
         return Resultado<QHash<SolicitudId, int>, ErrorPersistencia>::exito({});
     }
+    // T026.1: la exportacion no se prueba con este fake (ver
+    // TestPlanificadorExportacion); devuelve la evidencia fijada por mes.
+    Resultado<InstantaneaExportacion, ErrorPersistencia> capturarParaExportar(const PerfilId&,
+                                                                             const QList<MesCalendario>& meses,
+                                                                             int) override
+    {
+        registrarHilo();
+        if (m_fallar) {
+            return Resultado<InstantaneaExportacion, ErrorPersistencia>::fallo(errorAlmacenamiento());
+        }
+        QMutexLocker b(&m_mutex);
+        InstantaneaExportacion r;
+        for (const MesCalendario mes : meses) {
+            r.meses.append(MesInstantaneaExportacion{mes, {}, m_evidencia});
+        }
+        return Resultado<InstantaneaExportacion, ErrorPersistencia>::exito(r);
+    }
 
 private:
     void registrarHilo()

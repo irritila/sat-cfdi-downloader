@@ -46,6 +46,11 @@ qt_add_library(satcfdi_ports STATIC
     # T025.5: restauracion (origen, base en staging, area y marcador).
     respaldo/Restauracion.h
     respaldo/Restauracion.cpp
+    # T026.1: destino atomico de la exportacion de facturas.
+    exportacion/ErrorDestinoExportacion.h
+    exportacion/ArchivoParcialExportacion.h
+    exportacion/DestinoExportacion.h
+    exportacion/EscritorZipExportacion.h
 )
 
 set_target_properties(satcfdi_ports PROPERTIES AUTOMOC ON)

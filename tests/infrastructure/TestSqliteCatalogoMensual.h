@@ -8,7 +8,9 @@
 // mismo RFC, revalidacion), evidencia mensual y catalogo mensual
 // deduplicado (perfil, mes y direccion, limites 31 dic / 1 ene, fuente
 // guiada frente a manual, eliminacion de la fuente, CFDI sin UUID, conteos
-// coherentes con la lista) contra SQLite real en QTemporaryDir.
+// coherentes con la lista) contra SQLite real en QTemporaryDir. T026.1:
+// instantanea de exportacion (varios meses, sin paginar, con evidencia, en
+// una transaccion de lectura propia o la del llamador).
 class TestSqliteCatalogoMensual : public QObject {
     Q_OBJECT
 
@@ -29,4 +31,7 @@ private slots:
     void catalogoSinUuidNoSeDeduplica();
     void catalogoOcultaEliminadosYCuentaIgualQueLaLista();
     void catalogoFiltrosTextoTipoYPaginacion();
+    // T026.1
+    void instantaneaExportacionSinPaginarConEvidencia();
+    void instantaneaExportacionDentroDeUnidadDeTrabajo();
 };

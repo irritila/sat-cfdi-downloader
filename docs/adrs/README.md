@@ -39,3 +39,4 @@ Un ADR aceptado no se edita para cambiar la decision central. Si una decision ca
 | [0020](0020-huecos-y-causas-superadas-cobertura-mensual.md) | Accepted | Huecos y causas superadas en la cobertura mensual (modifica ADR 0019) |
 | [0021](0021-respaldo-cifrado-a-carpeta-sincronizada.md) | Accepted | Respaldo cifrado a carpeta sincronizada del usuario (enmienda acotada a ADR 0004) |
 | [0022](0022-restauracion-transaccional-al-arranque.md) | Accepted | Restauracion transaccional al arranque: staging verificado, marcador con diario de fases y sustitucion antes de T019 y SQLite |
+| [0023](0023-exportacion-local-atomica-cfdi.md) | Accepted | Exportacion local atomica de CFDI: plan por instantanea, hilo propio fuera del ejecutor, escritor ZIP en streaming y publicacion exclusiva (complementa ADR 0014) |

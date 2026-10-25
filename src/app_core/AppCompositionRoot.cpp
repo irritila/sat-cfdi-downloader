@@ -33,6 +33,8 @@
 #include "application/respaldo/RespaldoService.h"
 #include "infrastructure/crypto/ContenedorRespaldoOpenSsl.h"
 #include "infrastructure/storage/DestinoRespaldoPosix.h"
+#include "infrastructure/storage/DestinoExportacionPosix.h"
+#include "infrastructure/cfdi/zip/EscritorZipStreaming.h"
 #include "application/estadoagregado/MonitorEstadoAgregado.h"
 #include "application/operaciones/OperacionesSatProductivo.h"
 #include "application/paquetes/AccesoPaquetesService.h"
@@ -342,6 +344,13 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
     }
     m_restauracionAlArrancar = monitoreo.restauracionAlArrancar;
     m_directorioDatos = QFileInfo(rutaBase).absolutePath();
+    // T026.1 (D12): destino de la exportacion; su limpieza corre en
+    // iniciarMonitoreo(). Construirlo no escribe en disco.
+    {
+        DestinoExportacionPosix::Opciones o;
+        o.directorioDatos = m_directorioDatos;
+        m_destinoExportacion = std::make_shared<DestinoExportacionPosix>(std::move(o));
+    }
     m_worker = std::make_unique<WorkerLocal>(*m_ejecutor, *m_configuracionService, *programadorWorker, reloj);
     m_extensionWorker = std::make_unique<ExtensionWorker>(*m_worker, *m_ejecutor);
     m_accionesWorker = std::make_unique<AccionesWorker>(*m_worker);
@@ -813,6 +822,11 @@ std::shared_ptr<respaldo::DestinoRespaldo> AppCompositionRoot::crearDestinoRespa
     return std::make_shared<DestinoRespaldoPosix>(carpetaAbsoluta, std::move(o));
 }
 
+exportacion::FabricaEscritorZip AppCompositionRoot::fabricaEscritorZip() const
+{
+    return EscritorZipStreaming::fabrica();
+}
+
 respaldo::FuenteRespaldo& AppCompositionRoot::fuenteRespaldo() const
 {
     return *m_fuenteRespaldo;
@@ -832,6 +846,13 @@ void AppCompositionRoot::iniciarMonitoreo()
         return;
     }
     m_monitoreoIniciado = true;
+    // T026.1 (D12): `.partial` de exportacion huerfanos de un proceso anterior,
+    // en un hilo del pool y antes de que la UI pueda iniciar una exportacion.
+    m_limpiezaExportacionInicial = QtFuture::makeReadyVoidFuture().then(
+        QtFuture::Launch::Async, [destino = m_destinoExportacion] {
+            const auto r = destino->limpiarParcialesPropios();
+            return r ? r.valor().borrados : -1;
+        });
     m_worker->iniciar(); // recuperacion (D9) y primer ciclo
     m_avisoVencimiento->iniciar(); // T014.3: al arrancar y cada 24 h
     m_indexadorCfdi->iniciar();    // T015.2 (a)+(d): pasada inicial del indice

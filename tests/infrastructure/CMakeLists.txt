@@ -211,3 +211,52 @@ set_tests_properties(satcfdi_cfdi_pdf_tests PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )
 satcfdi_enable_warnings(satcfdi_cfdi_pdf_tests)
+
+# T026.1 (D12, D20): destino atomico del ZIP de exportacion. POSIX real sobre
+# QTemporaryDir con fallas inyectadas por fase, FakeDestinoExportacion y la
+# limpieza al arrancar desde el root real (FakeOperacionesSat). Datos
+# sinteticos.
+qt_add_executable(satcfdi_exportacion_destino_tests
+    TestDestinoExportacionPosix.cpp
+    ../fakes/FakeDestinoExportacion.h
+    ../fakes/FakeOperacionesSat.h
+    ../fakes/FakeSecretStore.h
+)
+set_target_properties(satcfdi_exportacion_destino_tests PROPERTIES AUTOMOC ON)
+target_include_directories(satcfdi_exportacion_destino_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
+target_link_libraries(satcfdi_exportacion_destino_tests PRIVATE
+    satcfdi_app_core
+    satcfdi_storage
+    Qt6::Gui
+    Qt6::Test
+)
+add_test(NAME satcfdi_exportacion_destino_tests COMMAND satcfdi_exportacion_destino_tests)
+set_tests_properties(satcfdi_exportacion_destino_tests PROPERTIES
+    LABELS "infrastructure;exportacion"
+    TIMEOUT 120
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+satcfdi_enable_warnings(satcfdi_exportacion_destino_tests)
+
+# T026.1 (D12, C2): EscritorZipStreaming. Inspeccion binaria, libzip
+# (ZIP_CHECKCONS) y LectorZipLibzip como oraculos, unzip/zipinfo si existen,
+# ZIP64, cancelacion y fallos de escritura con DestinoExportacionPosix real y
+# FakeDestinoExportacion. zlib para inflar en la prueba.
+qt_add_executable(satcfdi_exportacion_zip_tests
+    TestEscritorZipStreaming.cpp
+    ../fakes/FakeDestinoExportacion.h
+)
+set_target_properties(satcfdi_exportacion_zip_tests PROPERTIES AUTOMOC ON)
+target_include_directories(satcfdi_exportacion_zip_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
+target_link_libraries(satcfdi_exportacion_zip_tests PRIVATE
+    satcfdi_cfdi_zip
+    satcfdi_storage
+    satcfdi_ports
+    satcfdi_domain
+    libzip::zip
+    ZLIB::ZLIB
+    Qt6::Test
+)
+add_test(NAME satcfdi_exportacion_zip_tests COMMAND satcfdi_exportacion_zip_tests)
+set_tests_properties(satcfdi_exportacion_zip_tests PROPERTIES LABELS "infrastructure;exportacion" TIMEOUT 300)
+satcfdi_enable_warnings(satcfdi_exportacion_zip_tests)

@@ -7,6 +7,7 @@
 #include "domain/cfdi/IndiceCfdi.h"
 
 #include <QHash>
+#include <QSet>
 #include <QSqlQuery>
 
 #include <utility>
@@ -399,6 +400,114 @@ SqliteCatalogoMensualRepository::conteosPorSolicitud(const PerfilId& perfil)
         conteos.insert(*solicitud, q.value(1).toInt());
     }
     return R::exito(std::move(conteos));
+}
+
+// T026.1: instantanea de exportacion. Una transaccion diferida propia (salvo
+// que el llamador ya tenga un UnitOfWork en este hilo): en WAL, todas las
+// lecturas siguientes ven el mismo snapshot, de modo que lista y evidencia de
+// todos los meses son coherentes entre si. consultar() y leerEvidencia() usan
+// la misma conexion del hilo y por tanto la misma transaccion. Se cierra con
+// COMMIT (o ROLLBACK si una lectura falla); no marca la transaccion en el
+// proveedor porque no admite escrituras.
+Resultado<InstantaneaExportacion, ErrorPersistencia>
+SqliteCatalogoMensualRepository::capturarParaExportar(const PerfilId& perfil, const QList<MesCalendario>& meses,
+                                                      int versionParser)
+{
+    using R = Resultado<InstantaneaExportacion, ErrorPersistencia>;
+    constexpr QStringView kContexto = u"cfdi_indexado.instantanea_exportacion";
+    auto conexion = sqlite::conexionLectura(m_proveedor);
+    if (!conexion) {
+        return R::fallo(std::move(conexion).error());
+    }
+    const bool propia = !m_proveedor.transaccionActiva();
+    if (propia) {
+        QSqlQuery q(conexion.valor());
+        if (auto r = sqlite::ejecutarDirecto(q, QStringLiteral("BEGIN DEFERRED"), kContexto); !r) {
+            return R::fallo(std::move(r).error());
+        }
+    }
+    auto terminar = [&](bool confirmar) -> Resultado<Exito, ErrorPersistencia> {
+        if (!propia) {
+            return Resultado<Exito, ErrorPersistencia>::exito({});
+        }
+        QSqlQuery q(conexion.valor());
+        if (confirmar) {
+            auto r = sqlite::ejecutarDirecto(q, QStringLiteral("COMMIT"), kContexto);
+            if (r) {
+                return r;
+            }
+            (void)sqlite::ejecutarDirecto(q, QStringLiteral("ROLLBACK"), kContexto);
+            return r;
+        }
+        return sqlite::ejecutarDirecto(q, QStringLiteral("ROLLBACK"), kContexto);
+    };
+
+    InstantaneaExportacion instantanea;
+    QList<MesCalendario> leidos;
+    for (const MesCalendario mes : meses) {
+        if (leidos.contains(mes)) {
+            continue;
+        }
+        leidos.append(mes);
+        ConsultaCatalogoMensual c;
+        c.perfil = perfil;
+        c.mes = mes;
+        c.orden = OrdenListaCfdi::FechaAscendente;
+        c.conConteosAnuales = false;
+        auto catalogo = consultar(c);
+        if (!catalogo) {
+            (void)terminar(false);
+            return R::fallo(std::move(catalogo).error());
+        }
+        auto evidencia = leerEvidencia(perfil, mes, versionParser);
+        if (!evidencia) {
+            (void)terminar(false);
+            return R::fallo(std::move(evidencia).error());
+        }
+        instantanea.meses.append(
+            MesInstantaneaExportacion{mes, std::move(catalogo).valor().cfdis, std::move(evidencia).valor()});
+    }
+    // Ruta y huella de los paquetes fuente, en la misma transaccion.
+    QSet<QString> usados;
+    for (const MesInstantaneaExportacion& m : std::as_const(instantanea.meses)) {
+        for (const CfdiMensual& c : m.cfdis) {
+            usados.insert(c.cfdi.paqueteId);
+        }
+    }
+    if (!usados.isEmpty()) {
+        QSqlQuery q(conexion.valor());
+        q.setForwardOnly(true);
+        const QString sql = QStringLiteral(
+            "SELECT p.id, p.ruta_local, i.tamano_bytes, i.modificado_en_ms, i.sha256 FROM paquete_solicitud p "
+            "JOIN solicitud_masiva s ON s.id = p.solicitud_masiva_id AND s.eliminado_en IS NULL "
+            "LEFT JOIN indice_cfdi_paquete i ON i.paquete_solicitud_id = p.id "
+            "WHERE s.perfil_sat_id = :perfil AND p.eliminado_en IS NULL");
+        auto r = sqlite::preparar(q, sql, kContexto);
+        if (r) {
+            q.bindValue(QStringLiteral(":perfil"), sqlite::texto(perfil.texto()));
+            r = sqlite::ejecutar(q, kContexto);
+        }
+        if (!r) {
+            (void)terminar(false);
+            return R::fallo(std::move(r).error());
+        }
+        while (q.next()) {
+            const QString id = q.value(0).toString();
+            if (!usados.contains(id)) {
+                continue;
+            }
+            PaqueteFuenteExportacion fuente;
+            fuente.rutaLocal = q.value(1).isNull() ? QString() : q.value(1).toString();
+            if (!q.value(4).isNull()) {
+                fuente.huella = HuellaZip{q.value(2).toLongLong(), q.value(3).toLongLong(), q.value(4).toString()};
+            }
+            instantanea.paquetes.insert(id, std::move(fuente));
+        }
+    }
+    if (auto r = terminar(true); !r) {
+        return R::fallo(std::move(r).error());
+    }
+    return R::exito(std::move(instantanea));
 }
 
 } // namespace satcfdi

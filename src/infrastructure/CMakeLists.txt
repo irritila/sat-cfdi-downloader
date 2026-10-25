@@ -207,6 +207,9 @@ qt_add_library(satcfdi_storage STATIC
     # T025.3 (D8): destino del respaldo (carpeta elegida por el usuario).
     storage/DestinoRespaldoPosix.h
     storage/DestinoRespaldoPosix.cpp
+    # T026.1 (D12): destino atomico del ZIP de exportacion.
+    storage/DestinoExportacionPosix.h
+    storage/DestinoExportacionPosix.cpp
 )
 target_include_directories(satcfdi_storage PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/..
@@ -355,6 +358,10 @@ qt_add_library(satcfdi_cfdi_zip STATIC
     # ArchivosZipCfdi); solo lectura, sin libzip.
     cfdi/zip/ArchivosZipCfdiFs.h
     cfdi/zip/ArchivosZipCfdiFs.cpp
+    # T026.1 (D12, C2): escritor ZIP propio en streaming (deflate raw con
+    # zlib) para la exportacion; libzip solo lee.
+    cfdi/zip/EscritorZipStreaming.h
+    cfdi/zip/EscritorZipStreaming.cpp
 )
 target_include_directories(satcfdi_cfdi_zip PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/..
@@ -366,6 +373,8 @@ target_link_libraries(satcfdi_cfdi_zip
         Qt6::Core
     PRIVATE
         libzip::zip
+        # T026.1: deflate raw y CRC32 del escritor (zlib del SDK de macOS).
+        ZLIB::ZLIB
 )
 satcfdi_enable_warnings(satcfdi_cfdi_zip)
 

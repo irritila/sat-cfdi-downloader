@@ -2,7 +2,7 @@
 
 ## Estado
 
-Pendiente (refinada 2026-10-19). Epica: se implementa en T023.1 a T023.5.
+Completada (2026-10-24). T023.1 a T023.6 completadas; prueba manual del usuario aprobada (2026-10-24).
 
 ## Prioridad y tamano
 
@@ -81,7 +81,7 @@ Orden: T023.1 > T023.2 > T023.3 y T023.4 (en paralelo cuando T023.2 cierre sus c
 ## Criterios de aceptacion
 
 - [x] T023.1 a T023.6 completadas.
-- [ ] Prueba manual del usuario con un perfil real sobre la app productiva: un mes cerrado ya descargado se ve con sus facturas y 3 CFDI coinciden con su XML (UUID, RFC emisor, total); la descarga de un mes nuevo se completa sin ver "solicitud", "paquete" ni "verificacion" fuera de Diagnostico.
+- [x] Prueba manual del usuario con un perfil real sobre la app productiva: un mes cerrado ya descargado se ve con sus facturas y 3 CFDI coinciden con su XML (UUID, RFC emisor, total); la descarga de un mes nuevo se completa sin ver "solicitud", "paquete" ni "verificacion" fuera de Diagnostico.
 
 ## Verificacion
 
@@ -89,7 +89,7 @@ Cada subtarea define la suya. Al cierre de la epica: `ctest` completo, build `-W
 
 ## Resultado
 
-Pendiente.
+La pantalla principal muestra las facturas del perfil fiscal por mes y permite obtener las que falten sin exponer solicitudes, paquetes ni verificaciones fuera de Diagnostico (T023.1 a T023.6). El usuario confirmo el 2026-10-24 la prueba manual con su perfil real en la app productiva. El barrido de vocabulario, manual, capturas y video queda en T024.
 
 ## Riesgos
 

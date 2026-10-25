@@ -70,6 +70,11 @@ qt_add_executable(satcfdi_tests
     # T015.4: previsualizacion PDF (servicio con fakes).
     TestPrevisualizacionCfdi.h
     TestPrevisualizacionCfdi.cpp
+    # T026.1: reglas de exportacion (D15, D17, D18) y plan de exportacion.
+    TestExportacionFacturas.h
+    TestExportacionFacturas.cpp
+    TestPlanificadorExportacion.h
+    TestPlanificadorExportacion.cpp
     ../infrastructure/CfdiPdfPruebasComun.h
     # Fakes compartidos header-only (T004); listados aqui para AUTOMOC.
     ../fakes/FakeOSIntegration.h

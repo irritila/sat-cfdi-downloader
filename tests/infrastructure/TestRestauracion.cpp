@@ -475,6 +475,9 @@ struct Destino {
         if (!escribir(zipViejo, "PK-viejo") || !escribir(QDir(datos).filePath(QStringLiteral("credentials/c.bin")), "x")
             || !escribir(QDir(datos).filePath(QStringLiteral("respaldo/publicados.json")), "{\"publicados\":[]}")
             || !escribir(QDir(datos).filePath(QStringLiteral("respaldo/parciales/p.partial")), "parcial")
+            // T026.1 (D12): estado transitorio de la exportacion (fuera de la restauracion).
+            || !escribir(QDir(datos).filePath(QStringLiteral("exportacion/parciales/.archivo-fiscal-exportacion-0123456789abcdef.partial")), "zip")
+            || !escribir(QDir(datos).filePath(QStringLiteral("exportacion/parciales-destinos.json")), "{\"formato\":1}")
             || !escribir(QDir(datos).filePath(QStringLiteral("preferencias.ini")), prefsViejas)) {
             return false;
         }
@@ -717,6 +720,10 @@ private slots:
         QCOMPARE(prefs.value(QStringLiteral("respaldo/diario")).toString(), QStringLiteral("true"));
         QVERIFY(QFileInfo::exists(QDir(b.datos).filePath(QStringLiteral("respaldo/publicados.json"))));
         QVERIFY(QFileInfo::exists(QDir(b.datos).filePath(QStringLiteral("respaldo/parciales/p.partial"))));
+        // T026.1 (D12): la restauracion no mueve ni borra `exportacion/`.
+        QVERIFY(QFileInfo::exists(QDir(b.datos).filePath(
+            QStringLiteral("exportacion/parciales/.archivo-fiscal-exportacion-0123456789abcdef.partial"))));
+        QVERIFY(QFileInfo::exists(QDir(b.datos).filePath(QStringLiteral("exportacion/parciales-destinos.json"))));
         // Sin stagings; solo el registro de restauraciones aplicadas (D22).
         QCOMPARE(entradasBajo(marcador_restauracion::rutaCarpeta(b.datos)),
                  QStringList{QString::fromLatin1(datos_previos_restauracion::kArchivoRegistro)});

@@ -59,6 +59,32 @@ struct CatalogoMensual {
     ConteosCatalogoMensual conteos;
 };
 
+// T026.1: un mes de la instantanea de exportacion (T026 D11).
+struct MesInstantaneaExportacion {
+    MesCalendario mes = *MesCalendario::crear(2000, 1);
+    // consultar() del mes sin texto, tipo, direccion ni paginacion (ambas
+    // direcciones, misma deduplicacion D13), en orden FechaAscendente.
+    QList<CfdiMensual> cfdis;
+    // leerEvidencia() del mes (indexacionProgramada en false).
+    QList<EvidenciaSolicitudMensual> evidencia;
+};
+
+// Paquete fuente de los CFDI de la instantanea: lo que T026.2 necesita para
+// resolver el ZIP y revalidar sus metadatos antes de releer (T026 D11).
+struct PaqueteFuenteExportacion {
+    QString rutaLocal;               // relativa a la raiz de paquetes (T008 D5); no va a logs
+    std::optional<HuellaZip> huella; // del ZIP indexado (tamano, mtime, SHA-256); nullopt sin huella
+
+    friend bool operator==(const PaqueteFuenteExportacion&, const PaqueteFuenteExportacion&) = default;
+};
+
+struct InstantaneaExportacion {
+    QList<MesInstantaneaExportacion> meses; // en el orden pedido
+    // paqueteId -> fuente, para cada paquete de algun CFDI de `meses`, leido
+    // en la misma transaccion.
+    QHash<QString, PaqueteFuenteExportacion> paquetes;
+};
+
 // Lecturas del flujo mensual (migraciones 006 y 007). Universo: CFDI
 // indexados de solicitudes y paquetes visibles de un perfil visible, cuya
 // `fecha` (fecha del comprobante) cae en el mes. CFDI sin fecha no pertenecen
@@ -93,6 +119,15 @@ public:
     // mes coincide con conteos.emitidos + conteos.recibidos del mes sin
     // filtros. Solicitudes sin CFDI no aparecen.
     virtual Resultado<QHash<SolicitudId, int>, ErrorPersistencia> conteosPorSolicitud(const PerfilId& perfil) = 0;
+
+    // T026.1 (T026 D11): instantanea para planear una exportacion. Para cada
+    // mes distinto de `meses` (un repetido se lee una vez), todos sus CFDI y su evidencia, leidos en
+    // UNA transaccion de lectura (todas las lecturas ven el mismo estado de la
+    // base; si el llamador ya tiene un UnitOfWork activo se lee en el). Sin
+    // paginacion: el universo esperado es de miles de CFDI (README).
+    // Errores: los de consultar() y leerEvidencia(); ninguna lectura parcial.
+    virtual Resultado<InstantaneaExportacion, ErrorPersistencia>
+    capturarParaExportar(const PerfilId& perfil, const QList<MesCalendario>& meses, int versionParser) = 0;
 };
 
 } // namespace satcfdi

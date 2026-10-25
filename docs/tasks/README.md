@@ -48,7 +48,7 @@ Ejemplo: `T001-modelo-fisico-sqlite.md`.
 | [T020](T020-logo.md) | Pendiente | Logo e iconos en SVG |
 | [T021](T021-manual-capturas-al-dia.md) | Pendiente | Manual y capturas al dia con la app |
 | [T022](T022-intermitencia-pruebas-graficas-video.md) | Pendiente | Intermitencia de pruebas graficas del video |
-| [T023](T023-rediseno-ui-caso-de-uso.md) | Pendiente | Rediseno de la UI centrado en las facturas del perfil fiscal (epica) |
+| [T023](T023-rediseno-ui-caso-de-uso.md) | Completada | Rediseno de la UI centrado en las facturas del perfil fiscal (epica) |
 | [T023.1](T023.1-prototipo-y-adr-cobertura.md) | Completada | Prototipo navegable y ADR de cobertura mensual |
 | [T023.2](T023.2-catalogo-mensual-y-disponibilidad.md) | Completada | Catalogo mensual y regla de disponibilidad |
 | [T023.3](T023.3-descarga-guiada.md) | Completada | Descarga guiada por mes y tramos |
@@ -63,6 +63,10 @@ Ejemplo: `T001-modelo-fisico-sqlite.md`.
 | [T025.4](T025.4-respaldo-diario.md) | Completada | Configuracion y respaldo diario |
 | [T025.5](T025.5-restauracion.md) | Completada | Restauracion transaccional |
 | [T025.6](T025.6-ui-y-documentacion-respaldo.md) | Completada | UI y documentacion del respaldo |
+| [T026](T026-exportar-facturas.md) | Pendiente | Exportar facturas (epica) |
+| [T026.1](T026.1-plan-y-escritura-zip.md) | Completada | Plan de exportacion y escritura atomica del ZIP |
+| [T026.2](T026.2-servicio-exportacion.md) | Pendiente | Servicio de exportacion |
+| [T026.3](T026.3-ui-exportacion.md) | Pendiente | UI y documentacion de la exportacion |
 
 ## Estados
 

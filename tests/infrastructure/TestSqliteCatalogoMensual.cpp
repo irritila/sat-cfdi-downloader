@@ -1055,3 +1055,127 @@ void TestSqliteCatalogoMensual::loteVariosTramosPorDireccion()
     auto u = e.enTransaccion([&] { return e.p->lotesDescargaGuiada().insertar(otraVez); });
     QVERIFY(!u && u.error().tipo == ErrorPersistencia::Tipo::Unicidad);
 }
+
+void TestSqliteCatalogoMensual::instantaneaExportacionSinPaginarConEvidencia()
+{
+    Entorno e;
+    QVERIFY(e.preparar());
+    const MesCalendario agosto = *MesCalendario::crear(2026, 8);
+    Sol agoE;
+    agoE.inicio = agosto.inicioSat();
+    agoE.fin = agosto.finSat();
+    const QString idAgo = e.solicitud(agoE);
+    const QString idE = e.solicitud(Sol{});
+    const QString idE2 = e.solicitud(Sol{});
+    Sol rec;
+    rec.dir = TipoDescarga::Recibidos;
+    const QString idR = e.solicitud(rec);
+    QVERIFY(!e.paqueteConCfdi(idAgo, {{kU4, QStringLiteral("2026-08-31T23:59:59")}}).isEmpty());
+    // kU1 en dos paquetes de septiembre: una sola fila (fuente indexada antes).
+    const QString paqAntiguo = e.paqueteConCfdi(idE,
+                                                {{kU1, QStringLiteral("2026-09-10T10:00:00")},
+                                                 {QString(), QStringLiteral("2026-09-11T10:00:00")}},
+                                                QStringLiteral("2026-10-01T00:00:00.000Z"));
+    QVERIFY(!paqAntiguo.isEmpty());
+    QVERIFY(!e.paqueteConCfdi(idE2, {{kU1, QStringLiteral("2026-09-10T10:00:00")}}).isEmpty());
+    // Mas filas que cualquier pagina tipica de la UI: sin paginacion.
+    QList<std::pair<QString, QString>> muchos;
+    for (int i = 0; i < 120; ++i) {
+        muchos.append({QStringLiteral("BBBBBBBB-0000-4000-8000-%1").arg(i, 12, 10, QLatin1Char('0')),
+                       QStringLiteral("2026-09-15T08:00:00")});
+    }
+    QVERIFY(!e.paqueteConCfdi(idR, muchos).isEmpty());
+
+    auto r = e.p->catalogoMensual().capturarParaExportar(pid(e.perfil), {kSeptiembre, agosto, kSeptiembre}, 1);
+    QVERIFY2(r, r ? "" : qPrintable(r.error().mensaje));
+    const InstantaneaExportacion& inst = r.valor();
+    QCOMPARE(inst.meses.size(), 2); // el repetido se lee una vez, en el orden pedido
+    QCOMPARE(inst.meses.at(0).mes, kSeptiembre);
+    QCOMPARE(inst.meses.at(1).mes, agosto);
+
+    const MesInstantaneaExportacion& sep = inst.meses.at(0);
+    QCOMPARE(sep.cfdis.size(), 1 + 1 + 120);
+    int conU1 = 0;
+    int recibidos = 0;
+    for (const CfdiMensual& c : sep.cfdis) {
+        if (c.cfdi.resumen.uuid == kU1) {
+            ++conU1;
+            QCOMPARE(c.cfdi.paqueteId, paqAntiguo);
+            QCOMPARE(c.solicitud, sid(idE));
+        }
+        recibidos += c.direccion == TipoDescarga::Recibidos ? 1 : 0;
+    }
+    QCOMPARE(conU1, 1);
+    QCOMPARE(recibidos, 120);
+    // Misma evidencia que leerEvidencia del mes.
+    auto evidencia = e.p->catalogoMensual().leerEvidencia(pid(e.perfil), kSeptiembre, 1);
+    QVERIFY(evidencia);
+    QCOMPARE(sep.evidencia.size(), evidencia.valor().size());
+    QCOMPARE(sep.evidencia.size(), 3);
+    for (qsizetype i = 0; i < sep.evidencia.size(); ++i) {
+        QCOMPARE(sep.evidencia.at(i).solicitud.id, evidencia.valor().at(i).solicitud.id);
+        QCOMPARE(sep.evidencia.at(i).paquetes.size(), 1);
+        QVERIFY(sep.evidencia.at(i).paquetes.at(0).indiceVigente);
+    }
+    // Ruta y huella del paquete fuente de cada CFDI (las del indice).
+    // Agosto, antiguo y recibidos: el segundo paquete de kU1 no aporta filas
+    // (deduplicado) y no aparece.
+    QCOMPARE(inst.paquetes.size(), 3);
+    for (const MesInstantaneaExportacion& m : inst.meses) {
+        for (const CfdiMensual& c : m.cfdis) {
+            QVERIFY(inst.paquetes.contains(c.cfdi.paqueteId));
+        }
+    }
+    const PaqueteFuenteExportacion fuente = inst.paquetes.value(paqAntiguo);
+    QCOMPARE(fuente.rutaLocal, QStringLiteral("paquetes/p.zip"));
+    QVERIFY(fuente.huella);
+    QCOMPARE(*fuente.huella, (HuellaZip{10, 1700000000000, kSha}));
+    const MesInstantaneaExportacion& ago = inst.meses.at(1);
+    QCOMPARE(ago.cfdis.size(), 1);
+    QCOMPARE(ago.cfdis.at(0).cfdi.resumen.uuid, kU4);
+    QCOMPARE(ago.evidencia.size(), 1);
+    QCOMPARE(ago.evidencia.at(0).solicitud.id, sid(idAgo));
+
+    // Sin transaccion abierta al terminar: una escritura posterior funciona.
+    QVERIFY(!e.prov().transaccionActiva());
+    QVERIFY(e.p->unidadDeTrabajo().begin());
+    QVERIFY(e.p->unidadDeTrabajo().commit());
+
+    // Perfil ajeno o sin meses: instantanea vacia.
+    auto ajeno = e.p->catalogoMensual().capturarParaExportar(pid(uuid::generarCanonico()), {kSeptiembre}, 1);
+    QVERIFY(ajeno);
+    QCOMPARE(ajeno.valor().meses.size(), 1);
+    QVERIFY(ajeno.valor().meses.at(0).cfdis.isEmpty());
+    QVERIFY(ajeno.valor().meses.at(0).evidencia.isEmpty());
+    auto sinMeses = e.p->catalogoMensual().capturarParaExportar(pid(e.perfil), {}, 1);
+    QVERIFY(sinMeses);
+    QVERIFY(sinMeses.valor().meses.isEmpty());
+    QVERIFY(consistente(e.prov()));
+}
+
+void TestSqliteCatalogoMensual::instantaneaExportacionDentroDeUnidadDeTrabajo()
+{
+    Entorno e;
+    QVERIFY(e.preparar());
+    const QString idE = e.solicitud(Sol{});
+    QVERIFY(!e.paqueteConCfdi(idE, {{kU1, QStringLiteral("2026-09-10T10:00:00")}}).isEmpty());
+
+    // Con un UnitOfWork activo lee en esa transaccion y no la cierra.
+    QVERIFY(e.p->unidadDeTrabajo().begin());
+    auto r = e.p->catalogoMensual().capturarParaExportar(pid(e.perfil), {kSeptiembre}, 1);
+    QVERIFY2(r, r ? "" : qPrintable(r.error().mensaje));
+    QCOMPARE(r.valor().meses.at(0).cfdis.size(), 1);
+    QVERIFY(e.prov().transaccionActiva());
+    QVERIFY(e.p->unidadDeTrabajo().commit());
+    QVERIFY(!e.prov().transaccionActiva());
+
+    // Una lectura que falla revierte la transaccion propia: la conexion queda
+    // sin transaccion y utilizable.
+    QCOMPARE(ejecutarSql(e.prov(), QStringLiteral("ALTER TABLE cfdi_indexado RENAME TO cfdi_indexado_x")), QString());
+    auto fallo = e.p->catalogoMensual().capturarParaExportar(pid(e.perfil), {kSeptiembre}, 1);
+    QVERIFY(!fallo);
+    QCOMPARE(ejecutarSql(e.prov(), QStringLiteral("ALTER TABLE cfdi_indexado_x RENAME TO cfdi_indexado")), QString());
+    auto otra = e.p->catalogoMensual().capturarParaExportar(pid(e.perfil), {kSeptiembre}, 1);
+    QVERIFY2(otra, otra ? "" : qPrintable(otra.error().mensaje));
+    QCOMPARE(otra.valor().meses.at(0).cfdis.size(), 1);
+}

@@ -6,6 +6,7 @@
 #include "application/persistence/PuertosPersistencia.h"
 #include "application/profiles/CredencialesSatService.h"
 #include "domain/perfiles/PerfilId.h"
+#include "ports/exportacion/EscritorZipExportacion.h"
 
 #include <QFuture>
 #include <QObject>
@@ -85,6 +86,9 @@ class AlmacenKekRespaldo;
 class CarpetaRespaldoSistema;
 struct EstadoRespaldoGestor;
 struct ResultadoRespaldo;
+}
+namespace exportacion {
+class DestinoExportacion;
 }
 
 // T025.5 (D22): resultado de AppCompositionRoot::descartarDatosPrevios().
@@ -277,6 +281,16 @@ public:
     // Arranque del respaldo (en iniciarMonitoreo): configuracion, KEK
     // huerfanas, .partial propios y primera evaluacion del diario.
     QFuture<int> arranqueRespaldo() const { return m_arranqueRespaldo; }
+    // T026.1 (D12): destino atomico del ZIP de exportacion (carpeta privada
+    // <datos>/exportacion/parciales). Thread-safe.
+    exportacion::DestinoExportacion& destinoExportacion() const { return *m_destinoExportacion; }
+    // T026.1 (D12): limpieza de `.partial` de exportacion huerfanos, lanzada
+    // en iniciarMonitoreo() fuera del hilo grafico. Una exportacion (T026.2)
+    // debe empezar despues de que termine. Valor: borrados (-1 si fallo).
+    // Antes de iniciarMonitoreo() es un future vacio.
+    QFuture<int> limpiezaExportacionInicial() const { return m_limpiezaExportacionInicial; }
+    // T026.1 (C2): fabrica de escritores ZIP en streaming (uno por exportacion).
+    exportacion::FabricaEscritorZip fabricaEscritorZip() const;
     // Id local de la instalacion (lo crea en preferencias.ini la primera vez).
     // Hilo grafico.
     QUuid idInstalacion() const;
@@ -385,6 +399,10 @@ private:
     std::unique_ptr<respaldo::GestorRespaldo> m_gestorRespaldo;
     std::unique_ptr<respaldo::ProgramadorRespaldoDiario> m_programadorDiario;
     QFuture<int> m_arranqueRespaldo;
+    // T026.1: compartido con la limpieza al arrancar (que puede terminar
+    // despues del root).
+    std::shared_ptr<exportacion::DestinoExportacion> m_destinoExportacion;
+    QFuture<int> m_limpiezaExportacionInicial;
     // T025.5 (se destruye primero: sus callbacks usan el root).
     std::unique_ptr<respaldo::RestauracionService> m_restauracion;
     std::optional<ResultadoRestauracionArranque> m_restauracionAlArrancar;

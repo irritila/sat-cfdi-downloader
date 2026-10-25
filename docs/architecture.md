@@ -197,7 +197,7 @@ Estado: validado.
 
 Objetivo: describir las interacciones principales del MVP. Se agregara un flujo a la vez para mantener la revision simple.
 
-Regla de ejecucion: toda operacion que toque SAT, estados persistidos o archivos ZIP se ejecuta mediante el ejecutor serial definido en `ADR 0014` y `docs/design/operational-rules.md`. El worker automatico y el servicio de acciones manuales disparan operaciones, pero no aplican resultados concurrentemente sobre los mismos registros.
+Regla de ejecucion: toda operacion que toque SAT, estados persistidos o archivos ZIP de paquetes se ejecuta mediante el ejecutor serial definido en `ADR 0014` y `docs/design/operational-rules.md`. El worker automatico y el servicio de acciones manuales disparan operaciones, pero no aplican resultados concurrentemente sobre los mismos registros. La exportacion de facturas solo lee esos ZIP y escribe un ZIP propio del usuario: corre en su propio hilo, fuera del ejecutor (`ADR 0023`).
 
 ### 3.1 Crear solicitud masiva
 

@@ -129,3 +129,34 @@ set_tests_properties(satcfdi_migracion_paquetes_tests PROPERTIES
     LABELS integration
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )
+
+# T026.1 (corte 3): conductor de exportacion sin UI con piezas reales: SQLite
+# en QTemporaryDir, ZIP sinteticos indexados con la regla de produccion,
+# PlanificadorExportacion, AsignadorNombresExportacion, LectorZipLibzip,
+# EscritorZipStreaming y DestinoExportacionPosix; el ZIP final se inspecciona
+# con libzip. Usa los fixtures SQL de tests/infrastructure (Qt6::Sql).
+qt_add_executable(satcfdi_exportacion_integracion_tests
+    TestExportacionIntegracion.cpp
+    ../infrastructure/SqlitePruebasComun.h
+    ../fakes/ZipCfdiSintetico.h
+)
+set_target_properties(satcfdi_exportacion_integracion_tests PROPERTIES AUTOMOC ON)
+target_include_directories(satcfdi_exportacion_integracion_tests PRIVATE ${PROJECT_SOURCE_DIR}/tests)
+target_link_libraries(satcfdi_exportacion_integracion_tests PRIVATE
+    satcfdi_infrastructure
+    satcfdi_storage
+    satcfdi_cfdi_zip
+    satcfdi_cfdi_xml
+    satcfdi_application
+    satcfdi_ports
+    satcfdi_domain
+    libzip::zip
+    Qt6::Sql
+    Qt6::Test
+)
+satcfdi_enable_warnings(satcfdi_exportacion_integracion_tests)
+add_test(NAME satcfdi_exportacion_integracion_tests COMMAND satcfdi_exportacion_integracion_tests)
+set_tests_properties(satcfdi_exportacion_integracion_tests PROPERTIES
+    LABELS "integration;exportacion"
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)

@@ -2,7 +2,7 @@
 
 ## Estado
 
-Pendiente (borrador; depende de T023).
+Pendiente (borrador; T023 completada el 2026-10-24, lista para refinar).
 
 ## Objetivo
 

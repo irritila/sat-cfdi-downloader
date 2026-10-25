@@ -27,6 +27,9 @@ qt_add_library(satcfdi_application STATIC
     # T015.4: previsualizacion PDF (hilo propio; cache y render por puertos).
     cfdi/PrevisualizacionCfdiService.h
     cfdi/PrevisualizacionCfdiService.cpp
+    # T026.1: plan de exportacion de facturas (instantanea del catalogo).
+    cfdi/PlanificadorExportacion.h
+    cfdi/PlanificadorExportacion.cpp
     common/Errores.h
     common/FechasLegibles.h
     common/FechasLegibles.cpp
