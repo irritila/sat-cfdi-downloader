@@ -65,7 +65,7 @@ Ejemplo: `T001-modelo-fisico-sqlite.md`.
 | [T025.6](T025.6-ui-y-documentacion-respaldo.md) | Completada | UI y documentacion del respaldo |
 | [T026](T026-exportar-facturas.md) | Pendiente | Exportar facturas (epica) |
 | [T026.1](T026.1-plan-y-escritura-zip.md) | Completada | Plan de exportacion y escritura atomica del ZIP |
-| [T026.2](T026.2-servicio-exportacion.md) | Pendiente | Servicio de exportacion |
+| [T026.2](T026.2-servicio-exportacion.md) | Completada | Servicio de exportacion |
 | [T026.3](T026.3-ui-exportacion.md) | Pendiente | UI y documentacion de la exportacion |
 
 ## Estados

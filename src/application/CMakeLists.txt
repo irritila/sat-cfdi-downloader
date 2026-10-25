@@ -30,6 +30,9 @@ qt_add_library(satcfdi_application STATIC
     # T026.1: plan de exportacion de facturas (instantanea del catalogo).
     cfdi/PlanificadorExportacion.h
     cfdi/PlanificadorExportacion.cpp
+    # T026.2: servicio de exportacion (hilo propio fuera del executor, ADR 0023).
+    cfdi/ExportacionFacturasService.h
+    cfdi/ExportacionFacturasService.cpp
     common/Errores.h
     common/FechasLegibles.h
     common/FechasLegibles.cpp

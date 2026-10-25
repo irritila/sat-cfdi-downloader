@@ -4,6 +4,7 @@
 #include "domain/cfdi/MesCalendario.h"
 #include "domain/perfiles/PerfilId.h"
 #include "domain/solicitudes/EstadosSolicitud.h"
+#include "domain/solicitudes/SolicitudId.h"
 
 #include <QByteArray>
 #include <QDate>
@@ -121,6 +122,10 @@ struct FacturaPlaneada {
     // locales: no van a logs.
     QString rutaPaquete;
     HuellaZip huellaPaquete;
+    // T026.2 (C2): solicitud fuente canonica del CFDI (CfdiMensual::solicitud).
+    // ExportacionFacturasService::notificarSolicitudEliminada omite las
+    // facturas pendientes de esa solicitud (D19). Nula en las omitidas del plan.
+    SolicitudId solicitud;
 
     friend bool operator==(const FacturaPlaneada&, const FacturaPlaneada&) = default;
 };

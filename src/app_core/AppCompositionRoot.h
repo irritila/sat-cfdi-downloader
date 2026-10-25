@@ -29,6 +29,8 @@ class AdaptadorCatalogoCfdi;
 class AlmacenPdfCfdi;
 class CfdiPdfRenderer;
 class PrevisualizacionCfdiService;
+class ExportacionFacturasService;
+class PlanificadorExportacion;
 class CatalogoCfdiService;
 class CatalogoMensualCfdiService;
 class DescargaGuiadaService;
@@ -193,6 +195,15 @@ struct OpcionesMonitoreo {
     // T025.5: resultado de la restauracion aplicada al arrancar
     // (PreparacionProceso::restauracion); main lo pasa tal cual para T025.6.
     std::optional<ResultadoRestauracionArranque> restauracionAlArrancar;
+    // T026.2: lector de ZIP de la exportacion (relectura por posicion en el
+    // hilo del servicio). Nulo = LectorZipLibzip propio, independiente del
+    // del indexador. Las pruebas inyectan compuertas (seguro entre hilos).
+    // Compartido (C7): el servicio lo retiene mientras viva su hilo.
+    std::shared_ptr<CfdiArchiveReader> lectorExportacion;
+    // T026.2 (C5): plazo maximo que la salida y la restauracion esperan el
+    // cierre de la exportacion; agotado, siguen y el `.partial` lo borra la
+    // limpieza del siguiente arranque. 0 = 10 s. Las pruebas lo acortan.
+    std::chrono::milliseconds plazoCierreExportacion{0};
 };
 
 class AppCompositionRoot {
@@ -254,6 +265,10 @@ public:
     }
     // T025.5: detiene worker, respaldo, indice, vista previa y ejecutor
     // (cancelacion inmediata). Lo usa RestauracionService::solicitar().
+    // T026.2 (D19, C5): tambien cierra la exportacion; el future se completa
+    // cuando el `.partial` propio ya se descarto y su hilo termino, o al
+    // agotarse OpcionesMonitoreo::plazoCierreExportacion (10 s): entonces la
+    // restauracion sigue y el `.partial` lo borra el siguiente arranque.
     QFuture<void> detenerParaRestaurar();
     // T025.5 (D22): hay carpetas `pre-restauracion-*` propias sin descartar
     // (mientras existan no se reconcilia la e.firma). Fuera del hilo grafico;
@@ -291,6 +306,14 @@ public:
     QFuture<int> limpiezaExportacionInicial() const { return m_limpiezaExportacionInicial; }
     // T026.1 (C2): fabrica de escritores ZIP en streaming (uno por exportacion).
     exportacion::FabricaEscritorZip fabricaEscritorZip() const;
+    // T026.2: servicio de exportacion (hilo propio) para T026.3. Puertos de
+    // produccion: planificador y visibilidad por el dispatcher, limpieza
+    // inicial, destino atomico, escritor en streaming, lector y archivos
+    // propios, parser y un RenderizadorPdfCfdi nuevo por exportacion. La
+    // eliminacion local le llega por SolicitudesService::solicitudEliminada;
+    // la salida (ExtensionWorker) y detenerParaRestaurar() esperan su cerrar().
+    // Hilo grafico.
+    ExportacionFacturasService& exportacionFacturas() const { return *m_exportacionFacturas; }
     // Id local de la instalacion (lo crea en preferencias.ini la primera vez).
     // Hilo grafico.
     QUuid idInstalacion() const;
@@ -403,6 +426,16 @@ private:
     // despues del root).
     std::shared_ptr<exportacion::DestinoExportacion> m_destinoExportacion;
     QFuture<int> m_limpiezaExportacionInicial;
+    // T026.2: el servicio se destruye antes que sus puertos (une su hilo). C7:
+    // lector, archivos y destino son compartidos con el servicio, que los
+    // retiene si su destructor abandona el hilo por plazo. El planificador
+    // vive hasta cerrar el dispatcher: una tarea de planear() encolada lo
+    // referencia (solo desde el hilo grafico, nunca desde el del servicio).
+    std::shared_ptr<CfdiArchiveReader> m_lectorExportacion;
+    std::shared_ptr<ArchivosZipCfdi> m_archivosExportacion;
+    std::unique_ptr<PlanificadorExportacion> m_planificadorExportacion;
+    std::unique_ptr<ExportacionFacturasService> m_exportacionFacturas;
+    std::chrono::milliseconds m_plazoCierreExportacion{std::chrono::seconds(10)};
     // T025.5 (se destruye primero: sus callbacks usan el root).
     std::unique_ptr<respaldo::RestauracionService> m_restauracion;
     std::optional<ResultadoRestauracionArranque> m_restauracionAlArrancar;

@@ -192,7 +192,18 @@ PlanExportacion planear(CatalogoExportacionMemoria& catalogo, const AlcanceExpor
         qWarning("planear fallo");
         return {};
     }
-    return std::move(r).valor();
+    // T026.2 (C2): cada factura planeada lleva su solicitud fuente; las
+    // comparaciones de esta prueba no dependen de ella (se verifica en
+    // fuenteConRutaYHuella).
+    PlanExportacion plan = std::move(r).valor();
+    for (FacturaPlaneada& f : plan.facturas) {
+        if (f.solicitud.esNulo()) {
+            qWarning("factura planeada sin solicitud");
+            return {};
+        }
+        f.solicitud = SolicitudId();
+    }
+    return plan;
 }
 
 } // namespace
@@ -535,6 +546,12 @@ void TestPlanificadorExportacion::fuenteConRutaYHuella()
     QCOMPARE(plan.facturas.size(), 1);
     QCOMPARE(plan.facturas.at(0).rutaPaquete, QStringLiteral("paquetes/pb.zip"));
     QCOMPARE(plan.facturas.at(0).huellaPaquete, *fuenteDe(QStringLiteral("pb")).huella);
+    // C2 (T026.2): la solicitud fuente canonica del CFDI viaja en el plan.
+    PlanificadorExportacion p(catalogo, [] { return kAhora; }, 1);
+    const auto directo = p.planear(AlcanceMesExportacion{kPerfil, kSeptiembre, kE});
+    QVERIFY(directo);
+    QCOMPARE(directo.valor().facturas.size(), 1);
+    QCOMPARE(directo.valor().facturas.at(0).solicitud, solicitudN(1));
     // Sin huella no se puede revalidar la relectura: se omite.
     QCOMPARE(plan.omisiones,
              (QList<OmisionExportacion>{OmisionFacturaExportacion{kE, kSeptiembre, kUuidE,

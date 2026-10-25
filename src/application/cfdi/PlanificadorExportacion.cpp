@@ -201,6 +201,7 @@ PlanExportacion PlanificadorExportacion::planificar(const AlcanceExportacion& al
         f.mes = c.mes;
         f.direccion = c.cfdi->direccion;
         f.uuidCanonico = cfdi::normalizarUuid(c.cfdi->cfdi.resumen.uuid);
+        f.solicitud = c.cfdi->solicitud;
         // Un paquete ausente de la evidencia no se descarta (su solicitud
         // puede no intersectar el mes); solo se omite un estado conocido.
         if (m) {

@@ -160,3 +160,133 @@ set_tests_properties(satcfdi_exportacion_integracion_tests PROPERTIES
     LABELS "integration;exportacion"
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )
+
+# T026.2: ExportacionFacturasService con piezas reales (LectorZipLibzip,
+# ArchivosZipCfdiFs, parsearCfdi, EscritorZipStreaming, DestinoExportacionPosix,
+# RenderizadorPdfCfdi) o fakes (FakeDestinoExportacion, FakeCfdiPdfRenderer,
+# LectorCfdiCompuerta); criterio 1 con SQLite real y los puertos por
+# PersistenceDispatcher; hilo frente al OperacionExecutor real con
+# FakeOperacionesSat (tests/unit/EntornoOperaciones.h). Qt Pdf extrae el texto
+# del PDF.
+qt_add_executable(satcfdi_exportacion_servicio_tests
+    TestExportacionServicio.cpp
+    TestExportacionServicioComun.h
+    ../infrastructure/SqlitePruebasComun.h
+    ../unit/EntornoOperaciones.h
+    ../unit/FakesPersistencia.h
+    ../fakes/FakeCfdiPdfRenderer.h
+    ../fakes/FakeDestinoExportacion.h
+    ../fakes/LectorCfdiCompuerta.h
+    ../fakes/ZipCfdiSintetico.h
+    ../fakes/FakeConfiguracionAppService.h
+    ../fakes/FakeOperacionesSat.h
+    ../fakes/FakePackageStorage.h
+    ../fakes/FakeProgramador.h
+)
+set_target_properties(satcfdi_exportacion_servicio_tests PROPERTIES AUTOMOC ON)
+target_include_directories(satcfdi_exportacion_servicio_tests PRIVATE ${PROJECT_SOURCE_DIR}/tests)
+target_link_libraries(satcfdi_exportacion_servicio_tests PRIVATE
+    satcfdi_infrastructure
+    satcfdi_storage
+    satcfdi_cfdi_zip
+    satcfdi_cfdi_xml
+    satcfdi_cfdi_pdf
+    satcfdi_application
+    satcfdi_ports
+    satcfdi_domain
+    libzip::zip
+    Qt6::Sql
+    Qt6::Gui
+    Qt6::Pdf
+    Qt6::Test
+)
+satcfdi_enable_warnings(satcfdi_exportacion_servicio_tests)
+add_test(NAME satcfdi_exportacion_servicio_tests COMMAND satcfdi_exportacion_servicio_tests)
+set_tests_properties(satcfdi_exportacion_servicio_tests PROPERTIES
+    LABELS "integration;exportacion"
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
+# T026.2 (criterio 2): misma exportacion con texto hostil y el renderer real en
+# un proceso sin QtNetwork (sin Qt Pdf ni adaptadores SAT); la prueba lo
+# comprueba con dyld.
+qt_add_executable(satcfdi_exportacion_sin_red_tests
+    TestExportacionServicioSinRed.cpp
+    TestExportacionServicioComun.h
+    ../fakes/FakeDestinoExportacion.h
+    ../fakes/ZipCfdiSintetico.h
+)
+set_target_properties(satcfdi_exportacion_sin_red_tests PROPERTIES AUTOMOC ON)
+target_include_directories(satcfdi_exportacion_sin_red_tests PRIVATE ${PROJECT_SOURCE_DIR}/tests)
+target_link_libraries(satcfdi_exportacion_sin_red_tests PRIVATE
+    satcfdi_cfdi_zip
+    satcfdi_cfdi_xml
+    satcfdi_cfdi_pdf
+    satcfdi_application
+    satcfdi_ports
+    satcfdi_domain
+    libzip::zip
+    Qt6::Gui
+    Qt6::Test
+)
+satcfdi_enable_warnings(satcfdi_exportacion_sin_red_tests)
+add_test(NAME satcfdi_exportacion_sin_red_tests COMMAND satcfdi_exportacion_sin_red_tests)
+set_tests_properties(satcfdi_exportacion_sin_red_tests PROPERTIES
+    LABELS "integration;exportacion"
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
+# T026.2 (criterio 5, D19): exportacion con el composition root real
+# (cableado de produccion) y una compuerta como lector de la exportacion:
+# restauracion y salida esperan el cierre (sin `.partial` ni ZIP) y la
+# eliminacion local llega al servicio por solicitudEliminada.
+qt_add_executable(satcfdi_exportacion_ciclo_tests
+    TestExportacionCicloDeVida.cpp
+    ../fakes/FakeOSIntegration.h
+    ../fakes/FakeProgramador.h
+    ../fakes/FakeSatGateway.h
+    ../fakes/FakeSecretStore.h
+    ../fakes/LectorCfdiCompuerta.h
+    ../fakes/ZipCfdiSintetico.h
+)
+set_target_properties(satcfdi_exportacion_ciclo_tests PROPERTIES AUTOMOC ON)
+target_include_directories(satcfdi_exportacion_ciclo_tests PRIVATE ${PROJECT_SOURCE_DIR}/tests)
+target_link_libraries(satcfdi_exportacion_ciclo_tests PRIVATE satcfdi_app_core libzip::zip Qt6::Gui Qt6::Test)
+satcfdi_enable_warnings(satcfdi_exportacion_ciclo_tests)
+add_test(NAME satcfdi_exportacion_ciclo_tests COMMAND satcfdi_exportacion_ciclo_tests)
+set_tests_properties(satcfdi_exportacion_ciclo_tests PROPERTIES
+    LABELS "integration;exportacion"
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
+# T026.2 (criterio 6): memoria con 10,000 CFDI con PDF real, ZIP fuente y
+# destino reales. Larga: QSKIP salvo SATCFDI_EJECUTAR_PRUEBA_MEMORIA=1; CI la
+# excluye con `ctest -LE memoria`.
+if(APPLE)
+    qt_add_executable(satcfdi_exportacion_memoria_tests
+        TestExportacionMemoria.cpp
+        TestExportacionServicioComun.h
+        ../fakes/ZipCfdiSintetico.h
+    )
+    set_target_properties(satcfdi_exportacion_memoria_tests PROPERTIES AUTOMOC ON)
+    target_include_directories(satcfdi_exportacion_memoria_tests PRIVATE ${PROJECT_SOURCE_DIR}/tests)
+    target_link_libraries(satcfdi_exportacion_memoria_tests PRIVATE
+        satcfdi_storage
+        satcfdi_cfdi_zip
+        satcfdi_cfdi_xml
+        satcfdi_cfdi_pdf
+        satcfdi_application
+        satcfdi_ports
+        satcfdi_domain
+        libzip::zip
+        Qt6::Gui
+        Qt6::Test
+    )
+    satcfdi_enable_warnings(satcfdi_exportacion_memoria_tests)
+    add_test(NAME satcfdi_exportacion_memoria_tests COMMAND satcfdi_exportacion_memoria_tests)
+    set_tests_properties(satcfdi_exportacion_memoria_tests PROPERTIES
+        LABELS "exportacion;memoria"
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+        TIMEOUT 3600
+    )
+endif()

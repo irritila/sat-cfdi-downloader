@@ -6,9 +6,20 @@
 #include "application/persistence/PersistenceDispatcher.h"
 #include "ports/repositories/PaqueteSolicitudRepository.h"
 
+#include <QCoreApplication>
+#include <QLoggingCategory>
+#include <QPromise>
+#include <QTimer>
+
+#include <atomic>
 #include <chrono>
+#include <memory>
 
 namespace satcfdi {
+
+namespace {
+Q_LOGGING_CATEGORY(lcCierre, "satcfdi.ciclo.cierre")
+} // namespace
 
 OSIntegration::EstadoMonitoreo estadoMonitoreoDe(const InstantaneaWorker& instantanea)
 {
@@ -91,9 +102,43 @@ OSIntegration::NotificacionLocal notificacionLocalDe(const Notificacion& n)
     return local;
 }
 
-ExtensionWorker::ExtensionWorker(WorkerLocal& worker, OperacionExecutor& ejecutor)
+QFuture<void> esperarConPlazo(QFuture<void> trabajo, std::chrono::milliseconds plazo, const char* codigo)
+{
+    if (trabajo.isFinished()) {
+        return QtFuture::makeReadyVoidFuture();
+    }
+    struct Espera {
+        QPromise<void> promesa;
+        std::atomic<bool> hecha{false};
+        void terminar()
+        {
+            if (!hecha.exchange(true)) {
+                promesa.finish();
+            }
+        }
+    };
+    auto espera = std::make_shared<Espera>();
+    espera->promesa.start();
+    QFuture<void> resultado = espera->promesa.future();
+    trabajo.then(QtFuture::Launch::Sync, [espera] { espera->terminar(); })
+        .onCanceled([espera] { espera->terminar(); });
+    const QByteArray clave(codigo);
+    QTimer::singleShot(plazo, QCoreApplication::instance(), [espera, clave] {
+        if (!espera->hecha.load()) {
+            qCWarning(lcCierre, "cierre con plazo agotado; codigo: %s", clave.constData());
+        }
+        espera->terminar();
+    });
+    return resultado;
+}
+
+ExtensionWorker::ExtensionWorker(WorkerLocal& worker, OperacionExecutor& ejecutor,
+                                 std::function<QFuture<void>()> detenerAdicional,
+                                 std::chrono::milliseconds plazoAdicional)
     : m_worker(worker)
     , m_ejecutor(ejecutor)
+    , m_detenerAdicional(std::move(detenerAdicional))
+    , m_plazoAdicional(plazoAdicional)
 {
 }
 
@@ -110,7 +155,13 @@ void ExtensionWorker::aplicarMonitoreoPausado(bool pausado)
 QFuture<void> ExtensionWorker::detener()
 {
     m_worker.detener();
-    return m_ejecutor.detener(std::chrono::seconds(10));
+    QFuture<void> ejecutor = m_ejecutor.detener(std::chrono::seconds(10));
+    if (!m_detenerAdicional) {
+        return ejecutor;
+    }
+    QList<QFuture<void>> detenciones{
+        esperarConPlazo(m_detenerAdicional(), m_plazoAdicional, "salida.exportacion_plazo_agotado"), ejecutor};
+    return QtFuture::whenAll(detenciones.begin(), detenciones.end()).then([](const QList<QFuture<void>>&) {});
 }
 
 ConsultaExistenciaEjecutor::ConsultaExistenciaEjecutor(PersistenceDispatcher& dispatcher,

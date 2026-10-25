@@ -13,6 +13,8 @@
 #include "application/cfdi/CatalogoCfdiService.h"
 #include "application/cfdi/IndexadorCfdi.h"
 #include "application/cfdi/PrevisualizacionCfdiService.h"
+#include "application/cfdi/ExportacionFacturasService.h"
+#include "application/cfdi/PlanificadorExportacion.h"
 #include "AppBootstrapper.h"
 #include "infrastructure/cfdi/pdf/AlmacenPdfCfdiFs.h"
 #include "infrastructure/cfdi/pdf/RenderizadorPdfCfdi.h"
@@ -352,7 +354,15 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
         m_destinoExportacion = std::make_shared<DestinoExportacionPosix>(std::move(o));
     }
     m_worker = std::make_unique<WorkerLocal>(*m_ejecutor, *m_configuracionService, *programadorWorker, reloj);
-    m_extensionWorker = std::make_unique<ExtensionWorker>(*m_worker, *m_ejecutor);
+    // T026.2 (D19): la salida tambien espera el cierre de la exportacion
+    // (cancelada y sin `.partial`); el servicio se crea mas abajo.
+    if (monitoreo.plazoCierreExportacion.count() > 0) {
+        m_plazoCierreExportacion = monitoreo.plazoCierreExportacion;
+    }
+    m_extensionWorker = std::make_unique<ExtensionWorker>(
+        *m_worker, *m_ejecutor,
+        [this] { return m_exportacionFacturas ? m_exportacionFacturas->cerrar() : QtFuture::makeReadyVoidFuture(); },
+        m_plazoCierreExportacion);
     m_accionesWorker = std::make_unique<AccionesWorker>(*m_worker);
     m_consultaExistencia = std::make_unique<ConsultaExistenciaEjecutor>(*m_dispatcher, p.paquetes(), *m_ejecutor);
     m_accesoPaquetes = std::make_unique<AccesoPaquetesEjecutor>(*m_ejecutor);
@@ -488,6 +498,36 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
         m_previsualizacionCfdi = std::make_unique<PrevisualizacionCfdiService>(std::move(puertosPdf));
         // "Abrir en Vista Previa" solo acepta PDF de la cache o del temporal.
         m_accesoFinder->setDirectoriosVistaPrevia({m_directorioCachePdf, m_directorioTemporalPdf});
+
+        // T026.2: exportacion de facturas en su propio hilo (ADR 0023; nunca
+        // el grafico ni la cola SAT). Plan y visibilidad por el dispatcher;
+        // lector y archivos propios (sin estado); un renderer nuevo por
+        // exportacion (D13). La indexacion en curso no se consulta al planear
+        // (IndexadorCfdi::cubre es del hilo grafico): un mes con paquetes aun
+        // sin indexar se informa como "cobertura incompleta".
+        m_lectorExportacion = monitoreo.lectorExportacion ? monitoreo.lectorExportacion
+                                                          : std::make_shared<LectorZipLibzip>();
+        m_archivosExportacion = std::make_shared<ArchivosZipCfdiFs>(raizIndice);
+        m_planificadorExportacion =
+            std::make_unique<PlanificadorExportacion>(p.catalogoMensual(), reloj, indexador->versionParser());
+        PuertosExportacionFacturas puertosExportacion{
+            ExportacionFacturasService::planearPorDispatcher(*m_dispatcher, *m_planificadorExportacion),
+            ExportacionFacturasService::paqueteExportablePorCatalogo(*m_dispatcher, p.catalogoCfdi()),
+            [this] { return m_limpiezaExportacionInicial; },
+            m_destinoExportacion,
+            fabricaEscritorZip(),
+            m_lectorExportacion,
+            m_archivosExportacion,
+            [](QByteArrayView xml) { return parsearCfdi(xml); },
+            []() -> std::unique_ptr<CfdiPdfRenderer> { return std::make_unique<RenderizadorPdfCfdi>(); },
+            reloj, // por valor; no depende de la vida del root (C7)
+            m_plazoCierreExportacion, // C5: tambien acota la espera del destructor
+            {}};
+        m_exportacionFacturas = std::make_unique<ExportacionFacturasService>(std::move(puertosExportacion));
+        // D19: eliminar localmente omite al instante las facturas pendientes
+        // de esa solicitud (ademas de la revalidacion por paquete).
+        QObject::connect(m_solicitudesService.get(), &SolicitudesService::solicitudEliminada,
+                         m_exportacionFacturas.get(), &ExportacionFacturasService::notificarSolicitudEliminada);
     }
 
     // T014.3 D1: primer uso (lectura en el dispatcher). D2/D3: aviso de
@@ -609,6 +649,11 @@ AppCompositionRoot::~AppCompositionRoot()
     m_controlRestauracion.reset();
     m_controlRespaldo.reset();
     m_restauracion.reset(); // T025.5: sus callbacks usan este root
+    // T026.2: cancela, descarta su `.partial` y une su hilo antes que sus
+    // puertos (el planificador vive hasta cerrar el dispatcher).
+    m_exportacionFacturas.reset();
+    m_archivosExportacion.reset(); // C7: el hilo abandonado conserva los suyos
+    m_lectorExportacion.reset();
 
     // T007: el ejecutor termina antes que el dispatcher (y su hilo cierra su
     // propia conexion). Si la salida explicita ya lo detuvo, es inmediato.
@@ -679,6 +724,7 @@ AppCompositionRoot::~AppCompositionRoot()
         [persistencia] { persistencia->cerrarConexionDelHiloActual(); }));
     m_dispatcher->cerrar();
     m_dispatcher.reset();
+    m_planificadorExportacion.reset(); // T026.2: ya no hay tareas de planear()
 
     // 3. Repositorios y proveedor.
     m_sanitizer.reset();
@@ -804,7 +850,16 @@ QFuture<void> AppCompositionRoot::detenerParaRestaurar()
     if (m_previsualizacionCfdi) {
         m_previsualizacionCfdi->detener();
     }
-    return m_ejecutor->detener(std::chrono::milliseconds(0));
+    // T026.2 (D19, C5): la exportacion se cancela y su `.partial` se descarta
+    // antes de que la restauracion escriba nada; se espera junto al ejecutor,
+    // como maximo el plazo (agotado: el siguiente arranque borra el parcial).
+    QList<QFuture<void>> detenciones;
+    if (m_exportacionFacturas) {
+        detenciones.append(esperarConPlazo(m_exportacionFacturas->cerrar(), m_plazoCierreExportacion,
+                                           "restauracion.exportacion_plazo_agotado"));
+    }
+    detenciones.append(m_ejecutor->detener(std::chrono::milliseconds(0)));
+    return QtFuture::whenAll(detenciones.begin(), detenciones.end()).then([](const QList<QFuture<void>>&) {});
 }
 
 QUuid AppCompositionRoot::idInstalacion() const
@@ -945,6 +1000,10 @@ AppLifecycleController& AppCompositionRoot::iniciarCicloDeVida(OSIntegration& os
     // T015.4: la salida cancela la previsualizacion en curso.
     QObject::connect(controlador, &AppLifecycleController::salidaIniciada, m_previsualizacionCfdi.get(),
                      &PrevisualizacionCfdiService::detener);
+    // T026.2 (D19): la salida cancela la exportacion de inmediato; la
+    // extension (ExtensionWorker) espera su cerrar() antes del ultimo cierre.
+    QObject::connect(controlador, &AppLifecycleController::salidaIniciada, m_exportacionFacturas.get(),
+                     &ExportacionFacturasService::cancelar);
     monitor->alCambiarWorker(m_worker->instantanea());
     monitor->iniciar();
 

@@ -7,7 +7,11 @@
 #include "application/notificaciones/Notificador.h"
 #include "ports/OSIntegration.h"
 
+#include <QFuture>
 #include <QPointer>
+
+#include <chrono>
+#include <functional>
 
 namespace satcfdi {
 
@@ -20,6 +24,13 @@ struct InstantaneaWorker;
 // Traduce el estado del worker (application) al vocabulario del puerto
 // OSIntegration (D2, D11).
 OSIntegration::EstadoMonitoreo estadoMonitoreoDe(const InstantaneaWorker& instantanea);
+
+// T026.2 (C5): future que se completa cuando `trabajo` termina (valor o
+// cancelacion) o cuando pasa `plazo`, lo primero. Agotado el plazo registra
+// un warning con solo `codigo` (ASCII estable, D20) y `trabajo` sigue en
+// curso. Llamar desde un hilo con event loop (el temporizador vive en
+// QCoreApplication); el future puede completarse en cualquier hilo.
+QFuture<void> esperarConPlazo(QFuture<void> trabajo, std::chrono::milliseconds plazo, const char* codigo);
 
 // T014.4 D2: EstadoAgregado (application) -> EstadoIcono (puerto), 1:1.
 OSIntegration::EstadoIcono estadoIconoDe(EstadoAgregado estado);
@@ -37,9 +48,17 @@ OSIntegration::NotificacionLocal notificacionLocalDe(const Notificacion& notific
 // - detener: worker.detener() (timers, no encola mas) y despues
 //   ejecutor.detener(plazo): espera la operacion actual hasta el plazo, pide
 //   la cancelacion cooperativa y termina su hilo. No bloquea.
+// - T026.2 (D19, C5): `detenerAdicional` (opcional) se llama en detener()
+//   junto al ejecutor (la exportacion: cancela, descarta su `.partial` y une
+//   su hilo) y se espera como maximo `plazoAdicional` (esperarConPlazo); el
+//   future se completa cuando terminaron ambos o se agoto ese plazo. Agotado,
+//   la salida sigue y el `.partial` lo borra la limpieza del siguiente
+//   arranque (ADR 0023).
 class ExtensionWorker final : public ExtensionCicloDeVida {
 public:
-    ExtensionWorker(WorkerLocal& worker, OperacionExecutor& ejecutor);
+    ExtensionWorker(WorkerLocal& worker, OperacionExecutor& ejecutor,
+                    std::function<QFuture<void>()> detenerAdicional = {},
+                    std::chrono::milliseconds plazoAdicional = std::chrono::seconds(10));
 
     void aplicarMonitoreoPausado(bool pausado) override;
     QFuture<void> detener() override;
@@ -47,6 +66,8 @@ public:
 private:
     WorkerLocal& m_worker;
     OperacionExecutor& m_ejecutor;
+    std::function<QFuture<void>()> m_detenerAdicional;
+    std::chrono::milliseconds m_plazoAdicional;
     bool m_conocido = false;
     bool m_pausado = false;
 };

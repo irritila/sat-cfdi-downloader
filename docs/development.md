@@ -93,6 +93,12 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+Si la Mac se duerme durante las pruebas, los procesos se suspenden pero los plazos se miden con el reloj de pared: una prueba en curso puede agotar su tiempo o el timeout de CTest. En corridas largas o desatendidas, evita la suspension:
+
+```bash
+QT_QPA_PLATFORM=offscreen caffeinate -i -s ctest --test-dir build -j4
+```
+
 Filtrar pruebas por label:
 
 ```bash

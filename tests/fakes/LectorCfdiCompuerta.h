@@ -21,12 +21,23 @@
 #include <QThread>
 #include <QWaitCondition>
 
+#include <memory>
+
 namespace fakes {
 
 class LectorCfdiCompuerta final : public satcfdi::CfdiArchiveReader {
 public:
     explicit LectorCfdiCompuerta(satcfdi::CfdiArchiveReader& interno)
         : m_interno(interno)
+    {
+    }
+
+    // T026.2 (C7): duena del lector interno, para que la compuerta pueda
+    // vivir solo por quien la retiene (p. ej. un hilo de exportacion
+    // abandonado).
+    explicit LectorCfdiCompuerta(std::shared_ptr<satcfdi::CfdiArchiveReader> interno)
+        : m_propio(std::move(interno))
+        , m_interno(*m_propio)
     {
     }
 
@@ -111,6 +122,7 @@ private:
         m_bloqueado = false;
     }
 
+    std::shared_ptr<satcfdi::CfdiArchiveReader> m_propio; // nulo si es prestado
     satcfdi::CfdiArchiveReader& m_interno;
     mutable QMutex m_mutex;
     QWaitCondition m_condicion;
