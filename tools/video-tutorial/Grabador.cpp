@@ -1,6 +1,7 @@
 #include "Grabador.h"
 
 #include "Agarre.h"
+#include "BarreraExportacion.h"
 #include "Barreras.h"
 #include "CuadroApp.h"
 #include "DiagnosticoClic.h"
@@ -162,6 +163,12 @@ bool Sesion::cargar()
     // T022 D6: Facturas (pagina por omision) e Historial, como la app real.
     m_vms->setFuenteFacturas(&m_demo.facturas, &m_demo.preferenciasFacturas);
     m_vms->setFuenteHistorial(&m_demo.historial);
+    // T024.2 (D9): Exportacion y Respaldo sinteticos, como los cablea la app
+    // (las escenas que los usan son de T024.4).
+    m_vms->setExportacionFacturas(m_demo.exportacion.servicio(), [ahora = m_demo.ahora()] { return ahora; });
+    m_vms->setControlRespaldo(&m_demo.respaldo);
+    m_vms->setControlRestauracion(&m_demo.restauracion);
+    m_vms->setDatosPreviosRestauracion(&m_demo.datosPrevios);
 
     m_engine = std::make_unique<QQmlApplicationEngine>();
     m_engine->addUrlInterceptor(&m_interceptor);
@@ -492,6 +499,9 @@ bool Sesion::aplicarInstantanea(const Capitulo& cap, const Escena& esc, const Ac
         break;
     case TipoAccion::EsperarConteo:
         e = esperarConteo(m_ventana->contentItem(), a.objetivo, a.conteo, a.timeoutMs, bombearDibujando);
+        break;
+    case TipoAccion::EsperarExportacion:
+        e = esperarExportacion(m_vms->exportacionFacturas(), a.resultadoExportacion, a.timeoutMs, bombearDibujando);
         break;
     case TipoAccion::CambiarEFirma:
         e = m_demo.cambiarEFirma(a.perfil, a.efirma, a.vigenteHasta);

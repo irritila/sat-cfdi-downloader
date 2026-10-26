@@ -1,0 +1,122 @@
+{
+  "descripcion": "T024.2: manifiesto versionado de capturas del manual (escenario -> PNG). satcfdi_manual_capturas lo lee: genera exactamente estas capturas, en este orden, y falla si el entorno no coincide con el que fija o verifica. 'cubre' enlaza cada PNG con la lista de capturas de T024.3 (Alcance > Capturas). Sin 'ancho'/'alto', la ventana es la del entorno. 'fuente' y 'fuenteMono' son la familia que pide la app y la que resuelve esta maquina (observadas, no fijadas: la herramienta usa las de la app y falla si cambian). 'aserciones' se comprueban sobre el cuadro estable antes de capturar: 'visibles'/'ocultos' por objectName (visibilidad efectiva), 'textos' como lineas exactas entre los textos visibles y accesibles, 'propiedades' {objeto, propiedad, valor} del primer item visible con ese objectName, 'dibujados' objectName cuyo rectangulo no es de un solo color en la imagen que se guarda.",
+  "entorno": {
+    "plataforma": "offscreen",
+    "backendQtQuick": "software",
+    "renderLoop": "basic",
+    "escala": 2,
+    "ancho": 960,
+    "alto": 640,
+    "tema": "claro",
+    "locale": "es_MX",
+    "zonaHoraria": "UTC",
+    "relojUtc": "2026-10-15T18:00:00Z",
+    "pasoAnimacionMs": 16,
+    "parpadeoCursorMs": 0,
+    "fuente": "Sans Serif -> .AppleSystemUIFont",
+    "fuenteMono": "Menlo -> Menlo"
+  },
+  "escenarios": [
+    {"archivo": "01-perfiles.png", "escenario": "perfiles", "tipo": "Captura", "cubre": "Rehacer 01: Perfiles SAT con e.firma por vencer", "aserciones": {
+      "visibles": ["paginaPerfilesSat", "badgeVencimientoSeleccion"],
+      "ocultos": ["estadoCargandoPerfiles", "estadoErrorPerfiles"],
+      "textos": ["Contribuyente de ejemplo", "Vence en 21 días"]
+    }},
+    {"archivo": "02-efirma.png", "escenario": "efirma", "tipo": "Captura", "cubre": "Perfiles: dialogo de e.firma", "aserciones": {
+      "visibles": ["dialogoEFirmaContenido", "filaCertificado", "filaLlave"],
+      "ocultos": ["estadoValidandoEFirma", "errorEFirma"],
+      "textos": ["Registrar e.firma", "demo.cer", "demo.key"]
+    }},
+    {"archivo": "03-selector-archivos.png", "escenario": "selector-archivos", "tipo": "Ilustracion", "cubre": "Perfiles: selector de archivos de la e.firma", "aserciones": {
+      "visibles": ["ilustracion"],
+      "textos": ["demo.cer", "demo.key", "Abrir"]
+    }},
+    {"archivo": "08-detalle-terminada.png", "escenario": "diagnostico-detalle-terminada", "tipo": "Captura", "cubre": "Apendice Diagnostico: detalle de solicitud y paquetes", "aserciones": {
+      "visibles": ["paginaDetalleSolicitud", "seccionPaquetes"],
+      "ocultos": ["estadoCargandoDetalle", "estadoErrorDetalle"],
+      "textos": ["Terminada", "1 de 3 paquetes descargados · 1 disponible · 1 vencido"]
+    }},
+    {"archivo": "09-detalle-incidencia.png", "escenario": "diagnostico-detalle-incidencia", "tipo": "Captura", "cubre": "Apendice Diagnostico: paquete con incidencia", "aserciones": {
+      "visibles": ["paginaDetalleSolicitud", "seccionPaquetes"],
+      "ocultos": ["estadoCargandoDetalle", "estadoErrorDetalle"],
+      "textos": ["Hay un paquete con error de descarga", "Error de descarga"]
+    }},
+    {"archivo": "10-finder.png", "escenario": "diagnostico-finder", "tipo": "Ilustracion", "cubre": "Rehacer 10: Finder desde Diagnostico", "aserciones": {
+      "visibles": ["ilustracion"],
+      "textos": ["0F1E2D3C-4B5A-4978-8796-A5B4C3D2E103_01.zip"]
+    }},
+    {"archivo": "11-menu-bar.png", "escenario": "menu-bar", "tipo": "Ilustracion", "cubre": "Regenerar 11: menu bar con los textos de T024.1", "aserciones": {
+      "visibles": ["ilustracion"],
+      "textos": ["Monitoreo activo", "Salir de Archivo Fiscal"]
+    }},
+    {"archivo": "12-notificacion.png", "escenario": "notificacion", "tipo": "Ilustracion", "cubre": "Rehacer 12: notificaciones", "aserciones": {
+      "visibles": ["ilustracion"],
+      "textos": ["Facturas descargadas", "e.firma por vencer", "Abrir Perfiles SAT"]
+    }},
+    {"archivo": "14-visor-pdf.png", "escenario": "visor-pdf-facturas", "tipo": "Captura", "cubre": "Rehacer 14: ver PDF desde Facturas", "aserciones": {
+      "visibles": ["visorPdfCfdi", "imagenPaginaPdf_0"],
+      "ocultos": ["estadoGenerandoPdf", "estadoErrorPdf"],
+      "textos": ["Guardar PDF…"],
+      "propiedades": [{"objeto": "imagenPaginaPdf_0", "propiedad": "status", "valor": 1}, {"objeto": "visorPdfCfdi", "propiedad": "documentoListo", "valor": true}],
+      "dibujados": ["imagenPaginaPdf_0"]
+    }},
+    {"archivo": "15-icono-menu-bar.png", "escenario": "icono-menu-bar", "tipo": "Ilustracion", "cubre": "Menu bar: variantes del icono", "aserciones": {
+      "visibles": ["ilustracion"],
+      "textos": ["Archivo Fiscal: en pausa", "Archivo Fiscal: requiere atención"]
+    }},
+    {"archivo": "16-facturas-mes.png", "escenario": "facturas-mes-disponibles", "tipo": "Captura", "cubre": "Facturas por mes: un mes Disponibles y su lista (franja Disponibles)", "aserciones": {
+      "visibles": ["paginaFacturas", "franjaMes", "listaFacturas", "listaMesesFacturas"],
+      "ocultos": ["estadoCargandoFacturas", "estadoErrorFacturas", "estadoSinFacturas"],
+      "textos": ["Facturas de septiembre 2026 completas", "Emitidas (14)", "Recibidas (33)"]
+    }},
+    {"archivo": "17-franja-parcial.png", "escenario": "franja-parcial", "tipo": "Captura", "cubre": "Franja por estado: Disponibles parcialmente", "aserciones": {
+      "visibles": ["franjaMes", "botonAccionFranja"],
+      "ocultos": ["estadoCargandoFacturas", "estadoErrorFacturas"],
+      "textos": ["Faltan facturas de septiembre 2026", "Completar mes"]
+    }},
+    {"archivo": "18-franja-preparando.png", "escenario": "franja-preparando", "tipo": "Captura", "cubre": "Franja por estado: Preparando", "aserciones": {
+      "visibles": ["franjaMes"],
+      "ocultos": ["estadoCargandoFacturas", "estadoErrorFacturas"],
+      "textos": ["Preparando las facturas de septiembre 2026"]
+    }},
+    {"archivo": "19-franja-atencion.png", "escenario": "franja-atencion", "tipo": "Captura", "cubre": "Franja por estado: Requiere atencion", "aserciones": {
+      "visibles": ["franjaMes", "botonAccionFranja"],
+      "ocultos": ["estadoCargandoFacturas", "estadoErrorFacturas"],
+      "textos": ["No se pudieron obtener todas las facturas de septiembre 2026", "Reintentar"]
+    }},
+    {"archivo": "20-franja-sin-descargar.png", "escenario": "franja-sin-descargar", "tipo": "Captura", "cubre": "Franja por estado: Sin descargar", "aserciones": {
+      "visibles": ["franjaMes", "botonAccionFranja"],
+      "ocultos": ["estadoCargandoFacturas", "estadoErrorFacturas"],
+      "textos": ["Las facturas de septiembre 2026 no están en este equipo", "Descargar facturas"]
+    }},
+    {"archivo": "21-confirmacion-direccion.png", "escenario": "confirmacion-direccion", "tipo": "Captura", "cubre": "Descargar el mes: confirmacion por direccion", "aserciones": {
+      "visibles": ["confirmacionFacturasContenido", "confirmacionFacturasConfirmar"],
+      "textos": ["¿Descargar de nuevo las recibidas de septiembre 2026?", "Descargar de nuevo"]
+    }},
+    {"archivo": "22-busqueda.png", "escenario": "busqueda-activa", "tipo": "Captura", "cubre": "Busqueda activa", "aserciones": {
+      "visibles": ["botonLimpiarFiltrosFacturas", "listaFacturas"],
+      "ocultos": ["estadoSinCoincidenciasFacturas", "estadoCargandoFacturas"],
+      "textos": ["Papelería", "Emitidas (2)", "Recibidas (4)"]
+    }},
+    {"archivo": "23-layout-angosto.png", "escenario": "layout-angosto", "tipo": "Captura", "ancho": 720, "alto": 640, "cubre": "Layout angosto (combo de meses)", "aserciones": {
+      "visibles": ["selectorMesAngosto", "listaFacturas"],
+      "ocultos": ["listaMesesFacturas", "estadoCargandoFacturas"],
+      "textos": ["septiembre 2026, Disponibles, 47 facturas"]
+    }},
+    {"archivo": "24-historial.png", "escenario": "historial", "tipo": "Captura", "cubre": "Historial", "aserciones": {
+      "visibles": ["paginaHistorial", "listaHistorial"],
+      "ocultos": ["cargandoHistorial", "estadoVacioHistorial", "estadoErrorHistorial"],
+      "textos": ["Septiembre 2026", "Descarga del 3 oct 2026, 11:12"]
+    }},
+    {"archivo": "25-exportar.png", "escenario": "dialogo-exportar", "tipo": "Captura", "cubre": "Dialogo de Exportar", "aserciones": {
+      "visibles": ["configuracionExportar", "botonExportar"],
+      "ocultos": ["errorDestinoExportar", "errorPlanExportar", "progresoExportar"],
+      "textos": ["Se exportarán 14 facturas.", "Archivo-Fiscal-2026-09.zip"]
+    }},
+    {"archivo": "26-respaldo.png", "escenario": "respaldo", "tipo": "Captura", "cubre": "Pagina de Respaldo", "aserciones": {
+      "visibles": ["paginaRespaldo", "seccionRespaldarAhora"],
+      "ocultos": ["progresoRespaldo", "noDisponibleRespaldo"],
+      "textos": ["Respaldo", "Último respaldo correcto: 14 oct 2026, 09:00"]
+    }}
+  ]
+}

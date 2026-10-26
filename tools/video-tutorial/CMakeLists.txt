@@ -26,6 +26,7 @@ set(SATCFDI_VIDEO_SIN_RED ${SATCFDI_SANDBOX_EXEC} -f ${CMAKE_CURRENT_SOURCE_DIR}
 qt_add_library(satcfdi_video_guion STATIC
     Guion.h
     Guion.cpp
+    ResultadosExportacion.h
     Voz.h
     Voz.cpp
     Musica.h
@@ -46,8 +47,6 @@ qt_add_executable(satcfdi_video_tutorial
     Salidas.cpp
     DatosDemo.h
     DatosDemo.cpp
-    FuentesFacturasGuion.h
-    FuentesFacturasGuion.cpp
     Grabador.h
     Grabador.cpp
     Agarre.h
@@ -57,6 +56,9 @@ qt_add_executable(satcfdi_video_tutorial
     EntornoQml.cpp
     Barreras.h
     Barreras.cpp
+    BarreraExportacion.h
+    BarreraExportacion.cpp
+    ResultadosExportacion.h
     SalidaFfmpeg.h
     SalidaFfmpeg.cpp
     Ilustraciones.h
@@ -80,6 +82,8 @@ target_compile_definitions(satcfdi_video_tutorial PRIVATE
 )
 target_link_libraries(satcfdi_video_tutorial PRIVATE
     satcfdi_video_guion
+    # T024.2 (T024 D9): Facturas, Historial, Exportacion y Respaldo sinteticos.
+    satcfdi_fakes_materiales
     satcfdi_presentation
     satcfdi_presentationplugin
     satcfdi_application
@@ -232,6 +236,12 @@ add_test(NAME satcfdi_video_guion_presupuesto
     COMMAND satcfdi_video_tutorial --guion ${CMAKE_CURRENT_SOURCE_DIR}/pruebas/guion-excede-presupuesto.json --validar)
 set_tests_properties(satcfdi_video_guion_presupuesto PROPERTIES
     PASS_REGULAR_EXPRESSION "escena 'demo/larga': dura [0-9]+ cuadros, fuera de su presupuesto")
+# T024.2: esperarExportacion acepta "resultado" opcional (exito por omision) y
+# rechaza uno desconocido antes de grabar, nombrando los validos.
+add_test(NAME satcfdi_video_guion_resultado_exportacion
+    COMMAND satcfdi_video_tutorial --guion ${CMAKE_CURRENT_SOURCE_DIR}/pruebas/guion-exportacion-resultado.json --validar)
+set_tests_properties(satcfdi_video_guion_resultado_exportacion PROPERTIES
+    PASS_REGULAR_EXPRESSION "resultado de exportacion desconocido \"terminada\" \\(usa exito, advertencia, neutro, error, esperandoNombre\\)")
 # --salida fuera del build se rechaza.
 add_test(NAME satcfdi_video_salida_fuera_build
     COMMAND satcfdi_video_tutorial --guion ${_video_guion} --salida ${CMAKE_CURRENT_SOURCE_DIR}/no-permitido --rapido)
@@ -257,7 +267,7 @@ add_test(NAME satcfdi_video_sync_notificaciones
 add_test(NAME satcfdi_video_rotulo_ilustraciones
     COMMAND ${CMAKE_COMMAND} -DDIR=${PROJECT_SOURCE_DIR}/tools/capturas-manual/qml
             -P ${CMAKE_CURRENT_SOURCE_DIR}/pruebas/rotulo-ilustraciones.cmake)
-set_tests_properties(satcfdi_video_guion_ejemplo satcfdi_video_guion_tutorial satcfdi_video_guion_presupuesto satcfdi_video_salida_fuera_build
+set_tests_properties(satcfdi_video_guion_ejemplo satcfdi_video_guion_tutorial satcfdi_video_guion_presupuesto satcfdi_video_guion_resultado_exportacion satcfdi_video_salida_fuera_build
     satcfdi_video_sin_sesion satcfdi_video_red_control satcfdi_video_red_sandbox satcfdi_video_sync_notificaciones
     satcfdi_video_rotulo_ilustraciones PROPERTIES LABELS "video;tools")
 
@@ -299,6 +309,25 @@ target_link_libraries(satcfdi_video_agarre_tests PRIVATE Qt6::Test Qt6::Quick Qt
 satcfdi_enable_warnings(satcfdi_video_agarre_tests)
 add_test(NAME satcfdi_video_agarre COMMAND satcfdi_video_agarre_tests)
 set_tests_properties(satcfdi_video_agarre PROPERTIES LABELS "video;tools" ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# T024.2: barrera esperarExportacion sobre el servicio real con los puertos en
+# memoria de tools/fakes-materiales (sin grabar).
+qt_add_executable(satcfdi_video_barrera_exportacion_tests
+    pruebas/TestBarreraExportacion.cpp
+    BarreraExportacion.h
+    BarreraExportacion.cpp
+    ResultadosExportacion.h
+)
+target_include_directories(satcfdi_video_barrera_exportacion_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${PROJECT_SOURCE_DIR}/tools/capturas-manual
+)
+target_link_libraries(satcfdi_video_barrera_exportacion_tests PRIVATE
+    satcfdi_fakes_materiales satcfdi_presentation Qt6::Test Qt6::Core)
+satcfdi_enable_warnings(satcfdi_video_barrera_exportacion_tests)
+add_test(NAME satcfdi_video_barrera_exportacion COMMAND satcfdi_video_barrera_exportacion_tests)
+set_tests_properties(satcfdi_video_barrera_exportacion PROPERTIES LABELS "video;tools"
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 # T022 D7: perdida del foco de macOS entre press y release (inyectada tras el
 # press del clic 2, "Nuevo perfil"): corregida por FiltroEntradaReal y, sin

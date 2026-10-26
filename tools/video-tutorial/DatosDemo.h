@@ -6,10 +6,14 @@
 // lector ZIP (LectorZipLibzip), el parser (parsearCfdi), el calculo del
 // indice (calcularIndicePaquete) y el renderer (RenderizadorPdfCfdi) reales
 // sobre ZIP sinteticos generados antes de grabar en el directorio temporal.
-// Reutiliza los fakes inmutables de tools/capturas-manual/ServiciosFijos.h.
+// Reutiliza los fakes inmutables de tools/capturas-manual/ServiciosFijos.h y
+// (T024.2, T024 D9) los fakes sinteticos comunes de tools/fakes-materiales:
+// Facturas, Historial, Exportacion y Respaldo.
 
-#include "FuentesFacturasGuion.h"
+#include "ExportacionSintetica.h" // tools/fakes-materiales
+#include "FuentesSinteticas.h"
 #include "Guion.h"
+#include "RespaldoSintetico.h"
 #include "ServiciosFijos.h" // tools/capturas-manual
 
 #include "application/primeruso/ConsultaPrimerUso.h"
@@ -169,12 +173,26 @@ public:
     CatalogoGuion catalogo;
     PrevisualizacionZip previsualizacion;
     PrimerUsoGuion primerUso{perfiles, credenciales, solicitudes};
-    // T022 D6: Facturas (pantalla principal desde T023) e Historial.
-    FacturasGuion facturas{perfiles, credenciales};
-    PreferenciasFacturasGuion preferenciasFacturas;
-    HistorialGuion historial{perfiles, solicitudes};
+    // T024.2 (D9): Facturas (pantalla principal desde T023) e Historial con
+    // los fakes comunes. Facturas toma los perfiles visibles del guion con su
+    // e.firma (sin meses declarados: catalogo vacio y meses Sin descargar,
+    // como T022 D6); Historial, una entrada "Anterior" por solicitud visible.
+    materiales::FuenteFacturasSintetica facturas; // reloj del guion
+    materiales::PreferenciasFacturasMemoria preferenciasFacturas;
+    materiales::HistorialSintetico historial;
+    // Exportacion (servicio real sobre puertos en memoria; sin retener: el
+    // resultado se espera con la barrera esperarExportacion) y Respaldo
+    // gobernados por datos. Las escenas que los usan son de T024.4.
+    materiales::ExportacionSintetica exportacion;
+    materiales::ControlRespaldoSintetico respaldo;
+    materiales::ControlRestauracionSintetico restauracion;
+    materiales::DatosPreviosSinteticos datosPrevios;
 
 private:
+    static materiales::DatosFacturas datosFacturas(const DatosGuion& datos);
+    static materiales::DatosExportacion datosExportacion();
+    QList<PerfilFacturas> perfilesFacturas() const;
+    QList<EntradaHistorial> historialDe(const PerfilId& perfil) const;
     void aplicarEstado(SolicitudDetalle& d, const QString& estado, const QString& clave);
 
     DatosGuion m_datos;

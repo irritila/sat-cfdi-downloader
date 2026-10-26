@@ -1,5 +1,7 @@
 #include "Guion.h"
 
+#include "ResultadosExportacion.h"
+
 #include <QDate>
 #include <QDateTime>
 #include <QFile>
@@ -97,6 +99,7 @@ std::optional<TipoAccion> tipoAccion(const QString& t)
         {QStringLiteral("ocultarIlustracion"), TipoAccion::OcultarIlustracion},
         {QStringLiteral("esperarDocumento"), TipoAccion::EsperarDocumento},
         {QStringLiteral("esperarConteo"), TipoAccion::EsperarConteo},
+        {QStringLiteral("esperarExportacion"), TipoAccion::EsperarExportacion},
         {QStringLiteral("escribirContrasena"), TipoAccion::EscribirContrasena},
         {QStringLiteral("cambiarEFirma"), TipoAccion::CambiarEFirma},
         {QStringLiteral("mostrarSolicitudes"), TipoAccion::MostrarSolicitudes},
@@ -238,6 +241,19 @@ bool leerAccion(Lector& l, const QJsonObject& o, Accion& a)
     case TipoAccion::EsperarDocumento:
         if (!l.soloClaves(o, {QStringLiteral("tipo"), QStringLiteral("timeoutMs")})) {
             return false;
+        }
+        a.timeoutMs = l.entero(o, "timeoutMs", 1, kTimeoutDocumentoMaxMs, true).value_or(0);
+        break;
+    case TipoAccion::EsperarExportacion:
+        if (!l.soloClaves(o, {QStringLiteral("tipo"), QStringLiteral("resultado"), QStringLiteral("timeoutMs")})) {
+            return false;
+        }
+        a.resultadoExportacion = l.texto(o, "resultado", false);
+        if (a.resultadoExportacion.isEmpty()) {
+            a.resultadoExportacion = video::resultadoExportacionPorOmision();
+        } else if (!video::resultadosExportacion().contains(a.resultadoExportacion)) {
+            return l.fallar(QStringLiteral("resultado de exportacion desconocido \"%1\" (usa %2)")
+                                .arg(a.resultadoExportacion, video::resultadosExportacion().join(QStringLiteral(", "))));
         }
         a.timeoutMs = l.entero(o, "timeoutMs", 1, kTimeoutDocumentoMaxMs, true).value_or(0);
         break;

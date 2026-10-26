@@ -175,6 +175,10 @@ endif()
 # T012 D2: herramienta que genera las imagenes del manual de usuario (cocoa;
 # no forma parte de la app ni de ctest). Target manual_capturas.
 option(SATCFDI_BUILD_MANUAL_CAPTURAS "Compilar la herramienta de capturas del manual (tools/capturas-manual)" OFF)
+# T024.2 (T024 D9): fakes sinteticos comunes de capturas y video.
+if(SATCFDI_BUILD_MANUAL_CAPTURAS OR SATCFDI_BUILD_VIDEO_TUTORIAL)
+    add_subdirectory(tools/fakes-materiales)
+endif()
 if(SATCFDI_BUILD_MANUAL_CAPTURAS)
     add_subdirectory(tools/capturas-manual)
 endif()

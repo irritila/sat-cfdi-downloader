@@ -488,42 +488,91 @@ no solicitado antes por otro medio. Un rechazo 301-305 obliga a usar otro dia.
 Solo la salida de consola (ya enmascarada) se comparte para la evidencia; el
 ledger y los ZIP quedan locales.
 
-## Manual de usuario: capturas (T012)
+## Manual de usuario: capturas (T012, T024.2)
 
 Las imagenes de `docs/manual/img/` se generan con la herramienta
 `satcfdi_manual_capturas` (`tools/capturas-manual/`). Usa los view models de
-presentacion sobre fakes deterministas: sin SQLite, worker, SAT ni Keychain, y
-solo datos sinteticos (RFC genericos `XAXX010101000`/`XEXX010101000`, rutas
-`/Users/usuario/...`, reloj fijo 2026-10-01 10:00 UTC). La herramienta fuerza
-tema claro, locale `es_MX`, zona UTC y ventana de 960x640; cada PNG se normaliza
-a 1920x1280 sin metadatos variables. Las ilustraciones (selector de archivos,
-Finder, menu bar, notificaciones, variantes del icono del menu bar) se
-alimentan de `menubar::entradas`, de `ServicioNotificaciones`, de las acciones
-de notificacion (`notificacionLocalDe`, `textoAccionNotificacion`) y del dibujo
-del icono (`dibujarIconoMenuBar`, `textoEstadoIcono`), asi que reflejan los
-textos y dibujos reales.
+presentacion sobre fakes deterministas: los fakes sinteticos comunes de
+`tools/fakes-materiales/` (Facturas con catalogo y disponibilidad por mes,
+Historial por lotes, Exportacion y Respaldo gobernados por datos; T024 D9) y,
+para el apendice Diagnostico, `ServiciosFijos.h`. Sin SQLite, worker, SAT, red
+ni Keychain, y solo datos sinteticos (RFC genericos
+`XAXX010101000`/`XEXX010101000`, nombres inventados, rutas `/Users/usuario/...`,
+reloj fijo 2026-10-15 18:00 UTC). La app arranca en Facturas. Las ilustraciones
+(selector de archivos, Finder, menu bar, notificaciones, variantes del icono del
+menu bar) se alimentan de `menubar::entradas`, de `ServicioNotificaciones`, de
+las acciones de notificacion (`notificacionLocalDe`, `textoAccionNotificacion`)
+y del dibujo del icono (`dibujarIconoMenuBar`, `textoEstadoIcono`), asi que
+reflejan los textos y dibujos reales.
+
+El manifiesto versionado `tools/capturas-manual/escenarios.json` es la lista de
+capturas (escenario -> PNG, con la entrada de T024.3 que cubre cada una) y el
+entorno fijo. La herramienta genera exactamente esas capturas y falla si el
+entorno del manifiesto no coincide con el que fija: plataforma `offscreen` (no
+abre ventanas ni toma el foco; no requiere sesion grafica), Qt Quick con el
+backend `software` y render loop `basic`, escala 2, ventana de 960x640 (o la del
+escenario), tema claro, `es_MX`, UTC, reloj de datos fijo, cursor sin parpadeo y
+reloj de animaciones virtual (16 ms por paso, nunca el tiempo real; tambien
+mueve los `Timer` de QML, como el retraso de 300 ms de los indicadores de
+carga). Fuentes: las de la app, sin cambiarlas; el manifiesto declara la
+familia pedida y la resuelta (`fuente`: `Sans Serif -> .AppleSystemUIFont`,
+`fuenteMono`: `Menlo -> Menlo` observadas en macOS 26.3 con Qt 6.10.2 de Homebrew) y la
+herramienta falla si esta maquina resuelve otra. Otra version de macOS o Qt
+puede cambiar los bytes aunque coincida la familia.
+
+Cada escenario declara `aserciones` que se comprueban sobre el cuadro estable
+justo antes de capturar, porque el SHA-256 solo prueba que el cuadro se repite,
+no que sea el correcto: `visibles` y `ocultos` (objectName con visibilidad
+efectiva, p. ej. sin indicador de carga), `textos` (lineas exactas entre los
+textos visibles y accesibles) y `propiedades` (p. ej. `imagenPaginaPdf_0.status
+== 1`, `Image.Ready`) y `dibujados` (el rectangulo del item no es de un solo
+color en la misma imagen que se guarda). Si una falla, la captura falla
+nombrandola y no se escribe el PNG. El visor PDF espera, sin avanzar el reloj,
+a ver la pagina dibujada (falla a los 10 s): `PdfPageImage` es asincrono y puede
+estar `Ready` con la pagina en blanco mientras re-rasteriza al ancho final (en
+T024.2 eso daba 14-visor-pdf en blanco en 3 de 8 corridas).
 
 ```bash
-cmake -S . -B build -G Ninja -DSATCFDI_BUILD_MANUAL_CAPTURAS=ON
-cmake --build build --target manual_capturas      # regenera las 15 imagenes (claro)
-cmake --build build --target manual_capturas_oscuro  # evidencia en oscuro: build/capturas-oscuro
-# Una sola imagen o a otro directorio:
-QT_QPA_PLATFORM=cocoa ./build/tools/capturas-manual/satcfdi_manual_capturas \
-    --salida docs/manual/img --solo 08-detalle-terminada.png
+cmake -S . -B build-capturas -G Ninja -DSATCFDI_BUILD_MANUAL_CAPTURAS=ON \
+    -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt -DSATCFDI_WARNINGS_AS_ERRORS=ON
+cmake --build build-capturas --target manual_capturas          # escribe docs/manual/img (claro): solo en T024.3
+cmake --build build-capturas --target manual_capturas_oscuro   # evidencia en oscuro: build-capturas/capturas-oscuro
+cmake --build build-capturas --target manual_capturas_verificar # reproducibilidad + escaneo
+ctest --test-dir build-capturas -L capturas                    # lo mismo como pruebas, mas la asercion negativa
+# Hasta T024.3, generar en build (no en docs/manual/img):
+./build-capturas/tools/capturas-manual/satcfdi_manual_capturas \
+    --salida build-capturas/capturas --textos build-capturas/capturas/textos
+# Una sola imagen:
+./build-capturas/tools/capturas-manual/satcfdi_manual_capturas \
+    --salida build-capturas/capturas --solo 16-facturas-mes.png [--textos <dir>]
 ```
 
 - `--tema claro|oscuro` (claro por omision). En oscuro fija `Theme.oscuro = true`
-  antes de cargar la app (T013 D9); las ilustraciones (selector de archivos,
-  Finder, menu bar, notificaciones, icono del menu bar) imitan la interfaz de macOS y quedan en claro.
-  Las capturas en oscuro son evidencia de revision: no se versionan y el manual
-  sigue en claro.
-- Requiere una sesion grafica de macOS: abre ventanas cocoa breves. No forma
-  parte de `ctest` y no usa `screencapture`.
+  antes de cargar la app (T013 D9); las ilustraciones imitan la interfaz de
+  macOS y quedan en claro. Las capturas en oscuro son evidencia de revision: no
+  se versionan y el manual sigue en claro.
+- El target `manual_capturas` escribe en `docs/manual/img/`; ese directorio y
+  el manual los cambia T024.3 (que tambien da de baja las capturas que ya no
+  estan en el manifiesto). Antes de T024.3 usa `--salida` bajo `build-capturas`
+  o `manual_capturas_verificar`.
+- `--textos <dir>` escribe por captura `<archivo>.png.txt` con los textos
+  visibles y accesibles (`Accessible.name`/`description`, incluidos dialogos),
+  para el escaneo de datos reales y para revisar las aserciones.
 - Guarda PNG sin perdida con compresion zlib maxima. Imprime
-  `OK`/`FALLA <archivo> <tipo> <WxH> <bytes>` por imagen y termina con codigo 0
-  solo si todas miden 1920x1280 y ninguna pasa de 1 MB.
-- El determinismo es de contenido, no de bytes: dos corridas producen los mismos
-  nombres, dimensiones y escenarios, con diferencias minimas de antialiasing.
+  `OK`/`FALLA <archivo> <escenario> <tipo> <WxH> <bytes>` por imagen y termina
+  con codigo 0 solo si todas miden el tamano del escenario a escala 2 y ninguna
+  pasa de 1 MB.
+- Reproducibilidad (T024.2): `satcfdi_capturas_reproducibles` (label
+  `capturas`, solo con la opcion) ejecuta la herramienta dos veces en
+  directorios limpios (`build-capturas/capturas-reproducibles/a` y `/b`) y
+  falla si algun PNG del manifiesto tiene distinto SHA-256; deja los hashes en
+  `sha256.txt`. `satcfdi_capturas_escaneo` revisa los PNG y sus textos: solo
+  los RFC genericos, rutas `/Users/usuario`, sin el usuario, nombre completo,
+  equipo ni HOME de la sesion, y sin metadatos de texto en los PNG. Riesgo
+  residual: un nombre real que no sea de la sesion no se detecta (no hay regla
+  sin falsos positivos); la mitigacion es que los datos salen solo de
+  `tools/fakes-materiales` y `ServiciosFijos.h`. `satcfdi_capturas_asercion_negativa`
+  cambia una asercion del manifiesto y exige que la captura falle.
 - La prueba `satcfdi_manual_enlaces` (label `docs`, `ctest -L docs`) verifica que
   cada `![...](img/X.png)` de `docs/manual/usuario.md` exista y que no haya PNG
   sin referenciar.

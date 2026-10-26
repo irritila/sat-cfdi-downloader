@@ -486,12 +486,102 @@ QFuture<PrevisualizacionCfdi::ResultadoGuardar> PrevisualizacionZip::guardarComo
 // --- DemoVideo ---------------------------------------------------------------------
 
 DemoVideo::DemoVideo(const DatosGuion& datos, QString dirTemporal)
-    : m_datos(datos)
+    : facturas(datosFacturas(datos))
+    , exportacion(facturas, datosExportacion())
+    , m_datos(datos)
     , m_dir(std::move(dirTemporal))
     , m_ahora(QDateTime::fromString(datos.ahora, Qt::ISODate).toUTC())
 {
     solicitudes.ahora = m_ahora;
-    facturas.setAhora(m_ahora);
+    // Como T022 D6: ejecutar() termina sin crear solicitudes.
+    facturas.setSolicitudesCreadasAlEjecutar(0);
+    facturas.proveedorPerfiles = [this] { return perfilesFacturas(); };
+    historial.proveedor = [this](const PerfilId& perfil) { return historialDe(perfil); };
+}
+
+// Solo el reloj del guion: sin perfiles ni meses declarados.
+materiales::DatosFacturas DemoVideo::datosFacturas(const DatosGuion& datos)
+{
+    materiales::DatosFacturas d;
+    d.ahoraUtc = QDateTime::fromString(datos.ahora, Qt::ISODate).toUTC();
+    return d;
+}
+
+materiales::DatosExportacion DemoVideo::datosExportacion()
+{
+    materiales::DatosExportacion d;
+    d.retenerAlIniciar = false;
+    return d;
+}
+
+// Perfiles visibles y activos del guion con el estado de su e.firma.
+QList<PerfilFacturas> DemoVideo::perfilesFacturas() const
+{
+    QList<PerfilFacturas> lista;
+    for (const PerfilResumen& p : perfiles.perfiles) {
+        if (perfiles.ocultos.contains(p.id.texto()) || !p.activo) {
+            continue;
+        }
+        const auto it = credenciales.resumenes.constFind(p.id.texto());
+        const EstadoCredencial estado = it == credenciales.resumenes.cend() ? EstadoCredencial::SinCredencial
+                                                                           : it->estado;
+        lista.append(PerfilFacturas{p.id, p.rfc, p.nombre, estado});
+    }
+    return lista;
+}
+
+namespace {
+
+ResultadoHistorial resultadoHistorial(const SolicitudResumen& r)
+{
+    if (r.paquetesDescargados > 0) {
+        return ResultadoHistorial::Completa;
+    }
+    if (r.estadoLocal == EstadoLocal::EnvioFallido || r.estadoSat == EstadoSolicitudSat::Error
+        || r.estadoSat == EstadoSolicitudSat::Rechazada || r.estadoSat == EstadoSolicitudSat::Vencida) {
+        return ResultadoHistorial::RequiereAtencion;
+    }
+    return ResultadoHistorial::EnPreparacion;
+}
+
+} // namespace
+
+// Una entrada "Anterior" por solicitud visible del perfil (mas reciente
+// primero), con "Ver detalles tecnicos" hacia su detalle.
+QList<EntradaHistorial> DemoVideo::historialDe(const PerfilId& perfil) const
+{
+    QString rfc;
+    for (const PerfilResumen& p : perfiles.perfiles) {
+        if (p.id == perfil) {
+            rfc = p.rfc;
+        }
+    }
+    QList<EntradaHistorial> entradas;
+    for (const SolicitudDetalle& d : solicitudes.detalles) {
+        const SolicitudResumen& r = d.resumen;
+        if (rfc.isEmpty() || r.perfilRfc != rfc || solicitudes.ocultas.contains(r.id.texto())) {
+            continue;
+        }
+        EntradaHistorial e;
+        e.tipo = EntradaHistorial::Tipo::Anterior;
+        e.perfil = perfil;
+        const std::optional<MesCalendario> mes = MesCalendario::de(r.fechaInicial);
+        if (mes && MesCalendario::de(r.fechaFinal) == mes) {
+            e.mes = mes;
+        }
+        e.desde = r.fechaInicial;
+        e.hasta = r.fechaFinal;
+        e.creadoEn = r.creadaEn;
+        e.resultado = resultadoHistorial(r);
+        const bool emitidos = r.tipoDescarga == TipoDescarga::Emitidos;
+        e.tieneEmitidas = emitidos;
+        e.tieneRecibidas = !emitidos;
+        (emitidos ? e.diagnosticoEmitidas : e.diagnosticoRecibidas) = r.id;
+        entradas.append(e);
+    }
+    std::stable_sort(entradas.begin(), entradas.end(),
+                     [](const EntradaHistorial& a, const EntradaHistorial& b) { return a.creadoEn > b.creadoEn; });
+    return entradas;
 }
 
 void DemoVideo::aplicarEstado(SolicitudDetalle& d, const QString& estado, const QString& clave)

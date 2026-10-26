@@ -55,6 +55,7 @@ enum class TipoAccion {
     OcultarIlustracion,
     EsperarDocumento,   // timeoutMs (barrera documentoListo / documentoError)
     EsperarConteo,      // objetivo, conteo, timeoutMs (barrera: propiedad count)
+    EsperarExportacion, // resultado?, timeoutMs (barrera: estado final de la exportacion, T024.2)
     EscribirContrasena, // longitud, cuadrosPorCaracter (valor sintetico, nunca en el guion)
     CambiarEFirma,      // perfil, efirma, vigenteHasta
     MostrarSolicitudes, // claves: reemplaza la lista visible
@@ -84,6 +85,7 @@ struct Accion {
     QString estado;
     QString ilustracion;
     QVariantMap parametros;
+    QString resultadoExportacion; // EsperarExportacion: resultadosExportacion()
     int timeoutMs = 0;
     int conteo = 0;
     QString perfil;

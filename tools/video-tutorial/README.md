@@ -624,6 +624,7 @@ aparte, fuera del sandbox.
 | `ocultarIlustracion` | | 0 |
 | `esperarDocumento` | `timeoutMs` (1-30000) | 0 (barrera) |
 | `esperarConteo` | `objetivo`, `conteo`, `timeoutMs` | 0 (barrera) |
+| `esperarExportacion` | `resultado`? (exito, advertencia, neutro, error, esperandoNombre; exito por omision), `timeoutMs` (1-30000) | 0 (barrera) |
 
 - Cursor (revision de motion design): el destino de `mover` se recalcula en
   cada cuadro (M3), con smoothstep. `ancla` auto: a la derecha del texto de un
@@ -644,13 +645,19 @@ aparte, fuera del sandbox.
   escena y el objectName.
 - `nuevaN`: la N-esima solicitud creada desde la UI durante la grabacion
   (vale en `avanzarSolicitud` y en `mostrarSolicitudes`).
-- Facturas e Historial (T022 D6, `FuentesFacturasGuion`): Facturas es la
-  pagina inicial, como en la app. Muestra los perfiles visibles con su
-  e.firma y un catalogo mensual vacio (sin descarga guiada). El Historial
+- Facturas e Historial (T022 D6; desde T024.2 con los fakes comunes de
+  `tools/fakes-materiales`, los mismos de `tools/capturas-manual`): Facturas
+  es la pagina inicial, como en la app. Muestra los perfiles visibles del
+  guion con su e.firma y un catalogo mensual vacio (sin descarga guiada). El Historial
   tiene una entrada por solicitud visible del perfil, la mas reciente
   primero, y su "Ver detalles tecnicos" (`filaHistorial_N/botonDetalles`)
   abre el detalle (Verificar ahora, Ver facturas). Desde Perfiles,
   `botonRegresar` vuelve a Facturas.
+- Exportacion y Respaldo (T024.2): la sesion conecta el
+  `ExportacionFacturasService` real con puertos en memoria
+  (`materiales::ExportacionSintetica`, sin disco ni PDF reales) y los
+  controles sinteticos de respaldo, restauracion y datos previos. Ninguna
+  escena del guion los usa todavia; adoptarlos es T024.4.
 - Pendiente de T024.4: `guion-tutorial.json` aun apunta a `guiaPrimerUso/*` en
   Diagnostico y a `botonNuevaSolicitud`, retirados en T024.1; no se graba hasta
   reescribirlo. Guia "Empieza en tres pasos" (T014.3 D1, historico): se deriva en vivo de los datos
@@ -662,6 +669,12 @@ aparte, fuera del sandbox.
   `esperarDocumento`: `documentoListo` del visor (`visorPdfCfdi`) y la primera
   pagina rasterizada; `documentoError` o el timeout fallan nombrando la escena.
   `esperarConteo`: la propiedad `count` del control (p. ej. `listaFacturas`).
+  `esperarExportacion`: la exportacion abierta sale de Planeando/Exportando y
+  termina en el `resultado` declarado (la variante del resultado, o
+  `esperandoNombre`); falla nombrando la causa si no hay exportacion abierta,
+  vence el timeout, vuelve al dialogo por un error del plan o del destino, se
+  cierra o el resultado es otro (p. ej. una cancelacion es `neutro`). El
+  servicio corre en su propio hilo, por eso es barrera.
   El timeout es de tiempo real (ms), no de cuadros.
 - Busqueda del explorador: la consulta usa un debounce `QTimer` de 250 ms en
   tiempo real (`ExploradorCfdiViewModel`). Despues de `escribir` en
