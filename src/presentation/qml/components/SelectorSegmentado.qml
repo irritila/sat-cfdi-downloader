@@ -53,6 +53,13 @@ Rectangle {
         selector.activado(clave)
     }
 
+    // Foco al segmento activo (el Rectangle del carril no recibe teclado).
+    function enfocar(razon) {
+        const segmento = repetidor.itemAt(selector.indiceActivo())
+        if (segmento)
+            segmento.forceActiveFocus(razon)
+    }
+
     function indiceActivo() {
         for (let i = 0; i < selector.opciones.length; ++i) {
             if (selector.opciones[i].clave === selector.valor)

@@ -617,6 +617,8 @@ AppCompositionRoot::AppCompositionRoot(const QString& rutaBase, SecretStore& sec
     m_preferenciasFacturas = std::make_unique<PreferenciasFacturasArchivo>(
         QDir(QFileInfo(rutaBase).absolutePath()).filePath(QStringLiteral("preferencias.ini")));
     m_viewModels->setFuenteFacturas(m_fuenteFacturas.get(), m_preferenciasFacturas.get());
+    // T026.3: exportacion de facturas desde Facturas, con el mismo reloj.
+    m_viewModels->setExportacionFacturas(m_exportacionFacturas.get(), reloj);
     // T023.5: Historial y destino de notificaciones de solicitud.
     m_fuenteHistorial = std::make_unique<FuenteHistorialRoot>(*m_catalogoMensual, *m_fuenteFacturas);
     m_viewModels->setFuenteHistorial(m_fuenteHistorial.get());

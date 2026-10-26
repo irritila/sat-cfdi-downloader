@@ -20,6 +20,7 @@ TestCase {
         FacturasPage {
             app: fixtureFacturas.app
             facturas: fixtureFacturas.facturas
+            exportacion: fixtureFacturas.exportacion
         }
     }
 
@@ -168,6 +169,7 @@ TestCase {
 
     function test_tecladoTabFlechasEnterYCopiar() {
         const p = paginaCon("Disponibles")
+        fixtureFacturas.habilitarExportacion()
         const lista = findChild(p, "listaFacturas")
         tryVerify(() => lista.activeFocus && lista.currentIndex === 0)
         // Foco inicial sin anillo en la primera fila.
@@ -204,6 +206,11 @@ TestCase {
         verify(findChild(p, "campoBusquedaFacturas").activeFocus, "busqueda")
         keyClick(Qt.Key_Tab)
         verify(findChild(p, "filtroTipoFacturas").activeFocus, "filtro")
+        // T026.3: exportar y elegir facturas antes de la lista.
+        keyClick(Qt.Key_Tab)
+        verify(findChild(p, "botonExportarMes").activeFocus, "Exportar este mes")
+        keyClick(Qt.Key_Tab)
+        verify(findChild(p, "botonElegirFacturas").activeFocus, "Elegir facturas")
         keyClick(Qt.Key_Tab)
         verify(lista.activeFocus, "lista")
         // Entrar con Tab dibuja el anillo.

@@ -19,6 +19,8 @@ class AppViewModel;
 class CredencialesSatService;
 class EFirmaFormViewModel;
 class ExploradorCfdiViewModel;
+class ExportacionFacturasService;
+class ExportacionFacturasViewModel;
 class FacturasViewModel;
 class FuenteHistorial;
 class HistorialViewModel;
@@ -73,11 +75,16 @@ public:
     // T025.6: pagina Respaldo y franja de avisos de restauracion (siempre
     // existe; sin puertos queda "no disponible").
     RespaldoViewModel* respaldo() const { return m_respaldo; }
+    // T026.3: exportacion de facturas desde Facturas (siempre existe; sin
+    // servicio queda "no disponible"). Sigue el perfil, mes y pestana de
+    // facturas(). Main.qml lo pasa a FacturasPage.
+    ExportacionFacturasViewModel* exportacionFacturas() const { return m_exportacionFacturas; }
 
     // {"appViewModel", "solicitudesModel",
     //  "detalleViewModel", "perfilesViewModel", "eFirmaViewModel",
     //  "exploradorViewModel", "avisoRaizPaquetesViewModel",
-    //  "facturasViewModel", "historialViewModel", "respaldoViewModel"} para
+    //  "facturasViewModel", "historialViewModel", "respaldoViewModel",
+    //  "exportacionFacturasViewModel"} para
     //  QQmlApplicationEngine::setInitialProperties.
     QVariantMap initialProperties() const;
 
@@ -116,6 +123,10 @@ public:
     void setImpresionTexto(ImpresionTexto impresion);
     // H1: copia de la clave de recuperacion (vacia = sin "Copiar").
     void setCopiaTextoSecreto(CopiaTextoSecreto copia);
+    // T026.3: servicio de exportacion (no propietario; debe vivir mas que
+    // este objeto) y reloj de Facturas (mes en curso y fecha del nombre
+    // sugerido). nullptr = exportacion no disponible.
+    void setExportacionFacturas(ExportacionFacturasService* servicio, RelojUtc reloj = relojSistema());
 
 private:
     void conectarPreparacionDetalle(PerfilesSatService* perfiles, CredencialesSatService* credenciales,
@@ -132,6 +143,7 @@ private:
     AppViewModel* m_app;
     AvisoRaizPaquetesViewModel* m_avisoRaizPaquetes;
     RespaldoViewModel* m_respaldo;
+    ExportacionFacturasViewModel* m_exportacionFacturas;
 };
 
 } // namespace satcfdi

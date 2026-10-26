@@ -30,7 +30,8 @@ Contenido:
 7. [Menu bar](#7-menu-bar)
 8. [Notificaciones de macOS](#8-notificaciones-de-macos)
 9. [Respaldo y restauración](#9-respaldo-y-restauración)
-10. [Mensajes frecuentes y cómo resolverlos](#10-mensajes-frecuentes-y-cómo-resolverlos)
+10. [Exportar facturas](#10-exportar-facturas)
+11. [Mensajes frecuentes y cómo resolverlos](#11-mensajes-frecuentes-y-cómo-resolverlos)
 
 ## 1. Perfiles SAT y e.firma
 
@@ -159,7 +160,7 @@ nueva se valida. Si falla, la actual sigue registrada sin cambios." Pulsa
 falla, el mensaje termina con "La e.firma anterior sigue registrada sin
 cambios." y la lista vuelve a mostrar el estado real de la e.firma anterior.
 
-Los errores al registrar o reemplazar están en la [sección 10](#10-mensajes-frecuentes-y-cómo-resolverlos).
+Los errores al registrar o reemplazar están en la [sección 11](#11-mensajes-frecuentes-y-cómo-resolverlos).
 
 ## 2. Crear una nueva solicitud y resolver duplicados
 
@@ -769,7 +770,109 @@ que creó Archivo Fiscal; cualquier otra carpeta con un nombre parecido, o que
 sea un enlace, queda intacta y la app te avisa para que la revises a mano.
 Después se limpian del llavero las e.firmas anteriores.
 
-## 10. Mensajes frecuentes y cómo resolverlos
+## 10. Exportar facturas
+
+Desde **Facturas** puedes guardar en un solo archivo ZIP las facturas que ya
+están en tu equipo, para entregarlas o guardarlas donde tú quieras. La app no
+se conecta al SAT para exportar: usa solo lo que ya descargó.
+
+Hay tres formas de elegir qué exportar:
+
+- **Este mes**: pulsa **Exportar este mes**. Se exportan las facturas del mes
+  que estás viendo.
+- **Varios meses**: en el diálogo, elige **Varios meses** e indica **Desde** y
+  **Hasta**. Puede ser el mismo mes en los dos. El rango no puede incluir meses
+  que todavía no empiezan ni meses fuera de los que se pueden consultar en
+  Facturas (los últimos 6 años), y el mes inicial no puede ser posterior al
+  final; si pasa, el diálogo lo dice debajo del rango y no deja exportar.
+- **Elegidas**: pulsa **Elegir facturas**. Cada fila muestra una casilla;
+  márcala con un clic o, con la fila seleccionada, con la barra espaciadora.
+  Arriba se ve cuántas llevas ("3 facturas elegidas"). Lo elegido se conserva
+  al cambiar entre Emitidas y Recibidas, al buscar o filtrar y cuando la lista
+  se actualiza, pero se borra al cambiar de perfil. **Quitar selección** desmarca todo;
+  **Listo** o Escape salen del modo de selección. Pulsa **Exportar
+  elegidas…** para abrir el diálogo.
+
+### El diálogo Exportar facturas
+
+El diálogo siempre muestra este aviso:
+
+> El archivo que vas a crear contiene tus facturas completas y no está
+> protegido con contraseña. Cualquier persona que lo abra podrá verlas. Si lo
+> guardas en iCloud Drive, Dropbox o una carpeta compartida, se copiará fuera
+> de este equipo. Guárdalo en un lugar de confianza y bórralo cuando ya no lo
+> necesites.
+
+Debajo eliges:
+
+- **Qué exportar**: **Este mes**, **Varios meses** o **Elegidas (N)**.
+- **Facturas a exportar** (solo para un mes o varios): **Emitidas**,
+  **Recibidas** o **Ambas**. Por omisión, la pestaña que estabas viendo. Con
+  facturas elegidas no hay que elegir: se exporta exactamente lo que marcaste.
+- **Incluir el PDF de cada factura**: agrega junto a cada XML el mismo PDF que
+  ves en **Ver PDF**.
+- Cuántas facturas se exportarán ("Se exportarán 12 facturas."). Si alguna no
+  está en tu equipo, o un mes tiene descargas pendientes o incompletas, el
+  diálogo lo avisa antes de exportar. Si no hay ninguna, dice "No hay facturas
+  para exportar" y **Exportar** queda deshabilitado; no se crea un archivo
+  vacío.
+- **Guardar en**: pulsa **Elegir carpeta…** para elegir la carpeta con el
+  diálogo de macOS. No puede ser una carpeta dentro de los datos de Archivo
+  Fiscal.
+- **Nombre del archivo**: la app sugiere uno sin RFC ni nombres, por ejemplo
+  `Archivo-Fiscal-2026-09.zip`, `Archivo-Fiscal-2026-08_2026-09.zip` para
+  varios meses o `Archivo-Fiscal-seleccion-2026-10-26.zip` para facturas
+  elegidas. Puedes cambiarlo; la app quita los caracteres que macOS no admite y
+  agrega `.zip` si falta.
+
+**Exportar** se habilita cuando hay facturas y una carpeta elegida. **Cancelar**
+o Escape cierran el diálogo sin crear nada.
+
+### Mientras se exporta
+
+El diálogo muestra la etapa ("Agregando facturas…", "Creando los PDF…",
+"Terminando el archivo…") con una barra y el conteo de facturas exportadas.
+**Cancelar exportación** (o Escape) detiene el trabajo: no queda ningún archivo
+a medias en la carpeta. Solo corre una exportación a la vez.
+
+### Si el nombre ya existe
+
+La app nunca reemplaza un archivo. Si en la carpeta ya hay uno con ese nombre,
+el diálogo dice "Ya existe un archivo con ese nombre en la carpeta. Escribe otro
+nombre.", con el foco en **Nombre del archivo**. Escribe otro nombre y pulsa
+**Guardar con este nombre** (no se vuelve a preparar el archivo) o pulsa
+**Cancelar exportación** para descartarlo.
+
+### Resultado y contenido del ZIP
+
+Al terminar, el diálogo dice "Exportación terminada" con el número de facturas
+exportadas (y de PDF, si los pediste) y el nombre del archivo creado. Si
+algunas facturas no se incluyeron o salieron sin PDF, lo indica con su conteo.
+Si no se pudo leer ninguna factura, dice "No se exportó ninguna factura" y el
+ZIP solo contiene `omitidas.txt`.
+
+Dentro del ZIP:
+
+- `emitidas/AAAA-MM/<UUID>.xml` y `recibidas/AAAA-MM/<UUID>.xml`: el XML
+  original de cada factura, sin cambios, agrupado por el mes que ves en
+  Facturas. Con PDF, `<UUID>.pdf` va junto a su XML. El PDF es una
+  visualización generada en tu equipo, igual que en **Ver PDF**; el comprobante
+  fiscal es el XML.
+- `omitidas.txt`, solo si algo no se exportó completo: una línea por factura
+  con su UUID y el motivo ("no disponible en este equipo", "ilegible", "cambió
+  desde que se indexó", "ya no disponible" o "sin PDF" cuando el XML sí se
+  incluyó), y una línea por mes con descargas pendientes o cobertura
+  incompleta. No incluye RFC, nombres ni rutas.
+
+Una factura cuyo ZIP original falta en tu equipo o todavía se está
+descargando no se exporta y aparece en `omitidas.txt`. Si acabas de descargar
+el mes, espera a que termine y exporta de nuevo.
+
+Con el teclado: Tab recorre el diálogo en orden (qué exportar, facturas a
+exportar, PDF, carpeta, nombre, **Cancelar** y **Exportar**); las flechas
+cambian de opción en los selectores; Escape cierra o cancela según el momento.
+
+## 11. Mensajes frecuentes y cómo resolverlos
 
 ### e.firma (al registrar o reemplazar)
 
@@ -853,6 +956,22 @@ contraseña.
 | No se descartaron todos los datos anteriores | Pulsa **Descartar datos anteriores…** otra vez; las e.firmas anteriores se conservan hasta terminar. |
 | Datos anteriores descartados, con avisos | Los datos se borraron, pero no se terminaron de limpiar las e.firmas anteriores del llavero; tus perfiles actuales no se ven afectados. |
 | Hay N carpetas «pre-restauracion» que Archivo Fiscal no creó o que son enlaces; no se tocaron. Revísalas a mano. | Revisa esas carpetas en Finder y bórralas tú si ya no las necesitas. |
+
+### Exportar facturas
+
+| Mensaje | Qué hacer |
+| --- | --- |
+| No hay facturas para exportar | Elige otro mes, rango o facturas; no se crea un archivo vacío. |
+| El rango no puede incluir meses que aún no empiezan. / El rango solo puede incluir meses de los últimos 6 años. / El mes inicial debe ser anterior o igual al mes final. | Corrige **Desde** o **Hasta**. |
+| No se pudieron leer las facturas para exportar. Intenta de nuevo. | Pulsa **Reintentar** en el diálogo. |
+| Ya hay una exportación en curso. | Espera a que termine la otra exportación. |
+| Ya existe un archivo con ese nombre en la carpeta. Escribe otro nombre. | Escribe otro nombre y pulsa **Guardar con este nombre** (o **Exportar**). |
+| La carpeta elegida ya no está disponible. Elige otra. / No hay permiso para guardar en esa carpeta. Elige otra. | Pulsa **Elegir carpeta…** y elige otra. |
+| No se puede guardar la exportación dentro de los datos de Archivo Fiscal. Elige otra carpeta. | Elige una carpeta fuera de los datos de la app, por ejemplo Documentos. |
+| El nombre del archivo no es válido. Escribe otro nombre. | Usa otro nombre. |
+| No hay espacio suficiente en el disco. Libera espacio o elige otra carpeta. | Libera espacio y exporta de nuevo. No se creó ningún archivo. |
+| El archivo se creó, pero no se pudo confirmar que quedara guardado en el disco. Ábrelo para comprobarlo antes de borrar nada. | Abre el ZIP en Finder; si está bien, no hace falta nada más. |
+| No se exportó ninguna factura | Revisa `omitidas.txt` dentro del ZIP: indica por qué no se incluyó cada factura. |
 
 ### Otros
 

@@ -22,6 +22,8 @@ set(_satcfdi_qml_files
     qml/components/DialogoContrasenaRespaldo.qml
     qml/components/DialogoClaveRecuperacion.qml
     qml/components/DialogoRestaurarRespaldo.qml
+    # T026.3: exportacion de facturas.
+    qml/components/DialogoExportarFacturas.qml
     qml/components/FranjaMes.qml
     qml/components/ListaMesesFacturas.qml
     qml/components/EFirmaDialogo.qml
@@ -143,6 +145,11 @@ qt_add_qml_module(satcfdi_presentation
         viewmodels/PuertosRespaldoPresentacion.h
         viewmodels/RespaldoViewModel.h
         viewmodels/RespaldoViewModel.cpp
+        # T026.3: exportacion de facturas y horizonte compartido con Facturas.
+        viewmodels/HorizonteFacturas.h
+        viewmodels/HorizonteFacturas.cpp
+        viewmodels/ExportacionFacturasViewModel.h
+        viewmodels/ExportacionFacturasViewModel.cpp
 )
 
 # Includes: "presentation/viewmodels/X.h" desde src/, y "X.h" para el codigo

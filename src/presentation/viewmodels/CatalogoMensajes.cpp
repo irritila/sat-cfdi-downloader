@@ -473,4 +473,193 @@ QString textoPendienteDiario(EstadoRespaldoPresentacion::PendienteDiario pendien
     return {};
 }
 
+// ---- T026.3: exportacion de facturas ----
+
+ResumenExportacion resumenExportacion(const ResultadoExportacion& resultado)
+{
+    ResumenExportacion r;
+    r.estado = resultado.estado;
+    if (resultado.error) {
+        r.error = resultado.error->codigo;
+        if (resultado.error->destino) {
+            r.destino = resultado.error->destino->codigo;
+        } else if (resultado.error->zip && resultado.error->zip->destino) {
+            r.destino = *resultado.error->zip->destino; // escritura del ZIP (p. ej. disco lleno)
+        }
+    }
+    r.exportadas = resultado.exportadas;
+    r.pdfExportados = resultado.pdfExportados;
+    r.sinPdf = resultado.sinPdf;
+    r.omitidas = resultado.omitidas;
+    r.lineasMes = resultado.lineasMes;
+    r.advertenciaDurabilidad = resultado.advertenciaDurabilidad;
+    return r;
+}
+
+QString avisoExportacion()
+{
+    return tr("El archivo que vas a crear contiene tus facturas completas y no está protegido con contraseña. "
+              "Cualquier persona que lo abra podrá verlas. Si lo guardas en iCloud Drive, Dropbox o una carpeta "
+              "compartida, se copiará fuera de este equipo. Guárdalo en un lugar de confianza y bórralo cuando ya "
+              "no lo necesites.");
+}
+
+QString textoConteoPrevisto(int conteo)
+{
+    if (conteo <= 0) {
+        return tr("No hay facturas para exportar");
+    }
+    return trn("Se exportará %n factura.", "Se exportarán %n facturas.", conteo);
+}
+
+QStringList avisosPlanExportacion(int omitidas, int lineasMes)
+{
+    QStringList avisos;
+    if (omitidas > 0) {
+        avisos << trn("%n factura no está disponible en este equipo y no se incluirá.",
+                      "%n facturas no están disponibles en este equipo y no se incluirán.", omitidas);
+    }
+    if (lineasMes > 0) {
+        avisos << trn("Hay %n mes con descargas pendientes o incompleto: pueden faltar facturas de ese mes.",
+                      "Hay %n meses con descargas pendientes o incompletos: pueden faltar facturas de esos meses.",
+                      lineasMes);
+    }
+    return avisos;
+}
+
+QString textoErrorRango(horizonte_facturas::ErrorRango error)
+{
+    using E = horizonte_facturas::ErrorRango;
+    switch (error) {
+    case E::Ninguno: return {};
+    case E::Futuro: return tr("El rango no puede incluir meses que aún no empiezan.");
+    case E::FueraDelHorizonte:
+        return tr("El rango solo puede incluir meses de los últimos %1 años.").arg(horizonte_facturas::kAniosAtras);
+    case E::Invertido: return tr("El mes inicial debe ser anterior o igual al mes final.");
+    }
+    return {};
+}
+
+QString textoErrorPlanExportacion(ErrorExportacion::Codigo codigo)
+{
+    using C = ErrorExportacion::Codigo;
+    switch (codigo) {
+    case C::Detenido:
+        return tr("La exportación no está disponible mientras Archivo Fiscal se cierra o se restaura.");
+    case C::EnCurso: return tr("Ya hay una exportación en curso.");
+    default: break;
+    }
+    return tr("No se pudieron leer las facturas para exportar. Intenta de nuevo.");
+}
+
+QString textoErrorPublicarExportacion(ErrorExportacion::Codigo codigo)
+{
+    if (codigo == ErrorExportacion::Codigo::Detenido) {
+        return textoErrorPlanExportacion(codigo);
+    }
+    return tr("El archivo preparado ya no se puede guardar. Cierra y vuelve a exportar.");
+}
+
+QString textoDestinoExistente()
+{
+    return tr("Ya existe un archivo con ese nombre en la carpeta. Escribe otro nombre.");
+}
+
+QString textoErrorDestinoCorregible(exportacion::ErrorDestinoExportacion::Codigo codigo)
+{
+    using C = exportacion::ErrorDestinoExportacion::Codigo;
+    switch (codigo) {
+    case C::DestinoExistente: return textoDestinoExistente();
+    case C::CarpetaNoDisponible:
+    case C::NoEsCarpeta: return tr("La carpeta elegida ya no está disponible. Elige otra.");
+    case C::CarpetaNoPermitida:
+        return tr("No se puede guardar la exportación dentro de los datos de Archivo Fiscal. Elige otra carpeta.");
+    case C::SinPermiso: return tr("No hay permiso para guardar en esa carpeta. Elige otra.");
+    case C::NombreInvalido: return tr("El nombre del archivo no es válido. Escribe otro nombre.");
+    default: break;
+    }
+    return {};
+}
+
+QString textoFase(FaseExportacion fase)
+{
+    switch (fase) {
+    case FaseExportacion::Preparando: return tr("Preparando la exportación…");
+    case FaseExportacion::Xml: return tr("Agregando facturas…");
+    case FaseExportacion::Pdf: return tr("Creando los PDF…");
+    case FaseExportacion::Finalizando: return tr("Terminando el archivo…");
+    }
+    return {};
+}
+
+MensajeVisible mensajeExportacion(const ResumenExportacion& r)
+{
+    using E = ResultadoExportacion::Estado;
+    switch (r.estado) {
+    case E::Publicada:
+        if (r.exportadas == 0) { // D22
+            return {QStringLiteral("advertencia"), tr("No se exportó ninguna factura"),
+                    tr("No se pudo leer ninguna de las facturas. El archivo ZIP solo contiene la lista de las "
+                       "facturas omitidas.")};
+        }
+        return {r.advertenciaDurabilidad ? QStringLiteral("advertencia") : QStringLiteral("exito"),
+                tr("Exportación terminada"),
+                r.pdfExportados > 0
+                    ? trn("Se exportó %n factura", "Se exportaron %n facturas", r.exportadas)
+                          + trn(" con %n PDF.", " con %n PDF.", r.pdfExportados)
+                    : trn("Se exportó %n factura.", "Se exportaron %n facturas.", r.exportadas)};
+    case E::SinFacturas:
+        return {QStringLiteral("neutro"), tr("No hay facturas para exportar"), tr("No se creó ningún archivo.")};
+    case E::Cancelada:
+        return {QStringLiteral("neutro"), tr("Exportación cancelada"), tr("No se creó ningún archivo.")};
+    case E::Error:
+        break;
+    }
+    QString descripcion;
+    if ((r.error == ErrorExportacion::Codigo::Destino || r.error == ErrorExportacion::Codigo::Zip) && r.destino) {
+        using C = exportacion::ErrorDestinoExportacion::Codigo;
+        descripcion = *r.destino == C::EspacioInsuficiente
+                          ? tr("No hay espacio suficiente en el disco. Libera espacio o elige otra carpeta.")
+                          : textoErrorDestinoCorregible(*r.destino);
+    } else if (r.error == ErrorExportacion::Codigo::EnCurso || r.error == ErrorExportacion::Codigo::Detenido) {
+        descripcion = textoErrorPlanExportacion(*r.error);
+    }
+    if (descripcion.isEmpty()) {
+        descripcion = tr("No se pudo crear el archivo. Intenta de nuevo.");
+    }
+    return {QStringLiteral("error"), tr("No se pudo exportar"), descripcion + QLatin1Char(' ')
+                                                                    + tr("No se creó ningún archivo.")};
+}
+
+QStringList detallesExportacion(const ResumenExportacion& r)
+{
+    QStringList lineas;
+    if (r.estado != ResultadoExportacion::Estado::Publicada) {
+        return lineas;
+    }
+    if (r.sinPdf > 0) {
+        lineas << trn("%n factura se exportó sin PDF.", "%n facturas se exportaron sin PDF.", r.sinPdf);
+    }
+    if (r.omitidas > 0) {
+        lineas << trn("%n factura no se exportó.", "%n facturas no se exportaron.", r.omitidas);
+    }
+    if (r.lineasMes > 0) {
+        lineas << trn("%n mes tiene descargas pendientes o está incompleto.",
+                      "%n meses tienen descargas pendientes o están incompletos.", r.lineasMes);
+    }
+    if (r.sinPdf > 0 || r.omitidas > 0 || r.lineasMes > 0) {
+        lineas << tr("El detalle está en omitidas.txt, dentro del archivo ZIP.");
+    }
+    return lineas;
+}
+
+QString advertenciaExportacion(const ResumenExportacion& r)
+{
+    if (r.estado != ResultadoExportacion::Estado::Publicada || !r.advertenciaDurabilidad) {
+        return {};
+    }
+    return tr("El archivo se creó, pero no se pudo confirmar que quedara guardado en el disco. Ábrelo para "
+              "comprobarlo antes de borrar nada.");
+}
+
 } // namespace satcfdi::catalogo

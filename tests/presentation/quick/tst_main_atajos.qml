@@ -26,6 +26,7 @@ TestCase {
             exploradorViewModel: fixtureExplorador.explorador
             avisoRaizPaquetesViewModel: fixtureAvisoRaiz.crear(AvisoRaizPaquetesViewModel.Ninguno)
             respaldoViewModel: fixtureRespaldo.respaldo
+            exportacionFacturasViewModel: fixtureFacturas.exportacion
         }
     }
 

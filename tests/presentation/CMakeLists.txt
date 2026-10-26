@@ -137,6 +137,11 @@ qt_add_executable(satcfdi_presentation_quicktests
     quick/FixtureExplorador.cpp
     quick/FixtureFacturas.h
     quick/FixtureFacturas.cpp
+    ../integration/TestExportacionServicioComun.h
+    ../fakes/FakeCfdiPdfRenderer.h
+    ../fakes/FakeDestinoExportacion.h
+    ../fakes/LectorCfdiCompuerta.h
+    ../fakes/ZipCfdiSintetico.h
     quick/FixtureAvisoRaiz.h
     quick/FixtureRespaldo.h
     RespaldoFakes.h
@@ -151,14 +156,23 @@ target_include_directories(satcfdi_presentation_quicktests PRIVATE ${PROJECT_SOU
 target_compile_definitions(satcfdi_presentation_quicktests PRIVATE
     QUICK_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/quick"
 )
+# T026.3: FixtureFacturas usa el ExportacionFacturasService real con ZIP
+# sinteticos (libzip, lector y escritor reales).
 target_link_libraries(satcfdi_presentation_quicktests PRIVATE
     satcfdi_presentation
     satcfdi_presentationplugin
+    satcfdi_infrastructure
+    satcfdi_storage
+    satcfdi_cfdi_zip
+    satcfdi_cfdi_xml
     satcfdi_application
+    satcfdi_ports
     satcfdi_domain
+    libzip::zip
     Qt6::Qml
     Qt6::Quick
     Qt6::QuickTest
+    Qt6::Test
 )
 satcfdi_enable_warnings(satcfdi_presentation_quicktests)
 add_test(NAME satcfdi_presentation_quicktests COMMAND satcfdi_presentation_quicktests)
@@ -262,5 +276,43 @@ satcfdi_enable_warnings(satcfdi_respaldo_vm_tests)
 add_test(NAME satcfdi_respaldo_vm_tests COMMAND satcfdi_respaldo_vm_tests)
 set_tests_properties(satcfdi_respaldo_vm_tests PROPERTIES
     LABELS presentation
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
+# satcfdi_exportacion_vm_tests (T026.3): ExportacionFacturasViewModel sobre el
+# ExportacionFacturasService real (hilo propio) con ZIP sinteticos reales
+# (libzip), FakeDestinoExportacion, FakeCfdiPdfRenderer y un plan controlado
+# por la prueba; FacturasViewModel real sobre FuenteFalsa. Incluye el
+# horizonte compartido, el catalogo de textos y las sondas en logs.
+qt_add_executable(satcfdi_exportacion_vm_tests
+    TestExportacionFacturasViewModel.cpp
+    FuenteFacturasFake.h
+    ServiciosAsincronosFake.h
+    ../integration/TestExportacionServicioComun.h
+    ../fakes/FakeCfdiPdfRenderer.h
+    ../fakes/FakeDestinoExportacion.h
+    ../fakes/ZipCfdiSintetico.h
+    ../fakes/PromesasPendientes.h
+    ../fakes/FakePerfilesSatService.h
+    ../fakes/FakeCredencialesSatService.h
+)
+target_include_directories(satcfdi_exportacion_vm_tests PRIVATE ${PROJECT_SOURCE_DIR}/tests)
+target_link_libraries(satcfdi_exportacion_vm_tests PRIVATE
+    satcfdi_presentation
+    satcfdi_infrastructure
+    satcfdi_storage
+    satcfdi_cfdi_zip
+    satcfdi_cfdi_xml
+    satcfdi_application
+    satcfdi_ports
+    satcfdi_domain
+    libzip::zip
+    Qt6::Quick
+    Qt6::Test
+)
+satcfdi_enable_warnings(satcfdi_exportacion_vm_tests)
+add_test(NAME satcfdi_exportacion_vm_tests COMMAND satcfdi_exportacion_vm_tests)
+set_tests_properties(satcfdi_exportacion_vm_tests PROPERTIES
+    LABELS "presentation;exportacion"
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )

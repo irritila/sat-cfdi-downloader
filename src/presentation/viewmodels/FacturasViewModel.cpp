@@ -1,5 +1,6 @@
 #include "FacturasViewModel.h"
 
+#include "HorizonteFacturas.h"
 #include "domain/cfdi/PlanDescargaGuiada.h"
 #include "domain/cfdi/TipoComprobante.h"
 
@@ -18,8 +19,6 @@ namespace {
 
 using EstadoFranja = FranjaMesViewModel::Estado;
 using AccionFranja = FranjaMesViewModel::Accion;
-
-constexpr int kAniosAtras = 6; // primer anio navegable: anio en curso - 6
 
 const std::array<const char*, 12> kMeses = {"enero", "febrero", "marzo", "abril", "mayo", "junio",
                                             "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"};
@@ -344,7 +343,7 @@ bool FacturasViewModel::esFuturo(MesCalendario m) const
 bool FacturasViewModel::navegable(MesCalendario m) const
 {
     const auto curso = mesEnCurso();
-    return curso && m <= *curso && m.anio() >= curso->anio() - kAniosAtras;
+    return curso && horizonte_facturas::navegable(m, *curso); // C3: compartido con la exportacion
 }
 
 int FacturasViewModel::anio() const

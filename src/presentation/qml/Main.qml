@@ -28,6 +28,8 @@ ApplicationWindow {
     required property AvisoRaizPaquetesViewModel avisoRaizPaquetesViewModel
     // T025.6: pagina Respaldo (⌘4) y franja de avisos de restauracion.
     required property RespaldoViewModel respaldoViewModel
+    // T026.3: exportacion de facturas desde Facturas.
+    required property ExportacionFacturasViewModel exportacionFacturasViewModel
 
     width: 960
     height: 640
@@ -332,6 +334,7 @@ ApplicationWindow {
         FacturasPage {
             app: ventana.appViewModel
             facturas: ventana.facturasViewModel
+            exportacion: ventana.exportacionFacturasViewModel
         }
     }
     Component {

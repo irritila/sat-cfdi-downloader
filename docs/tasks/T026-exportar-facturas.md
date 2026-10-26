@@ -2,7 +2,7 @@
 
 ## Estado
 
-Pendiente (refinada 2026-10-24). Epica: se implementa en T026.1 a T026.3.
+Subtareas T026.1 a T026.3 completadas (2026-10-26). Pendiente: prueba manual del usuario.
 
 ## Prioridad y tamano
 

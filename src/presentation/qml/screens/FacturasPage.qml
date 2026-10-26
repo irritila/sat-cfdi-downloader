@@ -22,12 +22,18 @@ import QtQuick.Layouts
 // vacia la busqueda o cierra el visor. ⌘1/⌘2/⌘R/⌘F/⌘↑/⌘↓ en Main.qml.
 // Foco inicial sin anillo (OtherFocusReason); el anillo de la fila aparece al
 // navegar con teclado o al entrar con Tab.
+// T026.3: "Exportar este mes" y "Elegir facturas" en la barra de filtros (Tab:
+// filtro, [Limpiar filtros], Exportar, Elegir, lista). En modo de seleccion,
+// casilla por fila (enlazada a revisionSeleccion), Espacio alterna la fila
+// actual, barra con el conteo, "Exportar elegidas…", "Quitar selección" y
+// "Listo"; Escape sale del modo. DialogoExportarFacturas lo abre el view model.
 Page {
     id: pagina
     objectName: "paginaFacturas"
 
     required property AppViewModel app
     required property FacturasViewModel facturas
+    required property ExportacionFacturasViewModel exportacion
 
     readonly property FranjaMesViewModel franja: pagina.facturas.franja
     readonly property string vista: pagina.facturas.vista
@@ -35,7 +41,8 @@ Page {
     readonly property bool angosto: pagina.width < 760
     readonly property bool visorAbierto: pagina.facturas.visor.abierto
     // T014.1 D5: dialogos propios (confirmacion y guardado del visor).
-    readonly property bool dialogoAbierto: confirmacion.visible || visor.dialogoAbierto
+    readonly property bool dialogoAbierto: confirmacion.visible || visor.dialogoAbierto || dialogoExportar.visible
+    readonly property bool seleccionando: pagina.exportacion.seleccionando
     readonly property bool conLista: !pagina.sinPerfil && pagina.vista !== "futuro"
     readonly property bool puedeBuscar: pagina.conLista && !pagina.visorAbierto
     readonly property bool puedeAccion: !pagina.sinPerfil && !pagina.visorAbierto && franjaMes.conAccion
@@ -48,6 +55,7 @@ Page {
     readonly property alias franjaMes: franjaMes
     readonly property alias visor: visor
     readonly property alias dialogoConfirmacion: confirmacion
+    readonly property alias dialogoExportar: dialogoExportar
 
     focus: true
     Accessible.role: Accessible.Pane
@@ -106,6 +114,27 @@ Page {
         return false
     }
 
+    // Espacio en modo de seleccion: alterna la fila actual.
+    function alternarFilaActual() {
+        const m = pagina.facturas.modelo
+        if (!pagina.seleccionando || lista.currentIndex < 0)
+            return false
+        const indice = m.index(lista.currentIndex, 0)
+        return pagina.exportacion.alternarSeleccion(m.data(indice, FacturasListModel.PaqueteIdRole),
+                                                    m.data(indice, FacturasListModel.PosicionRole))
+    }
+
+    // El view model abre y cierra el dialogo de exportacion.
+    Connections {
+        target: pagina.exportacion
+        function onEstadoChanged() {
+            if (pagina.exportacion.dialogoAbierto && !dialogoExportar.visible)
+                dialogoExportar.open()
+            else if (!pagina.exportacion.dialogoAbierto && dialogoExportar.visible)
+                dialogoExportar.close()
+        }
+    }
+
     function ajustarFilaActual() {
         if (lista.count > 0 && lista.currentIndex < 0)
             lista.currentIndex = 0
@@ -146,6 +175,9 @@ Page {
     Keys.onEscapePressed: (evento) => {
         if (pagina.visorAbierto) {
             pagina.facturas.visor.cerrar()
+            evento.accepted = true
+        } else if (pagina.seleccionando) {
+            pagina.exportacion.terminarSeleccion()
             evento.accepted = true
         } else {
             evento.accepted = false
@@ -481,6 +513,73 @@ Page {
                 }
             }
 
+            // ---- Modo de seleccion (T026.3) ----
+            // Fuera de la seleccion: exportar el mes o empezar a elegir.
+            RowLayout {
+                objectName: "barraExportarFacturas"
+                visible: pagina.conLista && !pagina.seleccionando
+                spacing: Theme.espacioS
+                Layout.fillWidth: true
+                Item { Layout.fillWidth: true }
+                BotonAccion {
+                    objectName: "botonExportarMes"
+                    text: qsTr("Exportar este mes")
+                    icono: "arrow-down-circle"
+                    enabled: pagina.exportacion.puedeExportar
+                    descripcion: qsTr("Guardar las facturas de %1 en un archivo ZIP").arg(pagina.facturas.tituloMes)
+                    onClicked: pagina.exportacion.abrirMesActual()
+                }
+                BotonAccion {
+                    objectName: "botonElegirFacturas"
+                    text: qsTr("Elegir facturas")
+                    icono: "checkmark"
+                    enabled: pagina.exportacion.disponible
+                    descripcion: qsTr("Marcar facturas para exportarlas")
+                    onClicked: {
+                        pagina.exportacion.iniciarSeleccion()
+                        lista.enfocarSinAnillo(Qt.OtherFocusReason)
+                    }
+                }
+            }
+            RowLayout {
+                objectName: "barraSeleccionFacturas"
+                visible: pagina.conLista && pagina.seleccionando
+                spacing: Theme.espacioS
+                Layout.fillWidth: true
+                Label {
+                    objectName: "conteoSeleccionFacturas"
+                    text: pagina.exportacion.conteoSeleccionadas === 1 ? qsTr("1 factura elegida")
+                          : qsTr("%1 facturas elegidas").arg(pagina.exportacion.conteoSeleccionadas)
+                    color: Theme.texto
+                    font.family: Theme.familia
+                    font.pixelSize: Theme.cuerpo.size
+                    font.weight: Font.DemiBold
+                    elide: Text.ElideRight
+                    Layout.fillWidth: true
+                    Accessible.role: Accessible.StaticText
+                    Accessible.name: text
+                }
+                BotonAccion {
+                    objectName: "botonExportarElegidas"
+                    text: qsTr("Exportar elegidas…")
+                    variante: "primario"
+                    enabled: pagina.exportacion.puedeExportar && pagina.exportacion.conteoSeleccionadas > 0
+                    onClicked: pagina.exportacion.abrirSeleccion()
+                }
+                BotonAccion {
+                    objectName: "botonQuitarSeleccion"
+                    text: qsTr("Quitar selección")
+                    enabled: pagina.exportacion.conteoSeleccionadas > 0
+                    onClicked: pagina.exportacion.limpiarSeleccion()
+                }
+                BotonAccion {
+                    objectName: "botonTerminarSeleccion"
+                    text: qsTr("Listo")
+                    descripcion: qsTr("Salir del modo de selección (Escape)")
+                    onClicked: pagina.exportacion.terminarSeleccion()
+                }
+            }
+
             // ---- Lista ----
             Rectangle {
                 id: contenedorLista
@@ -536,6 +635,11 @@ Page {
                     Keys.onReturnPressed: pagina.previsualizarActual()
                     Keys.onEnterPressed: pagina.previsualizarActual()
                     Keys.onPressed: (evento) => {
+                        if (evento.key === Qt.Key_Space && pagina.seleccionando) {
+                            evento.accepted = pagina.alternarFilaActual()
+                            lista.focoSilencioso = false
+                            return
+                        }
                         if (evento.matches(StandardKey.Copy)) {
                             evento.accepted = pagina.copiarUuidActual()
                             return
@@ -573,6 +677,11 @@ Page {
                             anchors.leftMargin: Theme.espacioL
                             anchors.rightMargin: Theme.espacioL
                             spacing: Theme.espacioM
+                            // Hueco de la casilla en modo de seleccion.
+                            Item {
+                                visible: pagina.seleccionando
+                                Layout.preferredWidth: 28 + Theme.espacioS - Theme.espacioM
+                            }
                             component Columna: Label {
                                 color: Theme.textoSecundario
                                 font.family: Theme.familia
@@ -602,6 +711,11 @@ Page {
 
                         objectName: "filaFactura_" + index
                         width: ListView.view.width
+                        // La fila actual recibe el foco de la lista: Espacio
+                        // en modo de seleccion alterna la fila, no la pulsa.
+                        Keys.onSpacePressed: (evento) => {
+                            evento.accepted = pagina.seleccionando && pagina.alternarFilaActual()
+                        }
                         fecha: fila.model.fecha
                         tipoTexto: fila.model.tipoTexto
                         serieFolio: fila.model.serieFolio
@@ -619,6 +733,32 @@ Page {
                         mostrarReceptor: false
                         seleccionada: ListView.isCurrentItem
                         conFoco: ListView.isCurrentItem && lista.focoVisible
+                        // T026.3: casilla por fila; la seleccion es del view
+                        // model por identidad (revisionSeleccion reevalua).
+                        readonly property bool elegida: pagina.exportacion.revisionSeleccion >= 0
+                                                        && pagina.exportacion.estaSeleccionada(fila.model.paqueteId, fila.model.posicion)
+                        leftPadding: pagina.seleccionando ? Theme.espacioL + 28 + Theme.espacioS : Theme.espacioL
+                        Accessible.name: pagina.seleccionando
+                                         ? qsTr("%1, %2").arg(fila.model.nombreAccesible).arg(fila.elegida ? qsTr("elegida") : qsTr("no elegida"))
+                                         : fila.model.nombreAccesible
+                        Accessible.checkable: pagina.seleccionando
+                        Accessible.checked: fila.elegida
+
+                        CheckBox {
+                            objectName: "casillaFactura_" + fila.index
+                            visible: pagina.seleccionando
+                            focusPolicy: Qt.NoFocus
+                            padding: 0
+                            checked: fila.elegida
+                            anchors.left: parent.left
+                            anchors.leftMargin: Theme.espacioL - 4
+                            anchors.verticalCenter: parent.verticalCenter
+                            Accessible.name: qsTr("Elegir factura: %1").arg(fila.model.nombreAccesible)
+                            onToggled: {
+                                pagina.exportacion.alternarSeleccion(fila.model.paqueteId, fila.model.posicion)
+                                checked = Qt.binding(() => fila.elegida)
+                            }
+                        }
 
                         onClicked: {
                             lista.currentIndex = fila.index
@@ -740,6 +880,12 @@ Page {
         visible: pagina.visorAbierto
         vm: pagina.facturas.visor
         onCerrarSolicitado: pagina.facturas.visor.cerrar()
+    }
+
+    // ---- Exportacion (T026.3) ----
+    DialogoExportarFacturas {
+        id: dialogoExportar
+        exportacion: pagina.exportacion
     }
 
     // ---- Confirmacion por direccion (RequiereConfirmacion) ----

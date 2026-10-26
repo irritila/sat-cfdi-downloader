@@ -63,10 +63,10 @@ Ejemplo: `T001-modelo-fisico-sqlite.md`.
 | [T025.4](T025.4-respaldo-diario.md) | Completada | Configuracion y respaldo diario |
 | [T025.5](T025.5-restauracion.md) | Completada | Restauracion transaccional |
 | [T025.6](T025.6-ui-y-documentacion-respaldo.md) | Completada | UI y documentacion del respaldo |
-| [T026](T026-exportar-facturas.md) | Pendiente | Exportar facturas (epica) |
+| [T026](T026-exportar-facturas.md) | Pendiente prueba manual | Exportar facturas (epica) |
 | [T026.1](T026.1-plan-y-escritura-zip.md) | Completada | Plan de exportacion y escritura atomica del ZIP |
 | [T026.2](T026.2-servicio-exportacion.md) | Completada | Servicio de exportacion |
-| [T026.3](T026.3-ui-exportacion.md) | Pendiente | UI y documentacion de la exportacion |
+| [T026.3](T026.3-ui-exportacion.md) | Completada | UI y documentacion de la exportacion |
 
 ## Estados
 

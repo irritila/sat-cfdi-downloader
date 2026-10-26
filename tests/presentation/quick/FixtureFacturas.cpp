@@ -5,6 +5,11 @@
 #include "fakes/FakeCredencialesSatService.h"
 #include "fakes/FakePerfilesSatService.h"
 
+#include "fakes/FakeCfdiPdfRenderer.h"
+#include "fakes/FakeDestinoExportacion.h"
+#include "fakes/LectorCfdiCompuerta.h"
+#include "integration/TestExportacionServicioComun.h"
+
 #include "FuenteFacturasMes.h"
 #include "FuenteHistorial.h"
 #include "PresentacionViewModels.h"
@@ -316,6 +321,45 @@ private:
 
 } // namespace
 
+// T026.3: servicio de exportacion real sobre piezas sinteticas. Todo lo que
+// usa su hilo es compartido (C7 de T026.2).
+struct ExportacionSintetica {
+    exportacionpruebas::Banco banco;
+    exportacionpruebas::Banco::Paquete paquete;
+    std::shared_ptr<fakes::FakeDestinoExportacion> destino = std::make_shared<fakes::FakeDestinoExportacion>();
+    std::shared_ptr<fakes::LectorCfdiCompuerta> compuerta =
+        std::make_shared<fakes::LectorCfdiCompuerta>(std::make_shared<LectorZipLibzip>());
+    std::shared_ptr<fakes::FakeCfdiPdfRenderer::Estado> pdf = std::make_shared<fakes::FakeCfdiPdfRenderer::Estado>();
+    int conteo = 2;
+    std::unique_ptr<ExportacionFacturasService> servicio;
+
+    bool preparar()
+    {
+        if (!banco.preparar()) {
+            return false;
+        }
+        paquete = banco.paquete({exportacionpruebas::xml40(1), exportacionpruebas::xml40(2)});
+        PuertosExportacionFacturas p = exportacionpruebas::puertos(
+            destino, compuerta, std::make_shared<ArchivosZipCfdiFs>(banco.raiz),
+            fakes::FakeCfdiPdfRenderer::fabrica(pdf));
+        p.planear = [this](const AlcanceExportacion&) {
+            PlanExportacion plan;
+            for (int i = 0; i < conteo && !paquete.id.isEmpty(); ++i) {
+                plan.facturas.append(banco.factura(paquete, i, i + 1));
+            }
+            return QtFuture::makeReadyValueFuture(Resultado<PlanExportacion, ErrorPersistencia>::exito(plan));
+        };
+        servicio = std::make_unique<ExportacionFacturasService>(std::move(p));
+        return !paquete.id.isEmpty();
+    }
+
+    ~ExportacionSintetica()
+    {
+        compuerta->liberar(); // el hilo del servicio no queda bloqueado al cerrar
+        servicio.reset();
+    }
+};
+
 struct FixtureFacturas::Grafo {
     explicit Grafo(bool conPerfiles)
         : fuente(conPerfiles)
@@ -333,6 +377,13 @@ struct FixtureFacturas::Grafo {
     FuenteSintetica fuente;
     PreferenciasEnMemoria preferencias;
     PresentacionViewModels vms{&solicitudes, &perfiles, &credenciales};
+    std::unique_ptr<ExportacionSintetica> exportacion; // despues de vms: se destruye antes
+
+    ~Grafo()
+    {
+        vms.setExportacionFacturas(nullptr);
+        exportacion.reset();
+    }
 };
 
 FixtureFacturas::FixtureFacturas(QObject* parent)
@@ -347,6 +398,74 @@ FixtureFacturas::~FixtureFacturas() = default;
 AppViewModel* FixtureFacturas::app() const { return m_grafo->vms.app(); }
 FacturasViewModel* FixtureFacturas::facturas() const { return m_grafo->vms.facturas(); }
 HistorialViewModel* FixtureFacturas::historial() const { return m_grafo->vms.historial(); }
+ExportacionFacturasViewModel* FixtureFacturas::exportacion() const { return m_grafo->vms.exportacionFacturas(); }
+
+void FixtureFacturas::habilitarExportacion()
+{
+    if (m_grafo->exportacion) {
+        return;
+    }
+    auto e = std::make_unique<ExportacionSintetica>();
+    if (!e->preparar()) {
+        qWarning("FixtureFacturas: no se pudo preparar la exportacion sintetica");
+        return;
+    }
+    FuenteSintetica* fuente = &m_grafo->fuente;
+    m_grafo->vms.setExportacionFacturas(e->servicio.get(), [fuente] { return fuente->ahoraUtc(); });
+    m_grafo->exportacion = std::move(e);
+}
+
+void FixtureFacturas::fijarConteoPlan(int conteo)
+{
+    if (m_grafo->exportacion) {
+        m_grafo->exportacion->conteo = qBound(0, conteo, 2);
+    }
+}
+
+void FixtureFacturas::cerrarCompuerta()
+{
+    if (m_grafo->exportacion) {
+        m_grafo->exportacion->compuerta->cerrar();
+    }
+}
+
+void FixtureFacturas::liberarCompuerta()
+{
+    if (m_grafo->exportacion) {
+        m_grafo->exportacion->compuerta->liberar();
+    }
+}
+
+bool FixtureFacturas::compuertaBloqueada() const
+{
+    return m_grafo->exportacion && m_grafo->exportacion->compuerta->bloqueado();
+}
+
+void FixtureFacturas::colisionAlPublicar()
+{
+    if (!m_grafo->exportacion) {
+        return;
+    }
+    auto* destino = m_grafo->exportacion->destino.get();
+    auto primera = std::make_shared<std::atomic<bool>>(true);
+    const QString nombre = m_grafo->vms.exportacionFacturas()->nombreZip();
+    const QString carpeta = QStringLiteral("/Users/usuario/Documentos");
+    destino->antesDeRenombrar = [destino, primera, nombre, carpeta] {
+        if (primera->exchange(false)) {
+            destino->ponerArchivo(carpeta, sanearNombreZip(nombre));
+        }
+    };
+}
+
+int FixtureFacturas::parcialesVivos() const
+{
+    return m_grafo->exportacion ? m_grafo->exportacion->destino->parcialesVivos() : 0;
+}
+
+int FixtureFacturas::archivosEnCarpeta(const QString& carpeta) const
+{
+    return m_grafo->exportacion ? int(m_grafo->exportacion->destino->archivos(carpeta).size()) : 0;
+}
 
 void FixtureFacturas::fijarHistorial(const QString& caso)
 {
@@ -360,6 +479,10 @@ void FixtureFacturas::reiniciar(bool conPerfiles)
 {
     // El grafo anterior se retira (no se destruye): QML puede tener aun
     // bindings hacia sus objetos hasta el siguiente ciclo.
+    // T026.3: el servicio de exportacion (y su hilo) se cierra ya; el view
+    // model retirado queda "no disponible".
+    m_grafo->vms.setExportacionFacturas(nullptr);
+    m_grafo->exportacion.reset();
     m_retirados.push_back(std::move(m_grafo));
     m_grafo = std::make_unique<Grafo>(conPerfiles);
     emit reiniciado();

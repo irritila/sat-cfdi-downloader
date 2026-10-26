@@ -788,8 +788,9 @@ void TestPresentacion::qmlSinImportsProhibidos()
     }
     // 31 .qml (Theme, Icono, componentes T013, BotonCopiar, T015.3, VisorPdfCfdi y T019) + Etiquetas.js,
     // mas T023.4: FacturasPage, FranjaMes y ListaMesesFacturas; T023.5: HistorialPage;
-    // T025.6: RespaldoPage, FranjaAvisosRespaldo y cuatro dialogos de respaldo.
-    QCOMPARE(archivos, 42);
+    // T025.6: RespaldoPage, FranjaAvisosRespaldo y cuatro dialogos de respaldo;
+    // T026.3: DialogoExportarFacturas.
+    QCOMPARE(archivos, 43);
 }
 
 // ---------------------------------------------------------------------------

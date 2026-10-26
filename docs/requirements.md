@@ -70,7 +70,7 @@ Queda fuera del MVP:
 - Extraccion, parseo o indexacion de XML.
 - Consulta local de CFDI por campos internos del XML.
 - Solicitudes de metadata como flujo alterno.
-- Exportaciones avanzadas.
+- Exportaciones avanzadas (resumenes CSV o XLSX, formatos contables, plantillas, filtros por campos del XML o envio a otros sistemas). La exportacion simple a un ZIP local de RF-022 es una ampliacion aceptada (T026 D6) y no las incluye.
 - Integraciones con sistemas contables.
 - Timbrado o cancelacion de CFDI.
 - Procesamiento fiscal avanzado.
@@ -514,6 +514,19 @@ El usuario respalda sus datos desde la pantalla Respaldo (Ir > Respaldo, ⌘4; T
 - Crea una contrasena de al menos 12 caracteres (D23). Al crearla, la app muestra una clave de recuperacion que se puede copiar (solo a este equipo, se borra del portapapeles a los 90 s) o imprimir, y que no se vuelve a mostrar despues de confirmar que se guardo. Cambiar la contrasena conserva la clave (D16).
 - "Respaldar ahora" y respaldo diario opcional (D4) con progreso, resultado y advertencias (paquetes faltantes, copias que hay que borrar a mano, resultado no guardado). Se conservan las 5 copias propias mas recientes (D6, D17).
 - La e.firma, los logs y los temporales nunca se respaldan (D3, D7).
+
+### RF-022 Exportar facturas
+
+El usuario exporta a un solo archivo ZIP, en la carpeta que elige, las facturas que ya estan en el equipo (T026, ADR 0023):
+
+- Alcance: el mes que esta viendo en Facturas ("Exportar este mes"), un rango de meses o facturas elegidas en un modo de seleccion con casilla por fila (D3). El rango rechaza meses futuros, rangos invertidos y meses fuera del horizonte navegable de Facturas, y acepta el mismo mes en ambos extremos. La seleccion se conserva al cambiar de pestana, filtro o recarga y se vacia al cambiar de perfil (D14).
+- Para mes o rango se elige Emitidas, Recibidas o Ambas (por omision, la pestana actual); con facturas elegidas no hay selector y se exporta exactamente lo elegido (D8).
+- Contenido: el XML original de cada CFDI en `emitidas/AAAA-MM/<UUID>.xml` o `recibidas/AAAA-MM/<UUID>.xml` y, opcionalmente, su PDF generado localmente junto al XML (D2, D7). Sin resumen CSV o XLSX.
+- Antes de exportar, el dialogo muestra siempre el aviso fijo de D10 (el archivo no esta cifrado y puede copiarse fuera del equipo) y cuantas facturas se exportaran; con 0, "Exportar" queda deshabilitado con "No hay facturas para exportar" y no se crea un ZIP vacio (D5, D10, D16).
+- Una factura cuyo ZIP falta, esta en descarga, es ilegible o cambio desde que se indexo no se exporta; el resultado muestra por separado las exportadas, las exportadas sin PDF y las omitidas, y el ZIP lleva `omitidas.txt` con UUID y motivo, mas una linea por mes con descargas pendientes o cobertura incompleta (D4, D9, D17).
+- El nombre sugerido no lleva RFC y se puede editar; la app nunca sobrescribe: si el nombre ya existe pide otro. Cancelar o fallar no deja archivo publicado ni `.partial` (D12, D15).
+- Progreso por fase con conteo, cancelar y resultado en la ventana. Logs y notificaciones solo llevan fases, conteos y codigos; el nombre del archivo creado solo se muestra en la ventana (D20).
+- No llama al SAT ni modifica estados persistidos ni los ZIP de paquetes; corre en su propio hilo, una a la vez (D11).
 
 ## 14. Requerimientos no funcionales
 

@@ -951,6 +951,7 @@ flowchart TB
 - QML no contiene reglas SAT, reglas de estado ni acceso directo a base de datos; consume servicios expuestos desde C++.
 - La composition root vive en el target ejecutable y conecta servicios con adaptadores concretos.
 - Las llamadas SAT, cambios de estado criticos y escrituras de ZIP pasan por el ejecutor serial para evitar carreras entre worker y acciones manuales.
+- Exportar facturas (T026, ADR 0023) no aparece en el diagrama porque no pasa por el ejecutor serial. En presentacion, `ExportacionFacturasViewModel` (aparte de `FacturasViewModel`, cuyo contrato no cambia, D14) guarda el alcance (mes, rango o facturas elegidas por `(paqueteId, posicion)`), la direccion, el PDF y el destino, y expone los estados Inactivo, Planeando, Dialogo, Exportando, EsperandoNombre y Resultado. Pide a `ExportacionFacturasService` el plan (`planear`), inicia (`iniciar`), publica con otro nombre ante una colision (`publicarComo`) y cancela (`cancelar`); descarta respuestas de planes obsoletos. El servicio corre en su propio hilo, solo lee los ZIP de paquetes y escribe un ZIP del usuario por un destino atomico. El VM comparte con `FacturasViewModel` el predicado del horizonte navegable (`HorizonteFacturas`) y sus textos viven en `CatalogoMensajes`; QML solo muestra el dialogo `DialogoExportarFacturas` y las casillas de seleccion de `FacturasPage`.
 
 ### Decisiones reflejadas
 
@@ -1630,6 +1631,8 @@ flowchart TB
     confirm -->|"Confirmar o cancelar"| invoices
     invoices -->|"Registrar e.firma"| profile_form
     invoices -->|"Ver detalles tecnicos"| request_detail
+    invoices -->|"Exportar este mes / Elegir facturas"| export_dialog["Dialogo Exportar facturas"]
+    export_dialog -->|"Cerrar o cancelar"| invoices
     invoices --> history
     invoices --> profiles
 
@@ -1649,6 +1652,7 @@ flowchart TB
 - La apertura manual muestra Facturas con el ultimo perfil usado y el mes anterior al actual.
 - Facturas muestra los CFDI del perfil por mes natural, con la disponibilidad del mes y una sola accion (descargar, actualizar, completar, reintentar o registrar e.firma). Solicitudes, paquetes y verificaciones no forman parte de este recorrido (T023 D3).
 - La descarga guiada crea las solicitudes SAT necesarias por debajo (ADR 0019 y 0020) y pide confirmacion por direccion solo cuando hay un duplicado que confirmar.
+- Desde Facturas, "Exportar este mes" o el modo de seleccion ("Elegir facturas", "Exportar elegidas…") abren el dialogo Exportar facturas (T026.3): aviso fijo, alcance, direccion, PDF, carpeta y nombre, progreso y resultado. Al cerrarlo se vuelve a Facturas.
 - Historial lista las descargas guiadas del perfil y lleva al mes o al diagnostico.
 - Diagnostico (lista tecnica y detalle de solicitud) solo se abre desde Historial, desde "Requiere atencion" o desde el menu Ir; conserva reintento por paquete, "Mostrar en Finder" y la eliminacion local. "Atras" regresa al origen.
 - No hay pantalla para crear solicitudes manuales con filtros (T023 D6).

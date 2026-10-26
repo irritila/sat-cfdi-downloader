@@ -7,6 +7,7 @@
 #include "AppViewModel.h"
 #include "EFirmaFormViewModel.h"
 #include "ExploradorCfdiViewModel.h"
+#include "ExportacionFacturasViewModel.h"
 #include "FacturasViewModel.h"
 #include "HistorialViewModel.h"
 #include "NuevaSolicitudViewModel.h"
@@ -33,7 +34,9 @@ PresentacionViewModels::PresentacionViewModels(SolicitudesService* solicitudes,
     , m_app(new AppViewModel(m_detalle, m_perfiles, m_eFirma, this))
     , m_avisoRaizPaquetes(new AvisoRaizPaquetesViewModel(this))
     , m_respaldo(new RespaldoViewModel(this))
+    , m_exportacionFacturas(new ExportacionFacturasViewModel(this))
 {
+    m_exportacionFacturas->setFacturas(m_facturas);
     m_app->setRespaldo(m_respaldo);
     // Tras registrar/reemplazar (exito o fallo) se reverifica el estado real
     // del perfil: un reemplazo fallido muestra la credencial anterior.
@@ -143,6 +146,11 @@ void PresentacionViewModels::setCopiaTextoSecreto(CopiaTextoSecreto copia)
     m_respaldo->setCopiaSecreta(std::move(copia));
 }
 
+void PresentacionViewModels::setExportacionFacturas(ExportacionFacturasService* servicio, RelojUtc reloj)
+{
+    m_exportacionFacturas->setServicio(servicio, std::move(reloj));
+}
+
 QVariantMap PresentacionViewModels::initialProperties() const
 {
     return {
@@ -156,6 +164,7 @@ QVariantMap PresentacionViewModels::initialProperties() const
         {QStringLiteral("facturasViewModel"), QVariant::fromValue(m_facturas)},
         {QStringLiteral("historialViewModel"), QVariant::fromValue(m_historial)},
         {QStringLiteral("respaldoViewModel"), QVariant::fromValue(m_respaldo)},
+        {QStringLiteral("exportacionFacturasViewModel"), QVariant::fromValue(m_exportacionFacturas)},
     };
 }
 

@@ -19,6 +19,9 @@
 
 #include "app_core/AppBootstrapper.h"
 #include "app_core/AppCompositionRoot.h"
+#include "presentation/viewmodels/ExportacionFacturasViewModel.h"
+#include "presentation/viewmodels/FacturasViewModel.h"
+#include "presentation/viewmodels/PresentacionViewModels.h"
 
 #include "application/cfdi/ExportacionFacturasService.h"
 #include "application/cfdi/IndexadorCfdi.h"
@@ -38,6 +41,8 @@
 
 #include <QDir>
 #include <QElapsedTimer>
+#include <QLoggingCategory>
+#include <QMutex>
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QStandardPaths>
@@ -47,6 +52,7 @@
 #include <QTemporaryDir>
 #include <QTest>
 #include <QTimeZone>
+#include <QUrl>
 
 #include <chrono>
 #include <memory>
@@ -60,6 +66,42 @@ constexpr int kEspera = 20000;
 const QString kRfc = QStringLiteral("XAXX010101000");
 const QString kFechaInicial = QStringLiteral("2026-09-01T00:00:00");
 const MesCalendario kSeptiembre = *MesCalendario::crear(2026, 9);
+
+// Captura de logs (todas las categorias satcfdi.*) para las sondas (C9).
+QMutex g_mutexLogs;
+QStringList g_logs;
+QtMessageHandler g_anterior = nullptr;
+
+void capturarLog(QtMsgType tipo, const QMessageLogContext& contexto, const QString& mensaje)
+{
+    {
+        QMutexLocker l(&g_mutexLogs);
+        g_logs.append(QString::fromLatin1(contexto.category ? contexto.category : "") + QLatin1Char(' ') + mensaje);
+    }
+    if (g_anterior) {
+        g_anterior(tipo, contexto, mensaje);
+    }
+}
+
+struct CapturaLogs {
+    CapturaLogs()
+    {
+        QMutexLocker l(&g_mutexLogs);
+        g_logs.clear();
+        g_anterior = qInstallMessageHandler(capturarLog);
+        QLoggingCategory::setFilterRules(QStringLiteral("satcfdi.*=true"));
+    }
+    ~CapturaLogs()
+    {
+        QLoggingCategory::setFilterRules(QString());
+        qInstallMessageHandler(g_anterior);
+    }
+    QStringList lineas() const
+    {
+        QMutexLocker l(&g_mutexLogs);
+        return g_logs;
+    }
+};
 
 template <typename T>
 std::optional<T> esperar(QFuture<T> f)
@@ -98,6 +140,7 @@ struct Base {
     ArranquePreparado arranque;
     PerfilId perfil;
     SolicitudId solicitud;
+    QString paquete; // id local del paquete (sonda)
     QString destino;
 
     bool preparar()
@@ -116,7 +159,7 @@ struct Base {
         const QString idPerfil = uuid::generarCanonico();
         perfil = *PerfilId::desdeTexto(idPerfil);
         solicitud = SolicitudId::generar();
-        const QString paquete = uuid::generarCanonico();
+        paquete = uuid::generarCanonico();
         const QString ahora = QStringLiteral("2026-10-01T12:00:00.000Z");
         const auto ruta =
             rutapaquete::derivarRutaRelativa({kRfc, kFechaInicial, solicitud.texto(), QStringLiteral("PAQ_1")});
@@ -209,6 +252,8 @@ private slots:
     void restauracionConPlazoAgotadoSigueYArranqueLimpia();
     void salidaConPlazoAgotadoSigueYArranqueLimpia();
     void destruirRootConLecturaBloqueadaNoUsaPuertosLiberados();
+    void exportarPorViewModelSinNotificacionesNiSondas_data();
+    void exportarPorViewModelSinNotificacionesNiSondas();
 };
 
 void TestExportacionCicloDeVida::restauracionEsperaCierreYNoPublica()
@@ -483,6 +528,109 @@ void TestExportacionCicloDeVida::destruirRootConLecturaBloqueadaNoUsaPuertosLibe
     QTRY_VERIFY_WITH_TIMEOUT(hilo.isNull(), kEspera);
     QCOMPARE(archivosEn(base.parciales()), 0);
     QCOMPARE(archivosEn(base.destino), 0);
+}
+
+void TestExportacionCicloDeVida::exportarPorViewModelSinNotificacionesNiSondas_data()
+{
+    QTest::addColumn<bool>("cancelar");
+    QTest::newRow("publicada") << false;
+    QTest::newRow("cancelada") << true;
+}
+
+// T026.3 C9 (D20, C6): con el root real y la integracion OS falsa (permiso de
+// notificaciones concedido, para que cualquier notificacion se entregara),
+// exportar por viewModels().exportacionFacturas() hasta Publicada o
+// Cancelada no pide ninguna notificacion y los logs capturados no contienen
+// RFC, UUID, rutas, id de solicitud o paquete ni el nombre del archivo.
+void TestExportacionCicloDeVida::exportarPorViewModelSinNotificacionesNiSondas()
+{
+    QFETCH(bool, cancelar);
+    using Vm = ExportacionFacturasViewModel;
+    const QString hostil = QStringLiteral("Facturas $(whoami) \u202Egpj.exe;rm -rf ~");
+    const QString saneado = sanearNombreZip(hostil);
+    Base base;
+    QVERIFY(base.preparar());
+    Dependencias d;
+    d.os.setNotificationStatus(fakes::FakeOSIntegration::NotificationStatus::Granted);
+    auto root = d.root(base.arranque);
+    const auto abrir = qScopeGuard([&d] { d.compuerta->liberar(); });
+    QVERIFY(root->cargar());
+    root->iniciarCicloDeVida(d.os, nullptr, [] {});
+    QVERIFY(inactivo(*root));
+
+    FacturasViewModel* facturas = root->viewModels().facturas();
+    Vm* vm = root->viewModels().exportacionFacturas();
+    QVERIFY(facturas && vm);
+    facturas->activar();
+    QTRY_VERIFY_WITH_TIMEOUT(facturas->seleccionarPerfilId(base.perfil.texto()), kEspera);
+    QVERIFY(facturas->seleccionarMes(2026, 9));
+    QTRY_VERIFY_WITH_TIMEOUT(vm->puedeExportar(), kEspera);
+    QVERIFY(inactivo(*root));
+    const qsizetype pedidasAntes = d.os.notificacionesPedidas.size();
+    QStringList lineas;
+    {
+        CapturaLogs captura;
+        vm->abrirMesActual();
+        QTRY_COMPARE_WITH_TIMEOUT(vm->estado(), Vm::Estado::Dialogo, kEspera);
+        QCOMPARE(vm->conteoPrevisto(), 3);
+        vm->elegirDestino(QUrl::fromLocalFile(base.destino));
+        vm->setNombreZip(hostil);
+        vm->setConPdf(true);
+        QVERIFY(vm->puedeIniciar());
+        if (cancelar) {
+            d.compuerta->cerrar();
+        }
+        vm->iniciar();
+        if (cancelar) {
+            QVERIFY(d.compuerta->esperarBloqueo());
+            QCOMPARE(vm->estado(), Vm::Estado::Exportando);
+            vm->cancelar();
+            d.compuerta->liberar();
+        }
+        QTRY_COMPARE_WITH_TIMEOUT(vm->estado(), Vm::Estado::Resultado, kEspera);
+        QCOMPARE(vm->tituloResultado(),
+                 cancelar ? QStringLiteral("Exportación cancelada") : QStringLiteral("Exportación terminada"));
+        QCOMPARE(archivosEn(base.destino), cancelar ? 0 : 1);
+        QCOMPARE(archivosEn(base.parciales()), 0);
+        if (!cancelar) {
+            QCOMPARE(vm->nombrePublicado(), saneado); // solo en la ventana
+            QVERIFY(QFileInfo::exists(QDir(base.destino).filePath(saneado)));
+        }
+        vm->cerrarDialogo();
+        QTest::qWait(50); // senales tardias del servicio
+        lineas = captura.lineas();
+    }
+    QVERIFY(!lineas.filter(QStringLiteral("satcfdi.cfdi.exportacion")).isEmpty());
+    // Ninguna notificacion pedida (ni entregada) por la exportacion.
+    QCOMPARE(d.os.notificacionesPedidas.size(), pedidasAntes);
+
+    QStringList sondas{kRfc,
+                       QStringLiteral("XEXX010101000"),
+                       base.tmp.path(),
+                       base.destino,
+                       QFileInfo(base.destino).fileName() + QLatin1Char('/'),
+                       base.arranque.raizPaquetes,
+                       base.perfil.texto(),
+                       base.solicitud.texto(),
+                       base.paquete,
+                       QStringLiteral("PAQ_1"),
+                       hostil,
+                       saneado,
+                       QStringLiteral("whoami"),
+                       QStringLiteral("gpj"),
+                       QStringLiteral(".partial")};
+    for (int n = 1; n <= 3; ++n) {
+        sondas << fakes::uuidSintetico(n) << fakes::uuidSintetico(n).left(8);
+    }
+    for (const QString& linea : std::as_const(lineas)) {
+        for (const QString& sonda : std::as_const(sondas)) {
+            QVERIFY2(!linea.contains(sonda, Qt::CaseInsensitive),
+                     qPrintable(QStringLiteral("sonda %1 en log: %2")
+                                    .arg(sondas.indexOf(sonda))
+                                    .arg(linea.section(QLatin1Char(' '), 0, 0))));
+        }
+    }
+    root.reset();
 }
 
 int main(int argc, char* argv[])

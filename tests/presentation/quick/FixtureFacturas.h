@@ -9,6 +9,7 @@
 // octubre en curso, noviembre y diciembre futuros).
 
 #include "AppViewModel.h"
+#include "ExportacionFacturasViewModel.h"
 #include "FacturasViewModel.h"
 #include "FranjaMesViewModel.h"
 #include "HistorialViewModel.h"
@@ -26,6 +27,8 @@ class FixtureFacturas : public QObject {
     Q_PROPERTY(satcfdi::FacturasViewModel* facturas READ facturas NOTIFY reiniciado)
     // T023.5: Historial con una FuenteHistorial sintetica (filas mixtas).
     Q_PROPERTY(satcfdi::HistorialViewModel* historial READ historial NOTIFY reiniciado)
+    // T026.3: exportacion (sin servicio hasta habilitarExportacion()).
+    Q_PROPERTY(satcfdi::ExportacionFacturasViewModel* exportacion READ exportacion NOTIFY reiniciado)
     // Franja suelta para probar FranjaMes con cualquier combinacion de datos.
     Q_PROPERTY(satcfdi::FranjaMesViewModel* franjaSuelta READ franjaSuelta CONSTANT)
 
@@ -36,6 +39,21 @@ public:
     satcfdi::AppViewModel* app() const;
     satcfdi::FacturasViewModel* facturas() const;
     satcfdi::HistorialViewModel* historial() const;
+    satcfdi::ExportacionFacturasViewModel* exportacion() const;
+
+    // T026.3: ExportacionFacturasService real (hilo propio) con un ZIP
+    // sintetico de 2 facturas, FakeDestinoExportacion en memoria y un lector
+    // con compuerta. Cada plan tiene `conteoPlan` facturas (0..2).
+    Q_INVOKABLE void habilitarExportacion();
+    Q_INVOKABLE void fijarConteoPlan(int conteo);
+    // Cerrada: la exportacion se queda en Exportando al leer la primera factura.
+    Q_INVOKABLE void cerrarCompuerta();
+    Q_INVOKABLE void liberarCompuerta();
+    Q_INVOKABLE bool compuertaBloqueada() const;
+    // El nombre final aparece justo antes de guardar (EsperandoNombre) una vez.
+    Q_INVOKABLE void colisionAlPublicar();
+    Q_INVOKABLE int parcialesVivos() const;
+    Q_INVOKABLE int archivosEnCarpeta(const QString& carpeta) const;
     satcfdi::FranjaMesViewModel* franjaSuelta() const { return m_franja; }
 
     // Grafo nuevo (llamar en init(), sin objetos QML vivos del anterior).
