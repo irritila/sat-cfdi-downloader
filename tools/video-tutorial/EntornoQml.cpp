@@ -34,6 +34,13 @@ QUrl InterceptorOffline::intercept(const QUrl& url, DataType)
 
 bool FiltroEntradaReal::eventFilter(QObject* objeto, QEvent* e)
 {
+    // T022 D7: si otra app toma el foco de macOS, Qt envia WindowDeactivate
+    // (NO espontaneo) y Qt Quick suelta el agarre del raton: un clic en curso
+    // pierde su release. La grabacion nunca lo envia y su foco no depende del
+    // sistema (asegurarActiva), asi que se descarta siempre.
+    if (e->type() == QEvent::WindowDeactivate && descartarDesactivacion) {
+        return true;
+    }
     if (e->spontaneous()) {
         switch (e->type()) {
         case QEvent::MouseButtonPress:

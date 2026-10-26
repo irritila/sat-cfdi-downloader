@@ -96,7 +96,7 @@
             },
             {
               "tipo": "mover",
-              "objetivo": "botonPerfilesSat",
+              "objetivo": "botonPerfilesFacturas",
               "cuadros": 30
             },
             {
@@ -426,7 +426,19 @@
             },
             {
               "tipo": "mover",
-              "objetivo": "filaSolicitud_1",
+              "objetivo": "botonHistorialFacturas",
+              "cuadros": 24
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 15
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "filaHistorial_1/botonDetalles",
               "cuadros": 24
             },
             {
@@ -492,7 +504,7 @@
             },
             {
               "tipo": "mover",
-              "objetivo": "filaSolicitud_0",
+              "objetivo": "filaHistorial_0/botonDetalles",
               "cuadros": 24
             },
             {

@@ -46,8 +46,13 @@ qt_add_executable(satcfdi_video_tutorial
     Salidas.cpp
     DatosDemo.h
     DatosDemo.cpp
+    FuentesFacturasGuion.h
+    FuentesFacturasGuion.cpp
     Grabador.h
     Grabador.cpp
+    Agarre.h
+    DiagnosticoClic.h
+    DiagnosticoClic.cpp
     EntornoQml.h
     EntornoQml.cpp
     Barreras.h
@@ -285,7 +290,31 @@ add_test(NAME satcfdi_video_composicion
             -DFFMPEG=${SATCFDI_FFMPEG}
             -DFFPROBE=${SATCFDI_FFPROBE}
             -P ${CMAKE_CURRENT_SOURCE_DIR}/pruebas/prueba-composicion.cmake)
-set_tests_properties(satcfdi_video_rapido satcfdi_video_pdf_error satcfdi_video_pdf_timeout satcfdi_video_composicion PROPERTIES
+# T022 D7 (C2): contrato de la decision de agarre (Agarre.h) con items QML
+# sinteticos, sin grabar.
+find_package(Qt6 REQUIRED COMPONENTS Test)
+qt_add_executable(satcfdi_video_agarre_tests pruebas/TestAgarre.cpp)
+target_include_directories(satcfdi_video_agarre_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(satcfdi_video_agarre_tests PRIVATE Qt6::Test Qt6::Quick Qt6::Qml)
+satcfdi_enable_warnings(satcfdi_video_agarre_tests)
+add_test(NAME satcfdi_video_agarre COMMAND satcfdi_video_agarre_tests)
+set_tests_properties(satcfdi_video_agarre PROPERTIES LABELS "video;tools" ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# T022 D7: perdida del foco de macOS entre press y release (inyectada tras el
+# press del clic 2, "Nuevo perfil"): corregida por FiltroEntradaReal y, sin
+# el filtro, detectada antes del release con traza y PNG.
+foreach(_caso corregida detectada)
+    add_test(NAME satcfdi_video_desactivacion_${_caso}
+        COMMAND ${CMAKE_COMMAND}
+                "-DHERRAMIENTA=${SATCFDI_VIDEO_SIN_RED};$<TARGET_FILE:satcfdi_video_tutorial>"
+                -DGUION=${_video_guion}
+                -DSALIDA=${_video_prueba_dir}
+                -DCASO=${_caso}
+                -DCLIC=2
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/pruebas/prueba-desactivacion.cmake)
+endforeach()
+set_tests_properties(satcfdi_video_rapido satcfdi_video_pdf_error satcfdi_video_pdf_timeout satcfdi_video_composicion
+    satcfdi_video_desactivacion_corregida satcfdi_video_desactivacion_detectada PROPERTIES
     LABELS "video;tools;grafica"
     SKIP_RETURN_CODE 77
     RUN_SERIAL TRUE

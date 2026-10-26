@@ -1,14 +1,18 @@
 #include "Grabador.h"
 
+#include "Agarre.h"
 #include "Barreras.h"
 #include "CuadroApp.h"
+#include "DiagnosticoClic.h"
 #include "EntornoQml.h"
 #include "Ilustraciones.h"
 #include "SalidaFfmpeg.h"
 #include "Salidas.h"
 
+#include "presentation/viewmodels/AppViewModel.h"
 #include "presentation/viewmodels/EFirmaFormViewModel.h"
 #include "presentation/viewmodels/NuevaSolicitudViewModel.h"
+#include "presentation/viewmodels/PerfilesSatViewModel.h"
 #include "presentation/viewmodels/PresentacionViewModels.h"
 
 #include <QDir>
@@ -87,7 +91,6 @@ private:
     bool estabilizar();
     QQuickItem* esperarControl(const QString& objetivo);
     QString describirPunto(QPointF punto) const;
-    QList<QQuickItem*> caminoBajo(QPointF punto) const;
     QString diagnosticoControl();
     bool ejecutarEscena(const Capitulo& cap, const Escena& esc);
     bool aplicarInstantanea(const Capitulo& cap, const Escena& esc, const Accion& a);
@@ -141,6 +144,8 @@ private:
     bool m_hoverActivo = false;
     bool m_avisoEscala = false;
     bool m_avisoEscalaLienzo = false;
+    int m_clicsConEfecto = 0; // diagnostico: desactivarEnClic
+    std::unique_ptr<DiagnosticoClic> m_diag; // T022: siempre existe; inactivo sin la variable
 };
 
 bool Sesion::cargar()
@@ -155,6 +160,9 @@ bool Sesion::cargar()
     m_vms->setPrevisualizacionCfdi(&m_demo.previsualizacion);
     // T014.3 D1: guia "Empieza en tres pasos" derivada en vivo del guion.
     m_vms->setConsultaPrimerUso(&m_demo.primerUso);
+    // T022 D6: Facturas (pagina por omision) e Historial, como la app real.
+    m_vms->setFuenteFacturas(&m_demo.facturas, &m_demo.preferenciasFacturas);
+    m_vms->setFuenteHistorial(&m_demo.historial);
     // D8/D16: "hoy" de los atajos de periodo y de la validacion de fechas del
     // formulario es el `ahora` del guion, no el reloj del equipo.
     m_vms->nuevaSolicitud()->setReloj([hoy = m_demo.ahora().date()] { return hoy; });
@@ -175,6 +183,7 @@ bool Sesion::cargar()
     if (m_ventana == nullptr) {
         return fallar(QStringLiteral("Main.qml no es una ventana"));
     }
+    m_filtro.descartarDesactivacion = !m_op.permitirDesactivacion;
     m_ventana->installEventFilter(&m_filtro);
     if (QScreen* s = pantallaGrabacion()) {
         m_ventana->setScreen(s);
@@ -196,6 +205,12 @@ bool Sesion::cargar()
     m_overlay->setParentItem(m_ventana->contentItem());
     m_overlay->setProperty("cursor", m_cursor);
     m_overlay->setProperty("rotuloHerramienta", m_guion.rotuloHerramienta);
+    // T022 D2: diagnostico de clics (solo observa; inactivo con ruta vacia).
+    m_diag = std::make_unique<DiagnosticoClic>(m_op.rutaDiagnosticoClic, m_ventana, m_overlay);
+    m_diag->setSemantico({{QStringLiteral("pagina"), m_vms->app(), "pagina", {}},
+                          {QStringLiteral("perfiles.modo"), m_vms->perfiles(), "modo", {}},
+                          {QStringLiteral("hayFormulario"), nullptr, "hayFormulario", QStringLiteral("paginaPerfilesSat")},
+                          {QStringLiteral("dialogoAbierto"), nullptr, "dialogoAbierto", QStringLiteral("paginaPerfilesSat")}});
 
     // Lienzo (D21): ventana aparte de 1280x720 logicos que compone la captura
     // de la app con el fondo, el titulo y la transcripcion. No toma el foco:
@@ -556,7 +571,9 @@ QString Sesion::describirPunto(QPointF punto) const
 {
     QString nombre;
     QString clase;
-    for (QQuickItem* item : caminoBajo(punto)) {
+    // Item mas alto bajo el punto respetando z (T022: antes no ordenaba por
+    // z y podia nombrar el fondo de la pagina en vez del control).
+    for (QQuickItem* item : DiagnosticoClic::cadenaBajo(m_ventana->contentItem(), punto, m_overlay)) {
         if (!item->objectName().isEmpty()) {
             nombre = item->objectName();
         }
@@ -568,39 +585,17 @@ QString Sesion::describirPunto(QPointF punto) const
         .arg(nombre, clase);
 }
 
-// Diagnostico: items bajo `punto` desde el contentItem, eligiendo en cada
-// nivel el ultimo hijo visible que lo contiene, sin el overlay del cursor.
-// Aproximado: no ordena por `z`, asi que no es el blanco exacto de un clic.
-QList<QQuickItem*> Sesion::caminoBajo(QPointF punto) const
-{
-    QList<QQuickItem*> camino;
-    QQuickItem* item = m_ventana->contentItem();
-    while (item != nullptr) {
-        camino.append(item);
-        QQuickItem* siguiente = nullptr;
-        const QList<QQuickItem*> hijos = item->childItems();
-        for (auto it = hijos.crbegin(); it != hijos.crend(); ++it) {
-            QQuickItem* h = *it;
-            if (h != m_overlay && h->isVisible() && h->contains(h->mapFromScene(punto))) {
-                siguiente = h;
-                break;
-            }
-        }
-        item = siguiente;
-    }
-    return camino;
-}
-
 // Diagnostico de un control no encontrado: ultimo clic y la ventana de la app
 // en <salida>/<nombre>.fallo.png.
 QString Sesion::diagnosticoControl()
 {
     const QString png = QDir(m_op.dirSalida).filePath(m_op.nombre + QStringLiteral(".fallo.png"));
     const bool guardada = !m_op.dirSalida.isEmpty() && m_ventana->grabWindow().save(png);
-    return QStringLiteral("; ultimo clic en %1; cuadro %2%3")
+    return QStringLiteral("; ultimo clic en %1; cuadro %2%3%4")
         .arg(m_ultimoClic.isEmpty() ? QStringLiteral("(ninguno)") : m_ultimoClic)
         .arg(m_cuadro)
-        .arg(guardada ? QStringLiteral("; ventana en ") + png : QString());
+        .arg(guardada ? QStringLiteral("; ventana en ") + png : QString(),
+             m_diag && m_diag->activo() ? QStringLiteral("; diagnostico en ") + m_diag->ruta() : QString());
 }
 
 bool Sesion::aplicarCuadro(const Capitulo& cap, const Escena& esc, const Accion& a, int local)
@@ -608,10 +603,16 @@ bool Sesion::aplicarCuadro(const Capitulo& cap, const Escena& esc, const Accion&
     switch (a.tipo) {
     case TipoAccion::Mover: {
         if (local == 0) {
+            QElapsedTimer espera;
+            espera.start();
             m_objetivo = esperarControl(a.objetivo);
             if (!m_error.isEmpty()) {
                 return false; // bombear fallo por otra causa (ya registrada)
             }
+            m_diag->setContexto(nombreEscena(cap, esc), a.objetivo, m_objetivo);
+            m_diag->nota(m_cuadro, QStringLiteral("mover: encontrado=%1 espera=%2 ms")
+                                       .arg(m_objetivo.isNull() ? 0 : 1)
+                                       .arg(espera.elapsed()));
             if (m_objetivo.isNull()) {
                 return fallarEscena(cap, esc,
                                     QStringLiteral("no se encontro un control visible con objectName '%1' "
@@ -639,6 +640,10 @@ bool Sesion::aplicarCuadro(const Capitulo& cap, const Escena& esc, const Accion&
         double k = std::min(1.0, double(local + 1) / double(m_cuadrosMovimiento));
         k = k * k * (3 - 2 * k); // suavizado (smoothstep)
         moverCursor(m_desde + (m_hacia - m_desde) * k, a.hover);
+        if (local == 0 || local + 1 == m_cuadrosMovimiento) {
+            m_diag->instantanea(m_cuadro, local == 0 ? QStringLiteral("mover-inicio") : QStringLiteral("mover-fin"),
+                                m_cursor);
+        }
         return true;
     }
     case TipoAccion::Clic:
@@ -649,12 +654,38 @@ bool Sesion::aplicarCuadro(const Capitulo& cap, const Escena& esc, const Accion&
             if (!a.sinEfecto) {
                 asegurarActiva();
                 m_ultimoClic = describirPunto(m_cursor);
+                m_diag->instantanea(m_cuadro, QStringLiteral("antes-move"), m_cursor);
+                m_diag->vigilar();
                 enviarRaton(QEvent::MouseMove, Qt::NoButton, Qt::NoButton);
+                m_diag->instantanea(m_cuadro, QStringLiteral("antes-press"), m_cursor);
                 enviarRaton(QEvent::MouseButtonPress, Qt::LeftButton, Qt::LeftButton);
+                m_diag->instantanea(m_cuadro, QStringLiteral("tras-press"), m_cursor);
+                if (++m_clicsConEfecto == m_op.desactivarEnClic) {
+                    QWindowSystemInterface::handleFocusWindowChanged(nullptr, Qt::ActiveWindowFocusReason);
+                    QWindowSystemInterface::flushWindowSystemEvents();
+                    m_diag->instantanea(m_cuadro, QStringLiteral("tras-desactivar"), m_cursor);
+                }
             }
         } else if (local == a.pausa + 3 && !a.sinEfecto) {
+            m_diag->instantanea(m_cuadro, QStringLiteral("antes-release"), m_cursor);
+            // T022 D7: el release solo cuenta si el press sigue agarrado
+            // (Agarre.h); si no, el clic no tendria efecto. Falla con la
+            // traza y el PNG, sin reintento.
+            if (!conservaAgarre(m_objetivo.data(), m_ventana->mouseGrabberItem())) {
+                for (const QString& linea : m_diag->estado(QStringLiteral("antes-release"), m_cursor)) {
+                    imprimir(QStringLiteral("traza: ") + linea);
+                }
+                return fallarEscena(cap, esc,
+                                    QStringLiteral("el clic sobre '%1' perdio el agarre del raton antes del release "
+                                                   "(sin reintento)")
+                                            .arg(m_diag->nombreObjetivo())
+                                        + diagnosticoControl());
+            }
             enviarRaton(QEvent::MouseButtonRelease, Qt::LeftButton, Qt::NoButton);
+            m_diag->instantanea(m_cuadro, QStringLiteral("tras-release"), m_cursor);
             retirarHover();
+        } else if (local > a.pausa && !a.sinEfecto) {
+            m_diag->instantanea(m_cuadro, QStringLiteral("clic+%1").arg(local - a.pausa), m_cursor);
         }
         return m_error.isEmpty();
     case TipoAccion::Escribir:

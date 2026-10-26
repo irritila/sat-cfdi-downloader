@@ -34,9 +34,12 @@ public:
 };
 
 // Descarta la entrada REAL del usuario durante la grabacion: solo cuentan
-// los eventos sinteticos del guion.
+// los eventos sinteticos del guion. Tambien WindowDeactivate, aunque Qt lo
+// envie como no espontaneo (T022 D7).
 class FiltroEntradaReal final : public QObject {
 public:
+    // Solo pruebas del grabador (T022): false deja pasar WindowDeactivate.
+    bool descartarDesactivacion = true;
     bool eventFilter(QObject* objeto, QEvent* e) override;
 };
 

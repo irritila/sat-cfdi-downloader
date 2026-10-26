@@ -24,6 +24,14 @@ struct OpcionesGrabacion {
     QString dirDepuracion; // vacio o subdirectorio de dirSalida (SATCFDI_VIDEO_DEPURAR_CUADROS)
     int depurarDesde = 0;          // SATCFDI_VIDEO_DEPURAR_RANGO=desde-hasta (cuadros)
     int depurarHasta = 1 << 30;
+    QString rutaDiagnosticoClic; // T022: SATCFDI_VIDEO_DIAGNOSTICO_CLIC=1 -> <salida>/<nombre>.diag.log
+    // T022: solo diagnostico (SATCFDI_VIDEO_DIAGNOSTICO_DESACTIVAR=N): tras el
+    // press del N-esimo clic con efecto, la ventana pierde el foco de Qt como
+    // cuando otra app toma el foco de macOS. 0 = nunca.
+    int desactivarEnClic = 0;
+    // T022: solo pruebas (SATCFDI_VIDEO_DIAGNOSTICO_PERMITIR_DESACTIVAR=1):
+    // no descartar WindowDeactivate, para probar la deteccion de agarre perdido.
+    bool permitirDesactivacion = false;
     bool rapido = false;
     bool offline = false;
 };

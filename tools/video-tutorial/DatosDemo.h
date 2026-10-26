@@ -8,6 +8,7 @@
 // sobre ZIP sinteticos generados antes de grabar en el directorio temporal.
 // Reutiliza los fakes inmutables de tools/capturas-manual/ServiciosFijos.h.
 
+#include "FuentesFacturasGuion.h"
 #include "Guion.h"
 #include "ServiciosFijos.h" // tools/capturas-manual
 
@@ -168,6 +169,10 @@ public:
     CatalogoGuion catalogo;
     PrevisualizacionZip previsualizacion;
     PrimerUsoGuion primerUso{perfiles, credenciales, solicitudes};
+    // T022 D6: Facturas (pantalla principal desde T023) e Historial.
+    FacturasGuion facturas{perfiles, credenciales};
+    PreferenciasFacturasGuion preferenciasFacturas;
+    HistorialGuion historial{perfiles, solicitudes};
 
 private:
     void aplicarEstado(SolicitudDetalle& d, const QString& estado, const QString& clave);

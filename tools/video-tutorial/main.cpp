@@ -436,6 +436,13 @@ int main(int argc, char* argv[])
         }
     }
 
+    // T022 D2: diagnostico de clics, tambien solo dentro de la salida.
+    if (qEnvironmentVariableIntValue("SATCFDI_VIDEO_DIAGNOSTICO_CLIC") == 1) {
+        opciones.rutaDiagnosticoClic = QDir(opciones.dirSalida).filePath(opciones.nombre + QStringLiteral(".diag.log"));
+    }
+    opciones.desactivarEnClic = qEnvironmentVariableIntValue("SATCFDI_VIDEO_DIAGNOSTICO_DESACTIVAR");
+    opciones.permitirDesactivacion = qEnvironmentVariableIntValue("SATCFDI_VIDEO_DIAGNOSTICO_PERMITIR_DESACTIVAR") == 1;
+
     // D4/D8: entorno fijo antes de crear la app. Cache de QML desactivada
     // para no escribir fuera del temporal y de la salida.
     qputenv("TZ", "UTC");

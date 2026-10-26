@@ -34,6 +34,20 @@ sandbox-exec -f tools/video-tutorial/sin-red.sb build/tools/video-tutorial/satcf
 - `SATCFDI_VIDEO_DEPURAR_CUADROS=1`: diagnostico; guarda cada cuadro en PNG en
   `<salida>/<nombre>.cuadros/` (nunca fuera de la salida validada); con
   `SATCFDI_VIDEO_DEPURAR_RANGO=desde-hasta` solo esos cuadros.
+- `SATCFDI_VIDEO_DIAGNOSTICO_CLIC=1` (T022): diagnostico de clics, apagado
+  por omision. Escribe `<salida>/<nombre>.diag.log` con, en cada `mover` y
+  alrededor del press y del release de cada `clic`: cuadro, cursor, objetivo
+  (rect en escena, `visible`/`enabled`/`opacity`, `pressed`/`down`/`hovered`),
+  cadena de items bajo el cursor ordenada por `z`, `mouseGrabberItem`,
+  `activeFocusItem`, ventana activa, estado minimo (pagina, modo de perfiles,
+  `hayFormulario`) y los eventos que reciben la ventana y el objetivo, con
+  sello de tiempo. Sin RFC ni contrasenas. Solo observa (no bombea ni
+  renderiza): no cambia los cuadros.
+- `SATCFDI_VIDEO_DIAGNOSTICO_DESACTIVAR=N` y
+  `SATCFDI_VIDEO_DIAGNOSTICO_PERMITIR_DESACTIVAR=1`: solo diagnostico y
+  pruebas (T022). Tras el press del N-esimo clic con efecto, la ventana
+  pierde el foco de Qt como cuando otra app toma el foco de macOS; la segunda
+  deja pasar ese `WindowDeactivate` (ver "Clic perdido por cambio de app").
 - `--sonda-red`: intenta una conexion TCP (saliente y local) y dice
   `RED DISPONIBLE` o `RED BLOQUEADA: ...`; sirve para probar el sandbox.
 - Targets: `video_tutorial` (con voz), `video_tutorial_sin_voz`,
@@ -432,6 +446,34 @@ segunda ventana de la herramienta que no toma el foco):
   dispara (continuaciones de QFuture, pool de hilos, layouts) antes del
   siguiente cuadro.
 
+## Clic perdido por cambio de app (T022)
+
+Causa: el usuario cambia de app mientras corre una grabacion. Si la ventana
+pierde el foco del sistema entre el press y el release de un `clic`, Qt Quick
+suelta el agarre del raton: el release no llega al control y el clic no
+tiene efecto (era la intermitencia de `--rapido`). Una via es el
+`WindowDeactivate` no espontaneo, reproducida por inyeccion
+(`SATCFDI_VIDEO_DIAGNOSTICO_DESACTIVAR`). Con cambios de app reales el
+agarre tambien se pierde por otra via, que no se investigo.
+
+- `FiltroEntradaReal` descarta `WindowDeactivate`. Reduce el riesgo, pero
+  no lo elimina.
+- Antes del release, la herramienta exige que el raton siga agarrado por el
+  objetivo del `mover` previo, un descendiente o un ancestro (p. ej. la fila
+  que agarra el clic hecho sobre su texto). Con un grabber ajeno falla; sin
+  grabber solo vale si el objetivo sigue `pressed`/`down` (`Agarre.h`). Si
+  un clic pierde el agarre, la grabacion falla con
+  "el clic sobre '<objetivo>' perdio el agarre del raton antes del release",
+  imprime la traza en stderr y deja `<salida>/<nombre>.fallo.png`, sin
+  reintentar.
+
+Recomendacion: no cambiar de app mientras corren las pruebas graficas ni la
+grabacion.
+
+Pruebas: `satcfdi_video_agarre` (contrato de `Agarre.h` con items QML
+sinteticos), `satcfdi_video_desactivacion_corregida` y
+`satcfdi_video_desactivacion_detectada` (`pruebas/prueba-desactivacion.cmake`).
+
 ## Entorno fijo (D4, D8)
 
 `QSG_RENDER_LOOP=basic`, `QT_QPA_PLATFORM=cocoa`, `TZ=UTC`, locale `es_MX`,
@@ -588,7 +630,7 @@ aparte, fuera del sandbox.
   del autor: los tooltips aparecen tras 600 ms reales).
 - `objetivo`: objectName de un control visible (el primero en el arbol
   visual) o una ruta `padre/hijo` (p. ej. `campoTipoDescarga/segmento_Recibidos`,
-  `pestanasDetalle/segmento_datos`). Si no esta en la primera busqueda (la UI
+  `filaHistorial_0/botonDetalles`). Si no esta en la primera busqueda (la UI
   aun se asienta tras un clic o un future), la herramienta bombea eventos y
   renderiza con el reloj congelado hasta que exista y sea visible, con un
   limite de 2 s reales (igual con `--rapido`); no consume cuadros de la linea
@@ -596,6 +638,13 @@ aparte, fuera del sandbox.
   escena y el objectName.
 - `nuevaN`: la N-esima solicitud creada desde la UI durante la grabacion
   (vale en `avanzarSolicitud` y en `mostrarSolicitudes`).
+- Facturas e Historial (T022 D6, `FuentesFacturasGuion`): Facturas es la
+  pagina inicial, como en la app. Muestra los perfiles visibles con su
+  e.firma y un catalogo mensual vacio (sin descarga guiada). El Historial
+  tiene una entrada por solicitud visible del perfil, la mas reciente
+  primero, y su "Ver detalles tecnicos" (`filaHistorial_N/botonDetalles`)
+  abre el detalle (Verificar ahora, Ver facturas). Desde Perfiles,
+  `botonRegresar` vuelve a Facturas.
 - Guia "Empieza en tres pasos" (T014.3 D1): se deriva en vivo de los datos
   (perfiles visibles, alguna e.firma Lista, solicitudes visibles) y se ve en
   la lista vacia. Sus botones: `guiaPrimerUso/boton_pasoPerfil`,

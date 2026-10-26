@@ -491,6 +491,7 @@ DemoVideo::DemoVideo(const DatosGuion& datos, QString dirTemporal)
     , m_ahora(QDateTime::fromString(datos.ahora, Qt::ISODate).toUTC())
 {
     solicitudes.ahora = m_ahora;
+    facturas.setAhora(m_ahora);
 }
 
 void DemoVideo::aplicarEstado(SolicitudDetalle& d, const QString& estado, const QString& clave)

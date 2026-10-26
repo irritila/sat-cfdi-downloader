@@ -47,7 +47,7 @@ Ejemplo: `T001-modelo-fisico-sqlite.md`.
 | [T019](T019-renombrar-archivo-fiscal.md) | Completada | Renombrar la app a "Archivo Fiscal" |
 | [T020](T020-logo.md) | Pendiente | Logo e iconos en SVG |
 | [T021](T021-manual-capturas-al-dia.md) | Pendiente | Manual y capturas al dia con la app |
-| [T022](T022-intermitencia-pruebas-graficas-video.md) | Pendiente | Intermitencia de pruebas graficas del video |
+| [T022](T022-intermitencia-pruebas-graficas-video.md) | Completada con limitaciones | Intermitencia de pruebas graficas del video |
 | [T023](T023-rediseno-ui-caso-de-uso.md) | Completada | Rediseno de la UI centrado en las facturas del perfil fiscal (epica) |
 | [T023.1](T023.1-prototipo-y-adr-cobertura.md) | Completada | Prototipo navegable y ADR de cobertura mensual |
 | [T023.2](T023.2-catalogo-mensual-y-disponibilidad.md) | Completada | Catalogo mensual y regla de disponibilidad |
@@ -67,6 +67,7 @@ Ejemplo: `T001-modelo-fisico-sqlite.md`.
 | [T026.1](T026.1-plan-y-escritura-zip.md) | Completada | Plan de exportacion y escritura atomica del ZIP |
 | [T026.2](T026.2-servicio-exportacion.md) | Completada | Servicio de exportacion |
 | [T026.3](T026.3-ui-exportacion.md) | Completada | UI y documentacion de la exportacion |
+| [T027](T027-clic-perdido-cambio-de-app-video.md) | Pendiente (sin refinar, baja) | Clic perdido por cambio de app en pruebas del video |
 
 ## Estados
 
