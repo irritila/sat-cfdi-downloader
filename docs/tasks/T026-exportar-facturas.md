@@ -2,7 +2,7 @@
 
 ## Estado
 
-Subtareas T026.1 a T026.3 completadas (2026-10-26). Pendiente: prueba manual del usuario.
+Completada (2026-10-26).
 
 ## Prioridad y tamano
 
@@ -83,22 +83,22 @@ Propuesta del usuario (2026-10-24), antes de T024. Hoy la pantalla Facturas (T02
 
 Subtarea primaria entre corchetes. Datos sinteticos (`XAXX010101000`, `XEXX010101000`) y `QTemporaryDir`.
 
-- [ ] [T026.1/T026.2] Dado un perfil con 2 meses indexados de emitidas y recibidas, exportar el rango con Ambas produce un ZIP cuyas entradas son exactamente `emitidas|recibidas/AAAA-MM/<UUID>.xml`, una por CFDI canonico, con SHA-256 identico al XML del paquete fuente; un CFDI presente en dos paquetes aparece una vez. Con Emitidas solo hay entradas `emitidas/`.
-- [ ] [T026.2] Con PDF activado cada XML tiene su `.pdf` con el mismo nombre resuelto; con renderer fake que falla o un CFDI `VersionNoSoportada` solo va el XML y `omitidas.txt` dice "sin PDF". Con PDF desactivado no hay `.pdf`. Un XML con textos `<b>`, `<img src=http://...>` y `file://` se dibuja literal y no hace peticiones de red.
-- [ ] [T026.1/T026.2] Con fakes, un CFDI cuyo paquete esta `OrigenNoDisponible`, `Ilegible`, desaparece antes de su lectura, cuyo XML releido tiene otro UUID o una factura elegida que ya no existe no se exporta; `omitidas.txt` coincide byte a byte con el texto esperado (D17), incluidas las lineas de mes con descargas pendientes o cobertura incompleta; sin lineas no hay archivo. El conteo de omitidas de la app es igual al numero de lineas de CFDI con motivo distinto de "sin PDF", y el de "sin PDF" al de esas lineas.
-- [ ] [T026.1] El asignador produce `sin-uuid-<n>` para UUID vacio o no canonico y `-<n>` en colisiones, igual para XML y PDF; ninguna entrada contiene nombres internos de paquetes, `..`, rutas absolutas ni enlaces. La inspeccion del ZIP muestra comentario vacio, atributos `0100600` y fecha de la exportacion.
-- [ ] [T026.1] Con fallas inyectadas en crear, escribir, cerrar, `F_FULLFSYNC`, rename y disco lleno, o cancelacion en cada fase previa al rename: no hay ZIP final, el `.partial` propio se borra y un archivo previo con ese nombre queda intacto. Con falla solo en el `fsync` del directorio tras el rename, el ZIP queda publicado y el resultado trae advertencia. Durante y despues de exportar, en la carpeta privada y en la destino no hay otros archivos que el `.partial` propio y el ZIP final. El ZIP final tiene `0600` (`stat`), sin ACL y sin atributos extendidos salvo `com.apple.provenance`, que macOS asigna y no se puede retirar.
-- [ ] [T026.1] Un destino existente no se reemplaza, tampoco si aparece entre el dialogo y el rename; se pide otro nombre. El nombre se sanea segun D15 (vacio, sin extension, doble extension, `/`, `:`, inicio con `.`, mas de 255 bytes).
-- [ ] [T026.1] Si el proceso termina durante la exportacion (simulado dejando un `.partial` propio), el siguiente arranque lo borra; un archivo ajeno, un enlace o un nombre que no sigue el patron permanecen.
-- [ ] [T026.2] Con un lector que se bloquea en la lectura por posicion, la exportacion no corre en el hilo de UI ni en el executor: el VM procesa cancelar y una operacion SAT fake encolada en el executor real termina mientras la exportacion sigue bloqueada. Pedir otra exportacion durante una en curso no inicia otra. Cancelar dos veces o despues del rename no cambia el resultado.
-- [ ] [T026.2] Eliminar localmente un paquete durante la exportacion omite sus CFDI pendientes; iniciar una restauracion o salir de la app cancela, borra el `.partial` y termina antes de sustituir datos o cerrar; nunca se publica un ZIP con entradas truncadas.
-- [ ] [T026.2] Memoria maxima medida con 10,000 CFDI sinteticos con PDF y reportada; ningun buffer acumula todo el contenido (prueba omitible en CI).
-- [ ] [T026.3] En Facturas: "Exportar este mes"; rango de meses que rechaza futuros, invertidos y fuera del horizonte navegable y acepta el mismo mes en ambos extremos; modo de seleccion que conserva lo elegido al cambiar de pestana, filtro o recarga y se vacia al cambiar de perfil. El dialogo muestra el aviso D10, el selector de direccion solo para mes o rango, la opcion de PDF y los CFDI que se exportaran; con 0, "Exportar" esta deshabilitado con "No hay facturas para exportar".
-- [ ] [T026.3] Progreso por fase y conteo, cancelar y resultado (exportadas, sin PDF, omitidas, advertencia) visibles; pruebas Qt Quick de foco, Tab, Escape y nombres accesibles; textos sin "solicitud", "paquete" ni "verificacion". VoiceOver va en la lista manual.
-- [ ] [T026.1-T026.3] Con datos sonda (`XAXX010101000`, un UUID sintetico, `/Users/usuario`, un nombre de archivo hostil) los logs y notificaciones capturados no contienen ninguno; solo fases, conteos y codigos.
-- [ ] [T026.1/T026.3] ADR registrado; `docs/architecture.md`, `docs/requirements.md` y `docs/manual/usuario.md` actualizados.
-- [ ] [T026.1-T026.3] Build `-Werror`, `ctest` y `git diff --check` pasan.
-- [ ] Prueba manual del usuario con un perfil real (cierra la epica, no bloquea las subtareas): exportar un mes con PDF a una carpeta local, abrir el ZIP en Finder, comparar 3 CFDI con los de la app y revisar el aviso con VoiceOver.
+- [x] [T026.1/T026.2] Dado un perfil con 2 meses indexados de emitidas y recibidas, exportar el rango con Ambas produce un ZIP cuyas entradas son exactamente `emitidas|recibidas/AAAA-MM/<UUID>.xml`, una por CFDI canonico, con SHA-256 identico al XML del paquete fuente; un CFDI presente en dos paquetes aparece una vez. Con Emitidas solo hay entradas `emitidas/`.
+- [x] [T026.2] Con PDF activado cada XML tiene su `.pdf` con el mismo nombre resuelto; con renderer fake que falla o un CFDI `VersionNoSoportada` solo va el XML y `omitidas.txt` dice "sin PDF". Con PDF desactivado no hay `.pdf`. Un XML con textos `<b>`, `<img src=http://...>` y `file://` se dibuja literal y no hace peticiones de red.
+- [x] [T026.1/T026.2] Con fakes, un CFDI cuyo paquete esta `OrigenNoDisponible`, `Ilegible`, desaparece antes de su lectura, cuyo XML releido tiene otro UUID o una factura elegida que ya no existe no se exporta; `omitidas.txt` coincide byte a byte con el texto esperado (D17), incluidas las lineas de mes con descargas pendientes o cobertura incompleta; sin lineas no hay archivo. El conteo de omitidas de la app es igual al numero de lineas de CFDI con motivo distinto de "sin PDF", y el de "sin PDF" al de esas lineas.
+- [x] [T026.1] El asignador produce `sin-uuid-<n>` para UUID vacio o no canonico y `-<n>` en colisiones, igual para XML y PDF; ninguna entrada contiene nombres internos de paquetes, `..`, rutas absolutas ni enlaces. La inspeccion del ZIP muestra comentario vacio, atributos `0100600` y fecha de la exportacion.
+- [x] [T026.1] Con fallas inyectadas en crear, escribir, cerrar, `F_FULLFSYNC`, rename y disco lleno, o cancelacion en cada fase previa al rename: no hay ZIP final, el `.partial` propio se borra y un archivo previo con ese nombre queda intacto. Con falla solo en el `fsync` del directorio tras el rename, el ZIP queda publicado y el resultado trae advertencia. Durante y despues de exportar, en la carpeta privada y en la destino no hay otros archivos que el `.partial` propio y el ZIP final. El ZIP final tiene `0600` (`stat`), sin ACL y sin atributos extendidos salvo `com.apple.provenance`, que macOS asigna y no se puede retirar.
+- [x] [T026.1] Un destino existente no se reemplaza, tampoco si aparece entre el dialogo y el rename; se pide otro nombre. El nombre se sanea segun D15 (vacio, sin extension, doble extension, `/`, `:`, inicio con `.`, mas de 255 bytes).
+- [x] [T026.1] Si el proceso termina durante la exportacion (simulado dejando un `.partial` propio), el siguiente arranque lo borra; un archivo ajeno, un enlace o un nombre que no sigue el patron permanecen.
+- [x] [T026.2] Con un lector que se bloquea en la lectura por posicion, la exportacion no corre en el hilo de UI ni en el executor: el VM procesa cancelar y una operacion SAT fake encolada en el executor real termina mientras la exportacion sigue bloqueada. Pedir otra exportacion durante una en curso no inicia otra. Cancelar dos veces o despues del rename no cambia el resultado.
+- [x] [T026.2] Eliminar localmente un paquete durante la exportacion omite sus CFDI pendientes; iniciar una restauracion o salir de la app cancela, borra el `.partial` y termina antes de sustituir datos o cerrar; nunca se publica un ZIP con entradas truncadas.
+- [x] [T026.2] Memoria maxima medida con 10,000 CFDI sinteticos con PDF y reportada; ningun buffer acumula todo el contenido (prueba omitible en CI).
+- [x] [T026.3] En Facturas: "Exportar este mes"; rango de meses que rechaza futuros, invertidos y fuera del horizonte navegable y acepta el mismo mes en ambos extremos; modo de seleccion que conserva lo elegido al cambiar de pestana, filtro o recarga y se vacia al cambiar de perfil. El dialogo muestra el aviso D10, el selector de direccion solo para mes o rango, la opcion de PDF y los CFDI que se exportaran; con 0, "Exportar" esta deshabilitado con "No hay facturas para exportar".
+- [x] [T026.3] Progreso por fase y conteo, cancelar y resultado (exportadas, sin PDF, omitidas, advertencia) visibles; pruebas Qt Quick de foco, Tab, Escape y nombres accesibles; textos sin "solicitud", "paquete" ni "verificacion". VoiceOver va en la lista manual.
+- [x] [T026.1-T026.3] Con datos sonda (`XAXX010101000`, un UUID sintetico, `/Users/usuario`, un nombre de archivo hostil) los logs y notificaciones capturados no contienen ninguno; solo fases, conteos y codigos.
+- [x] [T026.1/T026.3] ADR registrado; `docs/architecture.md`, `docs/requirements.md` y `docs/manual/usuario.md` actualizados.
+- [x] [T026.1-T026.3] Build `-Werror`, `ctest` y `git diff --check` pasan.
+- [x] Prueba manual del usuario con un perfil real (cierra la epica, no bloquea las subtareas): exportar un mes con PDF a una carpeta local, abrir el ZIP en Finder, comparar 3 CFDI con los de la app y revisar el aviso con VoiceOver.
 
 ## Verificacion
 
@@ -106,7 +106,7 @@ Subtarea primaria entre corchetes. Datos sinteticos (`XAXX010101000`, `XEXX01010
 
 ## Resultado
 
-Pendiente.
+T026.1 (plan y escritura atomica del ZIP), T026.2 (servicio en hilo propio) y T026.3 (UI, dialogo con aviso, seleccion y documentacion). Prueba manual del usuario con un perfil real (2026-10-26): exportacion de un mes con PDF a una carpeta local, ZIP revisado en Finder, 3 CFDI comparados con la app y dialogo con VoiceOver: funciona bien.
 
 ## Riesgos
 
