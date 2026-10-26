@@ -655,12 +655,12 @@ QString RespaldoViewModel::conteosRestauracion() const
     }
     QString texto = tr("%1, %2 y %3.")
                         .arg(plural(m_resumen->perfiles, tr("%1 perfil"), tr("%1 perfiles")),
-                             plural(m_resumen->solicitudes, tr("%1 solicitud"), tr("%1 solicitudes")),
-                             plural(m_resumen->paquetes, tr("%1 paquete"), tr("%1 paquetes")));
+                             plural(m_resumen->solicitudes, tr("%1 descarga"), tr("%1 descargas")),
+                             plural(m_resumen->paquetes, tr("%1 archivo del SAT"), tr("%1 archivos del SAT")));
     if (m_resumen->faltantes > 0) {
         texto += QLatin1Char(' ')
-                 + plural(m_resumen->faltantes, tr("%1 paquete ya faltaba cuando se hizo el respaldo."),
-                          tr("%1 paquetes ya faltaban cuando se hizo el respaldo."));
+                 + plural(m_resumen->faltantes, tr("%1 archivo del SAT ya faltaba cuando se hizo el respaldo."),
+                          tr("%1 archivos del SAT ya faltaban cuando se hizo el respaldo."));
     }
     return texto;
 }

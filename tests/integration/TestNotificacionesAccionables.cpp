@@ -326,14 +326,14 @@ void TestNotificacionesAccionables::adaptacionANotificacionLocal()
         Notificacion n{QStringLiteral("x"), tipo, QStringLiteral("t"), QStringLiteral("c"), {t, id}};
         return notificacionLocalDe(n);
     };
-    for (const char* tipo : {"terminada", "error_sat", "rechazada", "vencida"}) {
+    // T024.1 (D4): ninguna notificacion nueva lleva "Mostrar en Finder",
+    // tampoco "descarga_completa"; el destino no cambia.
+    for (const char* tipo : {"terminada", "descarga_completa", "error_sat", "rechazada", "sin_facturas", "vencida"}) {
         const auto n = local(QString::fromLatin1(tipo), DestinoNotificacion::Tipo::Solicitud, sol);
         QCOMPARE(n.destino, (D{D::Tipo::Solicitud, sol}));
         QVERIFY(n.accionesExtra.isEmpty());
     }
-    auto n = local(QStringLiteral("descarga_completa"), DestinoNotificacion::Tipo::Solicitud, sol);
-    QCOMPARE(n.destino, (D{D::Tipo::Solicitud, sol}));
-    QCOMPARE(n.accionesExtra, QList<Accion>{Accion::MostrarEnFinder});
+    OSIntegration::NotificacionLocal n;
     for (const char* tipo : {"credencial", "efirma_por_vencer"}) {
         n = local(QString::fromLatin1(tipo), DestinoNotificacion::Tipo::Perfil, per);
         QCOMPARE(n.destino, (D{D::Tipo::Perfil, per}));
@@ -618,20 +618,17 @@ void TestNotificacionesAccionables::notificacionesDelRootSonAccionables()
                && d->paquetes.at(1).estadoDescarga == EstadoDescarga::Descargado;
     }());
 
-    // Destino tipado (UUID interno, sin RFC) y acciones extra por tipo.
+    // Destino tipado (UUID interno, sin RFC). T024.1 (D4): solo "Facturas
+    // descargadas" (Terminada con archivos no notifica) y sin "Mostrar en Finder".
     using D = OSIntegration::DestinoNotificacion;
     QTRY_VERIFY(!f.os.notificacionesPedidas.isEmpty());
-    bool vioDescarga = false;
-    for (const auto& n : f.os.notificacionesPedidas) {
-        QCOMPARE(n.destino, (D{D::Tipo::Solicitud, id->texto()}));
-        if (n.tipo == QStringLiteral("descarga_completa")) {
-            vioDescarga = true;
-            QCOMPARE(n.accionesExtra, QList<Accion>{Accion::MostrarEnFinder});
-        } else {
-            QVERIFY(n.accionesExtra.isEmpty());
-        }
-    }
-    QVERIFY(vioDescarga);
+    QCOMPARE(f.os.notificacionesPedidas.size(), 1);
+    const auto& descarga = f.os.notificacionesPedidas.constFirst();
+    QCOMPARE(descarga.tipo, QStringLiteral("descarga_completa"));
+    QCOMPARE(descarga.id, id->texto() + QStringLiteral(":descarga_completa"));
+    QCOMPARE(descarga.titulo, QStringLiteral("Facturas descargadas"));
+    QCOMPARE(descarga.destino, (D{D::Tipo::Solicitud, id->texto()}));
+    QVERIFY(descarga.accionesExtra.isEmpty());
     if (permiso == OSIntegration::NotificationStatus::Denied) {
         QVERIFY(f.os.notificacionesEntregadas.isEmpty());
     }
@@ -646,6 +643,8 @@ void TestNotificacionesAccionables::notificacionesDelRootSonAccionables()
     const int sat = f.llamadasSat();
     const auto destino = f.os.notificacionesPedidas.constLast().destino;
 
+    // T024.1 (D4): una notificacion historica (ya entregada con la categoria
+    // Finder) sigue abriendo la carpeta con su boton y su destino al abrirla.
     const qsizetype peticiones = f.os.peticionesFinder.size();
     f.os.simularActivacionNotificacion(destino, Accion::MostrarEnFinder);
     QTRY_COMPARE(f.os.peticionesFinder.size(), peticiones + 1);

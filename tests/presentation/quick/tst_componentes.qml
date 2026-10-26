@@ -1,3 +1,4 @@
+import QtCore
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -38,7 +39,17 @@ TestCase {
     Component { id: avisoComp; AvisoEnLinea { width: 400 } }
     Component { id: archivoComp; CampoArchivo { width: 360 } }
     Component { id: textoComp; CampoTexto { width: 200 } }
-    Component { id: comboComp; CampoCombo { width: 200; model: ["Emitidos", "Recibidos"] } }
+    Component { id: comboComp; CampoCombo { width: 200; model: ["Emitidas", "Recibidas"] } }
+    Component {
+        id: comboRolComp
+        CampoCombo {
+            width: 200
+            textRole: "texto"
+            // Fuera de macOS (offscreen) el hover viene desactivado por omision.
+            hoverEnabled: true
+            model: [{ texto: "Enero" }, { texto: "Febrero" }, { texto: "Marzo" }]
+        }
+    }
     Component {
         id: formularioComp
         CampoFormulario {
@@ -205,9 +216,99 @@ TestCase {
         compare(lectura.background.color, Theme.superficieSeccion)
 
         const combo = crear(comboComp)
-        compare(combo.displayText, "Emitidos")
+        compare(combo.displayText, "Emitidas")
         compare(combo.indicator.nombre, "chevron-up-down")
         compare(combo.background.color, Theme.controlFondo)
+    }
+
+    // ---- T024.1 M5: contraste de la lista del combo ----
+
+    // Luminancia relativa WCAG 2.x de un color QML (componentes 0..1).
+    function luminancia(c) {
+        const lin = v => v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)
+        return 0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b)
+    }
+    // Compone `arriba` (con su alfa) sobre `abajo` opaco.
+    function componer(arriba, abajo) {
+        const a = arriba.a
+        return Qt.rgba(arriba.r * a + abajo.r * (1 - a), arriba.g * a + abajo.g * (1 - a),
+                       arriba.b * a + abajo.b * (1 - a), 1)
+    }
+    function contraste(texto, fondo) {
+        const l1 = luminancia(texto), l2 = luminancia(fondo)
+        return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)
+    }
+    // Colores efectivos del delegado: texto pintado sobre su fondo, el fondo
+    // sobre la lista y la lista sobre la ventana de prueba (Theme.fondo).
+    function medirOpcion(combo, indice) {
+        const lista = combo.popup.contentItem
+        const opcion = lista.itemAtIndex(indice)
+        verify(opcion !== null, "sin delegado " + indice)
+        const texto = findChild(opcion, "textoOpcion")
+        const fondo = findChild(opcion, "fondoOpcion")
+        verify(texto !== null && fondo !== null)
+        const fondoLista = componer(combo.popup.background.color, Theme.fondo)
+        const fondoEfectivo = componer(fondo.color, fondoLista)
+        const textoEfectivo = componer(Qt.rgba(texto.color.r, texto.color.g, texto.color.b,
+                                               texto.color.a * opcion.opacity * combo.opacity), fondoEfectivo)
+        return contraste(textoEfectivo, fondoEfectivo)
+    }
+    function capturarFallo(objetivo, nombre) {
+        let dir = fixtureFacturas.directorioCapturas()
+        if (dir.length === 0)
+            dir = StandardPaths.writableLocation(StandardPaths.TempLocation).toString().replace(/^file:\/\//, "")
+        const ruta = dir + "/" + nombre + (Theme.oscuro ? "-oscuro" : "-claro") + ".png"
+        grabImage(objetivo).save(ruta)
+        return ruta
+    }
+
+    function test_campoComboContraste_data() { return temas() }
+    function test_campoComboContraste(fila) {
+        Theme.oscuro = fila.oscuro
+        // El puntero queda lejos de la lista para que solo el teclado resalte.
+        mouseMove(caso, caso.width - 2, caso.height - 2)
+        const combo = crear(comboRolComp, { x: 20, y: 20 })
+        combo.currentIndex = 1
+        combo.forceActiveFocus()
+        combo.popup.open()
+        tryCompare(combo.popup, "opened", true)
+        const lista = combo.popup.contentItem
+        tryVerify(() => lista.itemAtIndex(2) !== null)
+        waitForRendering(lista)
+
+        const medidas = []
+        // Al abrir, el seleccionado tambien es el resaltado.
+        compare(combo.highlightedIndex, 1)
+        medidas.push({ caso: "seleccionado y resaltado", valor: medirOpcion(combo, 1) })
+        // El seleccionado se distingue sin depender del color.
+        compare(findChild(lista.itemAtIndex(1), "marcaSeleccion").nombre, "checkmark")
+        compare(findChild(lista.itemAtIndex(0), "marcaSeleccion").nombre, "")
+        compare(lista.itemAtIndex(1).font.weight, Font.DemiBold)
+
+        // Resaltado por teclado (el seleccionado deja de estar resaltado).
+        keyClick(Qt.Key_Down)
+        tryCompare(combo, "highlightedIndex", 2)
+        verify(lista.itemAtIndex(2).highlighted)
+        medidas.push({ caso: "resaltado por teclado", valor: medirOpcion(combo, 2) })
+        medidas.push({ caso: "seleccionado sin resaltar", valor: medirOpcion(combo, 1) })
+        compare(findChild(lista.itemAtIndex(2), "fondoOpcion").color, Theme.seleccion)
+
+        // Resaltado por puntero.
+        const primera = lista.itemAtIndex(0)
+        mouseMove(primera, primera.width / 2 - 4, primera.height / 2)
+        mouseMove(primera, primera.width / 2, primera.height / 2)
+        tryCompare(combo, "highlightedIndex", 0)
+        verify(primera.highlighted)
+        medidas.push({ caso: "resaltado por puntero", valor: medirOpcion(combo, 0) })
+        medidas.push({ caso: "normal", valor: medirOpcion(combo, 2) })
+
+        const fallas = medidas.filter(m => m.valor < 4.5)
+        if (fallas.length > 0) {
+            waitForRendering(caso)
+            const ruta = capturarFallo(caso, "campo-combo-contraste")
+            fail(fallas.map(m => m.caso + ": " + m.valor.toFixed(2)).join("; ") + " (captura: " + ruta + ")")
+        }
+        combo.popup.close()
     }
 
     function test_campoFormulario() {
@@ -316,9 +417,9 @@ TestCase {
         Theme.oscuro = fila.oscuro
         const f = crear(perfilComp, { rfc: "XAXX010101000", nombre: "Contribuyente de ejemplo",
                                       preparacion: "Lista", estadoTexto: "e.firma lista",
-                                      disponibilidad: "Disponible para solicitudes", listo: true,
+                                      disponibilidad: "Disponible para descargas", listo: true,
                                       vigenteHasta: new Date(2029, 0, 1), objectNameReintentar: "reintentar" })
-        compare(f.Accessible.name, "XAXX010101000, Contribuyente de ejemplo, e.firma lista, Disponible para solicitudes, Vigente hasta 2029-01-01")
+        compare(f.Accessible.name, "XAXX010101000, Contribuyente de ejemplo, e.firma lista, Disponible para descargas, Vigente hasta 2029-01-01")
         compare(findChild(f, "badgePerfil").icono, "check-shield")
         verify(!findChild(f, "reintentar").visible)
         // T023.4: en reposo la fila es transparente (la lista o tarjeta ya es

@@ -2,7 +2,7 @@
 
 ## Estado
 
-Pendiente (sin refinar).
+Absorbida por T024 (2026-10-26, D1): se implementa en T024.3; M5 en T024.1.
 
 ## Objetivo
 

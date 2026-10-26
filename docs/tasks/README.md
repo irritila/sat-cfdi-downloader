@@ -46,7 +46,7 @@ Ejemplo: `T001-modelo-fisico-sqlite.md`.
 | [T017](T017-video-tutorial.md) | Completada | Video tutorial automatizado con voz, subtitulos y musica |
 | [T019](T019-renombrar-archivo-fiscal.md) | Completada | Renombrar la app a "Archivo Fiscal" |
 | [T020](T020-logo.md) | Pendiente | Logo e iconos en SVG |
-| [T021](T021-manual-capturas-al-dia.md) | Pendiente | Manual y capturas al dia con la app |
+| [T021](T021-manual-capturas-al-dia.md) | Absorbida por T024 | Manual y capturas al dia con la app |
 | [T022](T022-intermitencia-pruebas-graficas-video.md) | Completada con limitaciones | Intermitencia de pruebas graficas del video |
 | [T023](T023-rediseno-ui-caso-de-uso.md) | Completada | Rediseno de la UI centrado en las facturas del perfil fiscal (epica) |
 | [T023.1](T023.1-prototipo-y-adr-cobertura.md) | Completada | Prototipo navegable y ADR de cobertura mensual |
@@ -55,7 +55,11 @@ Ejemplo: `T001-modelo-fisico-sqlite.md`.
 | [T023.4](T023.4-pantalla-facturas.md) | Completada | Pantalla Facturas |
 | [T023.5](T023.5-historial-diagnostico-notificaciones.md) | Completada | Historial, diagnostico, notificaciones y menu bar |
 | [T023.6](T023.6-sin-facturas-5004.md) | Completada | Periodo sin facturas (Rechazada 5004) no es error |
-| [T024](T024-vocabulario-y-materiales-flujo-facturas.md) | Pendiente | Vocabulario y materiales del flujo centrado en facturas |
+| [T024](T024-vocabulario-y-materiales-flujo-facturas.md) | Refinada | Vocabulario y materiales del flujo centrado en facturas (epica) |
+| [T024.1](T024.1-vocabulario-y-notificaciones.md) | Completada | Vocabulario de la app y notificaciones |
+| [T024.2](T024.2-fakes-sinteticos-materiales.md) | Pendiente | Fakes sinteticos comunes para capturas y video |
+| [T024.3](T024.3-manual-y-capturas.md) | Pendiente | Manual y capturas al dia |
+| [T024.4](T024.4-video-tutorial-nuevo.md) | Pendiente | Video tutorial nuevo |
 | [T025](T025-respaldo-en-la-nube.md) | Completada | Respaldo cifrado en la nube del usuario (epica) |
 | [T025.1](T025.1-formato-y-cifrado-respaldo.md) | Completada | Formato y cifrado del respaldo |
 | [T025.2](T025.2-captura-consistente.md) | Completada | Captura consistente de los datos |

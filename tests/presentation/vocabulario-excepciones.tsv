@@ -1,0 +1,26 @@
+# T024.1: excepciones del barrido de vocabulario (TestBarridoVocabulario y
+# satcfdi_presentation_quicktests). Columnas separadas por TAB: origen
+# (nombre de archivo, o * para cualquiera), literal y motivo. Una excepcion
+# solo quita su literal en su origen. Diagnostico (SolicitudesPage,
+# DetalleSolicitudPage, ExploradorCfdiPage, FilaSolicitud, FilaPaquete,
+# Etiquetas.js y sus view models) esta excluido en BarridoVocabulario.cpp,
+# no aqui.
+DialogoRestaurarRespaldo.qml	Progreso de la verificación	Verificar del respaldo (D3: no cambia); no es la verificacion SAT
+DialogoRestaurarRespaldo.qml	Cancelar verificación	Verificar del respaldo (D3: no cambia)
+DialogoRestaurarRespaldo.qml	Verificando el respaldo	Verificar del respaldo (D3: no cambia)
+CatalogoMensajes.cpp	Se canceló la verificación del respaldo.	Verificar del respaldo (D3: no cambia)
+CatalogoMensajes.cpp	Extrayendo y verificando el respaldo	Verificar del respaldo (D3: no cambia)
+CatalogoMensajes.cpp	El perfil de esta solicitud está inactivo.	Diagnostico: motivoCredencial de CatalogoMensajes solo lo usa SolicitudDetailViewModel
+CatalogoMensajes.cpp	No se sabe si el SAT registró la solicitud.	Diagnostico: mensajeSolicitud de CatalogoMensajes solo lo usa SolicitudDetailViewModel
+CatalogoMensajes.cpp	El SAT ya no acepta solicitudes con este mismo criterio.	Diagnostico: mensajeSolicitud de CatalogoMensajes solo lo usa SolicitudDetailViewModel
+CatalogoMensajes.cpp	El SAT ya tiene una solicitud activa con este criterio.	Diagnostico: mensajeSolicitud de CatalogoMensajes solo lo usa SolicitudDetailViewModel
+CatalogoMensajes.cpp	El SAT rechazó la solicitud	Diagnostico: mensajeSolicitud de CatalogoMensajes solo lo usa SolicitudDetailViewModel
+CatalogoMensajes.cpp	El SAT no encontró esta solicitud. La verificación automática se detuvo.	Diagnostico: mensajeSolicitud de CatalogoMensajes solo lo usa SolicitudDetailViewModel
+CatalogoMensajes.cpp	El paquete ya no existe en el SAT (vencido). Crea una solicitud nueva	Diagnostico: mensajePaquete de CatalogoMensajes solo lo usa SolicitudDetailViewModel
+CatalogoMensajes.cpp	El paquete alcanzó el máximo de descargas permitidas.	Diagnostico: mensajePaquete de CatalogoMensajes solo lo usa SolicitudDetailViewModel
+CatalogoMensajes.cpp	No se pudo descargar el paquete.	Diagnostico: mensajePaquete de CatalogoMensajes solo lo usa SolicitudDetailViewModel
+FranjaAvisoRaizPaquetes.qml	Archivo-Fiscal/paquetes	Ruta real de la carpeta (nombre en disco, T019 D8); el texto que la rodea usa "archivos descargados"
+FranjaAvisoRaizPaquetes.qml	SAT-CFDI-Downloader/paquetes	Ruta real de la carpeta anterior (T019 D8)
+Theme.qml	Verificando	Clave interna de PreparacionPerfil en Theme.preparacionAAlias (no se muestra; el texto visible es "Comprobando")
+PerfilesSatListModel.cpp	verificando	nombre de rol QML (VerificandoRole), no visible
+MacOSMapeos.cpp	solicitud	tipo de destino en userInfo de notificaciones (contrato con las ya entregadas), no visible

@@ -973,21 +973,9 @@ AppLifecycleController& AppCompositionRoot::iniciarCicloDeVida(OSIntegration& os
     QObject::connect(m_worker.get(), &WorkerLocal::instantaneaCambiada, &os,
                      [&os](const InstantaneaWorker& i) { os.reflejarEstadoMonitoreo(estadoMonitoreoDe(i)); });
 
-    // T009.1 D1: "Abrir carpeta de paquetes" del menu bar. Si no se puede
-    // abrir (carpeta inexistente, error o Finder fallido) el aviso D7 se
-    // muestra en la lista de la ventana, que se trae al frente; nunca se crea
-    // la carpeta.
+    // T024.1 (D5): el menu bar ya no abre la carpeta de paquetes; esa accion
+    // vive en Diagnostico (AppViewModel::abrirCarpetaPaquetes).
     AppLifecycleController* controlador = m_controlador.get();
-    QObject::connect(&os, &OSIntegration::abrirCarpetaPaquetesSolicitada, controlador, [this, app, controlador] {
-        app->setMensajeFinder(QString());
-        m_accesoFinder->abrirCarpetaPaquetes().then(controlador, [app, controlador](const ResultadoAccionFinder& r) {
-            if (r.estado != ResultadoAccionFinder::Estado::Mostrado) {
-                app->setMensajeFinder(r.mensaje);
-                app->mostrarDiagnostico();
-                controlador->mostrarVentana();
-            }
-        });
-    });
 
     // T014.4 D2: estado agregado -> icono, solo cuando cambia (la primera
     // publicacion fija el estado inicial). En la salida deja de publicar.

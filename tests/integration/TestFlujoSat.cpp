@@ -2,8 +2,8 @@
 // real, FakeSatGateway (sin red), FilesystemPackageStorage real en un
 // directorio temporal, FakeSecretStore (credencial Lista) y FakeOSIntegration:
 // crear, enviar, verificar (Terminada, N paquetes), descargar (Descargado) y
-// notificaciones (una Terminada y una Descarga completa; permiso denegado sin
-// efectos).
+// notificaciones (solo "Facturas descargadas", T024.1 D4; permiso denegado
+// sin efectos).
 
 #include "app_core/AppBootstrapper.h"
 #include "app_core/AccesoFinder.h"
@@ -17,7 +17,6 @@
 #include "application/vencimiento/AvisoVencimientoEFirma.h"
 #include "application/profiles/PerfilesSatService.h"
 #include "application/requests/SolicitudesService.h"
-#include "presentation/viewmodels/AppViewModel.h"
 #include "presentation/viewmodels/PresentacionViewModels.h"
 #include "presentation/viewmodels/SolicitudDetailViewModel.h"
 
@@ -255,7 +254,9 @@ void TestFlujoSat::flujoCompleto()
     f.root->worker().verificarAhora(*id);
     f.root->worker().ejecutarCiclo();
     QTRY_COMPARE(f.notificaciones(QStringLiteral("descarga_completa")), 1);
-    QCOMPARE(f.notificaciones(QStringLiteral("terminada")), 1);
+    // T024.1 (D4): "Terminada" con archivos no se notifica.
+    QCOMPARE(f.notificaciones(QStringLiteral("terminada")), 0);
+    QCOMPARE(f.os.notificacionesPedidas.size(), 1);
     for (const auto& n : f.os.notificacionesPedidas) {
         QVERIFY(!n.titulo.contains(f.secretos.rfcCertificado) && !n.cuerpo.contains(f.secretos.rfcCertificado));
     }
@@ -338,17 +339,8 @@ void TestFlujoSat::finderDestinosExactosYSinCambios()
     QCOMPARE(vm->paquetes().first().toMap().value(QStringLiteral("estadoDescarga")).toString(),
              QStringLiteral("Descargado"));
 
-    // Menu bar: la intencion abre la raiz; si Finder falla, el aviso D7 va a
-    // la lista de la ventana (sin crear nada).
-    const qsizetype antesMenu = f.os.peticionesFinder.size();
-    f.os.emitirAbrirCarpetaPaquetes();
-    QTRY_COMPARE(f.os.peticionesFinder.size(), antesMenu + 1);
-    QCOMPARE(QFileInfo(f.os.peticionesFinder.last().ruta).canonicalFilePath(),
-             QFileInfo(f.root->raizPaquetes()).canonicalFilePath());
-    f.os.resultadoFinder = OSIntegration::ResultadoFinder::Fallido;
-    f.os.emitirAbrirCarpetaPaquetes();
-    QTRY_COMPARE(f.root->viewModels().app()->mensajeFinder(), QStringLiteral("No se pudo abrir Finder"));
-    QCOMPARE(f.root->viewModels().app()->pagina(), AppViewModel::Pagina::Diagnostico);
+    // T024.1 (D5): el menu bar ya no abre la carpeta de paquetes (sigue en
+    // Diagnostico mediante AccesoFinder, probado arriba).
 
     // Solo lectura: la base no cambio.
     QCOMPARE(volcado(rutaBase), antes);

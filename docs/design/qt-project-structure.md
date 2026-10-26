@@ -146,13 +146,11 @@ o ausentes hasta sus tareas correspondientes.
 │       │   ├── components/
 │       │   └── screens/
 │       │       ├── SolicitudesPage.qml
-│       │       ├── NuevaSolicitudPage.qml
 │       │       └── DetalleSolicitudPage.qml
 │       └── viewmodels/
 │           ├── AppViewModel.h
 │           ├── SolicitudesListModel.h
 │           ├── SolicitudDetailViewModel.h
-│           ├── NuevaSolicitudViewModel.h
 │           └── PerfilesSatViewModel.h       # T005.1
 └── tests/
     ├── unit/
@@ -168,8 +166,8 @@ Subconjunto T002:
 - No crea `PerfilesSatPage.qml` ni `PerfilesSatViewModel.h`.
 - Puede crear carpetas vacias o targets minimos cuando CMake lo requiera, pero
   sin implementaciones productivas fuera del shell.
-- `NuevaSolicitudViewModel` expone un modelo demo de perfiles activos para el
-  selector de formulario.
+- `NuevaSolicitudViewModel` exponia un modelo demo de perfiles activos para el
+  selector de formulario (retirado en T024.1 junto con `NuevaSolicitudPage`).
 
 Subconjunto T003:
 

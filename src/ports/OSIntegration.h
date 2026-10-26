@@ -231,7 +231,8 @@ public:
 
     // T007 (D2, D11): refleja el estado del worker en una linea NO
     // seleccionable del menu bar ("Monitoreo activo", "Monitoreo en pausa",
-    // "Trabajando: enviando…/verificando…/descargando…") y "Pendientes: N"
+    // "Trabajando: pidiendo facturas al SAT…/consultando al SAT…/descargando
+    // facturas…", T024.1 D3) y "Pendientes: N"
     // cuando N > 0. Sin errores detallados. No emite intenciones.
     virtual void reflejarEstadoMonitoreo(const EstadoMonitoreo& estado) = 0;
 
@@ -304,8 +305,6 @@ signals:
     void enfocarVentanaSolicitada();
     // T023.5: "Ver facturas" del menu bar (muestra la ventana en Facturas).
     void verFacturasSolicitada();
-    // T009.1 D1: "Abrir carpeta de paquetes" desde el menu bar.
-    void abrirCarpetaPaquetesSolicitada();
     // true = pausar monitoreo; false = reanudar.
     void cambioMonitoreoSolicitado(bool pausar);
     // Preferencia de inicio automatico pedida por el usuario (check del menu).

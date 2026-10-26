@@ -7,15 +7,17 @@
 
 namespace satcfdi {
 
-// Transiciones de solicitud que generan notificacion local (T009 D1, D9).
-// Nunca hay notificacion por paquete.
+// Transiciones de solicitud que pueden generar notificacion local (T009 D1,
+// D9). Nunca hay notificacion por paquete. Titulos segun la matriz T024.1
+// D4 (ServicioNotificaciones::componer); el cuerpo lleva la direccion
+// (emitidas/recibidas), el periodo y el RFC enmascarado del perfil.
 enum class TipoTransicionNotificable {
-    Terminada,        // estado SAT -> Terminada ("El SAT terminó la solicitud con N paquetes.")
-    DescargaCompleta, // no queda paquete por descargar ("X de N paquetes descargados.")
-    ErrorSat,         // estado SAT -> Error
-    Rechazada,        // estado SAT -> Rechazada (salvo sin informacion)
-    SinFacturas,      // T023.6: Rechazada con CodigoEstadoSolicitud 5004 (periodo sin facturas)
-    Vencida,          // estado SAT -> Vencida (los paquetes pueden ya no estar)
+    Terminada,        // estado SAT -> Terminada: con archivos no notifica; con 0, "Sin facturas en el periodo"
+    DescargaCompleta, // no queda archivo por descargar: "Facturas descargadas"
+    ErrorSat,         // estado SAT -> Error: "No se pudieron descargar las facturas"
+    Rechazada,        // estado SAT -> Rechazada (salvo sin informacion): "El SAT no aceptó preparar las facturas"
+    SinFacturas,      // T023.6: Rechazada con 5004 (periodo sin facturas): "Sin facturas en el periodo"
+    Vencida,          // estado SAT -> Vencida: "Facturas no descargadas"
 };
 
 // Claves estables (tipo de NotificacionLocal): "terminada",
@@ -42,7 +44,7 @@ struct TransicionNotificable {
     QString rfcSolicitante;   // completo: NO se muestra (ver ServicioNotificaciones)
     QString fechaInicialSat;  // "yyyy-MM-ddTHH:mm:ss"
     QString fechaFinalSat;
-    int paquetes = 0;         // Terminada: ids de paquete; DescargaCompleta: total visibles
+    int paquetes = 0;         // Terminada: archivos del SAT (0 = sin facturas); DescargaCompleta: total visibles
     int descargados = 0;      // solo DescargaCompleta
 
     friend bool operator==(const TransicionNotificable&, const TransicionNotificable&) = default;

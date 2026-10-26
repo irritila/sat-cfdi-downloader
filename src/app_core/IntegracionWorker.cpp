@@ -87,10 +87,8 @@ OSIntegration::NotificacionLocal notificacionLocalDe(const Notificacion& n)
     case DestinoNotificacion::Tipo::Ninguno:
         break;
     case DestinoNotificacion::Tipo::Solicitud:
+        // T024.1 (D4): sin "Mostrar en Finder" en las nuevas.
         local.destino = DestinoOS{DestinoOS::Tipo::Solicitud, n.destino.id};
-        if (n.tipo == QLatin1String("descarga_completa")) {
-            local.accionesExtra = {OSIntegration::AccionNotificacion::MostrarEnFinder};
-        }
         break;
     case DestinoNotificacion::Tipo::Perfil:
         local.destino = DestinoOS{DestinoOS::Tipo::Perfil, n.destino.id};

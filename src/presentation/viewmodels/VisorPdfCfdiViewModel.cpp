@@ -97,10 +97,10 @@ QString VisorPdfCfdiViewModel::errorDescripcion() const
         return {};
     }
     if (m_motivo == QLatin1String("origenNoDisponible")) {
-        return tr("Se movió o se borró fuera de la app. Revisa la carpeta de la solicitud e intenta de nuevo.");
+        return tr("Se movió o se borró fuera de la app. Revisa la carpeta de archivos descargados e intenta de nuevo.");
     }
     if (m_motivo == QLatin1String("versionNoSoportada") || m_motivo == QLatin1String("ilegible")) {
-        return tr("No se generó el PDF. El XML sigue en el ZIP de la solicitud.");
+        return tr("No se generó el PDF. El XML sigue en el archivo descargado del SAT.");
     }
     if (m_motivo == QLatin1String("documento")) {
         return tr("Intenta de nuevo o ábrelo en Vista Previa.");

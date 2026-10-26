@@ -124,6 +124,41 @@ set_tests_properties(satcfdi_aviso_raiz_tests PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )
 
+# satcfdi_vocabulario_tests (T024.1 criterio 1): barrido de vocabulario de
+# notificaciones, menu bar y literales tr/qsTr de las fuentes del recorrido
+# normal; normalizacion, inventario de excepciones y prueba negativa. El
+# arbol de items lo recorre satcfdi_presentation_quicktests con el mismo
+# BarridoVocabulario.
+set(_satcfdi_vocabulario_defs
+    SATCFDI_EXCEPCIONES_VOCABULARIO="${CMAKE_CURRENT_SOURCE_DIR}/vocabulario-excepciones.tsv"
+)
+qt_add_executable(satcfdi_vocabulario_tests
+    TestBarridoVocabulario.cpp
+    BarridoVocabulario.h
+    BarridoVocabulario.cpp
+)
+target_compile_definitions(satcfdi_vocabulario_tests PRIVATE
+    ${_satcfdi_vocabulario_defs}
+    SATCFDI_FUENTES="${PROJECT_SOURCE_DIR}/src"
+)
+target_link_libraries(satcfdi_vocabulario_tests PRIVATE
+    satcfdi_application
+    satcfdi_domain
+    Qt6::Qml
+    Qt6::Quick
+    Qt6::Test
+)
+if(APPLE)
+    target_link_libraries(satcfdi_vocabulario_tests PRIVATE satcfdi_os_macos satcfdi_infrastructure)
+    target_compile_definitions(satcfdi_vocabulario_tests PRIVATE SATCFDI_CON_MENUBAR)
+endif()
+satcfdi_enable_warnings(satcfdi_vocabulario_tests)
+add_test(NAME satcfdi_vocabulario_tests COMMAND satcfdi_vocabulario_tests)
+set_tests_properties(satcfdi_vocabulario_tests PROPERTIES
+    LABELS presentation
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
 # satcfdi_presentation_quicktests (T005.1, DA7): Qt Quick Test de
 # PerfilesSatPage y EFirmaDialogo sobre el modulo QML real. Los tst_*.qml se
 # leen de QUICK_TEST_SOURCE_DIR; FixturePerfiles expone view models sobre
@@ -144,6 +179,9 @@ qt_add_executable(satcfdi_presentation_quicktests
     ../fakes/ZipCfdiSintetico.h
     quick/FixtureAvisoRaiz.h
     quick/FixtureRespaldo.h
+    # T024.1: barrido de vocabulario del arbol de items (context property "barrido").
+    BarridoVocabulario.h
+    BarridoVocabulario.cpp
     RespaldoFakes.h
     ConsultaCatalogoFake.h
     PrevisualizacionFake.h
@@ -155,6 +193,7 @@ qt_add_executable(satcfdi_presentation_quicktests
 target_include_directories(satcfdi_presentation_quicktests PRIVATE ${PROJECT_SOURCE_DIR}/tests)
 target_compile_definitions(satcfdi_presentation_quicktests PRIVATE
     QUICK_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/quick"
+    ${_satcfdi_vocabulario_defs}
 )
 # T026.3: FixtureFacturas usa el ExportacionFacturasService real con ZIP
 # sinteticos (libzip, lector y escritor reales).

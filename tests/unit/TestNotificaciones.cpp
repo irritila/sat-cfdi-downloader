@@ -45,61 +45,107 @@ TransicionNotificable transicion(TipoTransicionNotificable tipo, const Solicitud
 
 } // namespace
 
-void TestNotificaciones::textosPorTransicion()
+// T024.1 (D4): una fila por renglon de la matriz (direccion recibidas y
+// emitidas). Titulo, direccion en el cuerpo, destino sin cambio e id/tipo
+// iguales a los anteriores (dedupe). La ausencia de "Mostrar en Finder" se
+// prueba en la adaptacion (TestNotificacionesAccionables).
+void TestNotificaciones::textosPorTransicion_data()
 {
-    const SolicitudId id = SolicitudId::generar();
-    struct Caso {
-        TipoTransicionNotificable tipo;
+    QTest::addColumn<TipoTransicionNotificable>("tipo");
+    QTest::addColumn<int>("paquetes");
+    QTest::addColumn<TipoDescarga>("direccion");
+    QTest::addColumn<QString>("clave");
+    QTest::addColumn<QString>("titulo");
+    QTest::addColumn<QString>("resultado");
+    using T = TipoTransicionNotificable;
+    struct Fila {
+        const char* nombre;
+        T tipo;
+        int paquetes;
         QString clave;
         QString titulo;
-        QString resultado;
+        QString resultado; // %1 = direccion
     };
-    const QList<Caso> casos = {
-        {TipoTransicionNotificable::Terminada, u"terminada"_s, u"Solicitud terminada"_s,
-         u"El SAT terminó la solicitud con 3 paquetes."_s},
-        {TipoTransicionNotificable::DescargaCompleta, u"descarga_completa"_s, u"Descarga completa"_s,
-         u"3 de 3 paquetes descargados."_s},
-        {TipoTransicionNotificable::ErrorSat, u"error_sat"_s, u"Error en el SAT"_s,
-         u"El SAT reportó un error en la solicitud."_s},
-        {TipoTransicionNotificable::Rechazada, u"rechazada"_s, u"Solicitud rechazada"_s,
-         u"El SAT rechazó la solicitud."_s},
-        // T023.6 (D22): informativo, sin "rechazó" ni "error".
-        {TipoTransicionNotificable::SinFacturas, u"sin_facturas"_s, u"Sin facturas en el periodo"_s,
-         u"El SAT no tiene facturas para este periodo."_s},
-        {TipoTransicionNotificable::Vencida, u"vencida"_s, u"Solicitud vencida"_s,
-         u"La solicitud venció en el SAT; los paquetes pueden ya no estar disponibles."_s},
+    const QList<Fila> filas = {
+        {"descarga completa", T::DescargaCompleta, 3, u"descarga_completa"_s, u"Facturas descargadas"_s,
+         u"Las facturas %1 ya están en tu equipo."_s},
+        {"terminada sin archivos", T::Terminada, 0, u"terminada"_s, u"Sin facturas en el periodo"_s,
+         u"El SAT no tiene facturas %1 en este periodo."_s},
+        {"sin facturas 5004", T::SinFacturas, 0, u"sin_facturas"_s, u"Sin facturas en el periodo"_s,
+         u"El SAT no tiene facturas %1 en este periodo."_s},
+        {"error sat", T::ErrorSat, 0, u"error_sat"_s, u"No se pudieron descargar las facturas"_s,
+         u"El SAT reportó un error al preparar las facturas %1."_s},
+        {"rechazada", T::Rechazada, 0, u"rechazada"_s, u"El SAT no aceptó preparar las facturas"_s,
+         u"No se descargaron las facturas %1."_s},
+        {"vencida", T::Vencida, 0, u"vencida"_s, u"Facturas no descargadas"_s,
+         u"Venció el plazo del SAT para descargar las facturas %1."_s},
     };
-    // Periodo de un mes (rango D5 con guion largo).
-    const QString contexto = u"Recibidos · 1–30 sep 2026 · RFC ***3C9"_s;
-    for (const Caso& c : casos) {
-        const Notificacion n = ServicioNotificaciones::componer(transicion(c.tipo, id, 3, 3));
-        QCOMPARE(n.tipo, c.clave);
-        QCOMPARE(n.id, id.texto() + QLatin1Char(':') + c.clave);
-        QCOMPARE(n.titulo, c.titulo);
-        QCOMPARE(n.cuerpo, c.resultado + QLatin1Char('\n') + contexto);
-        // Sin RFC completo ni Id local en lo visible.
-        QVERIFY(!n.titulo.contains(kRfc) && !n.cuerpo.contains(kRfc));
-        QVERIFY(!n.cuerpo.contains(id.texto()));
-        // Destino tipado (T023.5): la solicitud, que app_core resuelve.
-        QCOMPARE(n.destino, (DestinoNotificacion{DestinoNotificacion::Tipo::Solicitud, id.texto()}));
-        if (c.tipo == TipoTransicionNotificable::SinFacturas) {
-            for (const QString& t : {n.titulo, n.cuerpo}) {
-                QVERIFY2(!t.contains(u"rechaz"_s, Qt::CaseInsensitive) && !t.contains(u"error"_s, Qt::CaseInsensitive),
-                         qPrintable(t));
-            }
+    for (const Fila& f : filas) {
+        for (TipoDescarga d : {TipoDescarga::Recibidos, TipoDescarga::Emitidos}) {
+            const QString dir = d == TipoDescarga::Emitidos ? u"emitidas"_s : u"recibidas"_s;
+            QTest::addRow("%s %s", f.nombre, qPrintable(dir))
+                << f.tipo << f.paquetes << d << f.clave << f.titulo << f.resultado.arg(dir);
         }
     }
-    QCOMPARE(ServicioNotificaciones::componer(transicion(TipoTransicionNotificable::Terminada, id, 1)).cuerpo.section(
-                 QLatin1Char('\n'), 0, 0),
-             u"El SAT terminó la solicitud con 1 paquete."_s);
+}
 
-    // Texto de referencia de UX-39 (un solo dia).
+void TestNotificaciones::textosPorTransicion()
+{
+    QFETCH(TipoTransicionNotificable, tipo);
+    QFETCH(int, paquetes);
+    QFETCH(TipoDescarga, direccion);
+    QFETCH(QString, clave);
+    QFETCH(QString, titulo);
+    QFETCH(QString, resultado);
+    const SolicitudId id = SolicitudId::generar();
+    TransicionNotificable t = transicion(tipo, id, paquetes, paquetes);
+    t.tipoDescarga = direccion;
+    const std::optional<Notificacion> n = ServicioNotificaciones::componer(t);
+    QVERIFY(n);
+    // Claves de dedupe y destino sin cambio.
+    QCOMPARE(n->tipo, clave);
+    QCOMPARE(n->id, id.texto() + QLatin1Char(':') + clave);
+    QCOMPARE(n->destino, (DestinoNotificacion{DestinoNotificacion::Tipo::Solicitud, id.texto()}));
+    QCOMPARE(n->titulo, titulo);
+    // Cuerpo: resultado con la direccion; periodo (rango D5) y perfil (RFC enmascarado).
+    QCOMPARE(n->cuerpo, resultado + u"\n1–30 sep 2026 · RFC ***3C9"_s);
+    const QString otra = direccion == TipoDescarga::Emitidos ? u"recibidas"_s : u"emitidas"_s;
+    QVERIFY(!n->cuerpo.contains(otra));
+    // Sin RFC completo, Id local ni vocabulario del servicio web (D3).
+    for (const QString& texto : {n->titulo, n->cuerpo}) {
+        QVERIFY(!texto.contains(kRfc));
+        QVERIFY(!texto.contains(id.texto()));
+        for (const QString& prohibida : {u"solicitud"_s, u"paquete"_s, u"verificaci"_s, u"Emitidos"_s, u"Recibidos"_s}) {
+            QVERIFY2(!texto.contains(prohibida, Qt::CaseInsensitive), qPrintable(texto));
+        }
+    }
+    if (clave == u"sin_facturas"_s || clave == u"terminada"_s) {
+        // T023.6 (D22): informativo, sin "rechazó" ni "error".
+        for (const QString& texto : {n->titulo, n->cuerpo}) {
+            QVERIFY2(!texto.contains(u"rechaz"_s, Qt::CaseInsensitive) && !texto.contains(u"error"_s, Qt::CaseInsensitive),
+                     qPrintable(texto));
+        }
+    }
+}
+
+void TestNotificaciones::terminadaConArchivosNoNotifica()
+{
+    const SolicitudId id = SolicitudId::generar();
+    for (int paquetes : {1, 3}) {
+        QVERIFY(!ServicioNotificaciones::componer(transicion(TipoTransicionNotificable::Terminada, id, paquetes)));
+    }
+    NotificadorFalso notificador;
+    ServicioNotificaciones servicio(notificador);
+    servicio.alConfirmarTransicion(transicion(TipoTransicionNotificable::Terminada, id, 2));
+    QCOMPARE(notificador.pedidas.size(), 0);
+
+    // Texto de referencia (un solo dia, RFC generico).
     TransicionNotificable t = transicion(TipoTransicionNotificable::DescargaCompleta, id, 1, 1);
     t.rfcSolicitante = u"XAXX010101000"_s;
     t.fechaInicialSat = u"2026-09-03T00:00:00"_s;
     t.fechaFinalSat = u"2026-09-03T23:59:59"_s;
-    QCOMPARE(ServicioNotificaciones::componer(t).cuerpo,
-             u"1 de 1 paquetes descargados.\nRecibidos · 3 sep 2026 · RFC ***000"_s);
+    QCOMPARE(ServicioNotificaciones::componer(t)->cuerpo,
+             u"Las facturas recibidas ya están en tu equipo.\n3 sep 2026 · RFC ***000"_s);
     QCOMPARE(ServicioNotificaciones::rfcEnmascarado(QString()), QString());
 
     // Formateador de fechas de aplicacion (equivalente a FormatoFechas).
@@ -110,17 +156,69 @@ void TestNotificaciones::textosPorTransicion()
     QCOMPARE(fecha(QDate()), QString());
 }
 
+// T024.1 (D4): un mes guiado con archivos en ambas direcciones (Terminada y
+// Descarga completa por cada una) produce exactamente 2 notificaciones; las
+// transiciones repetidas (reintento, verificar de nuevo) no duplican y un
+// servicio nuevo (reinicio) compone las mismas claves de dedupe.
+void TestNotificaciones::mesGuiadoProduceDosNotificaciones()
+{
+    NotificadorFalso notificador;
+    ServicioNotificaciones servicio(notificador);
+    const SolicitudId emitidas = SolicitudId::generar();
+    const SolicitudId recibidas = SolicitudId::generar();
+    const auto de = [](TipoTransicionNotificable tipo, const SolicitudId& id, TipoDescarga d, int paq, int desc) {
+        TransicionNotificable t = transicion(tipo, id, paq, desc);
+        t.tipoDescarga = d;
+        return t;
+    };
+    const QList<TransicionNotificable> mes = {
+        de(TipoTransicionNotificable::Terminada, emitidas, TipoDescarga::Emitidos, 2, 0),
+        de(TipoTransicionNotificable::Terminada, recibidas, TipoDescarga::Recibidos, 1, 0),
+        de(TipoTransicionNotificable::DescargaCompleta, recibidas, TipoDescarga::Recibidos, 1, 1),
+        de(TipoTransicionNotificable::DescargaCompleta, emitidas, TipoDescarga::Emitidos, 2, 2),
+    };
+    for (const auto& t : mes) {
+        servicio.alConfirmarTransicion(t);
+    }
+    QCOMPARE(notificador.pedidas.size(), 2);
+    QCOMPARE(notificador.pedidas.at(0).id, recibidas.texto() + u":descarga_completa"_s);
+    QCOMPARE(notificador.pedidas.at(1).id, emitidas.texto() + u":descarga_completa"_s);
+    QVERIFY(notificador.pedidas.at(0).cuerpo.contains(u"recibidas"_s));
+    QVERIFY(notificador.pedidas.at(1).cuerpo.contains(u"emitidas"_s));
+    for (const auto& n : notificador.pedidas) {
+        QCOMPARE(n.titulo, u"Facturas descargadas"_s);
+    }
+
+    // Reintento: las mismas transiciones otra vez no duplican.
+    for (const auto& t : mes) {
+        servicio.alConfirmarTransicion(t);
+    }
+    QCOMPARE(notificador.pedidas.size(), 2);
+
+    // Reinicio: otro servicio compone exactamente las mismas claves (el SO
+    // reemplaza una notificacion con el mismo id; el ejecutor solo publica
+    // transiciones persistidas, asi que tras reiniciar no se repiten).
+    NotificadorFalso otro;
+    ServicioNotificaciones reiniciado(otro);
+    for (const auto& t : mes) {
+        reiniciado.alConfirmarTransicion(t);
+    }
+    QCOMPARE(otro.pedidas.size(), 2);
+    QCOMPARE(otro.pedidas.at(0).id, notificador.pedidas.at(0).id);
+    QCOMPARE(otro.pedidas.at(1).id, notificador.pedidas.at(1).id);
+}
+
 void TestNotificaciones::dedupePorSolicitudYTransicion()
 {
     NotificadorFalso notificador;
     ServicioNotificaciones servicio(notificador);
     const SolicitudId a = SolicitudId::generar();
     const SolicitudId b = SolicitudId::generar();
-    servicio.alConfirmarTransicion(transicion(TipoTransicionNotificable::Terminada, a, 2));
-    servicio.alConfirmarTransicion(transicion(TipoTransicionNotificable::Terminada, a, 2)); // repetida
+    servicio.alConfirmarTransicion(transicion(TipoTransicionNotificable::Terminada, a, 0));
+    servicio.alConfirmarTransicion(transicion(TipoTransicionNotificable::Terminada, a, 0)); // repetida
     servicio.alConfirmarTransicion(transicion(TipoTransicionNotificable::DescargaCompleta, a, 2, 2));
     servicio.alConfirmarTransicion(transicion(TipoTransicionNotificable::DescargaCompleta, a, 2, 2));
-    servicio.alConfirmarTransicion(transicion(TipoTransicionNotificable::Terminada, b, 1));
+    servicio.alConfirmarTransicion(transicion(TipoTransicionNotificable::Terminada, b, 0));
     QCOMPARE(notificador.pedidas.size(), 3);
     QCOMPARE(notificador.pedidas.at(0).tipo, QStringLiteral("terminada"));
     QCOMPARE(notificador.pedidas.at(1).tipo, QStringLiteral("descarga_completa"));

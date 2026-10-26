@@ -19,7 +19,7 @@ namespace satcfdi::menubar {
 enum class Id {
     MostrarVentana,
     VerFacturas, // T023.5: abre la ventana en Facturas (sustituye a "Nueva solicitud…")
-    AbrirCarpetaPaquetes,
+    // T024.1 (D5): sin "Abrir carpeta de paquetes" (sigue en Diagnostico).
     EstadoMonitoreo,     // no seleccionable
     PendientesMonitoreo, // no seleccionable; oculta si 0
     AccionMonitoreo,     // Pausar/Reanudar
@@ -85,7 +85,7 @@ inline QString iconoEstadoMonitoreo(OSIntegration::EstadoMonitoreo::Fase fase)
 inline const QList<Id>& estructura()
 {
     static const QList<Id> e{
-        Id::MostrarVentana,       Id::VerFacturas,           Id::AbrirCarpetaPaquetes, Id::Separador,
+        Id::MostrarVentana,       Id::VerFacturas,           Id::Separador,
         Id::EstadoMonitoreo,      Id::PendientesMonitoreo,   Id::AccionMonitoreo,      Id::Separador,
         Id::InicioAutomatico,     Id::EstadoLoginItem,       Id::AbrirAjustesLoginItem, Id::Separador,
         Id::EstadoNotificaciones, Id::SolicitarPermiso,      Id::EnviarPrueba,
@@ -108,9 +108,6 @@ inline Entrada entrada(Id id, const EstadoMenu& s)
     case Id::VerFacturas:
         // Sin "…": solo navega, no pide datos (UX-37).
         e.texto = textoMenu("Ver facturas");
-        break;
-    case Id::AbrirCarpetaPaquetes:
-        e.texto = textoMenu("Abrir carpeta de paquetes");
         break;
     case Id::EstadoMonitoreo:
         e.texto = macos::textoEstadoMonitoreo(s.monitoreo);

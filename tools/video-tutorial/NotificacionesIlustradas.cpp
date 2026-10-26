@@ -11,9 +11,7 @@ QList<OSIntegration::AccionNotificacion> accionesExtraNotificacion(const Notific
     case DestinoNotificacion::Tipo::Ninguno:
         break;
     case DestinoNotificacion::Tipo::Solicitud:
-        if (n.tipo == QLatin1String("descarga_completa")) {
-            return {OSIntegration::AccionNotificacion::MostrarEnFinder};
-        }
+        // T024.1 (D4): sin "Mostrar en Finder" en las nuevas.
         break;
     case DestinoNotificacion::Tipo::Perfil:
         if (n.tipo == QLatin1String("credencial") || n.tipo == QLatin1String("efirma_por_vencer")) {

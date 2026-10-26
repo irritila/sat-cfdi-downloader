@@ -335,8 +335,9 @@ void TestEstadoAgregado::destinoDeNotificaciones()
           TipoTransicionNotificable::ErrorSat, TipoTransicionNotificable::Rechazada,
           TipoTransicionNotificable::Vencida}) {
         t.tipo = tipo;
-        const Notificacion n = ServicioNotificaciones::componer(t);
-        QCOMPARE(n.destino, (DestinoNotificacion{T::Solicitud, t.solicitudId.texto()}));
+        const std::optional<Notificacion> n = ServicioNotificaciones::componer(t); // Terminada con 0 archivos
+        QVERIFY(n);
+        QCOMPARE(n->destino, (DestinoNotificacion{T::Solicitud, t.solicitudId.texto()}));
     }
     const PerfilId perfil = PerfilId::generar();
     const auto c = ServicioNotificaciones::componerCredencial(perfil, EstadoCredencial::Vencida);

@@ -26,6 +26,12 @@ TestCase {
         }
     }
 
+    function cleanup() {
+        // T024.1: barrido de vocabulario del estado final (Diagnostico excluido).
+        const fallasVocabulario = barrido.revisarVentana(caso)
+        verify(fallasVocabulario.length === 0, fallasVocabulario.join("\n"))
+    }
+
     function init() {
         // Cualquier warning falla la prueba (salvo el aviso de fuentes de offscreen).
         failOnWarning(/^(?!Populating font family aliases took).*/)
@@ -140,7 +146,7 @@ TestCase {
                         && findChild(p, "badgePreparacion_2").texto === "Estado no disponible")
         // Estado como texto, no solo color.
         compare(findChild(p, "badgePreparacion_0").texto, "e.firma lista")
-        compare(findChild(p, "disponibilidad_0").text, "Disponible para solicitudes")
+        compare(findChild(p, "disponibilidad_0").text, "Disponible para descargas")
         verify(findChild(p, "disponibilidad_1").text.indexOf("Inactivo") === 0)
         compare(findChild(p, "badgePreparacion_1").texto, "e.firma lista") // conserva su estado
         verify(findChild(p, "filaPerfil_1").Accessible.name.indexOf("no disponible") >= 0)
@@ -150,7 +156,7 @@ TestCase {
         verify(reintentar.visible)
         mouseClick(reintentar)
         compare(fixture.numResumenes(), 4)
-        tryCompare(findChild(p, "badgePreparacion_2"), "texto", "Verificando")
+        tryCompare(findChild(p, "badgePreparacion_2"), "texto", "Comprobando")
         fixture.resolverResumen(3, "SinCredencial")
         tryCompare(findChild(p, "badgePreparacion_2"), "texto", "Sin e.firma")
         verify(!findChild(p, "botonReintentarEstado_2").visible)
@@ -295,7 +301,7 @@ TestCase {
         verify(boton.activeFocus, "Tab no llego a Reintentar de la fila")
         keyClick(Qt.Key_Space)
         compare(fixture.numResumenes(), 3)
-        tryCompare(findChild(p, "badgePreparacion_1"), "texto", "Verificando")
+        tryCompare(findChild(p, "badgePreparacion_1"), "texto", "Comprobando")
     }
 
     // Registro de e.firma en Validando con la promesa pendiente.

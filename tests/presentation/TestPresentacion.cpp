@@ -28,7 +28,6 @@
 #include "AppViewModel.h"
 #include "AvisoRaizPaquetesViewModel.h"
 #include "FormatoFechas.h"
-#include "NuevaSolicitudViewModel.h"
 #include "PerfilesSatListModel.h"
 #include "PerfilesSatViewModel.h"
 #include "PresentacionViewModels.h"
@@ -370,7 +369,6 @@ private slots:
     void listaDescartaRespuestaTardia();
 
     // T003: perfiles y nueva solicitud
-    void perfilesDescartaRespuestaTardia();
 
     // T003: detalle
     void detalleEstadosErrorConDatosYNoEncontrada();
@@ -560,7 +558,7 @@ void TestPresentacion::avisoRaizPaquetesArribaDeLasPaginas()
     QVERIFY(acc);
     QCOMPARE(acc->role(), QAccessible::AlertMessage);
     const QString nombre = acc->text(QAccessible::Name);
-    QVERIFY2(nombre.startsWith(QStringLiteral("Los paquetes siguen en la carpeta anterior.")), qPrintable(nombre));
+    QVERIFY2(nombre.startsWith(QStringLiteral("Los archivos descargados siguen en la carpeta anterior.")), qPrintable(nombre));
     QVERIFY2(nombre.contains(QStringLiteral("~/Archivo-Fiscal/paquetes")), qPrintable(nombre));
     QVERIFY2(nombre.contains(QStringLiteral("Esta sesión usa ~/SAT-CFDI-Downloader/paquetes")), qPrintable(nombre));
     QVERIFY(!nombre.contains(QDir::homePath()));
@@ -789,8 +787,8 @@ void TestPresentacion::qmlSinImportsProhibidos()
     // 31 .qml (Theme, Icono, componentes T013, BotonCopiar, T015.3, VisorPdfCfdi y T019) + Etiquetas.js,
     // mas T023.4: FacturasPage, FranjaMes y ListaMesesFacturas; T023.5: HistorialPage;
     // T025.6: RespaldoPage, FranjaAvisosRespaldo y cuatro dialogos de respaldo;
-    // T026.3: DialogoExportarFacturas.
-    QCOMPARE(archivos, 43);
+    // T026.3: DialogoExportarFacturas. T024.1 D11: sin NuevaSolicitudPage.
+    QCOMPARE(archivos, 42);
 }
 
 // ---------------------------------------------------------------------------
@@ -872,26 +870,6 @@ void TestPresentacion::listaDescartaRespuestaTardia()
     QCOMPARE(modelo->rowCount(), 1);
     QCOMPARE(modelo->filaDe(reciente.texto()), 0);
     QCOMPARE(modelo->estado(), EstadoLista::ConDatos);
-}
-
-// ---------------------------------------------------------------------------
-// T003: perfiles y nueva solicitud
-
-void TestPresentacion::perfilesDescartaRespuestaTardia()
-{
-    EscenarioAsincrono e;
-    NuevaSolicitudViewModel* f = e.vms.nuevaSolicitud();
-    QCOMPARE(e.perfiles.listas.size(), 0);
-    f->cargarPerfiles();
-    f->cargarPerfiles();
-    QCOMPARE(e.perfiles.listas.size(), 2);
-
-    QVERIFY(resolverPerfiles(e, 1, {}));
-    QTRY_VERIFY(f->sinPerfiles());
-    QVERIFY(resolverPerfiles(e, 0, {perfilDePrueba()}));
-    procesarEventos();
-    QVERIFY(f->sinPerfiles());
-    QCOMPARE(f->perfilesDisponibles()->count(), 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -2001,22 +1979,14 @@ struct ConsultaPrimerUsoEspia final : ConsultaPrimerUso {
     }
 };
 
-QString iconoDePaso(const Vista& v, const QString& paso)
-{
-    QQuickItem* icono = buscar(v.item(paso), QStringLiteral("iconoPaso"));
-    return icono ? icono->property("nombre").toString() : QString();
-}
-
-QString varianteDe(const Vista& v, const QString& nombre)
-{
-    QQuickItem* boton = v.item(nombre);
-    return boton ? boton->property("variante").toString() : QString();
-}
-
 } // namespace
 
 void TestPresentacion::guiaPrimerUsoPorPasos()
 {
+    // T024.1 D11: la guia de primer uso vive solo en Facturas
+    // (tst_facturas_page). Diagnostico vacio muestra su estado vacio normal
+    // aunque AppViewModel indique que la guia aplica; los pasos siguen a la
+    // lista, los perfiles y las credenciales.
     EscenarioAsincrono e;
     ConsultaPrimerUsoEspia consulta;
     QVERIFY(e.cargar());
@@ -2025,57 +1995,30 @@ void TestPresentacion::guiaPrimerUsoPorPasos()
     e.solicitudes.lista.resolver(0, ResultadoListaSol::exito({}));
     QTRY_VERIFY(e.item(QStringLiteral("estadoVacio")) && e.item(QStringLiteral("estadoVacio"))->isVisible());
 
-    // Instalacion sin perfiles: tres pasos sin marcar; el primero es la accion principal.
     e.vms.setConsultaPrimerUso(&consulta);
     QCOMPARE(consulta.promesas.size(), 1);
     consulta.resolver(0, {false, false, false});
     QTRY_VERIFY(app->mostrarGuiaPrimerUso());
-    QTRY_VERIFY(e.item(QStringLiteral("guiaPrimerUso"))->isVisible());
-    QVERIFY(!e.item(QStringLiteral("estadoVacio"))->isVisible());
-    for (const char* paso : {"pasoPerfil", "pasoEFirma", "pasoSolicitud"}) {
-        QCOMPARE(iconoDePaso(e, QString::fromLatin1(paso)), QStringLiteral("circle-dashed"));
-        QVERIFY(nombreAccesible(e.item(QString::fromLatin1(paso))).endsWith(QStringLiteral("pendiente")));
-    }
-    QCOMPARE(nombreAccesible(e.item(QStringLiteral("pasoPerfil"))),
-             QStringLiteral("Paso 1 de 3: Crea un perfil SAT con el RFC del contribuyente, pendiente"));
-    QCOMPARE(varianteDe(e, QStringLiteral("boton_pasoPerfil")), QStringLiteral("primario"));
-    QTRY_COMPARE(objectNameConFoco(e.ventana), QStringLiteral("boton_pasoPerfil"));
+    QVERIFY(!e.item(QStringLiteral("guiaPrimerUso")));
+    QVERIFY(e.item(QStringLiteral("estadoVacio"))->isVisible());
+    QCOMPARE(nombreAccesible(e.item(QStringLiteral("botonVerFacturasVacia"))), QStringLiteral("Ver facturas"));
 
-    // Cada paso abre su pantalla.
-    QMetaObject::invokeMethod(e.item(QStringLiteral("boton_pasoPerfil")), "click");
-    QTRY_COMPARE(app->pagina(), Pagina::Perfiles);
-    app->mostrarDiagnostico();
-    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
-
-    // Perfil creado: paso 1 marcado. Un refresco conserva el ultimo resultado
-    // valido (sin parpadeo): no pasa a "cargando".
+    // Perfil creado: un refresco conserva el ultimo resultado valido.
     emit e.perfiles.perfilesCambiaron();
     QCOMPARE(consulta.promesas.size(), 2);
     QVERIFY(!app->primerUsoCargando());
     QVERIFY(app->mostrarGuiaPrimerUso());
-    QTRY_VERIFY(e.item(QStringLiteral("guiaPrimerUso"))->isVisible());
     consulta.resolver(1, {true, false, false});
-    QTRY_COMPARE(iconoDePaso(e, QStringLiteral("pasoPerfil")), QStringLiteral("check-circle"));
-    QVERIFY(nombreAccesible(e.item(QStringLiteral("pasoPerfil"))).endsWith(QStringLiteral("hecho")));
-    QCOMPARE(iconoDePaso(e, QStringLiteral("pasoEFirma")), QStringLiteral("circle-dashed"));
-    QCOMPARE(varianteDe(e, QStringLiteral("boton_pasoEFirma")), QStringLiteral("primario"));
-    QCOMPARE(varianteDe(e, QStringLiteral("boton_pasoPerfil")), QStringLiteral("secundario"));
-    QMetaObject::invokeMethod(e.item(QStringLiteral("boton_pasoEFirma")), "click");
-    QTRY_COMPARE(app->pagina(), Pagina::Perfiles);
-    app->mostrarDiagnostico();
-    QTRY_COMPARE(e.pagina()->objectName(), QStringLiteral("paginaSolicitudes"));
+    QTRY_COMPARE(app->primerUsoPasos(), (QVariantList{true, false, false}));
 
-    // e.firma registrada: paso 2 marcado; el siguiente es la primera solicitud.
+    // e.firma registrada.
     emit e.credenciales.credencialCambio(perfilDePrueba().id.texto());
     QTRY_COMPARE(consulta.promesas.size(), 3);
     consulta.resolver(2, {true, true, false});
-    QTRY_COMPARE(iconoDePaso(e, QStringLiteral("pasoEFirma")), QStringLiteral("check-circle"));
-    QCOMPARE(varianteDe(e, QStringLiteral("boton_pasoSolicitud")), QStringLiteral("primario"));
-    // T023.5: el paso lleva a Facturas ("Ver facturas"); sin pantalla
-    // Facturas en esta prueba no navega.
-    QCOMPARE(nombreAccesible(e.item(QStringLiteral("boton_pasoSolicitud"))), QStringLiteral("Ver facturas"));
+    QTRY_COMPARE(app->primerUsoPasos(), (QVariantList{true, true, false}));
+    QVERIFY(!e.item(QStringLiteral("guiaPrimerUso")));
 
-    // Primera solicitud: la guia desaparece y se ve la lista.
+    // Primera solicitud: deja de aplicar la guia y se ve la lista.
     const int lecturas = int(e.solicitudes.lista.size());
     emit e.solicitudes.listaCambiada();
     QTRY_COMPARE(int(e.solicitudes.lista.size()), lecturas + 1);
@@ -2084,7 +2027,6 @@ void TestPresentacion::guiaPrimerUsoPorPasos()
     consulta.resolver(3, {true, true, true});
     QTRY_VERIFY(!app->mostrarGuiaPrimerUso());
     QTRY_VERIFY(e.item(QStringLiteral("listaSolicitudes"))->isVisible());
-    QVERIFY(!e.item(QStringLiteral("guiaPrimerUso"))->isVisible());
     e.vms.setConsultaPrimerUso(nullptr);
 }
 
@@ -2101,14 +2043,14 @@ void TestPresentacion::guiaPrimerUsoCargandoOConErrorNoSeMuestra()
     // Sin consulta (shell sin root): estado vacio normal.
     QVERIFY(!app->mostrarGuiaPrimerUso());
     QVERIFY(!app->primerUsoCargando());
-    QVERIFY(!e.item(QStringLiteral("guiaPrimerUso"))->isVisible());
+    QVERIFY(!e.item(QStringLiteral("guiaPrimerUso")));
 
     // Cargando: sin guia.
     e.vms.setConsultaPrimerUso(&consulta);
     QVERIFY(app->primerUsoCargando());
     QVERIFY(!app->mostrarGuiaPrimerUso());
     procesarEventos();
-    QVERIFY(!e.item(QStringLiteral("guiaPrimerUso"))->isVisible());
+    QVERIFY(!e.item(QStringLiteral("guiaPrimerUso")));
     QVERIFY(e.item(QStringLiteral("estadoVacio"))->isVisible());
 
     // Error: sin guia, estado vacio normal.
@@ -2116,7 +2058,7 @@ void TestPresentacion::guiaPrimerUsoCargandoOConErrorNoSeMuestra()
     QTRY_VERIFY(app->primerUsoError());
     QVERIFY(!app->primerUsoCargando());
     QVERIFY(!app->mostrarGuiaPrimerUso());
-    QVERIFY(!e.item(QStringLiteral("guiaPrimerUso"))->isVisible());
+    QVERIFY(!e.item(QStringLiteral("guiaPrimerUso")));
     QVERIFY(e.item(QStringLiteral("estadoVacio"))->isVisible());
 
     // Reintento tras el error: carga de nuevo; una respuesta tardia se descarta.
@@ -2127,11 +2069,12 @@ void TestPresentacion::guiaPrimerUsoCargandoOConErrorNoSeMuestra()
     consulta.resolver(1, {false, false, false}); // tardia
     procesarEventos();
     QVERIFY(app->primerUsoCargando());
-    QVERIFY(!e.item(QStringLiteral("guiaPrimerUso"))->isVisible());
+    QVERIFY(!e.item(QStringLiteral("guiaPrimerUso")));
     consulta.resolver(2, {true, false, false});
     QTRY_VERIFY(app->mostrarGuiaPrimerUso());
     QCOMPARE(app->primerUsoPasos(), (QVariantList{true, false, false}));
-    QTRY_VERIFY(e.item(QStringLiteral("guiaPrimerUso"))->isVisible());
+    QVERIFY(!e.item(QStringLiteral("guiaPrimerUso")));
+    QVERIFY(e.item(QStringLiteral("estadoVacio"))->isVisible());
     e.vms.setConsultaPrimerUso(nullptr);
 }
 
@@ -2145,7 +2088,8 @@ void TestPresentacion::guiaPrimerUsoRefrescoFallidoLaOculta()
     e.solicitudes.lista.resolver(0, ResultadoListaSol::exito({}));
     e.vms.setConsultaPrimerUso(&consulta);
     consulta.resolver(0, {true, false, false});
-    QTRY_VERIFY(e.item(QStringLiteral("guiaPrimerUso")) && e.item(QStringLiteral("guiaPrimerUso"))->isVisible());
+    QTRY_VERIFY(app->mostrarGuiaPrimerUso());
+    QVERIFY(!e.item(QStringLiteral("guiaPrimerUso")));
 
     // Un refresco que falla oculta la guia (estado vacio normal).
     emit e.perfiles.perfilesCambiaron();
@@ -2154,7 +2098,7 @@ void TestPresentacion::guiaPrimerUsoRefrescoFallidoLaOculta()
     consulta.fallar(1);
     QTRY_VERIFY(app->primerUsoError());
     QVERIFY(!app->mostrarGuiaPrimerUso());
-    QTRY_VERIFY(!e.item(QStringLiteral("guiaPrimerUso"))->isVisible());
+    QVERIFY(!e.item(QStringLiteral("guiaPrimerUso")));
     QVERIFY(e.item(QStringLiteral("estadoVacio"))->isVisible());
 
     // Tras el error, el siguiente refresco es una carga sin guia hasta resolver.

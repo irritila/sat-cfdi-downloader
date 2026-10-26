@@ -37,9 +37,10 @@ OSIntegration::EstadoIcono estadoIconoDe(EstadoAgregado estado);
 
 // T014.4 D1: Notificacion (application) -> NotificacionLocal (puerto). El
 // destino se copia tal cual (tipo + UUID interno); accionesExtra por tipo:
-// [MostrarEnFinder] para "descarga_completa" con destino Solicitud;
 // [AbrirPerfiles] para "credencial" y "efirma_por_vencer" con destino Perfil;
-// vacio en el resto.
+// vacio en el resto. T024.1 (D4): ninguna notificacion nueva lleva
+// [MostrarEnFinder]; la categoria sigue registrada en el adaptador y la
+// activacion de una ya entregada sigue abriendo la carpeta (AppLifecycleController).
 OSIntegration::NotificacionLocal notificacionLocalDe(const Notificacion& notificacion);
 
 // ExtensionCicloDeVida sobre WorkerLocal + OperacionExecutor (T007 D1).

@@ -123,7 +123,7 @@ private slots:
         }
         QCOMPARE(visibles, (QStringList{
                                QStringLiteral("Mostrar ventana"), QStringLiteral("Ver facturas"),
-                               QStringLiteral("Abrir carpeta de paquetes"), QStringLiteral("---"),
+                               QStringLiteral("---"),
                                QStringLiteral("Monitoreo activo"), QStringLiteral("Pausar monitoreo"),
                                QStringLiteral("---"), QStringLiteral("Abrir al iniciar sesión"),
                                textoEstadoLoginItem(satcfdi::OSIntegration::LoginItemStatus::Disabled),
@@ -167,7 +167,10 @@ private slots:
         const QStringList prohibidas{QStringLiteral("..."), QStringLiteral("sesion"), QStringLiteral("notificacion "),
                                      QStringLiteral("aprobacion"), QStringLiteral("pausado"),
                                      // T023.5: ningun item lleva a Nueva solicitud ni usa "solicitud".
-                                     QStringLiteral("solicitud")};
+                                     QStringLiteral("solicitud"),
+                                     // T024.1 (D3, D5): glosario del recorrido normal.
+                                     QStringLiteral("paquete"), QStringLiteral("verificando"),
+                                     QStringLiteral("verificación"), QStringLiteral("enviando")};
         for (E::Fase f : {E::Fase::Pausado, E::Fase::ActivoEnEspera, E::Fase::Ejecutando, E::Fase::Deteniendo,
                           E::Fase::Detenido}) {
             for (E::Actividad a : {E::Actividad::Ninguna, E::Actividad::Enviando, E::Actividad::Verificando,
@@ -232,9 +235,9 @@ private slots:
         };
         QCOMPARE(texto(E::Fase::ActivoEnEspera), QStringLiteral("Monitoreo activo"));
         QCOMPARE(texto(E::Fase::Pausado), QStringLiteral("Monitoreo en pausa"));
-        QCOMPARE(texto(E::Fase::Ejecutando, E::Actividad::Enviando), QStringLiteral("Trabajando: enviando…"));
-        QCOMPARE(texto(E::Fase::Ejecutando, E::Actividad::Verificando), QStringLiteral("Trabajando: verificando…"));
-        QCOMPARE(texto(E::Fase::Ejecutando, E::Actividad::Descargando), QStringLiteral("Trabajando: descargando…"));
+        QCOMPARE(texto(E::Fase::Ejecutando, E::Actividad::Enviando), QStringLiteral("Trabajando: pidiendo facturas al SAT…"));
+        QCOMPARE(texto(E::Fase::Ejecutando, E::Actividad::Verificando), QStringLiteral("Trabajando: consultando al SAT…"));
+        QCOMPARE(texto(E::Fase::Ejecutando, E::Actividad::Descargando), QStringLiteral("Trabajando: descargando facturas…"));
         QCOMPARE(texto(E::Fase::Ejecutando, E::Actividad::Otra), QStringLiteral("Trabajando…"));
         QVERIFY(!texto(E::Fase::Deteniendo).isEmpty());
         QVERIFY(!texto(E::Fase::Detenido).isEmpty());

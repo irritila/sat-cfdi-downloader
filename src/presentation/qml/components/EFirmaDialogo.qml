@@ -365,9 +365,9 @@ Dialog {
             anunciar: false
             titulo: dialogo.eFirma.esReemplazo ? qsTr("e.firma reemplazada.") : qsTr("e.firma registrada.")
             descripcion: dialogo.vigenteHasta.length > 0
-                         ? qsTr("%1 ya está disponible para solicitudes. Vigente hasta %2.")
+                         ? qsTr("%1 ya está disponible para descargas. Vigente hasta %2.")
                                .arg(dialogo.eFirma.perfilRfc).arg(dialogo.vigenteHasta)
-                         : qsTr("%1 ya está disponible para solicitudes.").arg(dialogo.eFirma.perfilRfc)
+                         : qsTr("%1 ya está disponible para descargas.").arg(dialogo.eFirma.perfilRfc)
             Layout.fillWidth: true
         }
 

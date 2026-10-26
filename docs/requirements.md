@@ -10,11 +10,13 @@ La aplicacion no se esta disenando como producto comercial, SaaS, portal multius
 
 ## 2. Objetivo
 
-Permitir crear solicitudes de descarga masiva de CFDI ante el SAT, guardar localmente la informacion de cada solicitud, monitorear su estatus en segundo plano, descargar los paquetes disponibles y consultar el detalle de cada solicitud desde una interfaz de escritorio.
+Permitir ver las facturas (CFDI) emitidas y recibidas de cada perfil SAT por mes y descargar las que falten mediante el servicio de descarga masiva del SAT, guardarlas localmente, monitorear las descargas en segundo plano y revisar su avance desde una interfaz de escritorio (T023).
+
+Las solicitudes de descarga masiva y sus paquetes ZIP son el mecanismo interno: la descarga guiada de Facturas los crea y el worker los continua. El usuario no los ve en el recorrido normal (Facturas, Historial, Perfiles SAT, Respaldo); solo en Diagnostico (T023 D3, D10; T024 D3).
 
 La aplicacion debe poder mantenerse ejecutandose en segundo plano, iniciar automaticamente con la sesion de macOS y ofrecer acceso rapido desde el menu bar de macOS.
 
-El MVP descarga y guarda paquetes ZIP. No extrae, parsea ni indexa XML.
+El MVP guarda los ZIP del SAT tal como llegan; para mostrar las facturas los lee localmente (T015, T023), sin validacion, conciliacion ni procesamiento fiscal.
 
 ## 3. Alcance del MVP
 
@@ -24,17 +26,16 @@ El MVP incluye:
 - Un solo usuario local.
 - Perfiles SAT de contribuyentes/RFC.
 - Registro seguro de e.firma por perfil SAT.
-- Crear nueva solicitud de descarga masiva.
+- Pantalla Facturas: facturas emitidas y recibidas de un perfil por mes, estado del mes y una accion para descargar las que falten ("Descargar el mes", "Actualizar mes" o "Completar mes"); internamente se crean las solicitudes SAT necesarias (T023).
 - Guardar localmente la metadata de cada solicitud.
-- Listar solicitudes creadas.
-- Mostrar el estatus actual de cada solicitud.
+- Historial de descargas por perfil y mes.
+- Mostrar el estado de cada mes: Sin descargar, Preparando, Disponibles, Disponibles parcialmente o Requiere atencion (T023 D8).
 - Monitorear solicitudes en segundo plano mediante un worker local.
 - Iniciar automaticamente con la sesion de macOS, si el usuario lo habilita.
 - Mostrar un icono en el menu bar de macOS para acceso rapido.
-- Descargar paquetes cuando el SAT los deje disponibles.
-- Guardar paquetes descargados localmente.
-- Navegar al detalle de una solicitud.
-- Mostrar en el detalle los parametros enviados, respuesta SAT, estatus, paquetes y logs basicos.
+- Descargar los archivos del SAT (paquetes ZIP) cuando el SAT los deje disponibles.
+- Guardar los archivos descargados localmente.
+- Diagnostico (Ir > Diagnostico): lista tecnica de solicitudes y su detalle, con parametros enviados, respuesta SAT, estatus, paquetes y logs basicos.
 - Emitir notificaciones nativas de macOS para eventos relevantes.
 
 ## 4. Decisiones del MVP
@@ -78,15 +79,13 @@ Queda fuera del MVP:
 
 ## 6. Flujo principal
 
-1. El usuario registra o selecciona un perfil SAT.
-2. El usuario crea una solicitud de descarga masiva con los filtros permitidos por el SAT.
-3. La aplicacion envia la solicitud al SAT.
-4. La aplicacion guarda localmente la metadata de la solicitud.
-5. La solicitud aparece en la lista con su estatus actual.
-6. El worker local consulta periodicamente el estatus de solicitudes pendientes.
-7. Cuando el SAT devuelve paquetes disponibles, la aplicacion los descarga.
-8. La lista se actualiza con el avance de cada solicitud.
-9. El usuario abre el detalle de una solicitud para revisar estatus, metadata, paquetes y logs.
+1. El usuario registra o selecciona un perfil SAT y registra su e.firma.
+2. En Facturas elige el mes (por omision, el anterior al actual) y ve sus facturas emitidas y recibidas y el estado del mes.
+3. Si faltan facturas, pulsa la accion del mes ("Descargar el mes", "Actualizar mes" o "Completar mes"). La aplicacion crea internamente una solicitud SAT por direccion con el tramo que falta (T023 D2, D7, D12, D17); no hay filtros SAT en este recorrido.
+4. La aplicacion envia las solicitudes al SAT y guarda localmente su metadata.
+5. El worker local consulta periodicamente al SAT y descarga los archivos del SAT disponibles.
+6. La franja del mes muestra "Preparando" mientras hay trabajo y, al terminar, el mes pasa a Disponibles. Una notificacion avisa por direccion (seccion 7.6).
+7. Historial muestra cada descarga por perfil y mes. Si algo requiere atencion, "Ver detalles tecnicos" abre Diagnostico, donde se revisan estatus, metadata, paquetes y logs de cada solicitud.
 
 Cuando el inicio automatico este habilitado, la aplicacion debe iniciar con la sesion de macOS, mostrar solo el icono de menu bar y continuar el monitoreo sin abrir automaticamente la ventana principal.
 
@@ -103,13 +102,13 @@ Debe permitir:
 - Crear perfil SAT.
 - Editar nombre descriptivo del perfil.
 - Registrar certificado, llave privada y contrasena de e.firma.
-- Ver si el perfil esta listo para crear solicitudes.
+- Ver si el perfil esta listo para descargar facturas ("Disponible para descargas").
 
-### 7.2 Solicitudes
+### 7.2 Diagnostico: solicitudes
 
-Pantalla principal de la aplicacion.
+Vista tecnica fuera del recorrido normal (Ir > Diagnostico; T023 D10). La pantalla principal es Facturas (seccion 7.7). Conserva el vocabulario tecnico (solicitudes, paquetes, verificacion).
 
-Debe mostrar una lista de solicitudes masivas creadas.
+Debe mostrar una lista de solicitudes masivas creadas. Vacia, muestra "No hay solicitudes" con "Ver facturas"; la guia de primer uso vive solo en Facturas (T024.1 D11).
 
 Columnas sugeridas:
 
@@ -126,7 +125,6 @@ Columnas sugeridas:
 
 Acciones sugeridas:
 
-- Crear nueva solicitud.
 - Actualizar estatus.
 - Abrir detalle.
 - Descargar paquetes disponibles.
@@ -135,34 +133,19 @@ Acciones sugeridas:
 
 La accion de descargar o reintentar descarga solo aplica cuando existen paquetes pendientes, fallidos o no descargados por pausa del worker.
 
-### 7.3 Nueva solicitud
+### 7.3 Nueva solicitud (retirada)
 
-Formulario para crear una solicitud de descarga masiva.
+No hay formulario de nueva solicitud: salio de la navegacion en T023.5 (D10) y se elimino en T024.1 (D11). Las descargas se inician desde Facturas por perfil y mes, sin filtros SAT (T023 D6); la descarga guiada crea una solicitud por direccion y tramo.
 
-Debe pedir solo datos que el servicio del SAT soporte.
+El mapeo a las operaciones SAT `SolicitaDescargaEmitidos` y `SolicitaDescargaRecibidos` queda definido en `docs/adrs/0013-sat-request-operations-v15.md`.
 
-Campos iniciales:
-
-- Perfil SAT.
-- Tipo: emitidos o recibidos.
-- Fecha inicial.
-- Fecha final.
-- Tipo de solicitud fijo: CFDI/XML para el MVP.
-- RFC contraparte, si aplica segun SAT.
-- Tipo de comprobante, si aplica segun SAT.
-- Complemento, si aplica segun SAT.
-
-Nota: los campos del formulario deben mantenerse alineados con la especificacion local del servicio SAT.
-
-El mapeo de esos campos a las operaciones SAT `SolicitaDescargaEmitidos` y `SolicitaDescargaRecibidos` queda definido en `docs/adrs/0013-sat-request-operations-v15.md`.
-
-Antes de enviar una solicitud al SAT, la aplicacion debe validar localmente que no exista otra solicitud activa/no eliminada para el mismo perfil SAT con los mismos filtros relevantes para el servicio. Si existe, debe bloquear el envio y mostrar la solicitud existente, sin llamar al SAT.
+Antes de enviar una solicitud al SAT, la aplicacion valida localmente que no exista otra solicitud activa/no eliminada para el mismo perfil SAT con los mismos parametros relevantes. La descarga guiada reutiliza la existente o pide confirmacion por direccion (T023 D12), sin llamar al SAT.
 
 Para el MVP, `EstadoComprobante` no se expone en UI. La aplicacion lo fija internamente en `Vigente` para solicitudes CFDI/XML.
 
 ### 7.4 Detalle de solicitud
 
-Pantalla para revisar una solicitud especifica.
+Vista de Diagnostico para revisar una solicitud especifica. Se abre desde la lista de Diagnostico, desde Historial, desde "Ver detalles tecnicos" de un mes que requiere atencion y desde las notificaciones de solicitudes previas o con filtros.
 
 Debe mostrar:
 
@@ -187,7 +170,7 @@ Acciones sugeridas:
 
 Eliminar una solicitud local no modifica nada en SAT. En el MVP marca virtualmente como eliminados los registros locales de la aplicacion, pero no borra automaticamente paquetes ZIP ya descargados.
 
-Si una solicitud queda vencida sin haber descargado todos sus paquetes, el detalle debe mostrar un aviso visible. La aplicacion no debe recrear solicitudes por si sola; el usuario podra crear otra solicitud manualmente usando los filtros visibles.
+Si una solicitud queda vencida sin haber descargado todos sus paquetes, el detalle debe mostrar un aviso visible. La aplicacion no debe recrear solicitudes por si sola; el usuario puede volver a descargar el mes desde Facturas (Descargar o Completar mes), que crea las solicitudes necesarias.
 
 Si un paquete esta marcado como descargado pero el ZIP ya no existe en la ruta local, el detalle debe mostrarlo como archivo no encontrado sin cambiar automaticamente el estado persistido del paquete.
 
@@ -197,24 +180,41 @@ La aplicacion debe mostrar un icono de acceso rapido en el menu bar de macOS.
 
 Debe permitir:
 
-- Ver si el worker esta activo.
-- Abrir la ventana principal.
-- Ver un resumen simple de solicitudes pendientes o con error.
+- Ver el estado del monitoreo: "Monitoreo activo", "Monitoreo en pausa" o "Trabajando: pidiendo facturas al SAT…", "Trabajando: consultando al SAT…" o "Trabajando: descargando facturas…" ("Monitoreo" conserva su nombre).
+- Abrir la ventana principal ("Mostrar ventana") y ir a Facturas ("Ver facturas").
+- Ver cuantas descargas siguen pendientes ("Pendientes: N") y, en el icono, si algo requiere atencion ("Archivo Fiscal: trabajando", "en pausa" o "requiere atención").
 - Pausar o reanudar el monitoreo.
-- Ejecutar una revision manual.
+- Configurar el inicio automatico y las notificaciones (permiso y notificacion de prueba).
 - Salir de la aplicacion.
+
+El menu no tiene "Abrir carpeta de paquetes" (T024.1 D5); esa accion sigue en Diagnostico.
 
 Si el usuario pausa el monitoreo desde el menu bar, la pausa debe persistir aunque cierre y vuelva a abrir la aplicacion.
 
 ### 7.6 Notificaciones del sistema
 
-La aplicacion debe emitir notificaciones nativas de macOS cuando:
+La aplicacion emite notificaciones nativas de macOS segun la matriz de T024.1 (D4). Hay a lo mas una por direccion de cada descarga: un mes guiado con archivos en ambas direcciones produce exactamente dos. Nunca hay notificacion por paquete.
 
-- Una solicitud pase a terminada.
-- Una descarga de paquete concluya.
-- Una solicitud pase a error, rechazada o vencida.
+| Evento | Titulo |
+| --- | --- |
+| Descarga completa | Facturas descargadas |
+| SAT termino con archivos | (no se notifica; avisa "Facturas descargadas") |
+| SAT termino sin archivos o sin informacion (5004) | Sin facturas en el periodo |
+| Error del SAT | No se pudieron descargar las facturas |
+| Rechazada (salvo 5004) | El SAT no aceptó preparar las facturas |
+| Vencida | Facturas no descargadas |
 
-Cuando una solicitud pase a vencida, la notificacion debe indicar que los paquetes pueden ya no estar disponibles y que podria requerirse crear una nueva solicitud.
+El cuerpo tiene dos lineas: el resultado con la direccion ("emitidas" o "recibidas") y "{periodo} · RFC ***XYZ" (RFC enmascarado: solo los 3 ultimos caracteres). Sin Ids, rutas, Mensaje SAT ni las palabras solicitud o paquete. Las notificaciones de e.firma (no disponible, por vencer) no cambian salvo vocabulario.
+
+Al pulsarla, una notificacion de descarga guiada abre Facturas en su perfil y mes; la de una solicitud previa o con filtros abre su detalle (T023.5). Las nuevas no llevan la accion "Mostrar en Finder"; las ya entregadas con esa accion siguen abriendo su destino y su carpeta. Reintentar o reiniciar no duplica una notificacion (dedupe por solicitud y tipo).
+
+### 7.7 Facturas
+
+Pantalla principal (T023.4). Muestra, por perfil y mes natural, las facturas emitidas y recibidas que ya estan en el equipo (solo la contraparte) y una franja con el estado del mes y una sola accion: descargar, actualizar o completar el mes, reintentar, registrar la e.firma o "Ver detalles tecnicos" cuando requiere atencion. Sin perfiles muestra la guia de primer uso. Desde aqui se exporta (RF-022) y se abre el PDF de una factura.
+
+### 7.8 Historial
+
+Lista las descargas guiadas por perfil y mes con su resultado (T023.5). Lleva al mes en Facturas o a Diagnostico. Las solicitudes previas a T023 aparecen como "Descarga anterior", solo con diagnostico.
 
 ## 8. Worker local
 
@@ -230,7 +230,7 @@ Responsabilidades:
 - Registrar errores.
 - Evitar repetir descargas ya completadas.
 
-El worker no debe crear solicitudes nuevas por decision propia. Solo debe continuar el monitoreo y descarga de solicitudes creadas por el usuario.
+El worker no debe crear solicitudes nuevas por decision propia. Solo debe continuar el monitoreo y descarga de solicitudes creadas por una accion del usuario (la descarga guiada de Facturas; T023 D12). Las solicitudes y paquetes que maneja son mecanismo interno: el usuario ve su efecto en Facturas e Historial y su detalle en Diagnostico.
 
 El worker debe iniciar automaticamente al iniciar la sesion de macOS cuando el usuario haya habilitado esa preferencia. Este comportamiento pertenece a la sesion local del usuario, no a un servicio remoto ni a un proceso compartido entre usuarios.
 
@@ -244,7 +244,9 @@ Para mantener simple el MVP, las acciones manuales pendientes se guardan como do
 
 ## 9. Estados
 
-La aplicacion debe mostrar estados simples y entendibles. El modelo persiste por separado el ciclo local de envio y el estado devuelto por SAT; la UI puede presentar un resumen derivado.
+La aplicacion debe mostrar estados simples y entendibles. En el recorrido normal la UI muestra el estado del mes (Sin descargar, Preparando, Disponibles, Disponibles parcialmente o Requiere atencion; T023 D8, D11). Los estados de solicitud y paquete de esta seccion son internos y solo se ven en Diagnostico.
+
+El modelo persiste por separado el ciclo local de envio y el estado devuelto por SAT; la UI puede presentar un resumen derivado.
 
 Estados sugeridos para `SolicitudMasiva`:
 
@@ -272,7 +274,7 @@ La lista de solicitudes puede mostrar un estado agregado de descarga cuando una 
 
 El estado `Error SAT` de una solicitud es terminal para el worker automatico. Cualquier reintento debe ejecutarse como accion manual del usuario.
 
-Una solicitud en `Envio fallido` no tiene `IdSolicitud` SAT y es terminal en el MVP. Una solicitud en `Envio incierto` tampoco tiene `IdSolicitud`; la aplicacion no debe reenviarla porque no sabe si SAT alcanzo a registrar la solicitud. El usuario puede crear una nueva solicitud manualmente.
+Una solicitud en `Envio fallido` no tiene `IdSolicitud` SAT y es terminal en el MVP. Una solicitud en `Envio incierto` tampoco tiene `IdSolicitud`; la aplicacion no debe reenviarla porque no sabe si SAT alcanzo a registrar la solicitud. El usuario puede volver a descargar el mes desde Facturas (Descargar o Completar mes), que crea una solicitud nueva.
 
 El estado `Error` de un paquete no se reintenta automaticamente por el worker. Cualquier reintento de descarga debe ejecutarse como accion manual del usuario.
 
@@ -408,11 +410,11 @@ La aplicacion debe permitir registrar certificado, llave privada y contrasena de
 
 Al registrar e.firma, la aplicacion debe importar/copiar `.cer` y `.key` al almacenamiento controlado por la aplicacion.
 
-Antes de marcar el perfil como listo para crear solicitudes, la aplicacion debe validar que la contrasena abre la llave privada, que certificado y llave corresponden, que el RFC del certificado corresponde al perfil y que la e.firma esta vigente.
+Antes de marcar el perfil como listo para descargar facturas, la aplicacion debe validar que la contrasena abre la llave privada, que certificado y llave corresponden, que el RFC del certificado corresponde al perfil y que la e.firma esta vigente.
 
 ### RF-003 Crear solicitud masiva
 
-La aplicacion debe permitir crear una solicitud de descarga masiva usando un perfil SAT y filtros soportados por el SAT.
+La aplicacion debe crear solicitudes de descarga masiva usando un perfil SAT y parametros soportados por el SAT. En el recorrido normal las crea la descarga guiada de Facturas: una por direccion y tramo del mes (T023 D2, D12); no hay formulario de nueva solicitud ni filtros SAT en la UI (T024.1 D11).
 
 Antes de llamar al SAT, la aplicacion debe rechazar solicitudes locales duplicadas con los mismos parametros relevantes. Esta defensa evita gastar cupos o topar errores SAT por solicitudes duplicadas.
 
@@ -424,7 +426,7 @@ La aplicacion debe guardar la metadata de cada solicitud creada, incluyendo para
 
 ### RF-005 Listar solicitudes
 
-La aplicacion debe mostrar una lista de solicitudes masivas creadas con su estatus actual.
+La aplicacion debe mostrar en Diagnostico una lista de solicitudes masivas creadas con su estatus actual. El recorrido normal muestra en su lugar el Historial de descargas por perfil y mes.
 
 ### RF-006 Consultar estatus
 
@@ -442,7 +444,7 @@ La aplicacion debe escribir cada ZIP primero a un archivo temporal y marcarlo co
 
 ### RF-009 Ver detalle
 
-La aplicacion debe permitir abrir el detalle de una solicitud desde la lista.
+La aplicacion debe permitir abrir el detalle de una solicitud desde la lista de Diagnostico, desde Historial y desde "Ver detalles tecnicos" de un mes que requiere atencion.
 
 ### RF-010 Registrar logs
 
@@ -466,7 +468,7 @@ Cuando el usuario abra manualmente la aplicacion, la ventana principal debe most
 
 ### RF-014 Icono de menu bar
 
-La aplicacion debe mostrar un icono en el menu bar de macOS para acceso rapido al estado del worker y acciones principales.
+La aplicacion debe mostrar un icono en el menu bar de macOS para acceso rapido al estado del worker y acciones principales (seccion 7.5). El menu no ofrece "Abrir carpeta de paquetes"; los estados usan el vocabulario del recorrido normal (T024.1 D5).
 
 ### RF-015 Ejecutar con ventana oculta
 
@@ -474,7 +476,7 @@ La aplicacion debe poder seguir monitoreando y descargando solicitudes aunque la
 
 ### RF-016 Notificaciones del sistema operativo
 
-La aplicacion debe emitir notificaciones nativas de macOS cuando una solicitud termine, una descarga concluya o una solicitud pase a error, rechazada o vencida.
+La aplicacion debe emitir notificaciones nativas de macOS segun la matriz de la seccion 7.6 (T024.1 D4): "Facturas descargadas", "Sin facturas en el periodo", "No se pudieron descargar las facturas", "El SAT no aceptó preparar las facturas" y "Facturas no descargadas", con direccion, periodo y RFC enmascarado en el cuerpo. "Terminada" con archivos no notifica.
 
 ### RF-017 Comportamiento al cerrar ventana
 
@@ -484,7 +486,7 @@ Al salir de la aplicacion, se guarda estado de cierre a nivel aplicacion. No se 
 
 ### RF-018 Acciones manuales sobre solicitud
 
-La aplicacion debe permitir ejecutar acciones manuales sobre una solicitud: verificar ahora, reintentar descarga y eliminar solicitud local.
+La aplicacion debe permitir ejecutar acciones manuales sobre una solicitud desde Diagnostico: verificar ahora, reintentar descarga y eliminar solicitud local. En el recorrido normal, la accion del mes en Facturas reintenta o completa la descarga.
 
 Reintentar descarga solo aplica a paquetes pendientes o fallidos. Si el monitoreo esta pausado, la accion queda pendiente hasta reanudar.
 
@@ -512,7 +514,7 @@ El usuario respalda sus datos desde la pantalla Respaldo (Ir > Respaldo, ⌘4; T
 
 - Elige una carpeta con el dialogo del sistema (por ejemplo, su carpeta de iCloud Drive o Dropbox); la app escribe ahi una copia cifrada y el proveedor la sincroniza. La UI dice "copiado a la carpeta", nunca "subido".
 - Crea una contrasena de al menos 12 caracteres (D23). Al crearla, la app muestra una clave de recuperacion que se puede copiar (solo a este equipo, se borra del portapapeles a los 90 s) o imprimir, y que no se vuelve a mostrar despues de confirmar que se guardo. Cambiar la contrasena conserva la clave (D16).
-- "Respaldar ahora" y respaldo diario opcional (D4) con progreso, resultado y advertencias (paquetes faltantes, copias que hay que borrar a mano, resultado no guardado). Se conservan las 5 copias propias mas recientes (D6, D17).
+- "Respaldar ahora" y respaldo diario opcional (D4) con progreso, resultado y advertencias (archivos del SAT faltantes, copias que hay que borrar a mano, resultado no guardado). Se conservan las 5 copias propias mas recientes (D6, D17).
 - La e.firma, los logs y los temporales nunca se respaldan (D3, D7).
 
 ### RF-022 Exportar facturas
@@ -566,17 +568,17 @@ El usuario debe poder saber si la aplicacion esta corriendo en segundo plano y d
 
 ### CA-001 Crear perfil SAT
 
-Dado que el usuario captura los datos de un perfil SAT, cuando guarda el perfil, entonces la aplicacion lo muestra disponible para crear solicitudes.
+Dado que el usuario captura los datos de un perfil SAT, cuando guarda el perfil, entonces la aplicacion lo muestra disponible para descargas.
 
-### CA-002 Crear solicitud
+### CA-002 Descargar el mes
 
-Dado un perfil SAT valido, filtros soportados y sin una solicitud activa equivalente, cuando el usuario crea una solicitud, entonces la aplicacion la envia al SAT y guarda su metadata localmente.
+Dado un perfil SAT valido y un mes sin descargar, cuando el usuario elige Descargar en Facturas, entonces la aplicacion crea las solicitudes al SAT necesarias por direccion (mecanismo interno) y guarda su metadata localmente.
 
-Dado que ya existe una solicitud activa equivalente, cuando el usuario intenta crearla otra vez, entonces la aplicacion muestra la solicitud existente y no llama al SAT.
+Dado que ya existe una solicitud activa equivalente, cuando se intenta crearla otra vez, entonces la aplicacion reutiliza la existente y no llama al SAT.
 
-### CA-003 Listar solicitudes
+### CA-003 Ver facturas por mes
 
-Dado que existen solicitudes guardadas, cuando el usuario abre la pantalla principal, entonces ve la lista de solicitudes con su estatus actual.
+Dado un perfil con meses descargados, cuando el usuario abre la pantalla principal (Facturas), entonces ve el mes con su estado de disponibilidad y sus facturas. La lista de solicitudes con su estatus queda en Diagnostico.
 
 ### CA-004 Monitorear solicitud
 
@@ -586,7 +588,7 @@ Dado que existe una solicitud pendiente, cuando el worker local corre, entonces 
 
 Dado que existe una solicitud en la lista, cuando el usuario abre su detalle, entonces ve parametros, estatus, codigos SAT, mensajes, paquetes y logs basicos.
 
-### CA-006 Descargar paquetes
+### CA-006 Descargar paquetes (mecanismo interno)
 
 Dado que una solicitud tiene paquetes disponibles, cuando el worker o el usuario inicia la descarga, entonces la aplicacion guarda los paquetes localmente con archivo temporal, renombra a la ruta final y solo entonces actualiza su estado a descargado.
 
@@ -612,7 +614,7 @@ Dado que la ventana principal esta cerrada u oculta pero la aplicacion sigue act
 
 ### CA-012 Notificacion del sistema
 
-Dado que una solicitud termina, una descarga concluye o una solicitud falla, cuando la aplicacion procesa el cambio, entonces emite una notificacion nativa de macOS.
+Dado que la descarga de un mes concluye, no tiene facturas, falla, es rechazada o vence en una direccion, cuando la aplicacion procesa el cambio, entonces emite una notificacion nativa de macOS por direccion segun la matriz de §7.6. Una solicitud terminada con archivos pendientes de descarga no notifica.
 
 ### CA-013 Acciones manuales
 

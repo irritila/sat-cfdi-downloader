@@ -61,19 +61,19 @@ void TestAvisoRaizPaquetes::cadaMotivo_data()
 
     QTest::newRow("conflicto")
         << Motivo::Conflicto << QStringLiteral("advertencia")
-        << QStringLiteral("Los paquetes siguen en la carpeta anterior.")
+        << QStringLiteral("Los archivos descargados siguen en la carpeta anterior.")
         << QStringLiteral("No se movió ~/SAT-CFDI-Downloader/paquetes a ~/Archivo-Fiscal/paquetes porque la "
                           "carpeta nueva ya tiene contenido. Esta sesión usa ~/SAT-CFDI-Downloader/paquetes. "
-                          "Revisa las dos carpetas y deja los paquetes solo en una; el cambio se intentará de "
-                          "nuevo al reiniciar la aplicación.");
+                          "Revisa las dos carpetas y deja los archivos descargados solo en una; el cambio se "
+                          "intentará de nuevo al reiniciar la aplicación.");
     QTest::newRow("error")
-        << Motivo::Error << QStringLiteral("advertencia") << QStringLiteral("No se pudo mover la carpeta de paquetes.")
+        << Motivo::Error << QStringLiteral("advertencia") << QStringLiteral("No se pudo mover la carpeta de archivos descargados.")
         << QStringLiteral("No se movió ~/SAT-CFDI-Downloader/paquetes a ~/Archivo-Fiscal/paquetes y ningún "
                           "archivo se copió ni se borró. Esta sesión usa ~/SAT-CFDI-Downloader/paquetes. El cambio "
                           "se intentará de nuevo al reiniciar la aplicación.");
     QTest::newRow("raiz-no-disponible")
         << Motivo::RaizNoDisponible << QStringLiteral("error")
-        << QStringLiteral("No se pudo crear la carpeta de paquetes.")
+        << QStringLiteral("No se pudo crear la carpeta de archivos descargados.")
         << QStringLiteral("~/Archivo-Fiscal/paquetes no existe o no es una carpeta, así que las descargas pueden "
                           "fallar. Esta sesión usa ~/Archivo-Fiscal/paquetes. Se intentará crearla de nuevo al "
                           "reiniciar la aplicación.");
@@ -112,7 +112,7 @@ void TestAvisoRaizPaquetes::errorConRaizNuevaAnteriorNoEsCarpeta()
     QVERIFY(vm.activo());
     QCOMPARE(vm.variante(), QStringLiteral("advertencia"));
     QCOMPARE(vm.rutaEfectiva(), kNueva);
-    QCOMPARE(vm.titulo(), QStringLiteral("La carpeta de paquetes anterior no es válida."));
+    QCOMPARE(vm.titulo(), QStringLiteral("La carpeta anterior de archivos descargados no es válida."));
     QCOMPARE(vm.descripcion(),
              QStringLiteral("La ruta anterior ~/SAT-CFDI-Downloader/paquetes no es una carpeta; no se modificó. "
                             "Esta sesión usa ~/Archivo-Fiscal/paquetes."));

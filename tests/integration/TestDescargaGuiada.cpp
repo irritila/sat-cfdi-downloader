@@ -161,6 +161,7 @@ private slots:
     void con5005LaAtencionLlevaAlDiagnostico();
     void eFirmaNoListaPorElGateDelEjecutor();
     void cierreEntreCommitYEncoladoSeReenviaConLaAccion();
+    void mesConArchivosEnAmbasDireccionesNotificaDosVeces();
 };
 
 void TestDescargaGuiada::creaYEnviaAmbasDirecciones()
@@ -296,6 +297,80 @@ void TestDescargaGuiada::cierreEntreCommitYEncoladoSeReenviaConLaAccion()
     QCOMPARE(reenvio->valor().encoladas.size(), 2);
     QTRY_COMPARE(e.gateway.llamadas(Op::Crear), 2);
     QTRY_VERIFY(e.disponibilidad(*perfil)->emitidos.sinEnviar.isEmpty());
+}
+
+// T024.1 (D4): un mes guiado con archivos en ambas direcciones (flujo real
+// hasta Descargado) produce exactamente 2 notificaciones "Facturas
+// descargadas" (una por direccion, sin "Mostrar en Finder"); verificar de
+// nuevo y reiniciar no duplican.
+void TestDescargaGuiada::mesConArchivosEnAmbasDireccionesNotificaDosVeces()
+{
+    Entorno e;
+    QVERIFY(e.ok);
+    const auto perfil = e.perfil(true);
+    QVERIFY(perfil);
+    e.gateway.programar(Op::Crear, Paso::conCreacion(creacion("5000", QStringLiteral("aaaaaaaa-0000-4000-8000-000000000007"))));
+    e.gateway.programar(Op::Crear, Paso::conCreacion(creacion("5000", QStringLiteral("aaaaaaaa-0000-4000-8000-000000000008"))));
+    // Paquetes distintos por solicitud (2 y 1).
+    for (const QStringList& ids : {QStringList{QStringLiteral("aaaaaaaa-0000-4000-8000-000000000007_01"),
+                                               QStringLiteral("aaaaaaaa-0000-4000-8000-000000000007_02")},
+                                   QStringList{QStringLiteral("aaaaaaaa-0000-4000-8000-000000000008_01")}}) {
+        RespuestaVerificacion v = fakes::FakeSatGateway::verificacionTerminada();
+        v.idsPaquete = ids;
+        e.gateway.programar(Op::Verificar, Paso::conVerificacion(v));
+    }
+    const auto ej = e.descargar(*perfil);
+    QVERIFY(ej);
+    QCOMPARE(ej->creadas.size(), 2);
+
+    const auto descargas = [&e] {
+        QList<OSIntegration::NotificacionLocal> r;
+        for (const auto& n : e.os.notificacionesPedidas) {
+            if (n.tipo != QStringLiteral("credencial") && n.tipo != QStringLiteral("efirma_por_vencer")) {
+                r.append(n);
+            }
+        }
+        return r;
+    };
+    e.reloj.fijar(e.reloj.ahora().addSecs(11 * 60));
+    QTRY_VERIFY_WITH_TIMEOUT(
+        [&] {
+            e.root->worker().ejecutarCiclo();
+            return descargas().size() >= 2;
+        }(),
+        10000);
+    QTest::qWait(100);
+    const auto pedidas = descargas();
+    QCOMPARE(pedidas.size(), 2);
+    QStringList direcciones;
+    for (const auto& n : pedidas) {
+        QCOMPARE(n.tipo, QStringLiteral("descarga_completa"));
+        QCOMPARE(n.titulo, QStringLiteral("Facturas descargadas"));
+        QVERIFY(n.accionesExtra.isEmpty());
+        QCOMPARE(n.destino.tipo, OSIntegration::DestinoNotificacion::Tipo::Solicitud);
+        QVERIFY(ej->creadas.contains(SolicitudId::desdeTexto(n.destino.id).value()));
+        QCOMPARE(n.id, n.destino.id + QStringLiteral(":descarga_completa"));
+        direcciones << (n.cuerpo.contains(QStringLiteral("emitidas")) ? QStringLiteral("emitidas")
+                                                                       : QStringLiteral("recibidas"));
+        QVERIFY(n.cuerpo.contains(QStringLiteral("1–30 sep 2026")));
+    }
+    direcciones.sort();
+    QCOMPARE(direcciones, (QStringList{QStringLiteral("emitidas"), QStringLiteral("recibidas")}));
+
+    // Verificar de nuevo (reintento) no duplica.
+    for (const SolicitudId& id : ej->creadas) {
+        e.root->worker().verificarAhora(id);
+    }
+    e.root->worker().ejecutarCiclo();
+    QTest::qWait(200);
+    QCOMPARE(descargas().size(), 2);
+
+    // Reinicio sobre la misma base: nada se vuelve a notificar.
+    QVERIFY(e.crearRoot());
+    e.reloj.fijar(e.reloj.ahora().addSecs(11 * 60));
+    e.root->worker().ejecutarCiclo();
+    QTest::qWait(200);
+    QCOMPARE(descargas().size(), 2);
 }
 
 int ejecutarTestDescargaGuiada(int argc, char* argv[])

@@ -11,7 +11,6 @@
 
 #include "presentation/viewmodels/AppViewModel.h"
 #include "presentation/viewmodels/EFirmaFormViewModel.h"
-#include "presentation/viewmodels/NuevaSolicitudViewModel.h"
 #include "presentation/viewmodels/PerfilesSatViewModel.h"
 #include "presentation/viewmodels/PresentacionViewModels.h"
 
@@ -163,9 +162,6 @@ bool Sesion::cargar()
     // T022 D6: Facturas (pagina por omision) e Historial, como la app real.
     m_vms->setFuenteFacturas(&m_demo.facturas, &m_demo.preferenciasFacturas);
     m_vms->setFuenteHistorial(&m_demo.historial);
-    // D8/D16: "hoy" de los atajos de periodo y de la validacion de fechas del
-    // formulario es el `ahora` del guion, no el reloj del equipo.
-    m_vms->nuevaSolicitud()->setReloj([hoy = m_demo.ahora().date()] { return hoy; });
 
     m_engine = std::make_unique<QQmlApplicationEngine>();
     m_engine->addUrlInterceptor(&m_interceptor);

@@ -23,25 +23,30 @@ namespace satcfdi {
 // - Una notificacion por solicitud y transicion (dedupe en memoria por
 //   "<solicitud>:<tipo>"; el ejecutor solo publica transiciones persistidas,
 //   asi que un reinicio no repite).
-// - Nunca por paquete: solo "Descarga completa: N de N" cuando no quedan
-//   paquetes por descargar.
+// - Nunca por paquete: "Facturas descargadas" cuando no quedan paquetes
+//   por descargar.
+// - T024.1 (D4): una por direccion. "Terminada" con paquetes no notifica
+//   (componer devuelve nullopt); con 0 paquetes o SinFacturas (5004) es
+//   "Sin facturas en el periodo". Ids, tipos y destinos no cambian.
 // - Credencial: una por perfil al pasar a un estado que bloquea el
 //   monitoreo (Vencida, NoVigenteAun, SinCredencial, MaterialFaltante,
 //   MaterialDanado); volver a Lista no notifica pero rearma el aviso.
 // - El resultado de la entrega no se observa: un permiso denegado no cambia
 //   estados, logs ni reintentos.
-// - Textos (T013 D6, UX-39): titulo = evento; cuerpo en dos lineas separadas
-//   por "\n": resultado y "{Tipo} · {periodo D5} · RFC ***000". Ortografia
-//   completa. Sin RFC completo (solo los 3 ultimos caracteres), Ids ni
-//   Mensaje SAT.
+// - Textos (T013 D6, UX-39, T024.1 D3/D4): titulo = evento; cuerpo en dos
+//   lineas separadas por "\n": resultado con la direccion ("emitidas"/
+//   "recibidas") y "{periodo D5} · RFC ***000" (el perfil). Ortografia
+//   completa. Sin RFC completo (solo los 3 ultimos caracteres), Ids, Mensaje
+//   SAT ni "solicitud"/"paquete".
 class ServicioNotificaciones final : public QObject {
     Q_OBJECT
 
 public:
     explicit ServicioNotificaciones(Notificador& notificador, QObject* parent = nullptr);
 
-    // Composicion pura (expuesta para pruebas).
-    static Notificacion componer(const TransicionNotificable& transicion);
+    // Composicion pura (expuesta para pruebas). nullopt: la transicion no se
+    // notifica (T024.1 D4: Terminada con paquetes).
+    static std::optional<Notificacion> componer(const TransicionNotificable& transicion);
     // nullopt para estados que no se notifican (Lista, Validando).
     static std::optional<Notificacion> componerCredencial(const PerfilId& perfil, EstadoCredencial estado);
     // T014.3 D2: aviso de vencimiento de e.firma. id

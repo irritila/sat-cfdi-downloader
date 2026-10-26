@@ -7,7 +7,6 @@ qt_add_library(satcfdi_presentation STATIC)
 set(_satcfdi_qml_files
     qml/Main.qml
     qml/screens/SolicitudesPage.qml
-    qml/screens/NuevaSolicitudPage.qml
     qml/screens/DetalleSolicitudPage.qml
     qml/screens/PerfilesSatPage.qml
     qml/screens/ExploradorCfdiPage.qml
@@ -99,8 +98,6 @@ qt_add_qml_module(satcfdi_presentation
         viewmodels/PerfilesSatViewModel.cpp
         viewmodels/EFirmaFormViewModel.h
         viewmodels/EFirmaFormViewModel.cpp
-        viewmodels/NuevaSolicitudViewModel.h
-        viewmodels/NuevaSolicitudViewModel.cpp
         viewmodels/SolicitudDetailViewModel.h
         viewmodels/SolicitudDetailViewModel.cpp
         viewmodels/AccionesSolicitud.h

@@ -3,6 +3,7 @@
 // sobre fakes de promesas manuales (FixturePerfiles, context property
 // "fixture"). Los tst_*.qml viven junto a este archivo.
 
+#include "presentation/BarridoVocabulario.h"
 #include "FixtureAvisoRaiz.h"
 #include "FixtureExplorador.h"
 #include "FixtureFacturas.h"
@@ -28,6 +29,9 @@ public slots:
         engine->rootContext()->setContextProperty(QStringLiteral("fixtureFacturas"), new FixtureFacturas(engine));
         // T025.6: pagina Respaldo y franja de avisos de restauracion.
         engine->rootContext()->setContextProperty(QStringLiteral("fixtureRespaldo"), new FixtureRespaldo(engine));
+        // T024.1: barrido de vocabulario del arbol de items.
+        engine->rootContext()->setContextProperty(QStringLiteral("barrido"),
+                                                  new satcfdi::pruebas::BarridoVocabulario(engine));
     }
 };
 

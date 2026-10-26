@@ -241,11 +241,12 @@ QStringList advertenciasRespaldo(const ResultadoRespaldoPresentacion& r)
         return avisos;
     }
     if (r.faltantes > 0) {
-        avisos << trn("%n paquete ya no estaba en este equipo y no se incluyó.",
-                      "%n paquetes ya no estaban en este equipo y no se incluyeron.", r.faltantes);
+        avisos << trn("%n archivo del SAT ya no estaba en este equipo y no se incluyó.",
+                      "%n archivos del SAT ya no estaban en este equipo y no se incluyeron.", r.faltantes);
     }
     if (r.omitidos > 0) {
-        avisos << trn("%n paquete no se pudo incluir.", "%n paquetes no se pudieron incluir.", r.omitidos);
+        avisos << trn("%n archivo del SAT no se pudo incluir.", "%n archivos del SAT no se pudieron incluir.",
+                      r.omitidos);
     }
     if (r.avisoDepuracion || r.avisoRegistro) {
         avisos << tr("La copia es válida, pero algunas copias anteriores requieren revisión manual.");

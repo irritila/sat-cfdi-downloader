@@ -525,9 +525,6 @@ void MacOSIntegration::inicializar()
         case Id::VerFacturas:
             connect(accion, &QAction::triggered, this, intencion(&OSIntegration::verFacturasSolicitada));
             break;
-        case Id::AbrirCarpetaPaquetes:
-            connect(accion, &QAction::triggered, this, intencion(&OSIntegration::abrirCarpetaPaquetesSolicitada));
-            break;
         case Id::EstadoMonitoreo:
             d->estadoMonitoreo = accion;
             break;

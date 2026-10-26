@@ -46,12 +46,12 @@ QString AvisoRaizPaquetesViewModel::titulo() const
 {
     switch (m_datos.motivo) {
     case Motivo::Conflicto:
-        return tr("Los paquetes siguen en la carpeta anterior.");
+        return tr("Los archivos descargados siguen en la carpeta anterior.");
     case Motivo::Error:
-        return anteriorNoEsCarpeta(*this) ? tr("La carpeta de paquetes anterior no es válida.")
-                                          : tr("No se pudo mover la carpeta de paquetes.");
+        return anteriorNoEsCarpeta(*this) ? tr("La carpeta anterior de archivos descargados no es válida.")
+                                          : tr("No se pudo mover la carpeta de archivos descargados.");
     case Motivo::RaizNoDisponible:
-        return tr("No se pudo crear la carpeta de paquetes.");
+        return tr("No se pudo crear la carpeta de archivos descargados.");
     case Motivo::Ninguno:
         break;
     }
@@ -63,7 +63,7 @@ QString AvisoRaizPaquetesViewModel::descripcion() const
     switch (m_datos.motivo) {
     case Motivo::Conflicto:
         return tr("No se movió %1 a %2 porque la carpeta nueva ya tiene contenido. "
-                  "Esta sesión usa %3. Revisa las dos carpetas y deja los paquetes solo en una; "
+                  "Esta sesión usa %3. Revisa las dos carpetas y deja los archivos descargados solo en una; "
                   "el cambio se intentará de nuevo al reiniciar la aplicación.")
             .arg(m_datos.rutaLegada, m_datos.rutaNueva, m_datos.rutaEfectiva);
     case Motivo::Error:

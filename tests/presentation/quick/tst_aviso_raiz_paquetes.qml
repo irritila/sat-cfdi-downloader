@@ -19,6 +19,9 @@ TestCase {
     }
 
     function cleanup() {
+        // T024.1: barrido de vocabulario del estado final (Diagnostico excluido).
+        const fallasVocabulario = barrido.revisarVentana(caso)
+        verify(fallasVocabulario.length === 0, fallasVocabulario.join("\n"))
         Theme.oscuro = false
     }
 

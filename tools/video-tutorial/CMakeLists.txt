@@ -216,7 +216,7 @@ add_custom_target(video_tutorial_verificar
 
 # Huella SHA-256 de notificacionLocalDe (src/app_core/IntegracionWorker.cpp)
 # con la que se sincronizo NotificacionesIlustradas.cpp.
-set(SATCFDI_VIDEO_HUELLA_NOTIFICACIONES "66ae3a6d54db402f810c949e33b3969592d01bc0b4b78b9ae2f356e2f0c9f2d1")
+set(SATCFDI_VIDEO_HUELLA_NOTIFICACIONES "176552654268ea300b97e0eb65c0ae1e75050ada0443192e047681c698a1c4b7")
 
 # --- Pruebas (label video) -----------------------------------------------------
 set(_video_prueba_dir "${CMAKE_BINARY_DIR}/video-pruebas")

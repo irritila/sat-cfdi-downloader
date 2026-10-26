@@ -10,7 +10,8 @@
 
 #include "AppViewModel.h"
 #include "EFirmaFormViewModel.h"
-#include "NuevaSolicitudViewModel.h"
+#include "FacturasViewModel.h"
+#include "PerfilesDisponiblesModel.h"
 #include "PerfilesSatListModel.h"
 #include "PerfilesSatViewModel.h"
 #include "PresentacionViewModels.h"
@@ -474,14 +475,6 @@ void TestPerfilesViewModels::inactivoNoDisponibleParaSolicitudes()
     QVERIFY(!g.p()->seleccionActiva());
     QVERIFY(!g.p()->seleccionListo());
     QVERIFY(!g.p()->puedeGestionarEFirma()); // importar/reemplazar exigen perfil activo
-
-    // Tampoco lo ofrece el selector de nueva solicitud.
-    NuevaSolicitudViewModel* nueva = g.vms.nuevaSolicitud();
-    nueva->reiniciar();
-    QVERIFY(g.cargarCon(1, {inactivo}));
-    g.credenciales.resolverResumen(1, EstadoCredencial::Lista);
-    QTRY_VERIFY(nueva->sinPerfiles());
-    QCOMPARE(nueva->perfilesDisponibles()->count(), 0);
 }
 
 void TestPerfilesViewModels::eFirmaBasenamesSinRutasNiContrasena()
@@ -762,7 +755,7 @@ void TestPerfilesViewModels::navegacionPerfilesYCentinelas()
 
     // Centinelas sobre todos los view models expuestos a QML.
     for (const QObject* vm : {static_cast<QObject*>(app), static_cast<QObject*>(g.p()),
-                              static_cast<QObject*>(g.f()), static_cast<QObject*>(g.vms.nuevaSolicitud()),
+                              static_cast<QObject*>(g.f()), static_cast<QObject*>(g.vms.facturas()),
                               static_cast<QObject*>(g.p()->perfiles())}) {
         verificarSinSecretos(vm);
     }
@@ -772,7 +765,7 @@ void TestPerfilesViewModels::navegacionPerfilesYCentinelas()
     for (const QByteArray& rol : g.p()->perfiles()->roleNames()) {
         QVERIFY2(!sensible.match(QString::fromLatin1(rol)).hasMatch(), rol.constData());
     }
-    for (const QByteArray& rol : g.vms.nuevaSolicitud()->perfilesDisponibles()->roleNames()) {
+    for (const QByteArray& rol : g.vms.facturas()->perfiles()->roleNames()) {
         QVERIFY2(!sensible.match(QString::fromLatin1(rol)).hasMatch(), rol.constData());
     }
 }

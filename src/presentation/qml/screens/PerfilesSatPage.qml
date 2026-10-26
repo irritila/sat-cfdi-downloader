@@ -249,9 +249,9 @@ Page {
                     vigenteHasta: model.vigenteHasta
                     diasParaVencer: model.diasParaVencer
                     disponibilidad: !model.activo
-                        ? qsTr("Inactivo: no disponible para solicitudes")
-                        : (model.listoParaSolicitudes ? qsTr("Disponible para solicitudes")
-                                                      : qsTr("No disponible para solicitudes"))
+                        ? qsTr("Inactivo: no disponible para descargas")
+                        : (model.listoParaSolicitudes ? qsTr("Disponible para descargas")
+                                                      : qsTr("No disponible para descargas"))
                     seleccionada: model.id === pagina.perfiles.perfilId
                     conFoco: ListView.isCurrentItem && lista.activeFocus
 
@@ -489,15 +489,15 @@ Page {
                                     objectName: "listoSeleccion"
                                     text: {
                                         if (!pagina.perfiles.seleccionActiva)
-                                            return qsTr("Inactivo: no disponible para solicitudes")
+                                            return qsTr("Inactivo: no disponible para descargas")
                                         if (pagina.preparacion === "SinCredencial")
                                             return qsTr("Este perfil no tiene e.firma registrada.")
                                         if (pagina.perfiles.seleccionListo)
                                             return pagina.perfiles.seleccionVigenteHasta.length > 0
-                                                   ? qsTr("Lista para solicitudes · Vigente hasta %1")
+                                                   ? qsTr("Lista para descargas · Vigente hasta %1")
                                                          .arg(pagina.perfiles.seleccionVigenteHasta)
-                                                   : qsTr("Lista para solicitudes")
-                                        return qsTr("No disponible para solicitudes")
+                                                   : qsTr("Lista para descargas")
+                                        return qsTr("No disponible para descargas")
                                     }
                                     color: Theme.texto
                                     font.family: Theme.familia
@@ -510,7 +510,7 @@ Page {
                                 objectName: "ayudaEFirma"
                                 text: pagina.perfiles.tieneCredencial
                                       ? qsTr("La e.firma se guarda cifrada y su contraseña queda en el llavero de macOS.")
-                                      : qsTr("Regístrala para poder usar este perfil en solicitudes.")
+                                      : qsTr("Regístrala para poder descargar facturas con este perfil.")
                                 color: Theme.textoSecundario
                                 font.family: Theme.familia
                                 font.pixelSize: Theme.cuerpo.size

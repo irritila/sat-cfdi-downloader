@@ -381,8 +381,7 @@ Lectura:
 Decisiones reflejadas:
 
 - El worker consulta cada 10 minutos solicitudes pendientes y aplica backoff a 30 minutos tras tres verificaciones sin cambio.
-- Error, rechazada y vencida generan notificacion.
-- Terminada genera notificacion y deja paquetes listos para descarga.
+- Error, rechazada y vencida generan notificacion; Terminada con 0 paquetes o 5004 notifica "Sin facturas en el periodo" y Terminada con paquetes no notifica: la notificacion llega como "Facturas descargadas" (matriz de T024.1 D4, una por direccion).
 - La propagacion de vencimiento de solicitud a paquetes hijos es responsabilidad del worker.
 
 Preguntas para revisar:
@@ -1658,6 +1657,7 @@ flowchart TB
 - No hay pantalla para crear solicitudes manuales con filtros (T023 D6).
 - El inicio automatico solo muestra el icono de menu bar y mantiene el worker segun configuracion.
 - Las notificaciones de una descarga guiada abren Facturas en su perfil y mes; las de solicitudes previas o con filtros abren su detalle; si ya no existe, abren Facturas.
+- T024.1: las notificaciones siguen la matriz D4 (titulo del evento; cuerpo con direccion, periodo y RFC enmascarado) y las nuevas no llevan "Mostrar en Finder". El menu bar ofrece "Ver facturas" y no "Abrir carpeta de paquetes" (sigue en Diagnostico). `NuevaSolicitudPage` y su view model ya no existen.
 
 ### Decisiones reflejadas
 

@@ -35,6 +35,10 @@ TestCase {
     }
 
     function cleanup() {
+        // T024.1: barrido de vocabulario del visor (el explorador es Diagnostico).
+        const visorBarrido = findChild(caso, "visorPdfCfdi")
+        const fallasVocabulario = visorBarrido ? barrido.revisarArbol(visorBarrido) : []
+        verify(fallasVocabulario.length === 0, fallasVocabulario.join("\n"))
         Theme.oscuro = false
     }
 

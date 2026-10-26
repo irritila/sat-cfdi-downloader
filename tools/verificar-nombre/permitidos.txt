@@ -35,6 +35,8 @@ tests/presentation/TestAvisoRaizPaquetes.cpp :: SAT-CFDI-Downloader
 tests/presentation/TestPresentacion.cpp :: SAT-CFDI-Downloader
 tests/presentation/quick/FixtureAvisoRaiz.h :: SAT-CFDI-Downloader
 tests/presentation/quick/tst_aviso_raiz_paquetes.qml :: SAT-CFDI-Downloader
+# T024.1: excepcion del barrido de vocabulario para la ruta anterior del aviso.
+tests/presentation/vocabulario-excepciones.tsv :: SAT-CFDI-Downloader/paquetes
 # Documentacion de la migracion y de como revertirla.
 docs/adrs/0004-local-persistence-boundaries.md :: SAT-CFDI-Downloader
 docs/development.md :: SAT-CFDI-Downloader

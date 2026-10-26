@@ -10,7 +10,6 @@
 #include "ExportacionFacturasViewModel.h"
 #include "FacturasViewModel.h"
 #include "HistorialViewModel.h"
-#include "NuevaSolicitudViewModel.h"
 #include "PerfilesSatViewModel.h"
 #include "RespaldoViewModel.h"
 #include "SolicitudDetailViewModel.h"
@@ -24,7 +23,6 @@ PresentacionViewModels::PresentacionViewModels(SolicitudesService* solicitudes,
                                                QObject* parent, RelojUtc reloj)
     : QObject(parent)
     , m_solicitudes(new SolicitudesListModel(solicitudes, this))
-    , m_nuevaSolicitud(new NuevaSolicitudViewModel(solicitudes, perfiles, credenciales, this))
     , m_detalle(new SolicitudDetailViewModel(solicitudes, this))
     , m_perfiles(new PerfilesSatViewModel(perfiles, credenciales, this, reloj))
     , m_eFirma(new EFirmaFormViewModel(credenciales, this))
@@ -65,7 +63,6 @@ void PresentacionViewModels::conectarPreparacionDetalle(PerfilesSatService* perf
 
 void PresentacionViewModels::setAccionesSolicitud(AccionesSolicitud* acciones)
 {
-    m_nuevaSolicitud->setAccionesSolicitud(acciones);
     m_detalle->setAccionesSolicitud(acciones);
 }
 

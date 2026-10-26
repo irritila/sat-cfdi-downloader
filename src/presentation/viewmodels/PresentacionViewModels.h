@@ -27,7 +27,6 @@ class HistorialViewModel;
 class ResolucionDestinoNotificacion;
 class FuenteFacturasMes;
 class PreferenciasFacturas;
-class NuevaSolicitudViewModel;
 class PerfilesSatService;
 class PerfilesSatViewModel;
 class RespaldoViewModel;
@@ -46,7 +45,7 @@ class PresentacionViewModels : public QObject {
 public:
     // Los tres servicios son obligatorios (T005.1 DA6: el root productivo
     // pasa los persistidos; las pruebas, fakes). Construye las consultas de
-    // preparacion que necesitan NuevaSolicitudViewModel y PerfilesSatViewModel.
+    // preparacion que necesitan el detalle y PerfilesSatViewModel.
     // `reloj` (T014.3): el del aviso de vencimiento, para que diasParaVencer
     // (badge) y la notificacion usen la misma hora.
     PresentacionViewModels(SolicitudesService* solicitudes,
@@ -57,10 +56,6 @@ public:
 
     AppViewModel* app() const { return m_app; }
     SolicitudesListModel* solicitudes() const { return m_solicitudes; }
-    // T023.5: fuera de toda ruta de la app (sin pagina ni propiedad inicial).
-    // Se conserva solo para tools/video-tutorial, tools/capturas-manual y
-    // FixturePerfiles; T024 la elimina al regrabar manual y video.
-    NuevaSolicitudViewModel* nuevaSolicitud() const { return m_nuevaSolicitud; }
     SolicitudDetailViewModel* detalle() const { return m_detalle; }
     PerfilesSatViewModel* perfiles() const { return m_perfiles; }
     EFirmaFormViewModel* eFirma() const { return m_eFirma; }
@@ -133,7 +128,6 @@ private:
                                     RelojUtc reloj);
 
     SolicitudesListModel* m_solicitudes;
-    NuevaSolicitudViewModel* m_nuevaSolicitud;
     SolicitudDetailViewModel* m_detalle;
     PerfilesSatViewModel* m_perfiles;
     EFirmaFormViewModel* m_eFirma;

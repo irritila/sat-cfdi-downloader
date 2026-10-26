@@ -31,6 +31,9 @@ TestCase {
     }
 
     function cleanup() {
+        // T024.1: barrido de vocabulario del estado final (Diagnostico excluido).
+        const fallasVocabulario = barrido.revisarVentana(caso)
+        verify(fallasVocabulario.length === 0, fallasVocabulario.join("\n"))
         Theme.oscuro = false
     }
 
@@ -309,6 +312,10 @@ TestCase {
     }
 
     function sinVocabularioSat(p, contexto) {
+        // T024.1: barrido comun (normaliza acentos y plurales, inventario de
+        // excepciones) sobre toda la ventana, incluidos items ocultos.
+        const fallas = barrido.revisarVentana(p)
+        verify(fallas.length === 0, contexto + ":\n" + fallas.join("\n"))
         const textos = textosVisibles(p)
         verify(textos.length > 10, contexto + ": se recorrieron textos")
         for (const t of textos) {

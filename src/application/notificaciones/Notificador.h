@@ -8,7 +8,8 @@ namespace satcfdi {
 // application. `id` es el UUID canonico interno (SolicitudId/PerfilId); nunca
 // RFC, rutas ni datos SAT. El composition root lo traduce a
 // OSIntegration::DestinoNotificacion.
-// - Solicitud: terminada, descarga_completa, error_sat, rechazada, vencida.
+// - Solicitud: terminada (solo con 0 archivos, T024.1 D4), descarga_completa,
+//   error_sat, rechazada, sin_facturas, vencida.
 // - Perfil: credencial, efirma_por_vencer.
 struct DestinoNotificacion {
     enum class Tipo { Ninguno, Solicitud, Perfil };
@@ -25,8 +26,9 @@ struct DestinoNotificacion {
 //   el SO reemplaza una notificacion con el mismo id.
 // - tipo: "terminada", "descarga_completa", "error_sat", "rechazada", "sin_facturas",
 //   "vencida", "credencial" o "efirma_por_vencer" (T014.3).
-// - titulo/cuerpo: textos fijos (catalogo D10) sin RFC completo, Ids, token,
-//   rutas ni Mensaje SAT crudo.
+// - titulo/cuerpo: textos fijos (catalogo D10; matriz T024.1 D4: titulo del
+//   evento y cuerpo con direccion, periodo y RFC enmascarado) sin RFC
+//   completo, Ids, token, rutas, Mensaje SAT crudo ni "solicitud"/"paquete".
 struct Notificacion {
     QString id;
     QString tipo;

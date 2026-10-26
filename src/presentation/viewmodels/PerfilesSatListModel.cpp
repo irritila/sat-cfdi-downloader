@@ -10,7 +10,7 @@ QString PerfilesSatListModel::textoDe(PreparacionPerfil preparacion)
 {
     switch (preparacion) {
     case PreparacionPerfil::Verificando:
-        return tr("Verificando");
+        return tr("Comprobando");
     case PreparacionPerfil::SinCredencial:
         return tr("Sin e.firma");
     case PreparacionPerfil::Lista:

@@ -19,10 +19,9 @@ import QtQuick.Layouts
 //   SolicitudesFiltroModel local (no cambia la consulta ni el orden). Los
 //   filtros viven en AppViewModel (se conservan durante la sesion). Sin
 //   coincidencias: EstadoVacio con "Limpiar filtros".
-// - T014.3 D1: sin solicitudes y con la consulta de primer uso resuelta, el
-//   estado vacio es una guia de tres pasos con check (perfil, e.firma, primera
-//   solicitud); cada paso abre su pantalla. Mientras carga o si fallo se ve el
-//   estado vacio normal.
+// - T024.1 D11: sin solicitudes se ve el estado vacio normal ("Ver facturas").
+//   La guia de primer uso vive solo en Facturas (T014.3 D1 la ponia tambien
+//   aqui).
 // Teclado: orden de foco por las acciones del encabezado, la busqueda, los
 // filtros y la lista; foco inicial en la lista (primera fila); flechas para
 // moverse; Enter/Return/Espacio abre el detalle por id. ⌘F (Main.qml) enfoca
@@ -40,23 +39,6 @@ Page {
     readonly property bool dialogoAbierto: false
     readonly property bool puedeBuscar: pagina.conDatos
     readonly property alias campoBusqueda: busqueda
-    readonly property bool mostrarGuia: pagina.modelo.estado === SolicitudesListModel.Vacia
-                                        && pagina.app.mostrarGuiaPrimerUso
-    // T014.3 D1: pasos de la guia; `hecho` viene de AppViewModel.primerUsoPasos.
-    readonly property var pasosGuia: [
-        { nombre: "pasoPerfil", texto: qsTr("Crea un perfil SAT con el RFC del contribuyente"),
-          accion: qsTr("Perfiles SAT"), destino: "perfiles", hecho: pagina.app.primerUsoPasos[0] === true },
-        { nombre: "pasoEFirma", texto: qsTr("Registra la e.firma del perfil"),
-          accion: qsTr("Registrar e.firma"), destino: "perfiles", hecho: pagina.app.primerUsoPasos[1] === true },
-        { nombre: "pasoSolicitud", texto: qsTr("Descarga las facturas de un mes"),
-          accion: qsTr("Ver facturas"), destino: "facturas", hecho: pagina.app.primerUsoPasos[2] === true }
-    ]
-    readonly property int pasoSiguiente: pagina.pasosGuia.findIndex(p => !p.hecho)
-    // Tipo del delegado de la guia (para acceder a su boton con tipo).
-    component PasoGuia: Item {
-        property Item boton: null
-    }
-
     // T014.1 D1: filtro local enlazado al estado de sesion de AppViewModel.
     SolicitudesFiltroModel {
         id: filtro
@@ -96,8 +78,6 @@ Page {
             lista.forceActiveFocus(Qt.TabFocusReason)
         else if (error.visible)
             error.botonAccion.forceActiveFocus(Qt.TabFocusReason)
-        else if (pagina.mostrarGuia && pagina.pasoGuia(pagina.pasoSiguiente) !== null)
-            pagina.pasoGuia(pagina.pasoSiguiente).boton.forceActiveFocus(Qt.TabFocusReason)
         else
             botonPerfiles.forceActiveFocus(Qt.TabFocusReason)
     }
@@ -117,26 +97,10 @@ Page {
         }
     }
 
-    // T014.3 D1: si la guia aparece despues del foco inicial (en "Nueva
-    // solicitud"), el foco pasa al siguiente paso; no se mueve el foco del usuario.
-    Connections {
-        target: pagina.app
-        function onPrimerUsoChanged() { Qt.callLater(pagina.enfocarGuiaTrasCarga) }
-    }
-    function enfocarGuiaTrasCarga() {
-        const paso = pagina.pasoGuia(pagina.pasoSiguiente)
-        if (pagina.mostrarGuia && paso !== null && botonPerfiles.activeFocus)
-            paso.boton.forceActiveFocus(Qt.OtherFocusReason)
-    }
-
     // Diferido: la lista filtrada se hace visible cuando el proxy ya tiene filas.
     function enfocarListaTrasCarga() {
         if (lista.visible && botonPerfiles.activeFocus)
             lista.forceActiveFocus(Qt.OtherFocusReason)
-    }
-
-    function pasoGuia(indice) {
-        return repetidorPasos.itemAt(Math.max(0, indice)) as PasoGuia
     }
 
     function enfocarBusqueda() {
@@ -510,7 +474,7 @@ Page {
                 objectName: "estadoVacio"
                 anchors.centerIn: parent
                 width: Math.min(parent.width - 2 * Theme.espacioXxl, 420)
-                visible: pagina.modelo.estado === SolicitudesListModel.Vacia && !pagina.mostrarGuia
+                visible: pagina.modelo.estado === SolicitudesListModel.Vacia
                 variante: "vacio"
                 titulo: qsTr("No hay solicitudes")
                 descripcion: qsTr("Las descargas se inician desde Facturas, por perfil y mes.")
@@ -534,113 +498,6 @@ Page {
                 objectNameTitulo: "tituloSinCoincidencias"
                 objectNameAccion: "botonLimpiarFiltrosVacio"
                 onAccionSolicitada: pagina.limpiarFiltros()
-            }
-
-            // T014.3 D1: guia de primer uso (lista vacia y consulta resuelta).
-            EstadoVacio {
-                id: guia
-                objectName: "guiaPrimerUso"
-                anchors.centerIn: parent
-                width: Math.min(parent.width - 2 * Theme.espacioXxl, 480)
-                visible: pagina.mostrarGuia
-                variante: "vacio"
-                titulo: qsTr("Empieza en tres pasos")
-                descripcion: qsTr("Para descargar CFDI del SAT necesitas un perfil con su e.firma registrada.")
-                objectNameTitulo: "tituloGuiaPrimerUso"
-
-                Rectangle {
-                    Layout.fillWidth: true
-                    Layout.topMargin: Theme.espacioM
-                    implicitHeight: listaPasos.implicitHeight
-                    radius: Theme.radioTarjeta
-                    color: Theme.superficie
-                    border.width: 1
-                    border.color: Theme.separador
-
-                    ColumnLayout {
-                        id: listaPasos
-                        width: parent.width
-                        spacing: 0
-
-                        Repeater {
-                            id: repetidorPasos
-                            model: pagina.pasosGuia
-                            delegate: PasoGuia {
-                                id: paso
-                                required property var modelData
-                                required property int index
-                                boton: botonPaso
-                                readonly property bool siguiente: paso.index === pagina.pasoSiguiente
-
-                                objectName: paso.modelData.nombre
-                                Layout.fillWidth: true
-                                implicitHeight: Math.max(textosPaso.implicitHeight, botonPaso.implicitHeight) + 2 * Theme.espacioM
-                                Accessible.role: Accessible.ListItem
-                                Accessible.name: qsTr("Paso %1 de 3: %2, %3").arg(paso.index + 1).arg(paso.modelData.texto)
-                                                 .arg(paso.modelData.hecho ? qsTr("hecho") : qsTr("pendiente"))
-
-                                RowLayout {
-                                    anchors.fill: parent
-                                    anchors.leftMargin: Theme.espacioM
-                                    anchors.rightMargin: Theme.espacioM
-                                    spacing: Theme.espacioM
-
-                                    Icono {
-                                        objectName: "iconoPaso"
-                                        nombre: paso.modelData.hecho ? "check-circle" : "circle-dashed"
-                                        color: paso.modelData.hecho ? Theme.exito : Theme.textoSecundario
-                                        tamano: 18
-                                    }
-                                    ColumnLayout {
-                                        id: textosPaso
-                                        spacing: 0
-                                        Layout.fillWidth: true
-                                        Label {
-                                            text: qsTr("Paso %1").arg(paso.index + 1)
-                                            color: Theme.textoSecundario
-                                            font.family: Theme.familia
-                                            font.pixelSize: Theme.etiqueta.size
-                                            font.weight: Font.DemiBold
-                                            Accessible.ignored: true
-                                        }
-                                        Label {
-                                            objectName: "textoPaso"
-                                            text: paso.modelData.texto
-                                            color: paso.modelData.hecho ? Theme.textoSecundario : Theme.texto
-                                            font.family: Theme.familia
-                                            font.pixelSize: Theme.cuerpo.size
-                                            wrapMode: Text.WordWrap
-                                            Layout.fillWidth: true
-                                            Accessible.ignored: true
-                                        }
-                                    }
-                                    BotonAccion {
-                                        id: botonPaso
-                                        objectName: "boton_" + paso.modelData.nombre
-                                        compacto: true
-                                        variante: paso.siguiente ? "primario" : "secundario"
-                                        text: paso.modelData.accion
-                                        descripcion: paso.modelData.texto
-                                        onClicked: {
-                                            if (paso.modelData.destino === "facturas")
-                                                pagina.app.mostrarFacturas()
-                                            else
-                                                pagina.app.mostrarPerfiles()
-                                        }
-                                    }
-                                }
-                                Rectangle {
-                                    visible: paso.index < 2
-                                    anchors.left: parent.left
-                                    anchors.right: parent.right
-                                    anchors.bottom: parent.bottom
-                                    height: 1
-                                    color: Theme.separador
-                                }
-                            }
-                        }
-                    }
-                }
             }
 
             // Estado: cargando (solo si tarda mas de 300 ms)

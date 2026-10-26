@@ -102,7 +102,7 @@ void AppLifecycleController::iniciar()
             [this] { m_os.solicitarPermisoNotificaciones(); });
     connect(&m_os, &OSIntegration::notificacionPruebaSolicitada, this, [this] {
         m_os.enviarNotificacionPrueba(QStringLiteral("Archivo Fiscal"),
-                                      QStringLiteral("Notificacion de prueba."));
+                                      QStringLiteral("Notificación de prueba."));
     });
     connect(&m_os, &OSIntegration::salirSolicitado, this,
             &AppLifecycleController::solicitarSalida);

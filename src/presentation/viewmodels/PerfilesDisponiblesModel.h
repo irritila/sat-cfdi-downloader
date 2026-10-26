@@ -8,14 +8,14 @@
 
 namespace satcfdi {
 
-// Modelo de solo lectura de perfiles SAT LISTOS para solicitudes (T005.1:
-// ConsultaPreparacionPerfiles::listarListosParaSolicitudes) para el selector de
-// NuevaSolicitudPage. Roles: id (UUID texto), rfc, nombre y etiqueta
+// Modelo de solo lectura de perfiles SAT para el selector de perfil de
+// Facturas (FacturasViewModel.perfiles; T024.1 D11 retiro NuevaSolicitudPage,
+// su primer consumidor). Roles: id (UUID texto), rfc, nombre y etiqueta
 // (texto visible "RFC - nombre"). No expone credenciales.
 class PerfilesDisponiblesModel : public QAbstractListModel {
     Q_OBJECT
     QML_ELEMENT
-    QML_UNCREATABLE("Lo expone NuevaSolicitudViewModel.perfilesDisponibles.")
+    QML_UNCREATABLE("Lo expone FacturasViewModel.perfiles.")
 
     Q_PROPERTY(int count READ count NOTIFY countChanged)
 
@@ -39,7 +39,7 @@ public:
     // Fila del perfil con ese id (UUID texto) o -1.
     Q_INVOKABLE int filaDe(const QString& id) const;
 
-    // Uso interno de NuevaSolicitudViewModel (no invocable desde QML).
+    // Uso interno del view model que lo expone (no invocable desde QML).
     void reemplazar(QList<PerfilResumen> perfiles);
     bool contiene(const QString& id) const { return filaDe(id) >= 0; }
 

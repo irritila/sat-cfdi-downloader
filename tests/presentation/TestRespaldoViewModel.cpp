@@ -409,7 +409,7 @@ void TestRespaldoViewModel::respaldarAhoraProgresoYAdvertencias()
     QVERIFY(vm.tituloResultado().contains(QStringLiteral("copiado a la carpeta")));
     QVERIFY(vm.descripcionResultado().contains(QStringLiteral("2.5 MB")));
     QCOMPARE(vm.advertenciasResultado().size(), 2);
-    QVERIFY(vm.advertenciasResultado().at(0).startsWith(QStringLiteral("2 paquetes")));
+    QVERIFY(vm.advertenciasResultado().at(0).startsWith(QStringLiteral("2 archivos del SAT")));
     QVERIFY(vm.avisoCopiasSinRegistro().contains(QStringLiteral("Hay 3 copias anteriores")));
     QVERIFY(vm.avisoCopiasSinRegistro().contains(QStringLiteral("bórralas a mano")));
     QVERIFY(vm.textoFaseRespaldo().isEmpty());
@@ -542,7 +542,8 @@ void TestRespaldoViewModel::restaurarCancelarYConfirmar()
     QVERIFY(!vm.fechaRespaldoRestauracion().isEmpty());
     QCOMPARE(vm.idRespaldoRestauracion(), QStringLiteral("0011-2233-4455-6677-8899-AABB-CCDD-EEFF"));
     QCOMPARE(vm.conteosRestauracion(),
-             QStringLiteral("2 perfiles, 5 solicitudes y 1 paquete. 1 paquete ya faltaba cuando se hizo el respaldo."));
+             QStringLiteral("2 perfiles, 5 descargas y 1 archivo del SAT. 1 archivo del SAT ya faltaba cuando se hizo el "
+                            "respaldo."));
     QCOMPARE(vm.versionAppRestauracion(), QStringLiteral("Creado con Archivo Fiscal 1.0.0"));
     QVERIFY(vm.avisoMigracionRestauracion().isEmpty());
 

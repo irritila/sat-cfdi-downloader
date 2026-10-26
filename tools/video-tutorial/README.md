@@ -4,11 +4,16 @@ Graba el video tutorial cuadro a cuadro con la UI real (`SatCfdiDownloader`)
 sobre servicios fijos gobernados por un guion JSON versionado. Sin SQLite,
 worker, SAT, Keychain ni red. Corte 1: video sin voz (MP4 + `.srt` + capitulos).
 
+> Estado (T024.1): `guion-tutorial.json` describe la UI anterior a T023 y no
+> se puede grabar; todo comando de este README que lo usa queda roto hasta que
+> T024.4 lo reescriba. `guion-ejemplo.json` y las pruebas `-L video` si
+> funcionan.
+
 ## Uso
 
 ```bash
 cmake -S . -B build -G Ninja -DSATCFDI_BUILD_VIDEO_TUTORIAL=ON
-cmake --build build --target video_tutorial      # guion-tutorial.json -> build/video/tutorial.{mp4,srt,linea-tiempo.json}
+cmake --build build --target video_tutorial      # guion-tutorial.json -> build/video/tutorial.{mp4,srt,linea-tiempo.json} (roto desde T023/T024.1; se reescribe en T024.4)
 ctest --test-dir build -L video                  # validacion, sandbox, sincronia, modo rapido, barrera PDF
 
 # Directo (la grabacion siempre dentro del sandbox sin red, D15):
@@ -370,8 +375,8 @@ QuickTime (`bin_data`) que ffmpeg agrega al escribir capitulos.
 
 ## Guiones
 
-- `guion-tutorial.json`: el tutorial (especialista-guion-tutoriales); lo graba
-  `video_tutorial` (cache `SATCFDI_VIDEO_GUION`) y lo valida, sin grabar, la
+- `guion-tutorial.json`: el tutorial (especialista-guion-tutoriales); lo
+  grabaria `video_tutorial` (roto hasta T024.4) (cache `SATCFDI_VIDEO_GUION`) y lo valida, sin grabar, la
   prueba `satcfdi_video_guion_tutorial`.
 - `guion-ejemplo.json`: ejemplo corto que usan las demas pruebas.
 
@@ -478,13 +483,14 @@ sinteticos), `satcfdi_video_desactivacion_corregida` y
 
 `QSG_RENDER_LOOP=basic`, `QT_QPA_PLATFORM=cocoa`, `TZ=UTC`, locale `es_MX`,
 `Theme.oscuro=false`, sin parpadeo del cursor de texto, reloj de la app y
-"hoy" del formulario de Nueva solicitud (`setReloj`) iguales a `datos.ahora`, ventana 960x540 logica
+"hoy" de la app (`setReloj`) iguales a `datos.ahora`, ventana 960x540 logica
 en la pantalla de mayor `devicePixelRatio`, reloj de animaciones propio
 (`QAnimationDriver`: cada cuadro avanza 1/30 s). Las barreras congelan ese
 reloj. La entrada real del usuario (raton, teclado, perdida de foco) se
 descarta; solo cuentan los eventos sinteticos del guion.
 
-Riesgo residual de reloj: `NuevaSolicitudViewModel` crea su propia
+Riesgo residual de reloj (historico; `NuevaSolicitudViewModel` se retiro en
+T024.1): `NuevaSolicitudViewModel` creaba su propia
 `ConsultaPreparacionPerfiles` con el reloj del sistema (sin forma de
 inyectarlo desde fuera de `src/`). Ahi una e.firma cuyo `vigenteHasta` ya paso
 en la fecha REAL del equipo cuenta como vencida y el perfil no aparece en el
@@ -645,7 +651,9 @@ aparte, fuera del sandbox.
   primero, y su "Ver detalles tecnicos" (`filaHistorial_N/botonDetalles`)
   abre el detalle (Verificar ahora, Ver facturas). Desde Perfiles,
   `botonRegresar` vuelve a Facturas.
-- Guia "Empieza en tres pasos" (T014.3 D1): se deriva en vivo de los datos
+- Pendiente de T024.4: `guion-tutorial.json` aun apunta a `guiaPrimerUso/*` en
+  Diagnostico y a `botonNuevaSolicitud`, retirados en T024.1; no se graba hasta
+  reescribirlo. Guia "Empieza en tres pasos" (T014.3 D1, historico): se deriva en vivo de los datos
   (perfiles visibles, alguna e.firma Lista, solicitudes visibles) y se ve en
   la lista vacia. Sus botones: `guiaPrimerUso/boton_pasoPerfil`,
   `guiaPrimerUso/boton_pasoEFirma`, `guiaPrimerUso/boton_pasoSolicitud`; con

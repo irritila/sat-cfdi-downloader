@@ -146,11 +146,11 @@ QString textoEstadoMonitoreo(const OSIntegration::EstadoMonitoreo& estado)
     case Fase::Ejecutando:
         switch (estado.actividad) {
         case Actividad::Enviando:
-            return tr("Trabajando: enviando…");
+            return tr("Trabajando: pidiendo facturas al SAT…");
         case Actividad::Verificando:
-            return tr("Trabajando: verificando…");
+            return tr("Trabajando: consultando al SAT…");
         case Actividad::Descargando:
-            return tr("Trabajando: descargando…");
+            return tr("Trabajando: descargando facturas…");
         case Actividad::Ninguna:
         case Actividad::Otra:
             break;
