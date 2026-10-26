@@ -34,12 +34,12 @@
     {"archivo": "08-detalle-terminada.png", "escenario": "diagnostico-detalle-terminada", "tipo": "Captura", "cubre": "Apendice Diagnostico: detalle de solicitud y paquetes", "aserciones": {
       "visibles": ["paginaDetalleSolicitud", "seccionPaquetes"],
       "ocultos": ["estadoCargandoDetalle", "estadoErrorDetalle"],
-      "textos": ["Terminada", "1 de 3 paquetes descargados · 1 disponible · 1 vencido"]
+      "textos": ["Terminada", "1 de 3 paquetes descargados · 1 disponible · 1 vencido", "Regresar a Diagnóstico (Escape)", "Ver facturas (5)", "Recibidos · 1–30 sep 2026"]
     }},
     {"archivo": "09-detalle-incidencia.png", "escenario": "diagnostico-detalle-incidencia", "tipo": "Captura", "cubre": "Apendice Diagnostico: paquete con incidencia", "aserciones": {
       "visibles": ["paginaDetalleSolicitud", "seccionPaquetes"],
       "ocultos": ["estadoCargandoDetalle", "estadoErrorDetalle"],
-      "textos": ["Hay un paquete con error de descarga", "Error de descarga"]
+      "textos": ["Hay un paquete con error de descarga", "Error de descarga", "Regresar a Diagnóstico (Escape)", "Ver facturas (2)"]
     }},
     {"archivo": "10-finder.png", "escenario": "diagnostico-finder", "tipo": "Ilustracion", "cubre": "Rehacer 10: Finder desde Diagnostico", "aserciones": {
       "visibles": ["ilustracion"],
@@ -56,7 +56,7 @@
     {"archivo": "14-visor-pdf.png", "escenario": "visor-pdf-facturas", "tipo": "Captura", "cubre": "Rehacer 14: ver PDF desde Facturas", "aserciones": {
       "visibles": ["visorPdfCfdi", "imagenPaginaPdf_0"],
       "ocultos": ["estadoGenerandoPdf", "estadoErrorPdf"],
-      "textos": ["Guardar PDF…"],
+      "textos": ["Guardar PDF…", "Ingreso A-1268", "XAXX010101000 · 29 sep 2026 · 6340.91 MXN"],
       "propiedades": [{"objeto": "imagenPaginaPdf_0", "propiedad": "status", "valor": 1}, {"objeto": "visorPdfCfdi", "propiedad": "documentoListo", "valor": true}],
       "dibujados": ["imagenPaginaPdf_0"]
     }},
@@ -117,6 +117,11 @@
       "visibles": ["paginaRespaldo", "seccionRespaldarAhora"],
       "ocultos": ["progresoRespaldo", "noDisponibleRespaldo"],
       "textos": ["Respaldo", "Último respaldo correcto: 14 oct 2026, 09:00"]
+    }},
+    {"archivo": "27-diagnostico.png", "escenario": "diagnostico-lista", "tipo": "Captura", "cubre": "Apendice Diagnostico: lista de solicitudes", "aserciones": {
+      "visibles": ["paginaSolicitudes", "listaSolicitudes", "filaSolicitud_0"],
+      "ocultos": ["estadoCargando", "estadoError", "estadoVacio", "estadoSinCoincidencias"],
+      "textos": ["Diagnóstico", "Lista de solicitudes, 5 elemento(s)", "1–30 sep 2026", "En proceso SAT"]
     }}
   ]
 }

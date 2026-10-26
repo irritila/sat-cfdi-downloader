@@ -32,6 +32,8 @@ target_link_libraries(satcfdi_manual_capturas PRIVATE
     satcfdi_cfdi_pdf
     Qt6::Widgets
     Qt6::Quick
+    # T024.3: QPdfDocument comprueba que el PDF del visor es la factura de la fila.
+    Qt6::Pdf
     Qt6::Qml
 )
 satcfdi_enable_warnings(satcfdi_manual_capturas)

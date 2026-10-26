@@ -488,7 +488,7 @@ no solicitado antes por otro medio. Un rechazo 301-305 obliga a usar otro dia.
 Solo la salida de consola (ya enmascarada) se comparte para la evidencia; el
 ledger y los ZIP quedan locales.
 
-## Manual de usuario: capturas (T012, T024.2)
+## Manual de usuario: capturas (T012, T024.2, T024.3)
 
 Las imagenes de `docs/manual/img/` se generan con la herramienta
 `satcfdi_manual_capturas` (`tools/capturas-manual/`). Usa los view models de
@@ -535,11 +535,11 @@ T024.2 eso daba 14-visor-pdf en blanco en 3 de 8 corridas).
 ```bash
 cmake -S . -B build-capturas -G Ninja -DSATCFDI_BUILD_MANUAL_CAPTURAS=ON \
     -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt -DSATCFDI_WARNINGS_AS_ERRORS=ON
-cmake --build build-capturas --target manual_capturas          # escribe docs/manual/img (claro): solo en T024.3
+cmake --build build-capturas --target manual_capturas          # escribe docs/manual/img (claro)
 cmake --build build-capturas --target manual_capturas_oscuro   # evidencia en oscuro: build-capturas/capturas-oscuro
 cmake --build build-capturas --target manual_capturas_verificar # reproducibilidad + escaneo
 ctest --test-dir build-capturas -L capturas                    # lo mismo como pruebas, mas la asercion negativa
-# Hasta T024.3, generar en build (no en docs/manual/img):
+# Para revisar sin tocar docs/manual/img, generar en el build:
 ./build-capturas/tools/capturas-manual/satcfdi_manual_capturas \
     --salida build-capturas/capturas --textos build-capturas/capturas/textos
 # Una sola imagen:
@@ -551,10 +551,22 @@ ctest --test-dir build-capturas -L capturas                    # lo mismo como p
   antes de cargar la app (T013 D9); las ilustraciones imitan la interfaz de
   macOS y quedan en claro. Las capturas en oscuro son evidencia de revision: no
   se versionan y el manual sigue en claro.
-- El target `manual_capturas` escribe en `docs/manual/img/`; ese directorio y
-  el manual los cambia T024.3 (que tambien da de baja las capturas que ya no
-  estan en el manifiesto). Antes de T024.3 usa `--salida` bajo `build-capturas`
-  o `manual_capturas_verificar`.
+- El target `manual_capturas` escribe en `docs/manual/img/` y no borra nada:
+  al quitar una captura del manifiesto, borra tambien su PNG (la prueba
+  `satcfdi_manual_verificar` falla con un PNG que no este en el manifiesto).
+  Los PNG versionados deben tener el SHA-256 de una corrida limpia
+  (`build-capturas/capturas-reproducibles/sha256.txt`).
+- 14-visor-pdf (T024.3): el XML se arma con los datos de la fila que se abre
+  (serie y folio, fecha, emisor, receptor, total, metodo de pago, UUID) y se
+  pasa por el parser y el renderer reales; la herramienta extrae el texto del
+  PDF (`QPdfDocument`) y falla si no contiene la serie-folio, el UUID, los RFC
+  y el total de la fila. El encabezado del visor y la pagina son la misma
+  factura.
+- Apendice Diagnostico (T024.3): 27-diagnostico es la lista de Diagnostico
+  (cinco solicitudes de un mes completo por direccion, como las descargas
+  guiadas); 08 y 09 abren el detalle desde esa lista (Atras dice
+  "Diagnóstico") con "Ver facturas (N)" coherente con los paquetes
+  descargados; 10 es la carpeta de la solicitud de 08 en Finder.
 - `--textos <dir>` escribe por captura `<archivo>.png.txt` con los textos
   visibles y accesibles (`Accessible.name`/`description`, incluidos dialogos),
   para el escaneo de datos reales y para revisar las aserciones.
@@ -576,6 +588,25 @@ ctest --test-dir build-capturas -L capturas                    # lo mismo como p
 - La prueba `satcfdi_manual_enlaces` (label `docs`, `ctest -L docs`) verifica que
   cada `![...](img/X.png)` de `docs/manual/usuario.md` exista y que no haya PNG
   sin referenciar.
+- Verificacion del manual (T024.3, `tools/verificar-manual/`, label
+  `docs;manual`; corre en el build principal, sin la opcion de capturas):
+
+```bash
+cmake --build build --target verificar_manual   # o: ctest --test-dir build -L manual
+cmake -DMANUAL=docs/manual/usuario.md -DIMAGENES=docs/manual/img \
+      -DMANIFIESTO=tools/capturas-manual/escenarios.json -P tools/verificar-manual/verificar-manual.cmake
+```
+
+  Reglas: `vocabulario` ("solicitud(es)" y "paquete(s)", con y sin acento y en
+  cualquier caja, como palabra completa, solo dentro de la seccion cuyo
+  encabezado contiene "Diagnóstico", con sus subsecciones; debe haber
+  exactamente una; los `#` dentro de bloques de codigo no son encabezados),
+  `imagen` (cada `![alt](ruta)` existe y tiene texto alternativo), `huerfana`
+  (cada PNG de `docs/manual/img` esta referenciado) y `manifiesto` (cada PNG
+  esta en `escenarios.json` y cada PNG del manifiesto existe). Cada falla se
+  imprime como `FALLA <regla>: ...` con linea y seccion.
+  `satcfdi_manual_verificador` ejecuta un caso valido y un caso negativo por
+  regla sobre archivos temporales.
 
 ## Nombre de la app (T019)
 

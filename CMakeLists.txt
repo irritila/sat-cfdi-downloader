@@ -147,6 +147,9 @@ add_subdirectory(tests/integration)
 add_subdirectory(tests/presentation)
 # T012 D8: enlaces de imagenes del manual de usuario (label docs).
 add_subdirectory(tests/docs)
+# T024.3: vocabulario por secciones, imagenes y manifiesto del manual (label
+# docs;manual). Sin Qt; no depende de SATCFDI_BUILD_MANUAL_CAPTURAS.
+add_subdirectory(tools/verificar-manual)
 
 # T019: el nombre anterior de la app (y su carpeta de paquetes) solo puede
 # aparecer en las coincidencias de tools/verificar-nombre/permitidos.txt.

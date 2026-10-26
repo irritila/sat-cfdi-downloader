@@ -40,12 +40,14 @@
 #include "presentation/viewmodels/AppViewModel.h"
 #include "presentation/viewmodels/EFirmaFormViewModel.h"
 #include "presentation/viewmodels/ExportacionFacturasViewModel.h"
+#include "presentation/viewmodels/FacturasListModel.h"
 #include "presentation/viewmodels/FacturasViewModel.h"
 #include "presentation/viewmodels/FranjaMesViewModel.h"
 #include "presentation/viewmodels/HistorialViewModel.h"
 #include "presentation/viewmodels/PerfilesSatViewModel.h"
 #include "presentation/viewmodels/PresentacionViewModels.h"
 #include "presentation/viewmodels/RespaldoViewModel.h"
+#include "presentation/viewmodels/SolicitudesListModel.h"
 #include "presentation/viewmodels/VisorPdfCfdiViewModel.h"
 #include "presentation/estilo/EstiloVisual.h"
 
@@ -63,6 +65,8 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QPdfDocument>
+#include <QPdfSelection>
 #include <QQmlApplicationEngine>
 #include <QQmlComponent>
 #include <QQuickItem>
@@ -193,20 +197,24 @@ PaqueteResumen paquete(int solicitud, int n, EstadoDescarga estado)
     return p;
 }
 
-SolicitudDetalle solicitud(int n, EstadoLocal local, std::optional<EstadoSolicitudSat> sat, int dia)
+// T024.3: como las descargas guiadas de Facturas, cada solicitud cubre un mes
+// completo de una direccion (n par = Emitidos, impar = Recibidos).
+SolicitudDetalle solicitud(int n, EstadoLocal local, std::optional<EstadoSolicitudSat> sat, int mes)
 {
     SolicitudDetalle d;
+    const QDate inicio(2026, mes, 1);
+    const QDate fin = inicio.addMonths(1).addDays(-1);
     d.resumen.id = solicitudId(n);
     d.resumen.perfilRfc = kRfcPerfil;
     d.resumen.perfilNombre = perfilListo().nombre;
     d.resumen.tipoDescarga = n % 2 == 0 ? TipoDescarga::Emitidos : TipoDescarga::Recibidos;
-    d.resumen.fechaInicial = QDate(2026, 9, dia);
-    d.resumen.fechaFinal = QDate(2026, 9, dia);
+    d.resumen.fechaInicial = inicio;
+    d.resumen.fechaFinal = fin;
     d.resumen.estadoLocal = local;
     d.resumen.estadoSat = sat;
     d.resumen.creadaEn = kAhora.addSecs(qint64(n) * 60);
-    d.fechaInicialSat = QStringLiteral("2026-09-%1T00:00:00").arg(dia, 2, 10, QLatin1Char('0'));
-    d.fechaFinalSat = QStringLiteral("2026-09-%1T23:59:59").arg(dia, 2, 10, QLatin1Char('0'));
+    d.fechaInicialSat = inicio.toString(Qt::ISODate) + QStringLiteral("T00:00:00");
+    d.fechaFinalSat = fin.toString(Qt::ISODate) + QStringLiteral("T23:59:59");
     d.logs = {log(TipoEventoLog::SolicitudCreada, OrigenLog::Usuario, n)};
     if (local != EstadoLocal::Creada) {
         d.idSolicitudSat = QStringLiteral("4e80345d-917f-40bb-a98f-4a73939343%1").arg(n, 2, 10, QLatin1Char('0'));
@@ -236,7 +244,7 @@ void contarPaquetes(SolicitudDetalle& d)
 
 SolicitudDetalle solicitudTerminada()
 {
-    SolicitudDetalle d = solicitud(3, EstadoLocal::Enviada, EstadoSolicitudSat::Terminada, 3);
+    SolicitudDetalle d = solicitud(3, EstadoLocal::Enviada, EstadoSolicitudSat::Terminada, 9);
     d.numeroCfdi = 12;
     d.codigoEstadoSolicitud = QStringLiteral("5000");
     d.ultimaVerificacionEn = kAhora.addSecs(35 * 60);
@@ -251,7 +259,7 @@ SolicitudDetalle solicitudTerminada()
 
 SolicitudDetalle solicitudConIncidencia()
 {
-    SolicitudDetalle d = solicitud(5, EstadoLocal::Enviada, EstadoSolicitudSat::Terminada, 5);
+    SolicitudDetalle d = solicitud(5, EstadoLocal::Enviada, EstadoSolicitudSat::Terminada, 8);
     d.numeroCfdi = 4;
     d.codigoEstadoSolicitud = QStringLiteral("5000");
     d.ultimaVerificacionEn = kAhora.addSecs(35 * 60);
@@ -264,54 +272,142 @@ SolicitudDetalle solicitudConIncidencia()
     return d;
 }
 
-// T015.4: PDF del primer CFDI de la lista (Papeleria Ejemplo, A-1187) con el
-// parser y el renderer reales. XML sintetico: RFC genericos, nombres, UUID,
-// certificados y sellos inventados.
-QByteArray xmlCfdiFijo()
+// T024.3: solicitud Terminada con todos sus paquetes descargados.
+SolicitudDetalle solicitudCompleta(int n, int mes, int cfdi, int paquetes)
 {
-    return QStringLiteral(
-               "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-               "<cfdi:Comprobante xmlns:cfdi=\"http://www.sat.gob.mx/cfd/4\" "
-               "xmlns:tfd=\"http://www.sat.gob.mx/TimbreFiscalDigital\" Version=\"4.0\" Serie=\"A\" "
-               "Folio=\"1187\" Fecha=\"2026-09-03T18:42:10\" Sello=\"U0VMTE9GSUNUSUNJT0RFTUFOVUFM=Xk9fQ2w=\" "
-               "FormaPago=\"03\" NoCertificado=\"00001000000000000001\" SubTotal=\"1000.00\" Moneda=\"MXN\" "
-               "Total=\"1160.00\" TipoDeComprobante=\"I\" Exportacion=\"01\" MetodoPago=\"PUE\" "
-               "LugarExpedicion=\"64000\">"
-               "<cfdi:Emisor Rfc=\"%1\" Nombre=\"PAPELERIA EJEMPLO\" RegimenFiscal=\"601\"/>"
-               "<cfdi:Receptor Rfc=\"%2\" Nombre=\"CONTRIBUYENTE DE EJEMPLO\" DomicilioFiscalReceptor=\"64000\" "
-               "RegimenFiscalReceptor=\"616\" UsoCFDI=\"G03\"/>"
-               "<cfdi:Conceptos>"
-               "<cfdi:Concepto ClaveProdServ=\"44121600\" Cantidad=\"10\" ClaveUnidad=\"H87\" Unidad=\"Pieza\" "
-               "Descripcion=\"Cuaderno profesional de ejemplo\" ValorUnitario=\"60.00\" Importe=\"600.00\" "
-               "ObjetoImp=\"02\"/>"
-               "<cfdi:Concepto ClaveProdServ=\"44121700\" Cantidad=\"20\" ClaveUnidad=\"H87\" Unidad=\"Pieza\" "
-               "Descripcion=\"Bolígrafo de ejemplo\" ValorUnitario=\"20.00\" Importe=\"400.00\" "
-               "ObjetoImp=\"02\"/>"
-               "</cfdi:Conceptos>"
-               "<cfdi:Impuestos TotalImpuestosTrasladados=\"160.00\"><cfdi:Traslados>"
-               "<cfdi:Traslado Base=\"1000.00\" Impuesto=\"002\" TipoFactor=\"Tasa\" TasaOCuota=\"0.160000\" "
-               "Importe=\"160.00\"/></cfdi:Traslados></cfdi:Impuestos>"
-               "<cfdi:Complemento><tfd:TimbreFiscalDigital Version=\"1.1\" UUID=\"%3\" "
-               "FechaTimbrado=\"2026-09-03T18:43:02\" RfcProvCertif=\"%2\" "
-               "SelloCFD=\"U0VMTE9GSUNUSUNJT0RFTUFOVUFM=Xk9fQ2w=\" NoCertificadoSAT=\"00001000000000000002\" "
-               "SelloSAT=\"U0VMTE9TQVRGSUNUSUNJTw==\"/></cfdi:Complemento>"
-               "</cfdi:Comprobante>\n")
-        .arg(kRfcOtro, kRfcPerfil, QStringLiteral("5F2B1A30-4D5E-4F60-8A7B-0C1D2E3F4A5B"))
-        .toUtf8();
+    SolicitudDetalle d = solicitud(n, EstadoLocal::Enviada, EstadoSolicitudSat::Terminada, mes);
+    d.numeroCfdi = cfdi;
+    d.codigoEstadoSolicitud = QStringLiteral("5000");
+    d.ultimaVerificacionEn = kAhora.addSecs(35 * 60);
+    for (int p = 1; p <= paquetes; ++p) {
+        d.paquetes.append(paquete(n, p, EstadoDescarga::Descargado));
+    }
+    contarPaquetes(d);
+    d.logs.append(log(TipoEventoLog::VerificacionRealizada, OrigenLog::Worker, 35));
+    d.logs.append(log(TipoEventoLog::PaquetesRegistrados, OrigenLog::Worker, 35));
+    d.logs.append(log(TipoEventoLog::PaqueteDescargado, OrigenLog::Worker, 45));
+    return d;
 }
 
-// Escribe el PDF en `dir`; "" si no se pudo.
-QString pdfFijo(const QString& dir)
+// T024.3: solicitud que el SAT sigue preparando.
+SolicitudDetalle solicitudEnProceso(int n, int mes)
 {
+    SolicitudDetalle d = solicitud(n, EstadoLocal::Enviada, EstadoSolicitudSat::EnProceso, mes);
+    d.codigoEstadoSolicitud = QStringLiteral("5000");
+    d.ultimaVerificacionEn = kAhora.addSecs(35 * 60);
+    d.logs.append(log(TipoEventoLog::VerificacionRealizada, OrigenLog::Worker, 35));
+    return d;
+}
+
+// T024.3: lista del apendice Diagnostico (mas reciente primero): septiembre
+// y agosto en ambas direcciones y julio recibidas aun en el SAT.
+QList<SolicitudDetalle> solicitudesDiagnostico()
+{
+    return {solicitudEnProceso(1, 7), solicitudCompleta(2, 8, 17, 1), solicitudTerminada(),
+            solicitudCompleta(4, 9, 14, 1), solicitudConIncidencia()};
+}
+
+// T024.3: indice de CFDI de la solicitud abierta en Diagnostico, para que
+// "Ver facturas (N)" cuente los CFDI de los paquetes descargados.
+ResumenIndiceSolicitud indiceDe(int paquetesDescargados, int cfdi)
+{
+    ResumenIndiceSolicitud r;
+    r.paquetesDescargados = paquetesDescargados;
+    r.paquetesIndexados = paquetesDescargados;
+    r.cfdiTotal = cfdi;
+    return r;
+}
+
+// T015.4, T024.3: PDF de la factura de la fila que se abre en Facturas (la
+// misma factura sintetica que muestra el encabezado del visor), con el parser
+// y el renderer reales. El XML se arma con los datos de la fila (serie, folio,
+// fecha, emisor, receptor, total, metodo de pago, UUID); lo demas (conceptos,
+// regimenes, certificados y sellos) es inventado. Subtotal + IVA 16 % = total.
+QByteArray xmlCfdiDeFila(const FilaCfdi& f)
+{
+    const auto escapar = [](const QString& t) { return t.toHtmlEscaped(); };
+    const qsizetype guion = f.serieFolio.indexOf(QLatin1Char('-'));
+    const QString serie = guion < 0 ? QString() : f.serieFolio.left(guion);
+    const QString folio = guion < 0 ? f.serieFolio : f.serieFolio.mid(guion + 1);
+    const qint64 totalCentavos = qRound64(f.total.toDouble() * 100.0);
+    const qint64 subtotalCentavos = qRound64(double(totalCentavos) / 1.16);
+    const auto importe = [](qint64 c) {
+        return QStringLiteral("%1.%2").arg(c / 100).arg(c % 100, 2, 10, QLatin1Char('0'));
+    };
+    const QString subtotal = importe(subtotalCentavos);
+    const QString iva = importe(totalCentavos - subtotalCentavos);
+    const QString metodo = f.metodoPago.isEmpty() ? QStringLiteral("PUE") : f.metodoPago;
+    const QString formaPago = metodo == QStringLiteral("PPD") ? QStringLiteral("99") : QStringLiteral("03");
+    const QString fechaTimbrado = QDateTime::fromString(f.fechaIso, Qt::ISODate).addSecs(52).toString(Qt::ISODate);
+    const QString xml = QStringLiteral(
+               "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+               "<cfdi:Comprobante xmlns:cfdi=\"http://www.sat.gob.mx/cfd/4\" "
+               "xmlns:tfd=\"http://www.sat.gob.mx/TimbreFiscalDigital\" Version=\"4.0\"%1 Folio=\"%2\" "
+               "Fecha=\"%3\" Sello=\"U0VMTE9GSUNUSUNJT0RFTUFOVUFM=Xk9fQ2w=\" FormaPago=\"%4\" "
+               "NoCertificado=\"00001000000000000001\" SubTotal=\"%5\" Moneda=\"%6\" Total=\"%7\" "
+               "TipoDeComprobante=\"%8\" Exportacion=\"01\" MetodoPago=\"%9\" LugarExpedicion=\"64000\">")
+               .arg(serie.isEmpty() ? QString() : QStringLiteral(" Serie=\"%1\"").arg(escapar(serie)), escapar(folio),
+                    f.fechaIso, formaPago, subtotal, f.moneda, f.total, f.tipo, metodo)
+           + QStringLiteral(
+                 "<cfdi:Emisor Rfc=\"%1\" Nombre=\"%2\" RegimenFiscal=\"601\"/>"
+                 "<cfdi:Receptor Rfc=\"%3\" Nombre=\"%4\" DomicilioFiscalReceptor=\"64000\" "
+                 "RegimenFiscalReceptor=\"601\" UsoCFDI=\"G03\"/>"
+                 "<cfdi:Conceptos>"
+                 "<cfdi:Concepto ClaveProdServ=\"84111506\" Cantidad=\"1\" ClaveUnidad=\"E48\" "
+                 "Unidad=\"Servicio\" Descripcion=\"Servicio de ejemplo\" ValorUnitario=\"%5\" Importe=\"%5\" "
+                 "ObjetoImp=\"02\"/>"
+                 "</cfdi:Conceptos>"
+                 "<cfdi:Impuestos TotalImpuestosTrasladados=\"%6\"><cfdi:Traslados>"
+                 "<cfdi:Traslado Base=\"%5\" Impuesto=\"002\" TipoFactor=\"Tasa\" TasaOCuota=\"0.160000\" "
+                 "Importe=\"%6\"/></cfdi:Traslados></cfdi:Impuestos>")
+                 .arg(f.emisorRfc, escapar(f.emisorNombre.toUpper()), f.receptorRfc,
+                      escapar(f.receptorNombre.toUpper()), subtotal, iva)
+           + QStringLiteral(
+                 "<cfdi:Complemento><tfd:TimbreFiscalDigital Version=\"1.1\" UUID=\"%1\" "
+                 "FechaTimbrado=\"%2\" RfcProvCertif=\"%3\" "
+                 "SelloCFD=\"U0VMTE9GSUNUSUNJT0RFTUFOVUFM=Xk9fQ2w=\" NoCertificadoSAT=\"00001000000000000002\" "
+                 "SelloSAT=\"U0VMTE9TQVRGSUNUSUNJTw==\"/></cfdi:Complemento>"
+                 "</cfdi:Comprobante>\n")
+                 .arg(f.uuid, fechaTimbrado, kRfcOtro);
+    return xml.toUtf8();
+}
+
+// Nombre como la app ("CFDI-<serie><folio>-<UUID 8>.pdf").
+QString nombrePdfDeFila(const FilaCfdi& f)
+{
+    QString serieFolio = f.serieFolio;
+    serieFolio.remove(QLatin1Char('-'));
+    return QStringLiteral("CFDI-%1-%2.pdf").arg(serieFolio, f.uuid.left(8));
+}
+
+// Escribe en `dir` el PDF de la fila y comprueba, extrayendo su texto, que es
+// la misma factura (serie-folio, UUID, RFC y total de la fila); "" si no.
+QString pdfDeFila(const QString& dir, const FilaCfdi& f)
+{
+    const ResultadoParseoCfdi cfdi = parsearCfdi(xmlCfdiDeFila(f));
     RenderizadorPdfCfdi renderer;
-    const auto pdf = renderer.renderizar(parsearCfdi(xmlCfdiFijo()));
+    const auto pdf = renderer.renderizar(cfdi);
     if (!pdf.esExito()) {
+        std::fprintf(stderr, "visor-pdf-facturas: el renderer no genero el PDF de la fila\n");
         return {};
     }
-    const QString ruta = QDir(dir).filePath(QStringLiteral("CFDI-A1187-5F2B1A30.pdf"));
-    QFile f(ruta);
-    if (!f.open(QIODevice::WriteOnly) || f.write(pdf.valor().contenido) != pdf.valor().contenido.size()) {
+    const QString ruta = QDir(dir).filePath(nombrePdfDeFila(f));
+    QFile archivo(ruta);
+    if (!archivo.open(QIODevice::WriteOnly) || archivo.write(pdf.valor().contenido) != pdf.valor().contenido.size()) {
         return {};
+    }
+    archivo.close();
+    QPdfDocument documento;
+    if (documento.load(ruta) != QPdfDocument::Error::None || documento.pageCount() < 1) {
+        std::fprintf(stderr, "visor-pdf-facturas: no se pudo leer el PDF generado\n");
+        return {};
+    }
+    const QString texto = documento.getAllText(0).text();
+    for (const QString& esperado : {f.serieFolio, f.uuid, f.emisorRfc, f.receptorRfc, f.total}) {
+        if (esperado.isEmpty() || !texto.contains(esperado)) {
+            std::fprintf(stderr, "visor-pdf-facturas: el PDF no contiene '%s' de la fila\n", qPrintable(esperado));
+            return {};
+        }
     }
     return ruta;
 }
@@ -967,17 +1063,27 @@ QHash<QString, Generador> generadores()
     });
     g.insert(QStringLiteral("visor-pdf-facturas"), [](const QString& r, QSize t) {
         QTemporaryDir dir;
-        const QString pdf = dir.isValid() ? pdfFijo(dir.path()) : QString();
-        if (pdf.isEmpty()) {
-            std::fprintf(stderr, "visor-pdf-facturas: no se pudo generar el PDF sintetico\n");
+        if (!dir.isValid()) {
             return false;
         }
-        return capturaApp(r, t, [pdf](Grafo& g, QQuickWindow* v) {
-            g.previsualizacion.rutaPdf = pdf;
+        return capturaApp(r, t, [&dir](Grafo& g, QQuickWindow* v) {
             if (!g.vmFacturas()->seleccionarMes(2026, 9)) {
                 return false;
             }
             esperar(300);
+            // T024.3: el PDF se genera desde la fila que se abre, para que el
+            // encabezado del visor y la pagina sean la misma factura.
+            const FilaFactura* fila = g.vmFacturas()->modelo()->filaEn(0);
+            if (!fila) {
+                std::fprintf(stderr, "visor-pdf-facturas: la lista de septiembre no tiene filas\n");
+                return false;
+            }
+            g.previsualizacion.rutaPdf = pdfDeFila(dir.path(), fila->cfdi);
+            g.previsualizacion.nombreSugerido = nombrePdfDeFila(fila->cfdi);
+            if (g.previsualizacion.rutaPdf.isEmpty()) {
+                std::fprintf(stderr, "visor-pdf-facturas: no se pudo generar el PDF sintetico\n");
+                return false;
+            }
             if (!g.vmFacturas()->previsualizar(0)) {
                 std::fprintf(stderr, "visor-pdf-facturas: no se pudo previsualizar\n");
                 return false;
@@ -1092,9 +1198,25 @@ QHash<QString, Generador> generadores()
     });
 
     // ---- Apendice Diagnostico ----
+    // T024.3: lista de Diagnostico (abierta desde Facturas, como el menu).
+    g.insert(QStringLiteral("diagnostico-lista"), [](const QString& r, QSize t) {
+        return capturaApp(r, t, [](Grafo& g, QQuickWindow* v) {
+            g.solicitudes.detalles = solicitudesDiagnostico();
+            g.vms->solicitudes()->refrescar(); // la lista se leyo al cargar, sin datos
+            g.vms->app()->mostrarDiagnostico();
+            esperar(500);
+            return g.pagina(v, QStringLiteral("paginaSolicitudes")) != nullptr;
+        });
+    });
+    // T024.3: el detalle se abre desde la lista de Diagnostico (Atras dice
+    // "Diagnóstico").
     g.insert(QStringLiteral("diagnostico-detalle-terminada"), [](const QString& r, QSize t) {
         return capturaApp(r, t, [](Grafo& g, QQuickWindow* v) {
-            g.solicitudes.detalles = {solicitudTerminada()};
+            g.solicitudes.detalles = solicitudesDiagnostico();
+            g.catalogo.resumenIndice = indiceDe(1, 5);
+            g.vms->solicitudes()->refrescar();
+            g.vms->app()->mostrarDiagnostico();
+            esperar(300);
             if (!g.vms->app()->abrirDetalle(solicitudId(3).texto())) {
                 return false;
             }
@@ -1104,8 +1226,12 @@ QHash<QString, Generador> generadores()
     });
     g.insert(QStringLiteral("diagnostico-detalle-incidencia"), [](const QString& r, QSize t) {
         return capturaApp(r, t, [](Grafo& g, QQuickWindow* v) {
-            g.solicitudes.detalles = {solicitudConIncidencia()};
+            g.solicitudes.detalles = solicitudesDiagnostico();
+            g.catalogo.resumenIndice = indiceDe(1, 2);
             g.existencia.porPaquete.insert(idPaquete(5, 2), ExistenciaPaquete::NoEncontrado);
+            g.vms->solicitudes()->refrescar();
+            g.vms->app()->mostrarDiagnostico();
+            esperar(300);
             if (!g.vms->app()->abrirDetalle(solicitudId(5).texto())) {
                 return false;
             }

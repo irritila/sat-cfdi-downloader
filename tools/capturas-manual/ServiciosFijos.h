@@ -202,17 +202,19 @@ public:
 };
 
 // T015.4: PDF fijo (generado con el renderer real a partir de un XML
-// sintetico, ver main.cpp). Guardar no escribe nada.
+// sintetico armado con la fila que se abre, ver main.cpp). Guardar no escribe
+// nada.
 class PrevisualizacionFija final : public PrevisualizacionCfdi {
 public:
     QString rutaPdf; // vacio = Fallo
+    QString nombreSugerido;
 
     QFuture<ResultadoGenerar> generar(const SolicitudId&, const QString&, int) override
     {
         if (rutaPdf.isEmpty()) {
             return listo(ResultadoGenerar::fallo(MotivoPrevisualizacion::Fallo));
         }
-        return listo(ResultadoGenerar::exito(PdfPrevisualizado{rutaPdf, QStringLiteral("CFDI-A1187-5F2B1A30.pdf")}));
+        return listo(ResultadoGenerar::exito(PdfPrevisualizado{rutaPdf, nombreSugerido}));
     }
     QFuture<ResultadoGuardar> guardarComo(const QString&, const QString&) override
     {
