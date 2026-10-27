@@ -27,6 +27,13 @@
 	<key>CFBundleShortVersionString</key>
 	<string>${MACOSX_BUNDLE_SHORT_VERSION_STRING}</string>
 
+	<!-- T020 D4/D5: icono compilado de AppIcon.icon (Assets.car para macOS 26,
+	     AppIcon.icns de respaldo), copiado a Resources por src/app. -->
+	<key>CFBundleIconName</key>
+	<string>AppIcon</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+
 	<key>LSMinimumSystemVersion</key>
 	<string>${SATCFDI_MACOS_MINIMUM_VERSION}</string>
 

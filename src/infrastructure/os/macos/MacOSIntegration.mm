@@ -298,8 +298,8 @@ bool esNotificacionNoPermitida(NSError* error)
         && error.code == UNErrorCodeNotificationsNotAllowed;
 }
 
-// Icono plantilla monocromo (documento con flecha de descarga y, T014.4 D2,
-// insignia de estado). isMask -> NSImage template: macOS lo tine segun
+// Icono plantilla monocromo (T020 D6: carpeta del logo en contorno y, T014.4
+// D2, insignia de estado). isMask -> NSImage template: macOS lo tine segun
 // apariencia clara/oscura.
 QIcon crearIconoPlantilla(OSIntegration::EstadoIcono estado)
 {

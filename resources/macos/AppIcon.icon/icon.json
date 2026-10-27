@@ -1,0 +1,79 @@
+{
+  "fill" : {
+    "solid" : "srgb:0.01961,0.18039,0.10980,1.00000"
+  },
+  "fill-specializations" : [
+    {
+      "appearance" : "dark",
+      "value" : {
+        "solid" : "srgb:0.05490,0.12157,0.09412,1.00000"
+      }
+    }
+  ],
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "image-name" : "icono-frente.svg",
+          "name" : "frente"
+        }
+      ],
+      "name" : "frente",
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : false,
+        "value" : 0.5
+      }
+    },
+    {
+      "layers" : [
+        {
+          "image-name" : "icono-hoja-anterior.svg",
+          "name" : "hoja-anterior"
+        },
+        {
+          "image-name" : "icono-hoja-posterior.svg",
+          "name" : "hoja-posterior"
+        }
+      ],
+      "name" : "hojas",
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : false,
+        "value" : 0.5
+      }
+    },
+    {
+      "layers" : [
+        {
+          "image-name" : "icono-pestana.svg",
+          "name" : "pestana"
+        },
+        {
+          "image-name" : "icono-carpeta.svg",
+          "name" : "carpeta"
+        }
+      ],
+      "name" : "carpeta",
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : false,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "squares" : [
+      "macOS"
+    ]
+  }
+}

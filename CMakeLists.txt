@@ -150,6 +150,11 @@ add_subdirectory(tests/docs)
 # T024.3: vocabulario por secciones, imagenes y manifiesto del manual (label
 # docs;manual). Sin Qt; no depende de SATCFDI_BUILD_MANUAL_CAPTURAS.
 add_subdirectory(tools/verificar-manual)
+# T020: restricciones de los SVG de resources/branding (label branding) y, con
+# SATCFDI_BUILD_BRANDING, la herramienta de wordmark/PNG de control.
+add_subdirectory(tools/branding)
+# T020 D5: el icono compilado versionado coincide con su manifiesto (sin Xcode).
+add_subdirectory(tools/app-icon)
 
 # T019: el nombre anterior de la app (y su carpeta de paquetes) solo puede
 # aparecer en las coincidencias de tools/verificar-nombre/permitidos.txt.

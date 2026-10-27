@@ -1,0 +1,4 @@
+#!/bin/sh
+# T020 D5: regenera (o con --check compara) el icono compilado de la app.
+# Ver regenerar_app_icon.py. Requiere Xcode; el build normal no lo usa.
+exec /usr/bin/env python3 -I "$(dirname "$0")/regenerar_app_icon.py" "$@"

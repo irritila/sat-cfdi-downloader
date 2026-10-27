@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#052E1C" />
+  <g transform="translate(512 512) scale(1.242718446602) translate(-512 -512)">
+    <g transform="translate(-4 -12)">
+      <path d="M244 728              V308 Q244 272 280 272              H400 L456 332              H728 Q764 332 764 368              V728 Q764 768 724 768              H284 Q244 768 244 728Z" fill="#15924F" />
+    </g>
+  </g>
+  <g transform="translate(512 512) scale(1.242718446602) translate(-512 -512)">
+    <g transform="translate(-4 -12)">
+      <rect x="288" y="300" width="88" height="32" rx="8" fill="#C9A227" />
+    </g>
+  </g>
+  <g transform="translate(512 512) scale(1.242718446602) translate(-512 -512)">
+    <g transform="translate(-4 -12)">
+      <rect x="466" y="274" width="240" height="366" rx="28" fill="#F4F1E8" />
+    </g>
+  </g>
+  <g transform="translate(512 512) scale(1.242718446602) translate(-512 -512)">
+    <g transform="translate(-4 -12)">
+      <rect x="338" y="338" width="318" height="350" rx="40" fill="#15924F" />
+      <rect x="354" y="354" width="286" height="334" rx="24" fill="#F4F1E8" />
+    </g>
+  </g>
+  <g transform="translate(512 512) scale(1.242718446602) translate(-512 -512)">
+    <g transform="translate(-4 -12)">
+      <path d="M244 548              L764 476              V728 Q764 768 724 768              H284 Q244 768 244 728Z" fill="#15924F" />
+      <path d="M260 562              L748 494              V728 Q748 752 724 752              H284 Q260 752 260 728Z" fill="#0A5F38" />
+    </g>
+  </g>
+</svg>

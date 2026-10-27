@@ -629,6 +629,27 @@ cmake -DRAIZ=. -P tools/verificar-nombre/verificar-nombre.cmake
   y falla con cada coincidencia fuera de la lista; avisa de entradas que ya no
   cubren nada.
 
+## Logo e icono de la app (T020)
+
+- SVG de marca, Inter versionada y herramienta `tools/branding`
+  (`branding_render` se compila siempre; ctest `satcfdi_branding_wordmark`
+  regenera el wordmark y lo compara; con `-DSATCFDI_BUILD_BRANDING=ON`, targets
+  `branding_wordmark` y `branding_hoja`): ver `resources/branding/README.md`.
+- Icono de la app: `resources/macos/AppIcon.icon` compilado y versionado en
+  `resources/macos/AppIcon-compilado/`; el build normal solo lo copia a
+  `Contents/Resources` y no requiere Xcode. Tras cambiar el `.icon` o una capa
+  de `resources/branding/icono/`, ejecutar `tools/app-icon/regenerar_app_icon`
+  (Xcode 26) y `--check`; ctest `satcfdi_app_icon_manifiesto` detecta un
+  icono desactualizado (fuentes, salidas, o `minimo-macos` distinto de
+  `SATCFDI_MACOS_MINIMUM_VERSION`). Ver `tools/app-icon/README.md`.
+- Icon Composer: para revisar, abrir `resources/macos/AppIcon.icon` y cerrar
+  sin guardar (si guarda solo, descartar con git). Si se acepta un guardado,
+  su `icon.json` pasa a ser la fuente: ejecutar `regenerar_app_icon` y
+  `--check` y versionar juntos `.icon`, `AppIcon-compilado/` y manifiesto.
+- Dock y Finder pueden mostrar el icono anterior en cache: `touch` al bundle
+  y relanzar, o
+  `/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f <bundle>`.
+
 ## Video tutorial (T017)
 
 `tools/video-tutorial/` graba el video tutorial cuadro a cuadro desde el guion

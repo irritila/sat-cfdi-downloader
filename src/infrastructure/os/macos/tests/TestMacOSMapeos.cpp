@@ -1,7 +1,6 @@
 // Pruebas de los mapeos puros de MacOSIntegration (T004, corte C). Sin
 // AppKit, permisos, bundle firmado ni sesion grafica.
 
-#include "infrastructure/os/macos/IconoMenuBar.h"
 #include "infrastructure/os/macos/MacOSMapeos.h"
 #include "infrastructure/os/MenuBarDefinicion.h"
 
@@ -345,39 +344,7 @@ private slots:
         QCOMPARE(textoEstadoIcono(E::Pausado), QStringLiteral("Archivo Fiscal: en pausa"));
         QCOMPARE(textoEstadoIcono(E::Atencion), QStringLiteral("Archivo Fiscal: requiere atención"));
     }
-
-    void variantesIcono()
-    {
-        using E = satcfdi::OSIntegration::EstadoIcono;
-        const QList<E> estados{E::Normal, E::Pausado, E::Trabajando, E::Atencion};
-        for (const int lado : {18, 36}) {
-            QList<QImage> imagenes;
-            for (E e : estados) {
-                const QImage img = dibujarIconoMenuBar(e, lado);
-                QCOMPARE(img.size(), QSize(lado, lado));
-                QVERIFY(img.hasAlphaChannel());
-                // Plantilla: solo negro con alfa (el color lo pone macOS) y no vacia.
-                bool tieneTinta = false;
-                for (int y = 0; y < lado; ++y) {
-                    for (int x = 0; x < lado; ++x) {
-                        const QColor c = img.pixelColor(x, y);
-                        if (c.alpha() > 0) {
-                            tieneTinta = true;
-                            QCOMPARE(c.red() + c.green() + c.blue(), 0);
-                        }
-                    }
-                }
-                QVERIFY(tieneTinta);
-                imagenes.append(img);
-            }
-            // Las cuatro variantes son distinguibles entre si.
-            for (int i = 0; i < imagenes.size(); ++i) {
-                for (int j = i + 1; j < imagenes.size(); ++j) {
-                    QVERIFY2(imagenes.at(i) != imagenes.at(j), qPrintable(QStringLiteral("%1 vs %2").arg(i).arg(j)));
-                }
-            }
-        }
-    }
+    // Render del icono: TestIconoMenuBar.cpp (T020 D6).
 };
 
 QTEST_GUILESS_MAIN(TestMacOSMapeos)

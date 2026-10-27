@@ -45,7 +45,7 @@ Ejemplo: `T001-modelo-fisico-sqlite.md`.
 | [T018](T018-roles-produccion-video.md) | Completada | Roles de guion, audio y motion design (previa a T017) |
 | [T017](T017-video-tutorial.md) | Completada | Video tutorial automatizado con voz, subtitulos y musica |
 | [T019](T019-renombrar-archivo-fiscal.md) | Completada | Renombrar la app a "Archivo Fiscal" |
-| [T020](T020-logo.md) | Pendiente | Logo e iconos en SVG |
+| [T020](T020-logo.md) | Completada | Logo e iconos en SVG |
 | [T021](T021-manual-capturas-al-dia.md) | Absorbida por T024 | Manual y capturas al dia con la app |
 | [T022](T022-intermitencia-pruebas-graficas-video.md) | Completada con limitaciones | Intermitencia de pruebas graficas del video |
 | [T023](T023-rediseno-ui-caso-de-uso.md) | Completada | Rediseno de la UI centrado en las facturas del perfil fiscal (epica) |

@@ -1,0 +1,20 @@
+# T020 D5: manifiesto del icono compilado. Lo escribe
+# tools/app-icon/regenerar_app_icon; no editar a mano. Campos separados por
+# tabulador. satcfdi_app_icon_manifiesto (ctest, sin Xcode) recalcula los
+# hashes y falla si una fuente o salida no coincide.
+xcode	Xcode 26.2 / Build version 17C52
+minimo-macos	26.0
+comando	xcrun actool resources/macos/AppIcon.icon --compile <tmp> --platform macosx --minimum-deployment-target 26.0 --app-icon AppIcon --output-partial-info-plist <tmp>/partial.plist
+fuente	3a1c3a51c3e2a21690f968fe7b36db54c2d63b34b84182d93ab5f316c6d53d7d	resources/branding/icono/icono-carpeta.svg
+fuente	09e597d493e7f952179d48e122193bfbd9e2e3cfd92277293d63eff5592c522d	resources/branding/icono/icono-pestana.svg
+fuente	a3c1c2c70569b23b660e29d893c38b27da71b1c02680575bf8996efb92565ce2	resources/branding/icono/icono-hoja-posterior.svg
+fuente	aa991446cce57e43bb819e5933f453c915ad236c271efb81837c715060167276	resources/branding/icono/icono-hoja-anterior.svg
+fuente	601e202cc6d1e4c606a457d39c508403d19cc4654eee8bb884393f56ed50d2a5	resources/branding/icono/icono-frente.svg
+fuente	3a1c3a51c3e2a21690f968fe7b36db54c2d63b34b84182d93ab5f316c6d53d7d	resources/macos/AppIcon.icon/Assets/icono-carpeta.svg
+fuente	601e202cc6d1e4c606a457d39c508403d19cc4654eee8bb884393f56ed50d2a5	resources/macos/AppIcon.icon/Assets/icono-frente.svg
+fuente	aa991446cce57e43bb819e5933f453c915ad236c271efb81837c715060167276	resources/macos/AppIcon.icon/Assets/icono-hoja-anterior.svg
+fuente	a3c1c2c70569b23b660e29d893c38b27da71b1c02680575bf8996efb92565ce2	resources/macos/AppIcon.icon/Assets/icono-hoja-posterior.svg
+fuente	09e597d493e7f952179d48e122193bfbd9e2e3cfd92277293d63eff5592c522d	resources/macos/AppIcon.icon/Assets/icono-pestana.svg
+fuente	79ac7b6525891e4404ee28224c08231575b2b89b7247b5ca03a3b48474c62d7b	resources/macos/AppIcon.icon/icon.json
+salida	899e4d432751d6a179487dbd2fe74ddcdd329df7f31512ff37a2b7082256a3b1	resources/macos/AppIcon-compilado/Assets.car
+salida	eebb38e1fb4c038879bb3e97e4046624ad6e8eb40fd5e265d84e2f62428b5422	resources/macos/AppIcon-compilado/AppIcon.icns

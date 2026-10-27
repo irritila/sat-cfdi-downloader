@@ -13,6 +13,25 @@ qt_add_executable(satcfdi_app MACOSX_BUNDLE
     RespaldoPlataformaFactory.cpp
 )
 
+# T020 D4/D5: icono de la app. Se compila fuera del build con
+# tools/app-icon/regenerar_app_icon (Xcode) y se versiona; aqui solo se copia a
+# Contents/Resources. CFBundleIconName/CFBundleIconFile estan en
+# resources/macos/Info.plist.in. La copia es un POST_BUILD declarado antes que
+# el de la firma (mas abajo): los POST_BUILD corren en orden de declaracion,
+# asi que el icono siempre queda sellado. LINK_DEPENDS hace que un cambio solo
+# del icono reenlace y vuelva a copiar y firmar.
+set(_satcfdi_app_icon
+    "${PROJECT_SOURCE_DIR}/resources/macos/AppIcon-compilado/Assets.car"
+    "${PROJECT_SOURCE_DIR}/resources/macos/AppIcon-compilado/AppIcon.icns")
+add_custom_command(TARGET satcfdi_app POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_BUNDLE_CONTENT_DIR:satcfdi_app>/Resources"
+    COMMAND "${CMAKE_COMMAND}" -E copy ${_satcfdi_app_icon}
+            "$<TARGET_BUNDLE_CONTENT_DIR:satcfdi_app>/Resources/"
+    COMMENT "Copiando el icono de la app a Contents/Resources"
+    VERBATIM
+)
+set_property(TARGET satcfdi_app APPEND PROPERTY LINK_DEPENDS ${_satcfdi_app_icon})
+
 # Bundle id efectivo para los servicios Keychain del SecretStore.
 target_compile_definitions(satcfdi_app PRIVATE
     SATCFDI_BUNDLE_ID="${SATCFDI_BUNDLE_IDENTIFIER}"

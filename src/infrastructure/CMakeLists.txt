@@ -119,6 +119,7 @@ if(APPLE)
             Qt6::Core
         PRIVATE
             Qt6::Gui
+            Qt6::Svg
             Qt6::Widgets
             "-framework AppKit"
             "-framework Foundation"
@@ -127,6 +128,21 @@ if(APPLE)
     )
 
     satcfdi_enable_warnings(satcfdi_os_macos)
+
+    # T020 D6: SVG del menu bar (propuesta A) embebidos; IconoMenuBar los
+    # renderiza con QSvgRenderer en :/menubar/menu-{18,36}{,-trabajando,-pausa,-atencion}.svg.
+    set(_satcfdi_menu_svg_dir ${PROJECT_SOURCE_DIR}/resources/branding/menu)
+    set(_satcfdi_menu_svg)
+    foreach(_lado 18 36)
+        foreach(_estado "" "-trabajando" "-pausa" "-atencion")
+            list(APPEND _satcfdi_menu_svg ${_satcfdi_menu_svg_dir}/menu-${_lado}${_estado}.svg)
+        endforeach()
+    endforeach()
+    qt_add_resources(satcfdi_os_macos "satcfdi_menubar"
+        PREFIX "/menubar"
+        BASE ${_satcfdi_menu_svg_dir}
+        FILES ${_satcfdi_menu_svg}
+    )
 
     # Pruebas de los mapeos puros (sin permisos ni bundle). Viven junto al
     # adaptador porque tests/** pertenece a otros cortes en T004.
@@ -141,6 +157,28 @@ if(APPLE)
     add_test(NAME satcfdi_os_macos_tests COMMAND satcfdi_os_macos_tests)
     set_tests_properties(satcfdi_os_macos_tests PROPERTIES LABELS "unit;macos")
     satcfdi_enable_warnings(satcfdi_os_macos_tests)
+
+    # T020 D6: render del icono del menu bar (cuatro estados, 18/36 px) contra
+    # goldens de mascara alfa versionados. SATCFDI_REGENERAR_GOLDENS_MENU=1
+    # los reescribe; SATCFDI_CAPTURAS_MENU=<dir> escribe capturas claro/oscuro.
+    qt_add_executable(satcfdi_os_macos_menubar_tests
+        os/macos/tests/TestIconoMenuBar.cpp
+    )
+    set_target_properties(satcfdi_os_macos_menubar_tests PROPERTIES AUTOMOC ON)
+    target_compile_definitions(satcfdi_os_macos_menubar_tests PRIVATE
+        SATCFDI_MENU_GOLDENS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/os/macos/tests/goldens"
+    )
+    target_link_libraries(satcfdi_os_macos_menubar_tests PRIVATE
+        satcfdi_os_macos
+        Qt6::Gui
+        Qt6::Test
+    )
+    add_test(NAME satcfdi_os_macos_menubar_tests COMMAND satcfdi_os_macos_menubar_tests)
+    set_tests_properties(satcfdi_os_macos_menubar_tests PROPERTIES
+        LABELS "unit;macos"
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    )
+    satcfdi_enable_warnings(satcfdi_os_macos_menubar_tests)
 
     # T025.4: bookmark/ruta canonica de la carpeta de respaldo y actividad de
     # sistema reales (QTemporaryDir, sin permisos ni bundle).
