@@ -72,6 +72,7 @@ Ejemplo: `T001-modelo-fisico-sqlite.md`.
 | [T026.2](T026.2-servicio-exportacion.md) | Completada | Servicio de exportacion |
 | [T026.3](T026.3-ui-exportacion.md) | Completada | UI y documentacion de la exportacion |
 | [T027](T027-clic-perdido-cambio-de-app-video.md) | Pendiente (sin refinar, baja) | Clic perdido por cambio de app en pruebas del video |
+| [T028](T028-zona-horaria-respaldo.md) | Pendiente (sin refinar, baja) | Zona horaria de las fechas de Respaldo |
 
 ## Estados
 
