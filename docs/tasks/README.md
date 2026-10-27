@@ -55,10 +55,10 @@ Ejemplo: `T001-modelo-fisico-sqlite.md`.
 | [T023.4](T023.4-pantalla-facturas.md) | Completada | Pantalla Facturas |
 | [T023.5](T023.5-historial-diagnostico-notificaciones.md) | Completada | Historial, diagnostico, notificaciones y menu bar |
 | [T023.6](T023.6-sin-facturas-5004.md) | Completada | Periodo sin facturas (Rechazada 5004) no es error |
-| [T024](T024-vocabulario-y-materiales-flujo-facturas.md) | Refinada | Vocabulario y materiales del flujo centrado en facturas (epica) |
+| [T024](T024-vocabulario-y-materiales-flujo-facturas.md) | Completada | Vocabulario y materiales del flujo centrado en facturas (epica) |
 | [T024.1](T024.1-vocabulario-y-notificaciones.md) | Completada | Vocabulario de la app y notificaciones |
 | [T024.2](T024.2-fakes-sinteticos-materiales.md) | Completada | Fakes sinteticos comunes para capturas y video |
-| [T024.3](T024.3-manual-y-capturas.md) | En revision del usuario | Manual y capturas al dia |
+| [T024.3](T024.3-manual-y-capturas.md) | Completada | Manual y capturas al dia |
 | [T024.4](T024.4-video-tutorial-nuevo.md) | Completada | Video tutorial nuevo |
 | [T025](T025-respaldo-en-la-nube.md) | Completada | Respaldo cifrado en la nube del usuario (epica) |
 | [T025.1](T025.1-formato-y-cifrado-respaldo.md) | Completada | Formato y cifrado del respaldo |

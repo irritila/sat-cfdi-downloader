@@ -2,7 +2,7 @@
 
 ## Estado
 
-Pendiente (refinada 2026-10-26). Epica: se implementa en T024.1 a T024.4. Absorbe T021.
+Completada (2026-10-27). Epica: se implementa en T024.1 a T024.4. Absorbe T021.
 
 ## Prioridad y tamano
 
@@ -65,7 +65,7 @@ T023 (D3, D4, D10) llevo el recorrido principal a Facturas por mes y dejo solici
 
 ## Resultado
 
-Pendiente.
+T024.1 (vocabulario y notificaciones), T024.2 (fakes sinteticos), T024.3 (manual y capturas) y T024.4 (video nuevo de 5:52 con voz `cedar`) completadas. Pendientes derivados: T027 (clic perdido al cambiar de app) y la diferencia de zona horaria entre Respaldo e Historial.
 
 ## Referencias
 
