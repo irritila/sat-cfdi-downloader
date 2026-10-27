@@ -427,6 +427,7 @@ Page {
                                     : qsTr("El SAT aún no entrega paquetes.")
                             Layout.fillWidth: true
                             Layout.topMargin: Theme.espacioXl
+                            Layout.alignment: Qt.AlignHCenter
                         }
 
                         Repeater {

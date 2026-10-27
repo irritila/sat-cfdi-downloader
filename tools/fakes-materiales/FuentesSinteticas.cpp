@@ -57,14 +57,28 @@ const PerfilDeclarado* FuenteFacturasSintetica::perfil(const PerfilId& id) const
     return nullptr;
 }
 
-void FuenteFacturasSintetica::fijarMes(const PerfilId& id, int anio, int mes, const MesDeclarado& declarado)
+void FuenteFacturasSintetica::fijarMes(const PerfilId& id, int anio, int mes, const MesDeclarado& declarado,
+                                       bool avisar)
 {
     for (PerfilDeclarado& p : m_datos.perfiles) {
         if (p.id == id) {
             p.meses.insert(claveMes(anio, mes), declarado);
         }
     }
-    emit datosCambiados(id);
+    if (avisar) {
+        emit datosCambiados(id);
+    }
+}
+
+void FuenteFacturasSintetica::declararPerfil(const PerfilDeclarado& perfil)
+{
+    for (PerfilDeclarado& p : m_datos.perfiles) {
+        if (p.id == perfil.id) {
+            p = perfil;
+            return;
+        }
+    }
+    m_datos.perfiles.append(perfil);
 }
 
 MesDeclarado FuenteFacturasSintetica::mes(const PerfilId& id, MesCalendario mes) const
@@ -83,10 +97,12 @@ QList<CfdiMensual> FuenteFacturasSintetica::facturas(const PerfilId& id, MesCale
     const MesDeclarado m = this->mes(id, mes);
     QList<CfdiMensual> r;
     if (!direccion || *direccion == TipoDescarga::Emitidos) {
-        r += cfdisDelMes(*p, mes.anio(), mes.mes(), TipoDescarga::Emitidos, m.emitidas);
+        r += m.listaEmitidas ? *m.listaEmitidas
+                             : cfdisDelMes(*p, mes.anio(), mes.mes(), TipoDescarga::Emitidos, m.emitidas);
     }
     if (!direccion || *direccion == TipoDescarga::Recibidos) {
-        r += cfdisDelMes(*p, mes.anio(), mes.mes(), TipoDescarga::Recibidos, m.recibidas);
+        r += m.listaRecibidas ? *m.listaRecibidas
+                              : cfdisDelMes(*p, mes.anio(), mes.mes(), TipoDescarga::Recibidos, m.recibidas);
     }
     if (!direccion) {
         std::stable_sort(r.begin(), r.end(), [](const CfdiMensual& a, const CfdiMensual& b) {
@@ -150,6 +166,54 @@ EvaluacionCoberturaMensual FuenteFacturasSintetica::evaluacion(const PerfilId& i
         return e;
     }
     const MesDeclarado m = this->mes(id, mes);
+    if (m.estadoEmitidas && m.estadoRecibidas) {
+        // T024.4: por direccion, con la precedencia del dominio.
+        using D = EstadoDireccionSintetico;
+        const std::array<std::pair<CoberturaDireccion*, D>, 2> dirs{std::pair{&e.emitidos, *m.estadoEmitidas},
+                                                                    std::pair{&e.recibidos, *m.estadoRecibidas}};
+        int n = 0;
+        bool atencion = false;
+        bool preparando = false;
+        int disponibles = 0;
+        for (const auto& [d, estado] : dirs) {
+            const TipoDescarga direccion = d == &e.emitidos ? TipoDescarga::Emitidos : TipoDescarga::Recibidos;
+            switch (estado) {
+            case D::Disponibles:
+                completar(*d, e.frontera);
+                ++disponibles;
+                break;
+            case D::Preparando: {
+                const SolicitudId reserva = solicitudIdFija(claveMes(mes.anio(), mes.mes()) * 10 + 3 + n);
+                for (HuecoCobertura& h : d->huecos) {
+                    h.reservadoPor = {reserva};
+                    h.libres.clear();
+                }
+                d->solicitudesEnCurso = {reserva};
+                preparando = true;
+                break;
+            }
+            case D::RequiereAtencion: {
+                const CausaMensual causa{m.causa, direccion,
+                                         solicitudIdFija(claveMes(mes.anio(), mes.mes()) * 10 + 7 + n)};
+                if (!e.causa) {
+                    e.causa = causa;
+                }
+                e.causas.append(causa);
+                atencion = true;
+                break;
+            }
+            case D::SinDescargar:
+                break;
+            }
+            ++n;
+        }
+        e.estado = atencion     ? EstadoMes::RequiereAtencion
+                   : preparando ? EstadoMes::Preparando
+                   : disponibles == 2 ? EstadoMes::Disponibles
+                   : disponibles == 1 ? EstadoMes::DisponiblesParcialmente
+                                      : EstadoMes::SinDescargar;
+        return e;
+    }
     switch (m.estado) {
     case EstadoMesSintetico::Disponibles:
         completar(e.emitidos, e.frontera);
@@ -230,6 +294,9 @@ QFuture<FuenteFacturasSintetica::ResultadoPreplan> FuenteFacturasSintetica::plan
 QFuture<FuenteFacturasSintetica::ResultadoEjecucion> FuenteFacturasSintetica::ejecutar(const PreplanGuiado& preplan,
                                                                                       const DecisionesGuiadas&)
 {
+    if (alEjecutar) {
+        alEjecutar(preplan); // T024.4: el mes pasa a Preparando como con el worker real
+    }
     if (m_datos.solicitudesCreadasAlEjecutar) {
         EjecucionGuiada e;
         if (*m_datos.solicitudesCreadasAlEjecutar > 0) {

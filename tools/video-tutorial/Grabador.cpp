@@ -12,11 +12,18 @@
 
 #include "presentation/viewmodels/AppViewModel.h"
 #include "presentation/viewmodels/EFirmaFormViewModel.h"
+#include "presentation/viewmodels/ExportacionFacturasViewModel.h"
 #include "presentation/viewmodels/PerfilesSatViewModel.h"
 #include "presentation/viewmodels/PresentacionViewModels.h"
+#include "presentation/viewmodels/RespaldoViewModel.h"
 
+#include <QClipboard>
+#include <QDesktopServices>
 #include <QDir>
 #include <QElapsedTimer>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QFile>
 #include <QGuiApplication>
 #include <QImage>
@@ -46,11 +53,9 @@ namespace video {
 
 namespace {
 
-constexpr int kAncho = 960; // D4/D8: ventana logica 960x540 a 2x
-constexpr int kAlto = 540;
+// D4/D8: ventana logica a 2x; T024.4: tamano del guion ("ventana",
+// 960x540 por omision).
 constexpr int kEscala = 2;
-constexpr int kAnchoPx = kAncho * kEscala;
-constexpr int kAltoPx = kAlto * kEscala;
 // D8/D21: lienzo 1280x720 logicos = 2560x1440 px; la ventana va a escala 1.
 constexpr int kLienzoAncho = 1280;
 constexpr int kLienzoAlto = 720;
@@ -67,6 +72,132 @@ void imprimir(const QString& s)
 {
     std::fprintf(stderr, "%s\n", qPrintable(s));
     std::fflush(stderr);
+}
+
+// T024.4 (D10): durante la grabacion nada puede abrir un dialogo nativo,
+// Finder, Vista Previa ni tocar el portapapeles. QDesktopServices (y
+// Qt.openUrlExternally) llegan aqui en vez de al sistema.
+class VigilanteNativo final : public QObject {
+    Q_OBJECT
+public:
+    QString violacion;
+    void registrar(const QString& v)
+    {
+        if (violacion.isEmpty()) {
+            violacion = v;
+        }
+    }
+public slots:
+    void abrirUrl(const QUrl& url)
+    {
+        registrar(QStringLiteral("la UI intento abrir %1 con el sistema (Finder, Vista Previa o navegador)")
+                      .arg(url.scheme() == QLatin1String("file") ? QStringLiteral("un archivo local") : url.scheme()));
+    }
+};
+
+// Dialogos de QtQuick.Dialogs (FileDialog, FolderDialog, ColorDialog,
+// MessageDialog...) visibles: en macOS serian paneles nativos que la
+// grabacion no captura. Los cierra y devuelve su clase y objectName.
+QString dialogoNativoVisible(QObject* raiz)
+{
+    for (QObject* o : raiz->findChildren<QObject*>()) {
+        if (o->inherits("QQuickAbstractDialog") && o->property("visible").toBool()) {
+            const QString nombre = QStringLiteral("%1 '%2'")
+                                       .arg(QString::fromLatin1(o->metaObject()->className()), o->objectName());
+            QMetaObject::invokeMethod(o, "close");
+            return nombre;
+        }
+    }
+    return {};
+}
+
+// Simbolos del keycap (03-motion 3): modificadores y la tecla.
+QStringList simbolosKeycap(const Accion& a)
+{
+    static const QHash<QString, QString> kModificadores{{QStringLiteral("Cmd"), QStringLiteral("⌘")},
+                                                        {QStringLiteral("Shift"), QStringLiteral("⇧")},
+                                                        {QStringLiteral("Opcion"), QStringLiteral("⌥")},
+                                                        {QStringLiteral("Ctrl"), QStringLiteral("⌃")}};
+    static const QHash<QString, QString> kTeclas{
+        {QStringLiteral("Enter"), QStringLiteral("↩")},   {QStringLiteral("Escape"), QStringLiteral("esc")},
+        {QStringLiteral("Tab"), QStringLiteral("⇥")},     {QStringLiteral("Abajo"), QStringLiteral("↓")},
+        {QStringLiteral("Arriba"), QStringLiteral("↑")},  {QStringLiteral("Izquierda"), QStringLiteral("←")},
+        {QStringLiteral("Derecha"), QStringLiteral("→")}, {QStringLiteral("Espacio"), QStringLiteral("espacio")},
+        {QStringLiteral("Retroceso"), QStringLiteral("⌫")}, {QStringLiteral("Coma"), QStringLiteral(",")},
+        {QStringLiteral("Punto"), QStringLiteral(".")}};
+    QStringList r;
+    for (const QString& m : a.modificadores) {
+        r.append(kModificadores.value(m));
+    }
+    r.append(kTeclas.value(a.tecla, a.tecla));
+    return r;
+}
+
+int codigoTecla(const QString& tecla)
+{
+    static const QHash<QString, int> kTeclas{
+        {QStringLiteral("Enter"), Qt::Key_Return},       {QStringLiteral("Escape"), Qt::Key_Escape},
+        {QStringLiteral("Tab"), Qt::Key_Tab},            {QStringLiteral("Abajo"), Qt::Key_Down},
+        {QStringLiteral("Arriba"), Qt::Key_Up},          {QStringLiteral("Izquierda"), Qt::Key_Left},
+        {QStringLiteral("Derecha"), Qt::Key_Right},      {QStringLiteral("Espacio"), Qt::Key_Space},
+        {QStringLiteral("Retroceso"), Qt::Key_Backspace}, {QStringLiteral("Coma"), Qt::Key_Comma},
+        {QStringLiteral("Punto"), Qt::Key_Period}};
+    const auto it = kTeclas.constFind(tecla);
+    if (it != kTeclas.constEnd()) {
+        return *it;
+    }
+    return int(tecla.at(0).toUpper().unicode()); // A-Z y 0-9 coinciden con Qt::Key_*
+}
+
+// Cmd = Qt::ControlModifier en macOS (Qt intercambia Ctrl y Cmd).
+Qt::KeyboardModifiers modificadoresQt(const QStringList& m)
+{
+    Qt::KeyboardModifiers r;
+    if (m.contains(QStringLiteral("Cmd"))) {
+        r |= Qt::ControlModifier;
+    }
+    if (m.contains(QStringLiteral("Shift"))) {
+        r |= Qt::ShiftModifier;
+    }
+    if (m.contains(QStringLiteral("Opcion"))) {
+        r |= Qt::AltModifier;
+    }
+    if (m.contains(QStringLiteral("Ctrl"))) {
+        r |= Qt::MetaModifier;
+    }
+    return r;
+}
+
+// Flickable que mueve `desplazar`: el control o su primer Flickable interno
+// (p. ej. el contentItem de un ScrollView).
+QQuickItem* flickableDe(QQuickItem* item)
+{
+    if (item == nullptr || item->inherits("QQuickFlickable")) {
+        return item;
+    }
+    for (QQuickItem* hijo : item->findChildren<QQuickItem*>()) {
+        if (hijo->inherits("QQuickFlickable")) {
+            return hijo;
+        }
+    }
+    return nullptr;
+}
+
+// objectName (o clase) del primer Flickable ancestro en cuya vista NO cabe
+// el centro de `item`; vacio si esta a la vista o no hay Flickable.
+QString fueraDeVista(QQuickItem* item)
+{
+    for (QQuickItem* p = item->parentItem(); p != nullptr; p = p->parentItem()) {
+        if (!p->inherits("QQuickFlickable")) {
+            continue;
+        }
+        const QPointF centro = item->mapToItem(p, QPointF(item->width() / 2, item->height() / 2));
+        if (centro.y() < 0 || centro.y() > p->height() || centro.x() < 0 || centro.x() > p->width()) {
+            return p->objectName().isEmpty() ? QString::fromLatin1(p->metaObject()->className()) : p->objectName();
+        }
+        return {};
+    }
+    return {};
 }
 
 // Interprete del guion: aplica acciones por cuadro sobre la ventana real y
@@ -93,13 +224,16 @@ private:
     QString describirPunto(QPointF punto) const;
     QString diagnosticoControl();
     bool ejecutarEscena(const Capitulo& cap, const Escena& esc);
+    bool ejecutarMarca(const QString& nombre, int cuadros);
     bool aplicarInstantanea(const Capitulo& cap, const Escena& esc, const Accion& a);
     bool aplicarCuadro(const Capitulo& cap, const Escena& esc, const Accion& a, int local);
     void moverCursor(QPointF p, bool hover);
     void retirarHover();
     QPointF puntoDestino(QQuickItem* item, const Accion& a) const;
     void enviarRaton(QEvent::Type tipo, Qt::MouseButton boton, Qt::MouseButtons botones);
-    void enviarTecla(int tecla, const QString& texto);
+    void enviarTecla(int tecla, const QString& texto, Qt::KeyboardModifiers modificadores = Qt::NoModifier);
+    QString vigilar();
+    QByteArray lineaDeTiempo() const;
     void asegurarActiva();
     bool fallar(const QString& m)
     {
@@ -135,7 +269,15 @@ private:
     CuadroApp* m_cuadroApp = nullptr;
     QList<CueSalida> m_cues; // linea de tiempo de la salida (= .srt)
     int m_cuesVerificados = 0;
-    QPointF m_cursor{kAncho / 2.0, kAlto / 2.0};
+    int m_ancho = kVentanaAnchoPorOmision; // T024.4: ventana del guion
+    int m_alto = kVentanaAltoPorOmision;
+    QPointF m_cursor{kVentanaAnchoPorOmision / 2.0, kVentanaAltoPorOmision / 2.0};
+    QString m_escena;               // "capitulo/escena" en curso (mensajes D10)
+    QJsonArray m_sinEfecto;         // clics sinEfecto (linea de tiempo)
+    VigilanteNativo m_vigilante;
+    QPointer<QQuickItem> m_flickable; // desplazar
+    double m_desdeY = 0;
+    double m_haciaY = 0;
     QString m_ultimoClic; // diagnostico: punto y control bajo el ultimo clic
     QPointF m_desde;
     QPointF m_hacia;
@@ -150,7 +292,18 @@ private:
 
 bool Sesion::cargar()
 {
+    m_ancho = m_guion.ventanaAncho;
+    m_alto = m_guion.ventanaAlto;
+    m_cursor = QPointF(m_ancho / 2.0, m_alto / 2.0);
     m_reloj.install();
+    // D10: abrir URLs con el sistema y el portapapeles quedan vigilados.
+    for (const QString& esquema : {QStringLiteral("file"), QStringLiteral("http"), QStringLiteral("https"),
+                                   QStringLiteral("mailto")}) {
+        QDesktopServices::setUrlHandler(esquema, &m_vigilante, "abrirUrl");
+    }
+    QObject::connect(QGuiApplication::clipboard(), &QClipboard::dataChanged, &m_vigilante, [this] {
+        m_vigilante.registrar(QStringLiteral("la UI escribio en el portapapeles (D10: usa un clic con \"sinEfecto\")"));
+    });
     m_vms = std::make_unique<PresentacionViewModels>(&m_demo.solicitudes, &m_demo.perfiles, &m_demo.credenciales,
                                                      nullptr, [ahora = m_demo.ahora()] { return ahora; });
     m_vms->setAccionesSolicitud(&m_demo.acciones);
@@ -169,6 +322,17 @@ bool Sesion::cargar()
     m_vms->setControlRespaldo(&m_demo.respaldo);
     m_vms->setControlRestauracion(&m_demo.restauracion);
     m_vms->setDatosPreviosRestauracion(&m_demo.datosPrevios);
+    // T024.4 (6.2): "Copiar" e "Imprimir…" de la clave de recuperacion se ven
+    // como en la app, pero portapapeles e impresion son nativos (D10): usarlos
+    // con efecto hace fallar la grabacion.
+    m_vms->setImpresionTexto([this](const QString&, const QString&) {
+        m_vigilante.registrar(QStringLiteral("la UI pidio imprimir (D10: usa un clic con \"sinEfecto\")"));
+        return false;
+    });
+    m_vms->setCopiaTextoSecreto([this](const QString&) {
+        m_vigilante.registrar(QStringLiteral("la UI escribio en el portapapeles (D10: usa un clic con \"sinEfecto\")"));
+        return false;
+    });
 
     m_engine = std::make_unique<QQmlApplicationEngine>();
     m_engine->addUrlInterceptor(&m_interceptor);
@@ -192,9 +356,9 @@ bool Sesion::cargar()
         m_ventana->setScreen(s);
         m_ventana->setPosition(s->availableGeometry().topLeft() + QPoint(40, 40));
     }
-    m_ventana->setMinimumSize(QSize(kAncho, kAlto));
-    m_ventana->setMaximumSize(QSize(kAncho, kAlto));
-    m_ventana->resize(kAncho, kAlto);
+    m_ventana->setMinimumSize(QSize(m_ancho, m_alto));
+    m_ventana->setMaximumSize(QSize(m_ancho, m_alto));
+    m_ventana->resize(m_ancho, m_alto);
 
     QQmlComponent componente(m_engine.get(),
                              QUrl::fromLocalFile(QStringLiteral(SATCFDI_VIDEO_QML_DIR "/Superposicion.qml")));
@@ -208,6 +372,9 @@ bool Sesion::cargar()
     m_overlay->setParentItem(m_ventana->contentItem());
     m_overlay->setProperty("cursor", m_cursor);
     m_overlay->setProperty("rotuloHerramienta", m_guion.rotuloHerramienta);
+    m_overlay->setProperty("iconoApp", QUrl::fromLocalFile(QStringLiteral(SATCFDI_VIDEO_QML_DIR
+                                                                          "/../../../resources/branding/icono/"
+                                                                          "icono-compuesto.svg")));
     // T022 D2: diagnostico de clics (solo observa; inactivo con ruta vacia).
     m_diag = std::make_unique<DiagnosticoClic>(m_op.rutaDiagnosticoClic, m_ventana, m_overlay);
     m_diag->setSemantico({{QStringLiteral("pagina"), m_vms->app(), "pagina", {}},
@@ -257,6 +424,13 @@ bool Sesion::cargar()
     m_lienzo->setProperty("semilla", comp.semilla);
     m_lienzo->setProperty("velocidad", comp.velocidad);
     m_lienzo->setProperty("paleta", comp.paleta);
+    m_lienzo->setProperty("ventanaAncho", m_ancho);
+    // T024.4: portada y cierre en cuadros de la salida.
+    m_lienzo->setProperty("cuadrosPortada", m_salida.cuadrosPortada);
+    m_lienzo->setProperty("cuadrosCierre", m_salida.cuadrosCierre);
+    m_lienzo->setProperty("inicioCierre",
+                          m_salida.cuadrosCierre > 0 ? m_salida.totalCuadros - m_salida.cuadrosCierre : -1);
+    m_lienzo->setProperty("ventanaAlto", m_alto);
     m_lienzo->setFlag(Qt::WindowDoesNotAcceptFocus, true);
     m_lienzo->installEventFilter(&m_filtro);
     if (QScreen* s = pantallaGrabacion()) {
@@ -306,10 +480,31 @@ bool Sesion::bombear(bool renderizar)
         imprimir(QStringLiteral("aviso: ") + m);
         m_interceptor.bloqueadas.clear();
     }
-    if (!m_demo.perfiles.violacion.isEmpty()) {
-        return fallar(m_demo.perfiles.violacion);
+    if (const QString v = vigilar(); !v.isEmpty()) {
+        return fallar(m_escena.isEmpty() ? v : QStringLiteral("escena '%1': %2").arg(m_escena, v));
     }
     return true;
+}
+
+// D10 (T024.4): perfil no declarado, Finder, Vista Previa, URL al sistema,
+// portapapeles o dialogo nativo visible. Vacio si nada.
+QString Sesion::vigilar()
+{
+    if (const QString v = m_demo.violacion(); !v.isEmpty()) {
+        return v;
+    }
+    if (!m_vigilante.violacion.isEmpty()) {
+        return m_vigilante.violacion;
+    }
+    if (m_ventana != nullptr) {
+        if (const QString d = dialogoNativoVisible(m_ventana); !d.isEmpty()) {
+            m_vigilante.registrar(QStringLiteral("se abrio el dialogo nativo %1 (D10: usa un clic con \"sinEfecto\", "
+                                                 "la ilustracion selectorArchivos/selectorCarpeta y elegirCarpeta)")
+                                      .arg(d));
+            return m_vigilante.violacion;
+        }
+    }
+    return {};
 }
 
 // Un cuadro: avanza el reloj 1/30 s, procesa eventos, captura y envia.
@@ -349,7 +544,7 @@ bool Sesion::cuadro()
         return fallar(QStringLiteral("grabWindow devolvio una imagen vacia en el cuadro %1").arg(m_cuadro));
     }
     if (m_grabando) {
-        m_cuadroApp->setImagen(normalizar(app, kAnchoPx, kAltoPx, m_avisoEscala, "la ventana"));
+        m_cuadroApp->setImagen(normalizar(app, m_ancho * kEscala, m_alto * kEscala, m_avisoEscala, "la ventana"));
         m_lienzo->setProperty("cuadro", m_escritos);
         // D21: el texto quemado corresponde al cue vigente de la linea de
         // tiempo del .srt.
@@ -464,12 +659,18 @@ void Sesion::asegurarActiva()
     }
 }
 
-void Sesion::enviarTecla(int tecla, const QString& texto)
+void Sesion::enviarTecla(int tecla, const QString& texto, Qt::KeyboardModifiers modificadores)
 {
     asegurarActiva();
-    QKeyEvent abajo(QEvent::KeyPress, tecla, Qt::NoModifier, texto);
+    // T024.4: con modificadores primero el mapa de atajos (los Shortcut de
+    // QML no ven un sendEvent directo); si nadie lo toma, el evento normal.
+    if (modificadores != Qt::NoModifier
+        && QWindowSystemInterface::handleShortcutEvent(m_ventana, 0, tecla, modificadores, 0, 0, 0, texto)) {
+        return;
+    }
+    QKeyEvent abajo(QEvent::KeyPress, tecla, modificadores, texto);
     QCoreApplication::sendEvent(m_ventana, &abajo);
-    QKeyEvent arriba(QEvent::KeyRelease, tecla, Qt::NoModifier, texto);
+    QKeyEvent arriba(QEvent::KeyRelease, tecla, modificadores, texto);
     QCoreApplication::sendEvent(m_ventana, &arriba);
 }
 
@@ -511,6 +712,40 @@ bool Sesion::aplicarInstantanea(const Capitulo& cap, const Escena& esc, const Ac
         break;
     case TipoAccion::MostrarSolicitudes:
         e = m_demo.mostrarSolicitudes(a.claves);
+        break;
+    case TipoAccion::AvanzarMes:
+        e = m_demo.avanzarMes(a.perfil, a.mes, a.direccion, a.estado, a.causa);
+        break;
+    case TipoAccion::ElegirCarpeta: {
+        // Lo que el FolderDialog entregaria (D10): solo la URL de la carpeta.
+        const QUrl url = QUrl::fromLocalFile(a.ruta);
+        if (a.destino == QLatin1String("exportacion")) {
+            m_vms->exportacionFacturas()->elegirDestino(url);
+        } else {
+            m_vms->respaldo()->elegirCarpeta(url);
+        }
+        break;
+    }
+    case TipoAccion::ProgresoRespaldo:
+        e = m_demo.progresoRespaldo(a.fase, a.bytes, a.total);
+        break;
+    case TipoAccion::ResultadoRespaldo:
+        e = m_demo.resultadoRespaldo(a.resultado, a.fecha, a.bytes);
+        break;
+    case TipoAccion::EsperarRespaldo:
+        e = esperarRespaldo(m_vms->respaldo(), a.resultado, a.timeoutMs, bombearDibujando);
+        break;
+    case TipoAccion::MostrarBanner: {
+        const QVariantList ns = m_demo.notificaciones(a.parametros, e);
+        if (e.isEmpty()) {
+            m_overlay->setProperty("banners", ns);
+            m_overlay->setProperty("inicioBanner", m_cuadro);
+            m_overlay->setProperty("finBanner", -1000);
+        }
+        break;
+    }
+    case TipoAccion::OcultarBanner:
+        m_overlay->setProperty("finBanner", m_cuadro);
         break;
     case TipoAccion::SeleccionarArchivoEFirma: {
         // Lo que el dialogo nativo entregaria: solo una URL (el archivo
@@ -627,6 +862,15 @@ bool Sesion::aplicarCuadro(const Capitulo& cap, const Escena& esc, const Accion&
                                             .arg(kEsperaControlMs)
                                         + diagnosticoControl());
             }
+            // T024.4: un control fuera de la vista de su Flickable (p. ej. el
+            // contenido desplazable de los dialogos de Respaldo/Exportar) no se
+            // alcanza: el guion debe `desplazar` ese Flickable antes.
+            if (const QString f = fueraDeVista(m_objetivo); !f.isEmpty()) {
+                return fallarEscena(cap, esc,
+                                    QStringLiteral("'%1' queda fuera de la vista de '%2': usa desplazar sobre '%2' "
+                                                   "antes del mover")
+                                        .arg(a.objetivo, f));
+            }
             m_desde = m_cursor;
             m_hacia = puntoDestino(m_objetivo, a);
             // M6: sin `cuadros`, la duracion depende de la distancia; el plan
@@ -657,6 +901,19 @@ bool Sesion::aplicarCuadro(const Capitulo& cap, const Escena& esc, const Accion&
         // despues. M4: el hover solo existe del press al release.
         if (local == a.pausa) {
             QMetaObject::invokeMethod(m_overlay, "clic");
+            if (a.sinEfecto) {
+                // D10: queda registrado (stdout y linea de tiempo) que este
+                // clic no llega a la app (abriria un dialogo nativo o Finder).
+                const QString sobre = describirPunto(m_cursor);
+                std::printf("clic sinEfecto: escena %s, objetivo '%s', cuadro %d, %s\n", qPrintable(m_escena),
+                            qPrintable(m_objetivo.isNull() ? QString() : m_objetivo->objectName()), m_cuadro,
+                            qPrintable(sobre));
+                std::fflush(stdout);
+                m_sinEfecto.append(QJsonObject{
+                    {QStringLiteral("escena"), m_escena},
+                    {QStringLiteral("objetivo"), m_objetivo.isNull() ? QString() : m_objetivo->objectName()},
+                    {QStringLiteral("cuadro"), m_cuadro}});
+            }
             if (!a.sinEfecto) {
                 asegurarActiva();
                 m_ultimoClic = describirPunto(m_cursor);
@@ -705,16 +962,50 @@ bool Sesion::aplicarCuadro(const Capitulo& cap, const Escena& esc, const Accion&
         }
         return m_error.isEmpty();
     }
-    case TipoAccion::Tecla:
-        if (local == 0) {
-            static const QHash<QString, int> kTeclas{{QStringLiteral("Enter"), Qt::Key_Return},
-                                                    {QStringLiteral("Escape"), Qt::Key_Escape},
-                                                    {QStringLiteral("Tab"), Qt::Key_Tab},
-                                                    {QStringLiteral("Abajo"), Qt::Key_Down},
-                                                    {QStringLiteral("Arriba"), Qt::Key_Up}};
-            enviarTecla(kTeclas.value(a.tecla), a.tecla == QLatin1String("Enter") ? QStringLiteral("\r") : QString());
+    case TipoAccion::Tecla: {
+        // T024.4 (03-motion 3): con keycap, el dibujo entra en 0-5 y el
+        // evento sale en el cuadro 6; sin keycap, en el 0.
+        if (local == 0 && a.keycap) {
+            m_overlay->setProperty("teclasKeycap", simbolosKeycap(a));
+            m_overlay->setProperty("inicioKeycap", m_cuadro);
+        }
+        if (local == (a.keycap ? kCuadroEventoKeycap : 0)) {
+            QString texto;
+            if (a.tecla == QLatin1String("Enter")) {
+                texto = QStringLiteral("\r");
+            } else if (a.modificadores.isEmpty() && a.tecla.size() == 1) {
+                texto = a.tecla.toLower();
+            }
+            enviarTecla(codigoTecla(a.tecla), texto, modificadoresQt(a.modificadores));
         }
         return m_error.isEmpty();
+    }
+    case TipoAccion::Desplazar: {
+        // T024.4 (03-motion 5): contentY por cuadro con InOutQuad.
+        if (local == 0) {
+            QQuickItem* item = esperarControl(a.objetivo);
+            if (!m_error.isEmpty()) {
+                return false;
+            }
+            m_flickable = flickableDe(item);
+            if (m_flickable.isNull()) {
+                return fallarEscena(cap, esc,
+                                    QStringLiteral("desplazar: '%1' no es (ni contiene) un Flickable visible").arg(a.objetivo)
+                                        + diagnosticoControl());
+            }
+            m_desdeY = m_flickable->property("contentY").toDouble();
+            const double maximo = std::max(0.0, m_flickable->property("contentHeight").toDouble() - m_flickable->height()
+                                                    + m_flickable->property("originY").toDouble());
+            m_haciaY = std::clamp(a.hasta ? *a.hasta : m_desdeY + a.delta,
+                                  m_flickable->property("originY").toDouble(), maximo);
+        }
+        if (!m_flickable.isNull()) {
+            const double t = double(local + 1) / double(a.cuadros);
+            const double k = t < 0.5 ? 2 * t * t : 1 - std::pow(-2 * t + 2, 2) / 2;
+            m_flickable->setProperty("contentY", m_desdeY + (m_haciaY - m_desdeY) * k);
+        }
+        return m_error.isEmpty();
+    }
     default:
         return true; // esperar y esperarLinea: solo pasan cuadros
     }
@@ -723,6 +1014,7 @@ bool Sesion::aplicarCuadro(const Capitulo& cap, const Escena& esc, const Accion&
 bool Sesion::ejecutarEscena(const Capitulo& cap, const Escena& esc)
 {
     m_grabando = m_op.escenas.isEmpty() || m_op.escenas.contains(idEscena(cap, esc));
+    m_escena = idEscena(cap, esc);
     qsizetype siguiente = 0; // primera accion aun no iniciada
     const Accion* activa = nullptr;
     for (int local = 0; local < esc.duracion; ++local) {
@@ -756,6 +1048,34 @@ bool Sesion::ejecutarEscena(const Capitulo& cap, const Escena& esc)
     return true;
 }
 
+// Linea de tiempo con los clics sinEfecto de esta grabacion (D10).
+QByteArray Sesion::lineaDeTiempo() const
+{
+    QJsonObject raiz = QJsonDocument::fromJson(lineaDeTiempoJson(m_salida, m_op.rapido)).object();
+    raiz.insert(QStringLiteral("sinEfecto"), m_sinEfecto);
+    return QJsonDocument(raiz).toJson(QJsonDocument::Indented);
+}
+
+// T024.4 (03-motion 4): portada o cierre. La app sigue viva detras (la
+// ventana entra o sale en el lienzo); el cursor simulado se oculta. Solo sale
+// en el video si se graba completo (sin --escenas).
+bool Sesion::ejecutarMarca(const QString& nombre, int cuadros)
+{
+    if (cuadros <= 0) {
+        return true;
+    }
+    m_grabando = m_op.escenas.isEmpty();
+    m_escena = nombre;
+    m_overlay->setProperty("ocultarCursor", true);
+    for (int i = 0; i < cuadros; ++i) {
+        if (!cuadro()) {
+            return false;
+        }
+    }
+    m_overlay->setProperty("ocultarCursor", false);
+    return true;
+}
+
 int Sesion::ejecutar()
 {
     const QDir tmp(m_op.dirTemporal);
@@ -774,6 +1094,7 @@ int Sesion::ejecutar()
                                            tmp.filePath(QStringLiteral("ffmpeg.log")), m_op.rapido, m_op.pistaVoz);
         ok = e.isEmpty() || fallar(e);
     }
+    ok = ok && ejecutarMarca(QStringLiteral("portada"), m_guion.cuadrosPortada);
     for (qsizetype c = 0; ok && c < m_guion.capitulos.size(); ++c) {
         // El titulo de capitulo vive en el lienzo (margen superior, D21).
         const Capitulo& cap = m_guion.capitulos.at(c);
@@ -781,6 +1102,7 @@ int Sesion::ejecutar()
             ok = ejecutarEscena(cap, cap.escenas.at(e));
         }
     }
+    ok = ok && ejecutarMarca(QStringLiteral("cierre"), m_guion.cuadrosCierre);
     if (ok && (m_cuadro != m_guion.totalCuadros || m_escritos != m_salida.totalCuadros)) {
         ok = fallar(QStringLiteral("se grabaron %1 cuadros y el plan tenia %2").arg(m_escritos).arg(m_salida.totalCuadros));
     }
@@ -822,8 +1144,7 @@ int Sesion::ejecutar()
     const QString e = publicar(m_op.dirSalida,
                                {{m_op.nombre + QStringLiteral(".mp4"), mp4Temporal, {}},
                                 {m_op.nombre + QStringLiteral(".srt"), {}, subtitulosSrt(m_salida)},
-                                {m_op.nombre + QStringLiteral(".linea-tiempo.json"), {},
-                                 lineaDeTiempoJson(m_salida, m_op.rapido)}});
+                                {m_op.nombre + QStringLiteral(".linea-tiempo.json"), {}, lineaDeTiempo()}});
     if (!e.isEmpty()) {
         imprimir(QStringLiteral("error: ") + e);
         return 1;
@@ -843,3 +1164,5 @@ int grabar(Guion& guion, const Guion& salida, DemoVideo& demo, const OpcionesGra
 }
 
 } // namespace video
+
+#include "Grabador.moc"

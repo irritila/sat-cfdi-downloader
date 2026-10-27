@@ -2,12 +2,20 @@
   "esquema": 1,
   "tipo": "tutorial",
   "titulo": "Archivo Fiscal: tutorial",
+  "ventana": {
+    "ancho": 960,
+    "alto": 540
+  },
+  "portada": true,
+  "cierre": true,
   "cuadrosTitulo": 90,
   "rotuloHerramienta": false,
   "voz": {
     "modelo": "gpt-4o-mini-tts",
-    "voz": "onyx",
-    "instrucciones": "Usa español de México como base de pronunciación, sin acento extranjero ni español de España. Lee únicamente el texto recibido: no añadas introducciones, comentarios, interjecciones ni órdenes. Respeta exactamente las pronunciaciones escritas; pronuncia Sat como una sola palabra. Interpreta a un oficial militar con la solemnidad patriótica y la proyección imponente de un locutor de noticiero cinematográfico de los años cuarenta y cincuenta, aplicadas con absoluta seriedad a tareas cotidianas. El humor nace de esa solemnidad: no te rías ni hagas guiños. Usa un registro grave cómodo, resonancia de pecho y una textura firme, seca y limpia. Articula cada sílaba de forma deliberadamente marcada, precisa y exagerada: vocales definidas, consonantes completas y finales nítidos, sin arrastrar ni omitir sonidos. Conserva el acento tónico correcto de cada palabra. Da un golpe articulatorio claro a las consonantes oclusivas, especialmente T, P, K y B, sin soplidos de micrófono ni distorsión. Entrega las frases en ráfagas cortas, directas y enérgicas, con pausas secas entre órdenes e ideas completas. Dentro de las palabras, separa perceptivamente las sílabas mediante articulación firme, sin introducir silencios deliberados entre ellas. Evita encadenar las ideas con una cadencia conversacional suave. Remata cada orden con una caída tonal breve y tajante, completando siempre la última palabra. Proyecta hacia delante como un general ante sus tropas, con sensación de postura erguida y rígida, sin forzar la garganta, gritar, saturar ni imitar un megáfono. Prioriza la dicción sobre la velocidad. Mantén el mismo timbre, registro, intensidad y carácter en todos los bloques, sin reiniciar la presentación ni aumentar progresivamente el volumen."
+    "voz": "cedar",
+    "instrucciones": "Habla en español de México, con pronunciación mexicana estándar. Explica el uso de una aplicación a un contador adulto, con tono profesional, cercano y tranquilo. Lee únicamente el texto recibido, sin agregar palabras ni reformularlo. Respeta las pronunciaciones escritas; pronuncia Sat como una sola palabra. Mantén ritmo conversacional ágil y uniforme, articulación clara y finales de palabra completos. Destaca suavemente las acciones y los nombres de controles. Separa las frases con pausas naturales de aproximadamente 250 a 350 milisegundos, sin pausas dentro de palabras o siglas deletreadas. Conserva el mismo timbre, volumen y energía entre bloques. Evita solemnidad militar, humor interpretado, tono publicitario, susurros y énfasis exagerados.",
+    "formato": "wav",
+    "velocidad": 1.0
   },
   "montaje": {
     "tempo": 1.15,
@@ -25,7 +33,7 @@
     "duckDb": -9
   },
   "datos": {
-    "ahora": "2026-10-01T10:00:00Z",
+    "ahora": "2026-10-06T16:00:00Z",
     "perfiles": [
       {
         "clave": "principal",
@@ -35,165 +43,258 @@
         "visible": false
       }
     ],
-    "solicitudes": [
+    "meses": [
       {
-        "clave": "pendiente",
         "perfil": "principal",
-        "tipo": "emitidos",
-        "desde": "2026-07-01",
-        "hasta": "2026-07-31",
-        "estado": "creada",
-        "visible": false
+        "mes": "2026-01",
+        "estado": "disponibles",
+        "emitidas": 9,
+        "recibidas": 14
       },
       {
-        "clave": "agosto",
         "perfil": "principal",
-        "tipo": "recibidos",
-        "desde": "2026-08-01",
-        "hasta": "2026-08-31",
-        "estado": "terminada",
-        "visible": false,
-        "cfdis": [
+        "mes": "2026-02",
+        "estado": "disponibles",
+        "emitidas": 8,
+        "recibidas": 11
+      },
+      {
+        "perfil": "principal",
+        "mes": "2026-03",
+        "estado": "disponibles",
+        "emitidas": 10,
+        "recibidas": 15
+      },
+      {
+        "perfil": "principal",
+        "mes": "2026-04",
+        "estado": "disponibles",
+        "emitidas": 7,
+        "recibidas": 12
+      },
+      {
+        "perfil": "principal",
+        "mes": "2026-05",
+        "estado": "disponibles",
+        "emitidas": 11,
+        "recibidas": 13
+      },
+      {
+        "perfil": "principal",
+        "mes": "2026-06",
+        "estado": "disponibles",
+        "descargadoEn": "2026-07-02T16:05:00Z",
+        "emitidas": 9,
+        "recibidas": 16
+      },
+      {
+        "perfil": "principal",
+        "mes": "2026-07",
+        "estado": "requiereAtencion",
+        "direccion": "recibidas",
+        "causa": "ErrorSat",
+        "descargadoEn": "2026-08-03T15:40:00Z",
+        "emitidas": 6,
+        "recibidas": 0
+      },
+      {
+        "perfil": "principal",
+        "mes": "2026-08",
+        "estado": "disponibles",
+        "descargadoEn": "2026-09-02T17:12:00Z",
+        "emitidas": 8,
+        "recibidas": 12
+      },
+      {
+        "perfil": "principal",
+        "mes": "2026-09",
+        "estado": "sinDescargar",
+        "emitidas": [
           {
             "tipo": "I",
-            "serie": "S",
-            "folio": "204",
-            "contraparte": "Servicios Demo",
-            "fecha": "2026-08-04T09:15:00",
-            "subtotal": "2500.00",
-            "descripcion": "Asesoría de ejemplo"
+            "serie": "A",
+            "folio": "1301",
+            "contraparte": "Comercializadora Imaginaria",
+            "fecha": "2026-09-29T12:10:00",
+            "subtotal": "7200.00",
+            "descripcion": "Suministro de ejemplo"
           },
           {
             "tipo": "I",
-            "serie": "T",
-            "folio": "88",
+            "serie": "A",
+            "folio": "1298",
+            "contraparte": "Servicios Demo",
+            "fecha": "2026-09-25T10:30:00",
+            "subtotal": "3200.00",
+            "descripcion": "Mantenimiento de ejemplo"
+          },
+          {
+            "tipo": "E",
+            "serie": "NC",
+            "folio": "21",
+            "contraparte": "Papelería Ejemplo",
+            "fecha": "2026-09-22T16:45:00",
+            "subtotal": "150.00",
+            "descripcion": "Devolución de ejemplo"
+          },
+          {
+            "tipo": "I",
+            "serie": "A",
+            "folio": "1295",
             "contraparte": "Transportes Ficticios",
-            "fecha": "2026-08-09T16:30:45",
+            "fecha": "2026-09-18T09:05:00",
             "subtotal": "1800.00",
             "descripcion": "Flete de ejemplo"
           },
           {
             "tipo": "I",
-            "serie": "F",
-            "folio": "5521",
-            "contraparte": "Comercializadora Imaginaria",
-            "fecha": "2026-08-12T10:02:15",
-            "subtotal": "7200.00",
-            "descripcion": "Servicio de ejemplo"
-          },
-          {
-            "tipo": "E",
-            "serie": "NC",
-            "folio": "17",
-            "contraparte": "Papelería Ejemplo",
-            "fecha": "2026-08-20T11:47:30",
-            "subtotal": "100.00",
-            "descripcion": "Devolución de ejemplo"
-          },
-          {
-            "tipo": "I",
-            "serie": "S",
-            "folio": "219",
-            "contraparte": "Servicios Demo",
-            "fecha": "2026-08-25T13:05:00",
-            "subtotal": "3200.00",
-            "descripcion": "Mantenimiento de ejemplo"
+            "serie": "A",
+            "folio": "1290",
+            "contraparte": "Consultores de Prueba",
+            "fecha": "2026-09-12T13:20:00",
+            "subtotal": "5400.00",
+            "descripcion": "Asesoría de ejemplo"
           },
           {
             "tipo": "I",
             "serie": "A",
-            "folio": "1187",
+            "folio": "1287",
+            "contraparte": "Distribuidora Hipotética",
+            "fecha": "2026-09-08T11:40:00",
+            "subtotal": "2650.00",
+            "descripcion": "Mercancía de ejemplo"
+          },
+          {
+            "tipo": "I",
+            "serie": "A",
+            "folio": "1284",
+            "contraparte": "Servicios Demo",
+            "fecha": "2026-09-03T17:15:00",
+            "subtotal": "980.00",
+            "descripcion": "Soporte de ejemplo"
+          }
+        ],
+        "recibidas": [
+          {
+            "tipo": "I",
+            "serie": "S",
+            "folio": "412",
+            "contraparte": "Servicios Demo",
+            "fecha": "2026-09-27T10:15:00",
+            "subtotal": "2500.00",
+            "descripcion": "Asesoría de ejemplo"
+          },
+          {
+            "tipo": "I",
+            "serie": "F",
+            "folio": "77",
+            "contraparte": "Proveedor de ejemplo",
+            "fecha": "2026-09-20T12:00:00",
+            "subtotal": "4100.00",
+            "descripcion": "Material de ejemplo"
+          },
+          {
+            "tipo": "I",
+            "serie": "T",
+            "folio": "93",
+            "contraparte": "Transportes Ficticios",
+            "fecha": "2026-09-15T08:50:00",
+            "subtotal": "1350.00",
+            "descripcion": "Flete de ejemplo"
+          },
+          {
+            "tipo": "I",
+            "serie": "S",
+            "folio": "405",
+            "contraparte": "Servicios Demo",
+            "fecha": "2026-09-09T14:30:00",
+            "subtotal": "2500.00",
+            "descripcion": "Asesoría de ejemplo"
+          },
+          {
+            "tipo": "I",
+            "serie": "P",
+            "folio": "2210",
             "contraparte": "Papelería Ejemplo",
-            "fecha": "2026-08-28T18:42:10",
-            "subtotal": "1000.00",
-            "descripcion": "Cuaderno profesional de ejemplo"
+            "fecha": "2026-09-04T18:25:00",
+            "subtotal": "640.00",
+            "descripcion": "Papelería de ejemplo"
           }
         ]
-      },
-      {
-        "clave": "fallida",
-        "perfil": "principal",
-        "tipo": "emitidos",
-        "desde": "2026-08-01",
-        "hasta": "2026-08-31",
-        "estado": "error",
-        "visible": false
-      },
-      {
-        "clave": "actual",
-        "perfil": "principal",
-        "tipo": "recibidos",
-        "desde": "2026-09-01",
-        "hasta": "2026-09-30",
-        "estado": "enProceso",
-        "visible": false
       }
-    ]
+    ],
+    "respaldo": {
+      "carpeta": false,
+      "contrasena": false,
+      "diario": false
+    }
   },
   "capitulos": [
     {
-      "id": "perfil-efirma",
+      "id": "perfil",
       "titulo": "1 · Perfil y e.firma",
       "escenas": [
         {
           "id": "bienvenida",
           "presupuesto": {
-            "min": 710,
-            "max": 1210
+            "min": 748,
+            "max": 867
           },
           "lineas": [
             {
               "id": "l1",
-              "texto": "Archivo Fiscal es una aplicación para tu Mac.",
+              "texto": "Archivo Fiscal es una aplicación para tu Mac que guarda las facturas de cada contribuyente, mes por mes.",
               "inicio": 20
             },
             {
               "id": "l2",
-              "texto": "Pide al SAT la descarga masiva de tus CFDI. Los guarda en tu equipo.",
-              "voz": "Pide al Sat la descarga masiva de tus ce efe de i. Los guarda en tu equipo."
+              "texto": "Las descarga del SAT con la e.firma del contribuyente y las organiza en tu equipo.",
+              "voz": "Las descarga del Sat con la e firma del contribuyente y las organiza en tu equipo."
             },
             {
               "id": "l3",
-              "texto": "Es para contadores. Un perfil por RFC, con su e.firma. La aplicación hace el resto.",
-              "voz": "Es para contadores. Un perfil por erre efe ce, con su e firma. La aplicación hace el resto."
+              "texto": "Está pensada para contadores: un perfil por RFC y la aplicación hace el resto.",
+              "voz": "Está pensada para contadores: un perfil por erre efe ce y la aplicación hace el resto."
             },
             {
               "id": "l4",
-              "texto": "Todo queda en tu equipo. Sin servidores de terceros."
+              "texto": "Todo queda en tu equipo, sin servidores de terceros."
             },
             {
               "id": "l5",
-              "texto": "La e.firma se guarda cifrada. La contraseña, en el llavero.",
-              "voz": "La e firma se guarda cifrada. La contraseña, en el llavero."
-            },
-            {
-              "id": "l6",
-              "texto": "Veremos todo el recorrido: del perfil a las facturas y el menú de la barra."
-            },
-            {
-              "id": "l7",
-              "texto": "Empecemos. Sigue la guía de inicio, en tres pasos. Pulsa el botón Perfiles SAT.",
-              "voz": "Empecemos. Sigue la guía de inicio, en tres pasos. Pulsa el botón Perfiles Sat."
+              "texto": "Veremos el recorrido completo: perfil, descarga de un mes, facturas y PDF, historial, exportación, respaldo y menú de la barra.",
+              "voz": "Veremos el recorrido completo: perfil, descarga de un mes, facturas y pe de efe, historial, exportación, respaldo y menú de la barra."
             }
           ],
           "acciones": [
             {
               "tipo": "esperarLinea",
-              "linea": "l7",
+              "linea": "l2",
               "momento": "inicio"
             },
             {
               "tipo": "mover",
-              "objetivo": "guiaPrimerUso/boton_pasoPerfil",
-              "cuadros": 40
+              "objetivo": "tituloGuiaFacturas",
+              "cuadros": 30
             },
             {
               "tipo": "esperarLinea",
-              "linea": "l7",
-              "momento": "fin"
+              "linea": "l5",
+              "momento": "inicio"
             },
             {
-              "tipo": "clic"
+              "tipo": "mover",
+              "objetivo": "guiaPrimerUsoFacturas/pasoFacturas",
+              "cuadros": 40,
+              "desplazamiento": [
+                0,
+                70
+              ]
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l5",
+              "momento": "fin"
             },
             {
               "tipo": "esperar",
@@ -204,43 +305,45 @@
         {
           "id": "crear-perfil",
           "presupuesto": {
-            "min": 560,
-            "max": 950
+            "min": 570,
+            "max": 661
           },
           "lineas": [
             {
               "id": "l1",
-              "texto": "Un perfil es un contribuyente. Su RFC y un nombre para reconocerlo.",
-              "voz": "Un perfil es un contribuyente. Su erre efe ce y un nombre para reconocerlo.",
-              "inicio": 15
+              "texto": "Empecemos por la guía de inicio: pulsa Perfiles SAT."
             },
             {
               "id": "l2",
-              "texto": "Aún no hay ninguno. Pulsa Nuevo perfil. Escribe el RFC.",
-              "voz": "Aún no hay ninguno. Pulsa Nuevo perfil. Escribe el erre efe ce."
+              "texto": "La pantalla está vacía; pulsa Nuevo perfil."
             },
             {
               "id": "l3",
-              "texto": "Una vez guardado, no se puede cambiar. Identifica al perfil."
+              "texto": "Escribe el RFC del contribuyente y un nombre que lo identifique."
             },
             {
               "id": "l4",
-              "texto": "Añade un nombre descriptivo. Pulsa Guardar."
-            },
-            {
-              "id": "l5",
-              "texto": "La fila aparece a la izquierda. La clave queda bajo candado."
+              "texto": "Guarda. El perfil aparece en la lista con la marca Sin e.firma: todavía no puede descargar.",
+              "voz": "Guarda. El perfil aparece en la lista con la marca Sin e firma: todavía no puede descargar."
             }
           ],
           "acciones": [
             {
-              "tipo": "esperar",
-              "cuadros": 15
+              "tipo": "esperarLinea",
+              "linea": "l1",
+              "momento": "inicio"
             },
             {
               "tipo": "mover",
-              "objetivo": "botonNuevoPerfilVacio",
-              "cuadros": 36
+              "objetivo": "guiaPrimerUsoFacturas/boton_pasoPerfil"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l1",
+              "momento": "fin"
+            },
+            {
+              "tipo": "clic"
             },
             {
               "tipo": "esperarLinea",
@@ -248,28 +351,43 @@
               "momento": "inicio"
             },
             {
-              "tipo": "esperar",
-              "cuadros": 15
+              "tipo": "mover",
+              "objetivo": "botonNuevoPerfilVacio"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l2",
+              "momento": "fin"
             },
             {
               "tipo": "clic"
             },
             {
-              "tipo": "esperar",
-              "cuadros": 15
+              "tipo": "esperarLinea",
+              "linea": "l3",
+              "momento": "inicio"
             },
             {
               "tipo": "mover",
-              "objetivo": "campoRfcPerfil",
-              "cuadros": 20
+              "objetivo": "campoRfcPerfil"
             },
             {
               "tipo": "clic"
             },
             {
               "tipo": "escribir",
-              "texto": "XAXX010101000",
-              "cuadrosPorCaracter": 3
+              "texto": "XAXX010101000"
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "campoNombrePerfil"
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "escribir",
+              "texto": "Contribuyente de ejemplo"
             },
             {
               "tipo": "esperarLinea",
@@ -278,88 +396,19 @@
             },
             {
               "tipo": "mover",
-              "objetivo": "campoNombrePerfil",
-              "cuadros": 20
+              "objetivo": "botonGuardarPerfil"
             },
             {
               "tipo": "clic"
             },
             {
-              "tipo": "escribir",
-              "texto": "Contribuyente de ejemplo",
-              "cuadrosPorCaracter": 2
-            },
-            {
               "tipo": "mover",
-              "objetivo": "botonGuardarPerfil",
-              "cuadros": 24
+              "objetivo": "badgePreparacion_0"
             },
             {
               "tipo": "esperarLinea",
               "linea": "l4",
               "momento": "fin"
-            },
-            {
-              "tipo": "clic"
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l5",
-              "momento": "fin"
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 10
-            }
-          ]
-        },
-        {
-          "id": "sin-efirma",
-          "presupuesto": {
-            "min": 240,
-            "max": 420
-          },
-          "lineas": [
-            {
-              "id": "l1",
-              "texto": "Sin e.firma, el perfil no está disponible para solicitudes.",
-              "voz": "Sin e firma, el perfil no está disponible para solicitudes.",
-              "inicio": 10
-            },
-            {
-              "id": "l2",
-              "texto": "Regístrala con el botón Registrar e.firma… de este grupo.",
-              "voz": "Regístrala con el botón Registrar e firma, de este grupo."
-            }
-          ],
-          "acciones": [
-            {
-              "tipo": "esperar",
-              "cuadros": 10
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "badgePreparacion_0",
-              "cuadros": 30,
-              "ancla": "derecha"
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l2",
-              "momento": "inicio"
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "botonEFirma",
-              "cuadros": 40
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l2",
-              "momento": "fin"
-            },
-            {
-              "tipo": "clic"
             },
             {
               "tipo": "esperar",
@@ -370,50 +419,54 @@
         {
           "id": "registrar-efirma",
           "presupuesto": {
-            "min": 710,
-            "max": 1220
+            "min": 883,
+            "max": 1023
           },
           "lineas": [
             {
               "id": "l1",
-              "texto": "El diálogo pide tres datos: certificado, llave privada y contraseña.",
-              "inicio": 15
+              "texto": "Ahora registra la e.firma: pulsa Registrar e.firma.",
+              "voz": "Ahora registra la e firma: pulsa Registrar e firma."
             },
             {
               "id": "l2",
-              "texto": "Pulsa Elegir… junto a Certificado (.cer).",
-              "voz": "Pulsa Elegir, junto a Certificado, punto ce e erre."
+              "texto": "Elige el certificado (.cer) y la llave privada (.key) con los botones Elegir.",
+              "voz": "Elige el certificado punto cer y la llave privada punto key con los botones Elegir."
             },
             {
               "id": "l3",
-              "texto": "El selector es el de macOS. Aquí, una ilustración.",
-              "voz": "El selector es el de mac o ese. Aquí, una ilustración."
+              "texto": "Lo que ves es una ilustración del selector de archivos; en el campo solo aparece el nombre del archivo, nunca su ruta."
             },
             {
               "id": "l4",
-              "texto": "Haz lo mismo con la llave privada (.key).",
-              "voz": "Haz lo mismo con la llave privada, punto ka e ye.",
-              "inicio": 300
+              "texto": "Escribe la contraseña de la llave; se guarda en el llavero de macOS, no en la aplicación."
             },
             {
               "id": "l5",
-              "texto": "Escribe la contraseña. Se guarda en el llavero de macOS.",
-              "voz": "Escribe la contraseña. Se guarda en el llavero de mac o ese."
+              "texto": "Pulsa Registrar. La aplicación valida los archivos y la contraseña."
             },
             {
               "id": "l6",
-              "texto": "Con los tres datos se habilita el botón Registrar. Púlsalo."
-            },
-            {
-              "id": "l7",
-              "texto": "Una vez validada, el perfil queda disponible para solicitudes. Pulsa Cerrar.",
-              "nuevoBloque": true
+              "texto": "Listo: el perfil ya está disponible para descargas. Cierra el diálogo y regresa a Facturas."
             }
           ],
           "acciones": [
             {
-              "tipo": "esperar",
-              "cuadros": 15
+              "tipo": "esperarLinea",
+              "linea": "l1",
+              "momento": "inicio"
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "botonEFirma"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l1",
+              "momento": "fin"
+            },
+            {
+              "tipo": "clic"
             },
             {
               "tipo": "esperarLinea",
@@ -422,13 +475,7 @@
             },
             {
               "tipo": "mover",
-              "objetivo": "botonElegirCertificado",
-              "cuadros": 30
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l2",
-              "momento": "fin"
+              "objetivo": "botonElegirCertificado"
             },
             {
               "tipo": "clic",
@@ -452,10 +499,6 @@
               "momento": "fin"
             },
             {
-              "tipo": "esperar",
-              "cuadros": 10
-            },
-            {
               "tipo": "ocultarIlustracion"
             },
             {
@@ -465,13 +508,7 @@
             },
             {
               "tipo": "mover",
-              "objetivo": "botonElegirLlave",
-              "cuadros": 24
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l4",
-              "momento": "fin"
+              "objetivo": "botonElegirLlave"
             },
             {
               "tipo": "clic",
@@ -483,26 +520,65 @@
               "ruta": "/Users/usuario/Documentos/efirma/demo.key"
             },
             {
+              "tipo": "esperarLinea",
+              "linea": "l4",
+              "momento": "inicio"
+            },
+            {
               "tipo": "mover",
-              "objetivo": "campoContrasena",
-              "cuadros": 24
+              "objetivo": "campoContrasena"
             },
             {
               "tipo": "clic"
             },
             {
-              "tipo": "esperarLinea",
-              "linea": "l5",
-              "momento": "fin"
+              "tipo": "escribirContrasena",
+              "longitud": 10
             },
             {
-              "tipo": "escribirContrasena",
-              "longitud": 8
+              "tipo": "esperarLinea",
+              "linea": "l5",
+              "momento": "inicio"
             },
             {
               "tipo": "mover",
-              "objetivo": "botonEnviarEFirma",
-              "cuadros": 24
+              "objetivo": "botonEnviarEFirma"
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 45
+            },
+            {
+              "tipo": "completarEFirma",
+              "perfil": "principal",
+              "vigenteHasta": "2030-03-15T12:00:00Z"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l6",
+              "momento": "inicio"
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "botonCerrarEFirma"
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "badgePreparacion_0"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 20
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "botonRegresar"
             },
             {
               "tipo": "esperarLinea",
@@ -511,532 +587,55 @@
             },
             {
               "tipo": "clic"
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 30
-            },
-            {
-              "tipo": "completarEFirma",
-              "perfil": "principal",
-              "vigenteHasta": "2029-01-01T00:00:00Z"
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l7",
-              "momento": "inicio"
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "botonCerrarEFirma",
-              "cuadros": 30
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l7",
-              "momento": "fin"
-            },
-            {
-              "tipo": "clic"
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 10
-            }
-          ]
-        },
-        {
-          "id": "efirma-lista",
-          "presupuesto": {
-            "min": 380,
-            "max": 650
-          },
-          "lineas": [
-            {
-              "id": "l1",
-              "texto": "La fila ahora dice e.firma lista. Disponible para solicitudes.",
-              "voz": "La fila ahora dice e firma lista. Disponible para solicitudes.",
-              "inicio": 10
-            },
-            {
-              "id": "l2",
-              "texto": "Faltan treinta días o menos: verás la etiqueta Vence en veintiún días. Y un aviso."
-            },
-            {
-              "id": "l3",
-              "texto": "Renuévala con el SAT. Usa el botón Reemplazar e.firma… El flujo es el mismo.",
-              "voz": "Renuévala con el Sat. Usa el botón Reemplazar e firma. El flujo es el mismo."
-            }
-          ],
-          "acciones": [
-            {
-              "tipo": "esperar",
-              "cuadros": 10
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "badgePreparacion_0",
-              "cuadros": 30,
-              "ancla": "derecha"
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l2",
-              "momento": "inicio"
-            },
-            {
-              "tipo": "cambiarEFirma",
-              "perfil": "principal",
-              "efirma": "porVencer"
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "badgeVencimientoPerfil",
-              "cuadros": 30,
-              "ancla": "derecha"
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l3",
-              "momento": "inicio"
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "botonEFirma",
-              "cuadros": 30
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l3",
-              "momento": "fin"
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 15
             }
           ]
         }
       ]
     },
     {
-      "id": "nueva-solicitud",
-      "titulo": "2 · Nueva solicitud",
+      "id": "descargar",
+      "titulo": "2 · Descargar el mes",
       "escenas": [
         {
-          "id": "volver-guia",
-          "presupuesto": {
-            "min": 230,
-            "max": 410
-          },
-          "lineas": [
-            {
-              "id": "l1",
-              "texto": "De vuelta en Solicitudes. La guía ya marca los pasos uno y dos como hechos.",
-              "inicio": 40
-            },
-            {
-              "id": "l2",
-              "texto": "Sigue el tercero. Pulsa Nueva solicitud."
-            }
-          ],
-          "acciones": [
-            {
-              "tipo": "mover",
-              "objetivo": "botonRegresar",
-              "cuadros": 34
-            },
-            {
-              "tipo": "clic"
-            },
-            {
-              "tipo": "cambiarEFirma",
-              "perfil": "principal",
-              "efirma": "lista",
-              "vigenteHasta": "2029-01-01T00:00:00Z"
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 10
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l2",
-              "momento": "inicio"
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "guiaPrimerUso/boton_pasoSolicitud",
-              "cuadros": 40
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l2",
-              "momento": "fin"
-            },
-            {
-              "tipo": "clic"
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 10
-            }
-          ]
-        },
-        {
-          "id": "formulario",
-          "presupuesto": {
-            "min": 800,
-            "max": 1370
-          },
-          "lineas": [
-            {
-              "id": "l1",
-              "texto": "Primero, elige el Perfil SAT.",
-              "voz": "Primero, elige el Perfil Sat.",
-              "inicio": 15
-            },
-            {
-              "id": "l2",
-              "texto": "Solo aparecen perfiles activos con la e.firma lista.",
-              "voz": "Solo aparecen perfiles activos con la e firma lista."
-            },
-            {
-              "id": "l3",
-              "texto": "Después elige Emitidos o Recibidos. Aquí, Recibidos."
-            },
-            {
-              "id": "l4",
-              "texto": "El periodo va en formato AAAA-MM-DD. Incluye ambos días. Aquí: septiembre.",
-              "voz": "El periodo va en formato año, mes, día. Incluye ambos días. Aquí: septiembre."
-            },
-            {
-              "id": "l5",
-              "texto": "Los filtros opcionales son los del SAT: contraparte, comprobante y complemento.",
-              "voz": "Los filtros opcionales son los del Sat: contraparte, comprobante y complemento."
-            },
-            {
-              "id": "l6",
-              "texto": "Si ya hubiera una solicitud equivalente, la aplicación te avisaría antes de crearla."
-            },
-            {
-              "id": "l7",
-              "texto": "Al crearla, la envía al SAT con la e.firma del perfil. Pulsa Crear solicitud.",
-              "voz": "Al crearla, la envía al Sat con la e firma del perfil. Pulsa Crear solicitud."
-            }
-          ],
-          "acciones": [
-            {
-              "tipo": "esperar",
-              "cuadros": 15
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "campoPerfil",
-              "cuadros": 30
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 10
-            },
-            {
-              "tipo": "clic"
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 15
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "campoPerfil",
-              "cuadros": 16,
-              "desplazamiento": [
-                0,
-                34
-              ]
-            },
-            {
-              "tipo": "clic"
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l3",
-              "momento": "inicio"
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "campoTipoDescarga/segmento_Recibidos",
-              "cuadros": 30
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 15
-            },
-            {
-              "tipo": "clic"
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l4",
-              "momento": "inicio"
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "campoFechaInicial",
-              "cuadros": 30
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 20
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "botonPeriodoMesAnterior",
-              "cuadros": 24
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 10
-            },
-            {
-              "tipo": "clic"
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l5",
-              "momento": "inicio"
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "campoRfcContraparte",
-              "cuadros": 30
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 20
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "campoTipoComprobante",
-              "cuadros": 24
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 20
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "campoComplemento",
-              "cuadros": 24
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l7",
-              "momento": "inicio"
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "botonCrearSolicitud",
-              "cuadros": 30
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l7",
-              "momento": "fin"
-            },
-            {
-              "tipo": "clic"
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 15
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "seguimiento",
-      "titulo": "3 · Seguimiento y estados",
-      "escenas": [
-        {
-          "id": "envio-automatico",
-          "presupuesto": {
-            "min": 520,
-            "max": 900
-          },
-          "lineas": [
-            {
-              "id": "l1",
-              "texto": "Se abre el detalle. Un proceso local trabaja con el SAT por ti.",
-              "voz": "Se abre el detalle. Un proceso local trabaja con el Sat por ti.",
-              "inicio": 30
-            },
-            {
-              "id": "l2",
-              "texto": "Primero, la envía. Pasa de Creada a Enviando."
-            },
-            {
-              "id": "l3",
-              "texto": "Después, consulta su estado. Aceptada por SAT. Más tarde, En proceso SAT.",
-              "voz": "Después, consulta su estado. Aceptada por Sat. Más tarde, En proceso Sat."
-            },
-            {
-              "id": "l4",
-              "texto": "Cuando el SAT termina, los paquetes se descargan solos. Aunque la ventana esté oculta.",
-              "voz": "Cuando el Sat termina, los paquetes se descargan solos. Aunque la ventana esté oculta."
-            }
-          ],
-          "acciones": [
-            {
-              "tipo": "esperar",
-              "cuadros": 30
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "badgeResumen",
-              "cuadros": 40,
-              "ancla": "derecha"
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l2",
-              "momento": "inicio"
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 40
-            },
-            {
-              "tipo": "avanzarSolicitud",
-              "solicitud": "nueva1",
-              "estado": "enviando"
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l3",
-              "momento": "inicio"
-            },
-            {
-              "tipo": "avanzarSolicitud",
-              "solicitud": "nueva1",
-              "estado": "enviada"
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 60
-            },
-            {
-              "tipo": "avanzarSolicitud",
-              "solicitud": "nueva1",
-              "estado": "enProceso"
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l4",
-              "momento": "inicio"
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "titularResumen",
-              "cuadros": 30
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l4",
-              "momento": "fin"
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 10
-            }
-          ]
-        },
-        {
-          "id": "resumen-pestanas",
+          "id": "meses",
           "presupuesto": {
             "min": 450,
-            "max": 770
+            "max": 521
           },
           "lineas": [
             {
               "id": "l1",
-              "texto": "El resumen reúne lo básico: contribuyente, periodo, comprobantes y última verificación.",
-              "inicio": 10
+              "texto": "Facturas es la pantalla principal: arriba el perfil, a la izquierda los meses del año y, a la derecha, el mes elegido."
             },
             {
               "id": "l2",
-              "texto": "¿No quieres esperar al siguiente ciclo? El botón Verificar ahora consulta el SAT.",
-              "voz": "¿No quieres esperar al siguiente ciclo? El botón Verificar ahora consulta el Sat."
+              "texto": "Para el ejemplo, este perfil ya tiene varios meses en el equipo."
             },
             {
               "id": "l3",
-              "texto": "Las pestañas Datos e Historial guardan los identificadores del SAT. Y cada evento.",
-              "voz": "Las pestañas Datos e Historial guardan los identificadores del Sat. Y cada evento."
+              "texto": "Cada mes muestra su estado: Disponibles, Requiere atención si algo falló, o Sin descargar."
             }
           ],
           "acciones": [
             {
-              "tipo": "esperar",
-              "cuadros": 10
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "datoResumen_0",
-              "cuadros": 24
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 16
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "datoResumen_1",
-              "cuadros": 20
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 16
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "datoResumen_2",
-              "cuadros": 20
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 16
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "datoResumen_3",
-              "cuadros": 20
-            },
-            {
               "tipo": "esperarLinea",
-              "linea": "l2",
+              "linea": "l1",
               "momento": "inicio"
             },
             {
               "tipo": "mover",
-              "objetivo": "botonVerificarAhora",
+              "objetivo": "comboPerfilFacturas",
               "cuadros": 30
             },
             {
-              "tipo": "esperar",
-              "cuadros": 15
+              "tipo": "mover",
+              "objetivo": "anioMeses",
+              "cuadros": 30
             },
             {
-              "tipo": "clic"
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 25
-            },
-            {
-              "tipo": "avanzarSolicitud",
-              "solicitud": "nueva1",
-              "estado": "enProceso",
-              "verificadaEn": "2026-10-01T11:45:00Z"
+              "tipo": "mover",
+              "objetivo": "titularFranja",
+              "cuadros": 30
             },
             {
               "tipo": "esperarLinea",
@@ -1045,23 +644,23 @@
             },
             {
               "tipo": "mover",
-              "objetivo": "pestanasDetalle/segmento_datos",
-              "cuadros": 30
-            },
-            {
-              "tipo": "clic"
+              "objetivo": "mes_8/estadoMes"
             },
             {
               "tipo": "esperar",
-              "cuadros": 40
+              "cuadros": 20
             },
             {
               "tipo": "mover",
-              "objetivo": "pestanasDetalle/segmento_historial",
-              "cuadros": 24
+              "objetivo": "mes_7/estadoMes"
             },
             {
-              "tipo": "clic"
+              "tipo": "esperar",
+              "cuadros": 20
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "mes_9/estadoMes"
             },
             {
               "tipo": "esperarLinea",
@@ -1074,50 +673,225 @@
             }
           ]
         },
+        {
+          "id": "descargar",
+          "presupuesto": {
+            "min": 630,
+            "max": 730
+          },
+          "lineas": [
+            {
+              "id": "l1",
+              "texto": "Al abrir, la aplicación elige el último mes completo: septiembre."
+            },
+            {
+              "id": "l2",
+              "texto": "La franja explica que sus facturas no están en este equipo y ofrece una sola acción: Descargar facturas."
+            },
+            {
+              "id": "l3",
+              "texto": "Pulsa el botón, o usa comando R. El mes pasa a Preparando: primero el SAT prepara las facturas y después la aplicación las descarga y las organiza.",
+              "voz": "Pulsa el botón, o usa comando erre. El mes pasa a Preparando: primero el Sat prepara las facturas y después la aplicación las descarga y las organiza."
+            },
+            {
+              "id": "l4",
+              "texto": "Puede tardar de minutos a horas; puedes cerrar la ventana y la aplicación te avisará."
+            }
+          ],
+          "acciones": [
+            {
+              "tipo": "esperarLinea",
+              "linea": "l1",
+              "momento": "inicio"
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "mes_9",
+              "cuadros": 30
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l2",
+              "momento": "inicio"
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "titularFranja"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 20
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "botonAccionFranja"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l3",
+              "momento": "inicio"
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "etapaFranja"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l4",
+              "momento": "inicio"
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "notaFranja"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l4",
+              "momento": "fin"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 15
+            }
+          ]
+        },
+        {
+          "id": "disponibles",
+          "presupuesto": {
+            "min": 505,
+            "max": 585
+          },
+          "lineas": [
+            {
+              "id": "l1",
+              "texto": "Para el video adelantamos el tiempo. Las facturas van apareciendo conforme se descargan; al terminar, la franja dice que las de septiembre están completas."
+            },
+            {
+              "id": "l2",
+              "texto": "Las pestañas muestran cuántas hay: 7 emitidas y 5 recibidas.",
+              "voz": "Las pestañas muestran cuántas hay: siete emitidas y cinco recibidas."
+            },
+            {
+              "id": "l3",
+              "texto": "Octubre, el mes en curso, se descarga igual y se puede actualizar después."
+            }
+          ],
+          "acciones": [
+            {
+              "tipo": "esperarLinea",
+              "linea": "l1",
+              "momento": "inicio"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 20
+            },
+            {
+              "tipo": "avanzarMes",
+              "perfil": "principal",
+              "mes": "2026-09",
+              "direccion": "emitidas",
+              "estado": "disponibles"
+            },
+            {
+              "tipo": "esperarConteo",
+              "objetivo": "listaFacturas",
+              "conteo": 7,
+              "timeoutMs": 5000
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 30
+            },
+            {
+              "tipo": "avanzarMes",
+              "perfil": "principal",
+              "mes": "2026-09",
+              "direccion": "recibidas",
+              "estado": "disponibles"
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "titularFranja"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l2",
+              "momento": "inicio"
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "pestanasFacturas/segmento_emitidas"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 15
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "pestanasFacturas/segmento_recibidas"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l3",
+              "momento": "inicio"
+            },
+            {
+              "tipo": "desplazar",
+              "objetivo": "listaMeses",
+              "delta": 200
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "mes_10/estadoMes"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l3",
+              "momento": "fin"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 15
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "facturas",
+      "titulo": "3 · Ver facturas y PDF",
+      "escenas": [
         {
           "id": "lista",
           "presupuesto": {
-            "min": 340,
-            "max": 590
+            "min": 656,
+            "max": 760
           },
           "lineas": [
             {
               "id": "l1",
-              "texto": "La lista ordena tus solicitudes. De la más reciente a la más antigua.",
-              "inicio": 40
+              "texto": "Cada fila muestra la fecha y el tipo de comprobante, la contraparte, el total y el inicio del UUID, con un botón para copiarlo.",
+              "voz": "Cada fila muestra la fecha y el tipo de comprobante, la contraparte, el total y el inicio del u u i de, con un botón para copiarlo."
             },
             {
               "id": "l2",
-              "texto": "Los estados van de Creada a Terminada."
+              "texto": "En Emitidas la columna dice Receptor; en Recibidas, Emisor."
             },
             {
               "id": "l3",
-              "texto": "Los estados Error SAT y Rechazada por SAT requieren tu atención.",
-              "voz": "Los estados Error Sat y Rechazada por Sat requieren tu atención."
+              "texto": "Para encontrar una factura, escribe en la búsqueda: por nombre, RFC, UUID, serie o folio.",
+              "voz": "Para encontrar una factura, escribe en la búsqueda: por nombre, erre efe ce, UUID, serie o folio."
+            },
+            {
+              "id": "l4",
+              "texto": "Solo quedan las que coinciden; Limpiar filtros devuelve la lista completa."
             }
           ],
           "acciones": [
-            {
-              "tipo": "mover",
-              "objetivo": "botonRegresar",
-              "cuadros": 24
-            },
-            {
-              "tipo": "clic"
-            },
-            {
-              "tipo": "mostrarSolicitudes",
-              "claves": [
-                "actual",
-                "fallida",
-                "agosto",
-                "pendiente"
-              ]
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 15
-            },
             {
               "tipo": "esperarLinea",
               "linea": "l1",
@@ -1125,8 +899,23 @@
             },
             {
               "tipo": "mover",
-              "objetivo": "encabezadosColumnas",
-              "cuadros": 30
+              "objetivo": "filaFactura_0/fechaCfdi",
+              "cuadros": 25
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "filaFactura_0/emisorNombreCfdi",
+              "cuadros": 25
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "filaFactura_0/totalCfdi",
+              "cuadros": 25
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "filaFactura_0/botonCopiarUuid",
+              "cuadros": 25
             },
             {
               "tipo": "esperarLinea",
@@ -1135,310 +924,15 @@
             },
             {
               "tipo": "mover",
-              "objetivo": "filaSolicitud_3/badgeFila",
-              "cuadros": 24,
-              "ancla": "derecha"
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 16
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "filaSolicitud_2/badgeFila",
-              "cuadros": 16,
-              "ancla": "derecha"
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 16
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "filaSolicitud_1/badgeFila",
-              "cuadros": 16,
-              "ancla": "derecha"
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 16
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "filaSolicitud_0/badgeFila",
-              "cuadros": 16,
-              "ancla": "derecha"
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l3",
-              "momento": "fin"
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 15
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "paquetes",
-      "titulo": "4 · Paquetes",
-      "escenas": [
-        {
-          "id": "paquetes-terminada",
-          "presupuesto": {
-            "min": 590,
-            "max": 1020
-          },
-          "lineas": [
-            {
-              "id": "l1",
-              "texto": "Abre la solicitud Terminada. El SAT entregó un paquete.",
-              "voz": "Abre la solicitud Terminada. El Sat entregó un paquete.",
-              "inicio": 40
-            },
-            {
-              "id": "l2",
-              "texto": "La pestaña Paquetes muestra cada uno, con su estado y un mensaje."
-            },
-            {
-              "id": "l3",
-              "texto": "Este está Disponible. La aplicación lo descargará automáticamente."
-            },
-            {
-              "id": "l4",
-              "texto": "El botón Reintentar descarga lo pide ahora. Pasa a Descargando y luego a Descargado."
-            },
-            {
-              "id": "l5",
-              "texto": "Un paquete Vencido ya no existe en el SAT. Pide una solicitud nueva.",
-              "voz": "Un paquete Vencido ya no existe en el Sat. Pide una solicitud nueva."
-            }
-          ],
-          "acciones": [
-            {
-              "tipo": "mover",
-              "objetivo": "filaSolicitud_2",
-              "cuadros": 24
-            },
-            {
-              "tipo": "clic"
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 15
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l2",
-              "momento": "inicio"
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "filaPaquete_0F1E2D3C-4B5A-4978-8796-A5B4C3D2E102_01/badgePaquete",
-              "cuadros": 30,
-              "ancla": "derecha"
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l3",
-              "momento": "inicio"
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "filaPaquete_0F1E2D3C-4B5A-4978-8796-A5B4C3D2E102_01/mensajePaquete_0F1E2D3C-4B5A-4978-8796-A5B4C3D2E102_01",
-              "cuadros": 24
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l4",
-              "momento": "inicio"
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "botonReintentarDescarga",
-              "cuadros": 30
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 15
-            },
-            {
-              "tipo": "clic"
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 15
-            },
-            {
-              "tipo": "avanzarSolicitud",
-              "solicitud": "agosto",
-              "estado": "descargando"
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 45
-            },
-            {
-              "tipo": "avanzarSolicitud",
-              "solicitud": "agosto",
-              "estado": "descargada"
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l5",
-              "momento": "inicio"
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "filaPaquete_0F1E2D3C-4B5A-4978-8796-A5B4C3D2E102_01/badgePaquete",
-              "cuadros": 24,
-              "ancla": "derecha"
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l5",
-              "momento": "fin"
+              "objetivo": "encabezadoContraparte"
             },
             {
               "tipo": "esperar",
               "cuadros": 10
-            }
-          ]
-        },
-        {
-          "id": "finder",
-          "presupuesto": {
-            "min": 490,
-            "max": 850
-          },
-          "lineas": [
-            {
-              "id": "l1",
-              "texto": "Ya descargado, el botón Mostrar en Finder abre el ZIP en su carpeta.",
-              "voz": "Ya descargado, el botón Mostrar en Finder abre el zip en su carpeta.",
-              "inicio": 10
-            },
-            {
-              "id": "l2",
-              "texto": "Finder es el de tu equipo. Aquí, una ilustración."
-            },
-            {
-              "id": "l3",
-              "texto": "Los ZIP se guardan en Archivo-Fiscal/paquetes. Por RFC y mes.",
-              "voz": "Los zip se guardan en la carpeta paquetes de Archivo Fiscal. Por erre efe ce y mes."
-            },
-            {
-              "id": "l4",
-              "texto": "La aplicación no abre ni modifica los ZIP.",
-              "voz": "La aplicación no abre ni modifica los zip."
-            },
-            {
-              "id": "l5",
-              "texto": "También llegas a ellos con el botón Abrir carpeta de la solicitud."
-            }
-          ],
-          "acciones": [
-            {
-              "tipo": "esperar",
-              "cuadros": 10
             },
             {
               "tipo": "mover",
-              "objetivo": "filaPaquete_0F1E2D3C-4B5A-4978-8796-A5B4C3D2E102_01/existenciaPaquete_0F1E2D3C-4B5A-4978-8796-A5B4C3D2E102_01",
-              "cuadros": 24
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 20
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "botonMostrarFinder_0F1E2D3C-4B5A-4978-8796-A5B4C3D2E102_01",
-              "cuadros": 30
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l1",
-              "momento": "fin"
-            },
-            {
-              "tipo": "clic"
-            },
-            {
-              "tipo": "mostrarIlustracion",
-              "ilustracion": "finder",
-              "parametros": {
-                "carpeta": "/Users/usuario/Archivo-Fiscal/paquetes/XAXX010101000/2026-08/00000000-0000-4000-8000-000000000002",
-                "archivos": [
-                  {
-                    "nombre": "0F1E2D3C-4B5A-4978-8796-A5B4C3D2E102_01.zip",
-                    "tamano": "48 KB",
-                    "fecha": "1 oct 2026, 10:33"
-                  }
-                ],
-                "seleccionado": "0F1E2D3C-4B5A-4978-8796-A5B4C3D2E102_01.zip"
-              }
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l4",
-              "momento": "inicio"
-            },
-            {
-              "tipo": "ocultarIlustracion"
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "accionAbrirCarpeta",
-              "cuadros": 30
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l5",
-              "momento": "fin"
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 15
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "explorador-pdf",
-      "titulo": "5 · Explorador y PDF",
-      "escenas": [
-        {
-          "id": "facturas",
-          "presupuesto": {
-            "min": 430,
-            "max": 740
-          },
-          "lineas": [
-            {
-              "id": "l1",
-              "texto": "El botón Ver facturas abre los CFDI leídos del ZIP. Sin extraerlos ni modificarlos.",
-              "voz": "El botón Ver facturas abre los ce efe de i leídos del zip. Sin extraerlos ni modificarlos.",
-              "inicio": 50
-            },
-            {
-              "id": "l2",
-              "texto": "Cada fila muestra fecha y tipo, emisor, receptor, total e inicio del folio fiscal."
-            },
-            {
-              "id": "l3",
-              "texto": "El número junto al título Facturas indica cuántos comprobantes leyó."
-            }
-          ],
-          "acciones": [
-            {
-              "tipo": "mover",
-              "objetivo": "botonVerFacturas",
-              "cuadros": 30
+              "objetivo": "pestanasFacturas/segmento_recibidas"
             },
             {
               "tipo": "clic"
@@ -1446,49 +940,8 @@
             {
               "tipo": "esperarConteo",
               "objetivo": "listaFacturas",
-              "conteo": 6,
-              "timeoutMs": 8000
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 10
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l2",
-              "momento": "inicio"
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "filaCfdi_0/fechaCfdi",
-              "cuadros": 24
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 16
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "filaCfdi_0/emisorNombreCfdi",
-              "cuadros": 20
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 16
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "filaCfdi_0/totalCfdi",
-              "cuadros": 20
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 16
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "filaCfdi_0/uuidCfdi",
-              "cuadros": 20
+              "conteo": 5,
+              "timeoutMs": 5000
             },
             {
               "tipo": "esperarLinea",
@@ -1497,82 +950,14 @@
             },
             {
               "tipo": "mover",
-              "objetivo": "contadorEncabezado",
-              "cuadros": 30
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l3",
-              "momento": "fin"
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 10
-            }
-          ]
-        },
-        {
-          "id": "buscar",
-          "presupuesto": {
-            "min": 270,
-            "max": 470
-          },
-          "lineas": [
-            {
-              "id": "l1",
-              "texto": "Busca por RFC, nombre, folio fiscal o folio. O filtra por tipo.",
-              "voz": "Busca por erre efe ce, nombre, folio fiscal o folio. O filtra por tipo.",
-              "inicio": 10
-            },
-            {
-              "id": "l2",
-              "texto": "Escribe Papelería. La lista se actualiza al dejar de escribir."
-            }
-          ],
-          "acciones": [
-            {
-              "tipo": "esperar",
-              "cuadros": 10
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "campoBusquedaFacturas",
-              "cuadros": 30
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 10
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "filtroTipoComprobante",
-              "cuadros": 24
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 10
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "campoBusquedaFacturas",
-              "cuadros": 24
+              "objetivo": "campoBusquedaFacturas"
             },
             {
               "tipo": "clic"
             },
             {
-              "tipo": "esperarLinea",
-              "linea": "l2",
-              "momento": "inicio"
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 20
-            },
-            {
               "tipo": "escribir",
-              "texto": "Papelería",
-              "cuadrosPorCaracter": 3
+              "texto": "Servicios"
             },
             {
               "tipo": "esperarConteo",
@@ -1582,8 +967,8 @@
             },
             {
               "tipo": "esperarLinea",
-              "linea": "l2",
-              "momento": "fin"
+              "linea": "l4",
+              "momento": "inicio"
             },
             {
               "tipo": "esperar",
@@ -1591,8 +976,7 @@
             },
             {
               "tipo": "mover",
-              "objetivo": "botonLimpiarBusquedaFacturas",
-              "cuadros": 24
+              "objetivo": "botonLimpiarFiltrosFacturas"
             },
             {
               "tipo": "clic"
@@ -1600,75 +984,61 @@
             {
               "tipo": "esperarConteo",
               "objetivo": "listaFacturas",
-              "conteo": 6,
+              "conteo": 5,
               "timeoutMs": 5000
             },
             {
+              "tipo": "esperarLinea",
+              "linea": "l4",
+              "momento": "fin"
+            },
+            {
               "tipo": "esperar",
-              "cuadros": 10
+              "cuadros": 15
             }
           ]
         },
         {
           "id": "pdf",
           "presupuesto": {
-            "min": 720,
-            "max": 1220
+            "min": 941,
+            "max": 1090
           },
           "lineas": [
             {
               "id": "l1",
-              "texto": "Selecciona una factura. Pulsa Ver PDF.",
-              "voz": "Selecciona una factura. Pulsa Ver pe de efe.",
-              "inicio": 10
+              "texto": "Para ver una factura, selecciónala y pulsa Enter, o haz doble clic."
             },
             {
               "id": "l2",
-              "texto": "La aplicación genera el documento en tu equipo. A partir del XML.",
-              "voz": "La aplicación genera el documento en tu equipo. A partir del equis eme ele.",
-              "nuevoBloque": true
+              "texto": "La aplicación genera en tu equipo un PDF con los datos del XML: emisor, receptor, conceptos, impuestos, totales, el timbre y el código QR de verificación del SAT.",
+              "voz": "La aplicación genera en tu equipo un pe de efe con los datos del equis eme ele: emisor, receptor, conceptos, impuestos, totales, el timbre y el código cu erre de verificación del Sat."
             },
             {
               "id": "l3",
-              "texto": "Incluye emisor, receptor y conceptos. El timbre fiscal. Y el código QR del SAT.",
-              "voz": "Incluye emisor, receptor y conceptos. El timbre fiscal. Y el código cu erre del Sat."
+              "texto": "No es la representación impresa del contribuyente: el comprobante sigue siendo el XML, y el PDF lo indica con una leyenda."
             },
             {
               "id": "l4",
-              "texto": "Es una visualización local. No sustituye al XML. No valida el sello.",
-              "voz": "Es una visualización local. No sustituye al archivo. No valida el sello."
+              "texto": "Guardar PDF guarda una copia donde elijas, y Abrir en Vista Previa lo abre en la aplicación de macOS, por ejemplo para imprimirlo."
             },
             {
               "id": "l5",
-              "texto": "Para una copia, pulsa Guardar PDF…; para imprimir, Abrir en Vista Previa.",
-              "voz": "Para una copia, pulsa Guardar pe de efe; para imprimir, Abrir en Vista Previa."
-            },
-            {
-              "id": "l6",
-              "texto": "Para volver a la lista, pulsa Facturas o la tecla Escape."
+              "texto": "Escape regresa a la lista con la misma factura seleccionada."
             }
           ],
           "acciones": [
             {
-              "tipo": "esperar",
-              "cuadros": 10
+              "tipo": "esperarLinea",
+              "linea": "l1",
+              "momento": "inicio"
             },
             {
               "tipo": "mover",
-              "objetivo": "filaCfdi_0",
-              "cuadros": 24
+              "objetivo": "filaFactura_0"
             },
             {
               "tipo": "clic"
-            },
-            {
-              "tipo": "esperar",
-              "cuadros": 15
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "botonVerPdf",
-              "cuadros": 24
             },
             {
               "tipo": "esperarLinea",
@@ -1676,7 +1046,8 @@
               "momento": "fin"
             },
             {
-              "tipo": "clic"
+              "tipo": "tecla",
+              "tecla": "Enter"
             },
             {
               "tipo": "esperarDocumento",
@@ -1684,27 +1055,17 @@
             },
             {
               "tipo": "esperarLinea",
-              "linea": "l3",
+              "linea": "l2",
               "momento": "inicio"
             },
             {
               "tipo": "mover",
               "objetivo": "vistaPdf",
-              "cuadros": 30,
+              "cuadros": 40,
               "desplazamiento": [
-                330,
-                -70
+                -280,
+                20
               ]
-            },
-            {
-              "tipo": "esperarLinea",
-              "linea": "l5",
-              "momento": "inicio"
-            },
-            {
-              "tipo": "mover",
-              "objetivo": "botonGuardarPdf",
-              "cuadros": 30
             },
             {
               "tipo": "esperar",
@@ -1712,12 +1073,57 @@
             },
             {
               "tipo": "mover",
-              "objetivo": "botonVistaPreviaPdf",
-              "cuadros": 24
+              "objetivo": "vistaPdf",
+              "cuadros": 40,
+              "desplazamiento": [
+                270,
+                -125
+              ]
             },
             {
               "tipo": "esperarLinea",
-              "linea": "l6",
+              "linea": "l3",
+              "momento": "inicio"
+            },
+            {
+              "tipo": "desplazar",
+              "objetivo": "vistaPdf",
+              "delta": 2000
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "vistaPdf",
+              "cuadros": 40,
+              "desplazamiento": [
+                0,
+                100
+              ]
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l4",
+              "momento": "inicio"
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "botonGuardarPdf"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 20
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "botonVistaPreviaPdf"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l5",
+              "momento": "inicio"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l5",
               "momento": "fin"
             },
             {
@@ -1733,48 +1139,172 @@
       ]
     },
     {
-      "id": "menu-bar-notificaciones",
-      "titulo": "6 · Menu bar y notificaciones",
+      "id": "historial",
+      "titulo": "4 · Historial",
       "escenas": [
         {
-          "id": "menu-bar",
+          "id": "historial",
           "presupuesto": {
-            "min": 500,
-            "max": 860
+            "min": 544,
+            "max": 630
           },
           "lineas": [
             {
               "id": "l1",
-              "texto": "Archivo Fiscal vive en la barra de menús. Cerrar la ventana solo la oculta.",
-              "inicio": 60
+              "texto": "Historial muestra las descargas del perfil, de la más reciente a la más antigua: una fila por cada vez que pediste un mes."
             },
             {
               "id": "l2",
-              "texto": "Desde su icono: abres la ventana, una solicitud nueva o la carpeta de paquetes."
+              "texto": "Cada fila dice el mes, la fecha de la descarga, el resultado y cuántas facturas se obtuvieron."
             },
             {
               "id": "l3",
-              "texto": "Ahí mismo activas la opción Abrir al iniciar sesión."
-            },
-            {
-              "id": "l4",
-              "texto": "La opción Pausar monitoreo detiene el trabajo con el SAT. Lo que pidas queda pendiente.",
-              "voz": "La opción Pausar monitoreo detiene el trabajo con el Sat. Lo que pidas queda pendiente."
+              "texto": "Si una descarga requiere atención, Reintentar vuelve a pedir lo que falta; Ver facturas abre ese mes en Facturas."
             }
           ],
           "acciones": [
             {
-              "tipo": "tecla",
-              "tecla": "Escape"
+              "tipo": "esperarLinea",
+              "linea": "l1",
+              "momento": "inicio"
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "botonHistorialFacturas"
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l2",
+              "momento": "inicio"
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "filaHistorial_0/tituloFila",
+              "cuadros": 25
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "filaHistorial_0/fechaFila",
+              "cuadros": 25
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "filaHistorial_0/badgeResultado",
+              "cuadros": 25
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "filaHistorial_0/conteosFila",
+              "cuadros": 25
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l3",
+              "momento": "inicio"
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "filaHistorial_2/botonReintentar"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 25
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "filaHistorial_0/botonVerFacturas"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l3",
+              "momento": "fin"
+            },
+            {
+              "tipo": "clic"
             },
             {
               "tipo": "esperar",
               "cuadros": 15
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "exportar",
+      "titulo": "5 · Exportar",
+      "escenas": [
+        {
+          "id": "exportar-dialogo",
+          "presupuesto": {
+            "min": 602,
+            "max": 697
+          },
+          "lineas": [
+            {
+              "id": "l1",
+              "texto": "Para entregar las facturas de un mes en un solo archivo ZIP, pulsa Exportar este mes.",
+              "voz": "Para entregar las facturas de un mes en un solo archivo sip, pulsa Exportar este mes."
+            },
+            {
+              "id": "l2",
+              "texto": "El diálogo advierte que el archivo no está protegido con contraseña: guárdalo en un lugar de confianza."
+            },
+            {
+              "id": "l3",
+              "texto": "Elige qué exportar: este mes, emitidas, recibidas o ambas, y si quieres incluir el PDF de cada factura.",
+              "voz": "Elige qué exportar: este mes, emitidas, recibidas o ambas, y si quieres incluir el pe de efe de cada factura."
+            },
+            {
+              "id": "l4",
+              "texto": "El diálogo cuenta las facturas: se exportarán 12.",
+              "voz": "El diálogo cuenta las facturas: se exportarán doce."
+            }
+          ],
+          "acciones": [
+            {
+              "tipo": "esperarLinea",
+              "linea": "l1",
+              "momento": "inicio"
             },
             {
               "tipo": "mover",
-              "objetivo": "botonRegresar",
-              "cuadros": 40
+              "objetivo": "botonExportarMes"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l1",
+              "momento": "fin"
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l2",
+              "momento": "inicio"
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "avisoExportar",
+              "cuadros": 30
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l3",
+              "momento": "inicio"
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "selectorModoExportar/segmento_modoMes",
+              "cuadros": 20
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "selectorDireccionExportar/segmento_expAmbas"
             },
             {
               "tipo": "clic"
@@ -1784,8 +1314,20 @@
               "cuadros": 10
             },
             {
-              "tipo": "mostrarIlustracion",
-              "ilustracion": "menuBar"
+              "tipo": "mover",
+              "objetivo": "casillaPdfExportar"
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l4",
+              "momento": "inicio"
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "conteoExportar"
             },
             {
               "tipo": "esperarLinea",
@@ -1799,27 +1341,212 @@
           ]
         },
         {
-          "id": "icono",
+          "id": "exportar-guardar",
           "presupuesto": {
-            "min": 220,
-            "max": 420
+            "min": 686,
+            "max": 795
           },
           "lineas": [
             {
               "id": "l1",
-              "texto": "El icono indica el estado. Normal, en pausa, trabajando o requiere atención.",
-              "inicio": 15
+              "texto": "Elige la carpeta con el selector de macOS; aquí lo representamos con una ilustración."
             },
             {
               "id": "l2",
-              "texto": "¿Ves el punto? Revisa Solicitudes y Perfiles SAT.",
-              "voz": "¿Ves el punto? Revisa Solicitudes y Perfiles Sat."
+              "texto": "La aplicación sugiere un nombre sin RFC ni nombres; puedes cambiarlo. Pulsa Exportar.",
+              "voz": "La aplicación sugiere un nombre sin erre efe ce ni nombres; puedes cambiarlo. Pulsa Exportar."
+            },
+            {
+              "id": "l3",
+              "texto": "Agrega las facturas, crea los PDF y termina el archivo; nunca reemplaza uno existente."
+            },
+            {
+              "id": "l4",
+              "texto": "Al terminar, el diálogo confirma cuántas facturas se exportaron y el nombre del archivo creado. Ciérralo."
             }
           ],
           "acciones": [
             {
+              "tipo": "esperarLinea",
+              "linea": "l1",
+              "momento": "inicio"
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "botonElegirCarpetaExportar"
+            },
+            {
+              "tipo": "clic",
+              "sinEfecto": true
+            },
+            {
               "tipo": "mostrarIlustracion",
-              "ilustracion": "iconoMenuBar"
+              "ilustracion": "selectorCarpeta",
+              "parametros": {
+                "carpeta": "/Users/usuario",
+                "seleccionada": "Documentos"
+              }
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l1",
+              "momento": "fin"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 20
+            },
+            {
+              "tipo": "ocultarIlustracion"
+            },
+            {
+              "tipo": "elegirCarpeta",
+              "destino": "exportacion",
+              "ruta": "/Users/usuario/Documentos"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l2",
+              "momento": "inicio"
+            },
+            {
+              "tipo": "desplazar",
+              "objetivo": "dialogoExportarDesplazable",
+              "delta": 400
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "campoNombreExportar",
+              "cuadros": 30
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "botonExportar"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l2",
+              "momento": "fin"
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l3",
+              "momento": "inicio"
+            },
+            {
+              "tipo": "esperarExportacion",
+              "resultado": "exito",
+              "timeoutMs": 20000
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l4",
+              "momento": "inicio"
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "resultadoExportar",
+              "cuadros": 25
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "archivoCreadoExportar",
+              "cuadros": 25
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "botonCerrarExportar"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l4",
+              "momento": "fin"
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 15
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "respaldo",
+      "titulo": "6 · Respaldo",
+      "escenas": [
+        {
+          "id": "respaldo-carpeta-contrasena",
+          "presupuesto": {
+            "min": 766,
+            "max": 888
+          },
+          "lineas": [
+            {
+              "id": "l1",
+              "texto": "Archivo Fiscal puede guardar una copia cifrada de tus datos en la carpeta que elijas, por ejemplo en iCloud Drive o Dropbox. Abre Respaldo con comando 4.",
+              "voz": "Archivo Fiscal puede guardar una copia cifrada de tus datos en la carpeta que elijas, por ejemplo en ai cláud dráiv o Dropbox. Abre Respaldo con comando cuatro."
+            },
+            {
+              "id": "l2",
+              "texto": "Primero elige la carpeta; de nuevo, el selector es una ilustración."
+            },
+            {
+              "id": "l3",
+              "texto": "Después crea la contraseña: al menos 12 caracteres, escrita dos veces. Se protege en el llavero de macOS.",
+              "voz": "Después crea la contraseña: al menos doce caracteres, escrita dos veces. Se protege en el llavero de macOS."
+            }
+          ],
+          "acciones": [
+            {
+              "tipo": "esperarLinea",
+              "linea": "l1",
+              "momento": "inicio"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 20
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l1",
+              "momento": "fin"
+            },
+            {
+              "tipo": "tecla",
+              "tecla": "Cmd+4"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l2",
+              "momento": "inicio"
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "botonElegirCarpeta"
+            },
+            {
+              "tipo": "clic",
+              "sinEfecto": true
+            },
+            {
+              "tipo": "mostrarIlustracion",
+              "ilustracion": "selectorCarpeta",
+              "parametros": {
+                "carpeta": "/Users/usuario/Library/Mobile Documents/com~apple~CloudDocs",
+                "nombreCarpeta": "iCloud Drive",
+                "carpetas": [
+                  "Documentos",
+                  "Escritorio",
+                  "Respaldos"
+                ],
+                "seleccionada": "Respaldos"
+              }
             },
             {
               "tipo": "esperarLinea",
@@ -1828,62 +1555,112 @@
             },
             {
               "tipo": "esperar",
-              "cuadros": 15
+              "cuadros": 20
+            },
+            {
+              "tipo": "ocultarIlustracion"
+            },
+            {
+              "tipo": "elegirCarpeta",
+              "destino": "respaldo",
+              "ruta": "/Users/usuario/Library/Mobile Documents/com~apple~CloudDocs/Respaldos"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l3",
+              "momento": "inicio"
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "botonContrasena"
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "campoNueva"
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "escribirContrasena",
+              "longitud": 14
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "campoConfirmacion"
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "escribirContrasena",
+              "longitud": 14
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "dialogoContrasenaConfirmar"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l3",
+              "momento": "fin"
+            },
+            {
+              "tipo": "clic"
             }
           ]
         },
         {
-          "id": "notificaciones",
+          "id": "clave-recuperacion",
           "presupuesto": {
-            "min": 400,
-            "max": 690
+            "min": 283,
+            "max": 328
           },
           "lineas": [
             {
               "id": "l1",
-              "texto": "Con tu permiso, avisa cuando una solicitud termina, falla o se descarga.",
-              "inicio": 15
-            },
-            {
-              "id": "l2",
-              "texto": "Pulsa el aviso. Se abre la pantalla relacionada."
-            },
-            {
-              "id": "l3",
-              "texto": "La acción Mostrar en Finder lleva a la carpeta de la solicitud."
-            },
-            {
-              "id": "l4",
-              "texto": "El aviso e.firma por vencer te recuerda renovarla y abre Perfiles SAT.",
-              "voz": "El aviso e firma por vencer te recuerda renovarla y abre Perfiles Sat."
+              "texto": "La aplicación muestra tu clave de recuperación: con ella abres los respaldos si olvidas la contraseña. Cópiala o imprímela, guárdala y pulsa Ya la guardé."
             }
           ],
           "acciones": [
             {
-              "tipo": "cambiarEFirma",
-              "perfil": "principal",
-              "efirma": "porVencer"
+              "tipo": "esperarLinea",
+              "linea": "l1",
+              "momento": "inicio"
             },
             {
-              "tipo": "mostrarIlustracion",
-              "ilustracion": "notificacion",
-              "parametros": {
-                "notificaciones": [
-                  {
-                    "tipo": "descargaCompleta",
-                    "solicitud": "agosto"
-                  },
-                  {
-                    "tipo": "efirmaPorVencer",
-                    "perfil": "principal"
-                  }
-                ]
-              }
+              "tipo": "mover",
+              "objetivo": "textoClaveRecuperacion",
+              "cuadros": 30
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 30
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "botonCopiarClave",
+              "cuadros": 20
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "botonImprimirClave",
+              "cuadros": 20
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "botonClaveGuardada"
             },
             {
               "tipo": "esperarLinea",
-              "linea": "l4",
+              "linea": "l1",
               "momento": "fin"
+            },
+            {
+              "tipo": "clic"
             },
             {
               "tipo": "esperar",
@@ -1892,32 +1669,142 @@
           ]
         },
         {
-          "id": "cierre",
+          "id": "respaldar-ahora",
           "presupuesto": {
-            "min": 300,
-            "max": 510
+            "min": 373,
+            "max": 432
           },
           "lineas": [
             {
               "id": "l1",
-              "texto": "Pruébalas con la opción Enviar notificación de prueba, en el menú de la barra.",
-              "inicio": 20
+              "texto": "Activa el respaldo diario si quieres que se haga solo mientras la aplicación esté abierta."
             },
             {
               "id": "l2",
-              "texto": "Y eso es todo. Perfil, e.firma, solicitud, paquetes y facturas. Siempre en tu equipo.",
-              "voz": "Y eso es todo. Perfil, e firma, solicitud, paquetes y facturas. Siempre en tu equipo."
+              "texto": "O pulsa Respaldar ahora: la aplicación prepara la copia, la cifra y la copia a la carpeta; tu servicio de nube se encarga de subirla."
             }
           ],
           "acciones": [
             {
-              "tipo": "cambiarEFirma",
-              "perfil": "principal",
-              "efirma": "lista",
-              "vigenteHasta": "2029-01-01T00:00:00Z"
+              "tipo": "esperarLinea",
+              "linea": "l1",
+              "momento": "inicio"
             },
             {
-              "tipo": "ocultarIlustracion"
+              "tipo": "desplazar",
+              "objetivo": "desplazamientoRespaldo",
+              "delta": 300
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "interruptorDiario"
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l2",
+              "momento": "inicio"
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "botonRespaldarAhora"
+            },
+            {
+              "tipo": "clic"
+            },
+            {
+              "tipo": "progresoRespaldo",
+              "fase": "captura",
+              "bytes": 2500000,
+              "total": 12400000
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 25
+            },
+            {
+              "tipo": "progresoRespaldo",
+              "fase": "escritura",
+              "bytes": 8000000,
+              "total": 12400000
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 25
+            },
+            {
+              "tipo": "progresoRespaldo",
+              "fase": "publicacion",
+              "bytes": 12400000,
+              "total": 12400000
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 20
+            },
+            {
+              "tipo": "resultadoRespaldo",
+              "resultado": "exito",
+              "bytes": 12400000,
+              "fecha": "2026-10-06T10:12:00Z"
+            },
+            {
+              "tipo": "esperarRespaldo",
+              "resultado": "exito"
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "resultadoRespaldo"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l2",
+              "momento": "fin"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 20
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "menu-bar",
+      "titulo": "7 · Menu bar y notificaciones",
+      "escenas": [
+        {
+          "id": "menu-bar",
+          "presupuesto": {
+            "min": 588,
+            "max": 681
+          },
+          "lineas": [
+            {
+              "id": "l1",
+              "texto": "Archivo Fiscal pone un icono en la barra de menús de macOS. Cerrar la ventana solo la oculta: las descargas siguen."
+            },
+            {
+              "id": "l2",
+              "texto": "Esta ilustración muestra su menú: mostrar la ventana, ver facturas, pausar el monitoreo, abrir al iniciar sesión y salir."
+            },
+            {
+              "id": "l3",
+              "texto": "El icono cambia con una insignia cuando la aplicación trabaja con el SAT, está en pausa o algo requiere atención.",
+              "voz": "El icono cambia con una insignia cuando la aplicación trabaja con el Sat, está en pausa o algo requiere atención."
+            }
+          ],
+          "acciones": [
+            {
+              "tipo": "tecla",
+              "tecla": "Cmd+1"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l1",
+              "momento": "inicio"
             },
             {
               "tipo": "esperar",
@@ -1929,18 +1816,81 @@
               "momento": "inicio"
             },
             {
-              "tipo": "mover",
-              "objetivo": "botonPerfilesSat",
-              "cuadros": 30
+              "tipo": "mostrarIlustracion",
+              "ilustracion": "menuBar"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l3",
+              "momento": "inicio"
+            },
+            {
+              "tipo": "ocultarIlustracion"
+            },
+            {
+              "tipo": "mostrarIlustracion",
+              "ilustracion": "iconoMenuBar"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l3",
+              "momento": "fin"
             },
             {
               "tipo": "esperar",
               "cuadros": 20
             },
             {
-              "tipo": "mover",
-              "objetivo": "botonNuevaSolicitud",
-              "cuadros": 24
+              "tipo": "ocultarIlustracion"
+            }
+          ]
+        },
+        {
+          "id": "notificaciones",
+          "presupuesto": {
+            "min": 559,
+            "max": 648
+          },
+          "lineas": [
+            {
+              "id": "l1",
+              "texto": "Cuando termina una descarga, macOS te avisa con una notificación por dirección: una de emitidas y otra de recibidas."
+            },
+            {
+              "id": "l2",
+              "texto": "Muestran el periodo y solo los últimos tres caracteres del RFC; al pulsarlas, la aplicación abre ese mes en Facturas.",
+              "voz": "Muestran el periodo y solo los últimos tres caracteres del erre efe ce; al pulsarlas, la aplicación abre ese mes en Facturas."
+            },
+            {
+              "id": "l3",
+              "texto": "Eso es Archivo Fiscal: tus facturas, mes por mes, en tu equipo."
+            }
+          ],
+          "acciones": [
+            {
+              "tipo": "esperarLinea",
+              "linea": "l1",
+              "momento": "inicio"
+            },
+            {
+              "tipo": "mostrarIlustracion",
+              "ilustracion": "notificacion",
+              "parametros": {
+                "notificaciones": [
+                  {
+                    "tipo": "facturasDescargadas",
+                    "perfil": "principal",
+                    "mes": "2026-09",
+                    "direccion": "emitidas"
+                  },
+                  {
+                    "tipo": "facturasDescargadas",
+                    "perfil": "principal",
+                    "mes": "2026-09",
+                    "direccion": "recibidas"
+                  }
+                ]
+              }
             },
             {
               "tipo": "esperarLinea",
@@ -1949,7 +1899,19 @@
             },
             {
               "tipo": "esperar",
-              "cuadros": 25
+              "cuadros": 10
+            },
+            {
+              "tipo": "ocultarIlustracion"
+            },
+            {
+              "tipo": "esperarLinea",
+              "linea": "l3",
+              "momento": "fin"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 30
             }
           ]
         }

@@ -4,16 +4,15 @@ Graba el video tutorial cuadro a cuadro con la UI real (`SatCfdiDownloader`)
 sobre servicios fijos gobernados por un guion JSON versionado. Sin SQLite,
 worker, SAT, Keychain ni red. Corte 1: video sin voz (MP4 + `.srt` + capitulos).
 
-> Estado (T024.1): `guion-tutorial.json` describe la UI anterior a T023 y no
-> se puede grabar; todo comando de este README que lo usa queda roto hasta que
-> T024.4 lo reescriba. `guion-ejemplo.json` y las pruebas `-L video` si
-> funcionan.
+> Estado (T024.4, corte 2): `guion-tutorial.json` es el tutorial nuevo (7
+> capitulos, portada y cierre, voz `cedar`). Graba completo sin voz y con
+> `--rapido`; falta la voz real (la sintetiza el usuario: muestra y lote).
 
 ## Uso
 
 ```bash
 cmake -S . -B build -G Ninja -DSATCFDI_BUILD_VIDEO_TUTORIAL=ON
-cmake --build build --target video_tutorial      # guion-tutorial.json -> build/video/tutorial.{mp4,srt,linea-tiempo.json} (roto desde T023/T024.1; se reescribe en T024.4)
+cmake --build build --target video_tutorial      # guion-tutorial.json -> build/video/tutorial.{mp4,srt,linea-tiempo.json}
 ctest --test-dir build -L video                  # validacion, sandbox, sincronia, modo rapido, barrera PDF
 
 # Directo (la grabacion siempre dentro del sandbox sin red, D15):
@@ -281,13 +280,18 @@ satcfdi_video_voz --guion <guion.json> [--cache <dir>] [--motor openai|prueba]
 - Mezcla (al grabar): cada tramo de linea en su posicion (los cortes caen en
   pausas; fundidos de 5 ms), ajuste moderado por bloque (+-3 dB hacia la
   mediana de los bloques) y normalizacion de la pista completa en dos pasadas
-  de loudnorm (I=-16 LUFS, TP=-2 dBTP, LRA=11, lineal). AAC-LC estereo 48 kHz
+  de loudnorm (I=-16 LUFS, TP=-3 dBTP desde T024.4, LRA=11, lineal). AAC-LC estereo 48 kHz
   192 kb/s.
-- `--escenas <ids>` en el grabador: solo esas escenas salen en el MP4, el
+- `--escenas <ids>` en el grabador: ids `capitulo/escena`, o solo `escena`
+  si es unica (un id desconocido o ambiguo falla y lista los validos); imprime
+  `escenas: ... -> muestra de N cuadros`. Solo esas escenas salen en el MP4, el
   `.srt`, los capitulos y la voz (consecutivas); las demas se ejecutan sin
-  grabarse para dejar la app en el mismo estado. Sin presupuestos.
+  grabarse para dejar la app en el mismo estado; las que no tienen voz en el
+  cache usan la duracion estimada (no salen en el video). Sin presupuestos.
+  Sin `--escenas`, con `--voz`, un bloque sin audio en el cache hace fallar
+  la planificacion nombrando escena y bloque (D17).
 - Verificacion (`satcfdi_video_con_voz`): pista AAC 48 kHz estereo, misma
-  duracion que el video (+-0.1 s), -17 a -15 LUFS, pico <= -1 dBTP, cada cue
+  duracion que el video (+-0.1 s), -17 a -15 LUFS, pico <= -2.3 dBTP, cada cue
   justo antes de su voz (+-1 cuadro) y una muestra montada de 2 escenas.
 
 ## Musica de fondo (R4, 08-audio-musica.md)
@@ -318,6 +322,12 @@ musica: la pista sale byte a byte igual que antes):
   envolvente distinta de cero, tampoco en la vuelta del ultimo al primero).
   Fundidos globales `entradaMs`/`salidaMs` solo sobre la musica. Duracion
   exacta: `totalCuadros x 1600` muestras.
+- Con `"cierre": true` (T024.4, 01-audio-voz §2) la salida no usa `salidaMs`:
+  queda anclada al cierre. Medio coseno desde el cuadro local 45 del cierre
+  hasta silencio exacto en el 135; del 135 al 149 la musica es cero y la pista
+  conserva su duracion completa. El ancla entra en la clave de cache de la
+  mezcla. La portada no lleva voz; la entrada de 2 s (`entradaMs`) cae dentro
+  de ella.
 - EQ solo de la musica (biquads en C++, continuos en toda la pista):
   pasaaltos 120 Hz 12 dB/oct, campana 250 Hz -4 dB Q 0,8, pasabajos 900 Hz
   24 dB/oct, campana 2 kHz -9 dB Q 0,7.
@@ -348,7 +358,8 @@ musica: la pista sale byte a byte igual que antes):
   `pista.s16` (lo que recibe ffmpeg) sin sesion grafica ni grabacion, e
   imprime sus sha256. Lo usan las pruebas `satcfdi_video_musica_*`.
 - Pico verdadero (D25): -2 dBTP con +0,2 dB de tolerancia sobre el AAC
-  decodificado. Al terminar cada grabacion con audio, la herramienta decodifica
+  decodificado. La voz se normaliza a -3 dBTP (`kPicoObjetivoVozDb`): con -2
+  la muestra de T024.4 dio -1.76 dBTP en el AAC; con -3, -2.84. Al terminar cada grabacion con audio, la herramienta decodifica
   el MP4, imprime `audio AAC decodificado: X LUFS, Y dBTP (maximo -1.8)` y, si
   pasa de -1.8 dBTP, falla sin publicar nada. `verificar-d16.cmake` lo
   comprueba tambien (`picoVerdaderoMaximoAacDb` del manifiesto).
@@ -376,7 +387,7 @@ QuickTime (`bin_data`) que ffmpeg agrega al escribir capitulos.
 ## Guiones
 
 - `guion-tutorial.json`: el tutorial (especialista-guion-tutoriales); lo
-  grabaria `video_tutorial` (roto hasta T024.4) (cache `SATCFDI_VIDEO_GUION`) y lo valida, sin grabar, la
+  graba `video_tutorial` (cache `SATCFDI_VIDEO_GUION`) y lo valida, sin grabar, la
   prueba `satcfdi_video_guion_tutorial`.
 - `guion-ejemplo.json`: ejemplo corto que usan las demas pruebas.
 
@@ -431,6 +442,30 @@ segunda ventana de la herramienta que no toma el foco):
   foco de Qt a la ventana de la app con `QWindowSystemInterface` (Qt GUI
   privado) en cada cuadro: teclado, campo activo y apariencia activa no
   dependen del sistema (probado activando Finder a mitad de una grabacion).
+
+## Portada y cierre (T024.4, 03-motion §4)
+
+Raiz `"portada": true` y `"cierre": true` (booleanos; por omision false; con
+`--escenas` no se graban). Portada de 120 cuadros antes del primer capitulo y
+cierre de 150 despues del ultimo, sin voz ni transcripcion; la linea de
+tiempo los declara (`portada`, `cierre`) y el primer capitulo empieza en el
+cuadro 120. Todo depende solo del cuadro de la salida (`Lienzo.qml`):
+
+- Fondo con `atenuacion` (uniform de `fondo.frag`): 0.6 en la portada, sube a
+  1.0 en 96-119; en el cierre baja de 1.0 a 0.6 en 0-23.
+- Portada: capas de `resources/branding/` (carpeta y frente escalan de 0.96 a
+  1 en 12-23; hoja posterior 18 y anterior 24 bajan 40/56 logicos; pestana en
+  38-43; wordmark sube 8 logicos en 42-53) con halo `MultiEffect`; la marca se
+  va en 96-107 y la ventana entra en 102-119.
+- Cierre: ventana y textos salen en 0-14; `lockup-video.svg` entra en 10-21
+  (escala 0.98 -> 1) con el mismo halo; velo `#052E1C` de 112 a 136: el
+  ultimo cuadro es solido.
+- Pruebas: `satcfdi_video_portada_cierre` (linea de tiempo; ultimo cuadro
+  #052E1C; sin ventana en la portada 90; PSNR >= 40 dB entre la marca de la
+  portada 90 y la del cierre en total-90, en el interior: el h264 separa los
+  bordes) y `satcfdi_video_musica_portada_cierre` (voz < -60 dBFS en portada y
+  cierre; musica audible en la portada y en el cierre 0-44; < -60 dBFS desde
+  el 135).
 
 ## Overlays dentro de la ventana (motion design, revision-motion.md)
 
@@ -510,10 +545,23 @@ Reproducibilidad medida (guion de ejemplo de 2000 cuadros, dos corridas en el
 sandbox): mismos cuadros y `.srt` identico; PSNR minimo por cuadro 63.4 dB. No es identico byte a byte:
 el texto rasterizado por la GPU varia en 1 nivel en algunos pixeles.
 
+Ilustraciones reducidas (T024.4, D16): una ilustracion mas grande que la
+ventana (`selectorArchivos`, `finder`) se reduce con `scale`. Sin mas, su
+texto se muestreaba con filtro lineal desde el atlas de glifos, cuya
+disposicion depende de lo que se dibujo antes, y la columna del borde de
+algunos glifos cambiaba entre corridas (17 pixeles por cuadro en
+`perfil/registrar-efirma`). Ahora `Superposicion.qml` dibuja esas
+ilustraciones en una capa (`layer.enabled` cuando la escala es < 1) y reduce
+la textura. La prueba `satcfdi_video_ilustracion_determinista` graba dos
+veces la escena con `selectorArchivos` del guion de ejemplo y exige PNG
+identicos.
+
 ### Verificacion D16 (`verificar-d16.cmake`, `verificacion-d16.json`)
 
 - `verificacion-d16.json` (versionado): video h264 2560x1440 30/1, audio aac
-  48 kHz, tolerancia entre pistas (100 ms), duracion total (300-450 s),
+  48 kHz, tolerancia entre pistas (100 ms), duracion total (300-480 s),
+  esquema 2 (T024.4) con `huellaGuion` (SHA-256 del guion) y `huellaVoz`
+  (SHA-256 de las claves de bloque del cache de voz usadas),
   `totalCuadros`, `psnrMinimoDb` (60), formato de decodificacion del audio para
   el MD5 (`-c:a pcm_s16le -ar 48000 -ac 2 -f md5`), capitulos (titulo, inicio y
   fin en cuadros) y cuadros muestreados: la mitad de la primera escena de cada
@@ -529,7 +577,15 @@ el texto rasterizado por la GPU varia en 1 nivel en algunos pixeles.
   `build/video/verificacion/tutorial.mp4`).
 - `-DMODO=generar -DGUION=... -DLINEA_TIEMPO=<x.linea-tiempo.json>
   -DMANIFIESTO=...`: regenera el manifiesto desde la grabacion aprobada (solo
-  si cambia el guion; el diff se revisa).
+  si cambia el guion; el diff se revisa). Exige que la linea de tiempo sea de
+  ese guion y de una grabacion con voz. Target:
+  `cmake --build build --target video_tutorial_manifiesto` (desde
+  `build/video/tutorial.linea-tiempo.json`).
+- D16 (T024.4): cada MP4 lleva en su etiqueta `comment`
+  `satcfdi-d16 guion=<sha256> voz=<sha256|ninguna>`. `verificar` (que ahora
+  pide `-DGUION`) falla si el manifiesto no tiene huellas (es el del video
+  anterior: regeneralo), si es de otro guion, o si un video se grabo con otro
+  guion u otra voz (cache de voz anterior).
 - Prueba `satcfdi_video_verificacion_d16`: videos sinteticos pequenos; pasa con
   copias identicas y falla con contenido, capitulos o pistas distintos.
 
@@ -557,7 +613,9 @@ aparte, fuera del sandbox.
 ```jsonc
 {
   "esquema": 1,
-  "tipo": "tutorial" | "ejemplo",   // tutorial: total fijo de 9000 a 13500 cuadros (5 a 7:30 min)
+  "tipo": "tutorial" | "ejemplo",   // tutorial: 9000 a 14400 cuadros (5:00 a 8:00), exactamente 7 capitulos
+  "ventana": {"ancho": 960, "alto": 540}, // T024.4: ventana logica (800-1200 x 450-640); por omision 960x540
+  "portada": true, "cierre": true, // T024.4: 120 y 150 cuadros de marca sin voz (booleanos; por omision false)
   "titulo": "…",                   // titulo del MP4
   "presupuestoTotal": {"min": N, "max": N}, // solo con tipo "ejemplo"
   "cuadrosTitulo": 75,             // titulo del capitulo en pantalla (0-300)
@@ -576,7 +634,12 @@ aparte, fuera del sandbox.
                      "desde": "yyyy-MM-dd", "hasta": "yyyy-MM-dd", "estado", "visible"?: true,
                      "cfdis"?: [{"tipo": "I|E", "serie"?, "folio", "contraparte",
                                  "fecha": "yyyy-MM-ddTHH:mm:ss", "subtotal": "1000.00",
-                                 "descripcion"}]}]
+                                 "descripcion"}]}],
+    // T024.4: descarga guiada simulada (Facturas, franja e Historial por lotes)
+    "meses": [{"perfil", "mes": "yyyy-MM", "estado", "direccion"?, "causa"?, "descargadoEn"?: "ISO",
+               "emitidas"?: N | [cfdi…], "recibidas"?: N | [cfdi…]}],
+    // T024.4: estado inicial del respaldo (ausente = el del fake comun)
+    "respaldo": {"carpeta"?: true, "contrasena"?: true, "diario"?: true, "ultimoExito"?: "ISO"}
   },
   "capitulos": [{"id", "titulo", "escenas": [{
       "id", "presupuesto": {"min": N, "max": N},  // cuadros
@@ -600,9 +663,29 @@ aparte, fuera del sandbox.
   `.` `?` `!` o `:` y pertenece a un bloque de narracion; `voz` solo cambia la
   pronunciacion. Tiempos: ver "Voz por bloques". Sin `--voz`, el audio de cada
   bloque se estima por longitud (15 caracteres/s) con marcas proporcionales.
+- `datos.meses` (T024.4): cada mes declarado genera, por direccion con
+  facturas, un ZIP sintetico real (mismo XML que `cfdis`) que se indexa con el
+  codigo real; la lista y el PDF de Facturas salen de ahi. `emitidas` /
+  `recibidas` son un conteo (facturas deterministas dentro del mes) o una
+  lista explicita (`fecha` dentro del mes). Estados: `sinDescargar`,
+  `preparando`, `disponibles`, `disponiblesParcialmente` (la `direccion`
+  completa, por omision emitidas; la otra sin descargar) y
+  `requiereAtencion` (la `direccion`, por omision recibidas, con `causa` =
+  `claveEstable(CausaAtencion)`, p. ej. `ErrorSat`; la otra Disponibles).
+  Vale tambien para perfiles `"visible": false` (Facturas los muestra en
+  cuanto la UI los crea). Historial: un lote por mes descargado (fecha
+  `descargadoEn`, o el dia 1 del mes siguiente) con resultado coherente con su
+  estado, mas una entrada "Anterior" por solicitud visible. Ejecutar la accion
+  de la franja ("Descargar facturas") pasa a Preparando las direcciones sin
+  facturas y crea su lote, como el worker; el guion lo termina con
+  `avanzarMes`.
 - Escena: dura `max(fin de acciones, fin de voz) + colchon`. La validacion
   previa falla si una escena queda fuera de su presupuesto o el total fuera
   del suyo, con un mensaje que nombra `escena '<capitulo>/<escena>'`.
+- Tutorial (T024.4): exactamente 7 capitulos y 5:00-8:00; falla si el titulo
+  de un capitulo o el `texto`/`voz` de una linea dicen "solicitud(es)" o
+  "paquete(s)" (T024 D3; sin importar mayusculas ni acentos), nombrando
+  escena, linea y campo.
 
 ### Acciones (secuenciales; cuadros a 30 fps)
 
@@ -613,14 +696,22 @@ aparte, fuera del sandbox.
 | `clic` | `pausa`=8, `cuadros`=10, `sinEfecto`=false | `pausa` + `cuadros`: cursor quieto `pausa` cuadros; luego onda + press y release 3 cuadros despues (M7); con `sinEfecto` solo la onda (p. ej. Elegir…, que abriria un dialogo nativo) |
 | `escribir` | `texto`, `cuadrosPorCaracter`=3 | `len * cuadrosPorCaracter` |
 | `escribirContrasena` | `longitud`, `cuadrosPorCaracter`=3 | igual; valor sintetico fijo, nunca en el guion ni en logs |
-| `tecla` | `tecla`: Enter, Escape, Tab, Abajo, Arriba; `cuadros`=6 | `cuadros` |
+| `tecla` | `tecla`: `[Cmd+][Shift+][Opcion+][Ctrl+]<tecla>` (en ese orden; tecla: Enter, Escape, Tab, Abajo, Arriba, Izquierda, Derecha, Espacio, Retroceso, Coma, Punto, A-Z o 0-9); `mostrar`? (keycap; por omision solo con modificadores); `cuadros` | 36 con keycap (entra 0-5, evento en el 6, sale 28-35; tambien con `--rapido` el evento va en el 6), 6 sin keycap (evento en el 0). Cmd = `Qt::ControlModifier` (en macOS Qt intercambia Ctrl y Cmd); los atajos van por el mapa de atajos de Qt (`QWindowSystemInterface::handleShortcutEvent`) |
+| `desplazar` | `objetivo` (un Flickable o un control que lo contiene, p. ej. `<prefijo>Desplazable` de los dialogos de Respaldo/Exportar), `hasta` (contentY) o `delta`, `cuadros`? | `cuadros` (24 con `hasta` o con abs(`delta`) > 200, si no 18); contentY por cuadro con InOutQuad, acotado al contenido |
+| `avanzarMes` | `perfil`, `mes` (de `datos.meses`), `estado`, `direccion`? (emitidas, recibidas, ambas), `causa`? | 0; cambia la franja, la lista y el Historial como el worker (p. ej. `preparando` y luego `disponibles` por direccion) |
+| `elegirCarpeta` | `destino`: exportacion o respaldo; `ruta` bajo `/Users/usuario/` | 0; lo que el FolderDialog entregaria (D10: el dialogo real nunca se abre) |
+| `progresoRespaldo` | `fase` (captura, escritura, publicacion, depuracion), `bytes`, `total`? | 0; requiere un respaldo en curso ("Respaldar ahora") |
+| `resultadoRespaldo` | `resultado`? (exito, conAvisos, error), `bytes`? (12400000), `fecha`? (ISO; por omision `datos.ahora`) | 0; termina el respaldo en curso |
+| `esperarRespaldo` | `resultado`? (exito, conAvisos, error), `timeoutMs`? (5000) | 0 (barrera: la pagina muestra el resultado con esa variante) |
+| `mostrarBanner` | `notificaciones`: como en la ilustracion `notificacion` | 0; banner 400x70 sobre la app viva (motion 2b): entra en 10, el segundo en el cuadro 14 y 82 mas abajo, rotulo "Ilustración" |
+| `ocultarBanner` | | 0; sale en 10 cuadros |
 | `esperarLinea` | `linea`, `momento`: inicio o fin | hasta ese cuadro |
 | `avanzarSolicitud` | `solicitud` (clave o `nuevaN`), `estado`, `verificadaEn`? (ISO: resultado de Verificar ahora) | 0 |
 | `cambiarEFirma` | `perfil`, `efirma`, `vigenteHasta`? | 0 |
 | `mostrarSolicitudes` | `claves`: reemplaza la lista visible | 0 |
 | `seleccionarArchivoEFirma` | `archivo`: certificado o llave; `ruta` bajo `/Users/usuario/` (nunca se lee) | 0 |
 | `completarEFirma` | `perfil`, `vigenteHasta`? | 0; termina "Validando…" con exito |
-| `mostrarIlustracion` | `ilustracion`: menuBar, iconoMenuBar, notificacion, finder, selectorArchivos; `parametros` | 0 |
+| `mostrarIlustracion` | `ilustracion`: menuBar, iconoMenuBar, notificacion, finder, selectorArchivos, selectorCarpeta (T024.4: `qml/IlustracionSelectorCarpeta.qml`, 720x440, `carpeta`, `nombreCarpeta`?, `carpetas`, `seleccionada`); `parametros`. `notificacion` acepta tambien `{tipo: facturasDescargadas, perfil, mes, direccion: emitidas\|recibidas}` (texto de `ServicioNotificaciones`) | 0 |
 | `ocultarIlustracion` | | 0 |
 | `esperarDocumento` | `timeoutMs` (1-30000) | 0 (barrera) |
 | `esperarConteo` | `objetivo`, `conteo`, `timeoutMs` | 0 (barrera) |
@@ -648,7 +739,7 @@ aparte, fuera del sandbox.
 - Facturas e Historial (T022 D6; desde T024.2 con los fakes comunes de
   `tools/fakes-materiales`, los mismos de `tools/capturas-manual`): Facturas
   es la pagina inicial, como en la app. Muestra los perfiles visibles del
-  guion con su e.firma y un catalogo mensual vacio (sin descarga guiada). El Historial
+  guion con su e.firma y el catalogo mensual de `datos.meses` (vacio sin el). El Historial
   tiene una entrada por solicitud visible del perfil, la mas reciente
   primero, y su "Ver detalles tecnicos" (`filaHistorial_N/botonDetalles`)
   abre el detalle (Verificar ahora, Ver facturas). Desde Perfiles,
@@ -656,15 +747,26 @@ aparte, fuera del sandbox.
 - Exportacion y Respaldo (T024.2): la sesion conecta el
   `ExportacionFacturasService` real con puertos en memoria
   (`materiales::ExportacionSintetica`, sin disco ni PDF reales) y los
-  controles sinteticos de respaldo, restauracion y datos previos. Ninguna
-  escena del guion los usa todavia; adoptarlos es T024.4.
-- Pendiente de T024.4: `guion-tutorial.json` aun apunta a `guiaPrimerUso/*` en
-  Diagnostico y a `botonNuevaSolicitud`, retirados en T024.1; no se graba hasta
-  reescribirlo. Guia "Empieza en tres pasos" (T014.3 D1, historico): se deriva en vivo de los datos
-  (perfiles visibles, alguna e.firma Lista, solicitudes visibles) y se ve en
-  la lista vacia. Sus botones: `guiaPrimerUso/boton_pasoPerfil`,
-  `guiaPrimerUso/boton_pasoEFirma`, `guiaPrimerUso/boton_pasoSolicitud`; con
-  la guia visible no existe `botonNuevaSolicitudVacia`.
+  controles sinteticos de respaldo, restauracion y datos previos. T024.4: el
+  respaldo queda en curso tras "Respaldar ahora" hasta `resultadoRespaldo`
+  (con `progresoRespaldo` entre medias); el nombre visible de la carpeta es el
+  ultimo componente de la ruta de `elegirCarpeta`.
+- Dialogos nativos y sistema (D10, T024.4): la grabacion falla nombrando la
+  escena si se abre un FileDialog/FolderDialog (o cualquier dialogo de
+  QtQuick.Dialogs), si la UI pide Finder o Vista Previa, abre una URL con el
+  sistema (`QDesktopServices`/`Qt.openUrlExternally`) o escribe en el
+  portapapeles. Cada `clic` con `sinEfecto` queda en la salida
+  (`clic sinEfecto: escena …`) y en `sinEfecto` de la linea de tiempo.
+- `mover` falla si el centro del control queda fuera de la vista de su
+  Flickable ancestro (p. ej. el contenido desplazable de los dialogos en
+  960x540): el guion debe `desplazar` ese Flickable antes.
+- Guia de primer uso de Facturas (`guiaPrimerUsoFacturas`): se deriva en vivo
+  de los datos (perfiles visibles, alguna e.firma Lista) y se ve sin
+  perfiles. Pasos `guiaPrimerUsoFacturas/pasoPerfil|pasoEFirma|pasoFacturas`
+  y sus botones `.../boton_<paso>`.
+- Clave de recuperacion (T024.4): la herramienta conecta "Copiar" e
+  "Imprimir…" para que se vean como en la app; si se pulsan con efecto, la
+  grabacion falla (D10: portapapeles e impresion son nativos).
 - Barreras: congelan el reloj (no consumen cuadros) y esperan en tiempo real.
   `esperarDocumento`: `documentoListo` del visor (`visorPdfCfdi`) y la primera
   pagina rasterizada; `documentoError` o el timeout fallan nombrando la escena.

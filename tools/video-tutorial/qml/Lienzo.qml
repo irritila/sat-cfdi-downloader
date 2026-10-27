@@ -16,6 +16,11 @@ Window {
 
     // Lo fija la herramienta.
     property int cuadro: 0
+    // T024.4 (03-motion 4): portada (cuadros 0..cuadrosPortada-1) y cierre
+    // (desde inicioCierre, cuadrosCierre cuadros); 0 / -1 = sin ellos.
+    property int cuadrosPortada: 0
+    property int inicioCierre: -1
+    property int cuadrosCierre: 0
     property var cues: []        // [{i, f, e, t}] cuadros de la salida (= .srt); e = fin de su escena
     property var capitulos: []   // [{i, f, titulo}]
     property int cuadrosTitulo: 90
@@ -32,8 +37,11 @@ Window {
     }
     readonly property string textoActual: actual.texto
 
-    // Geometria (logicos): ventana 960x540 + barra de 28, centrada en x.
-    readonly property real ventanaX: (lienzo.width - 960) / 2
+    // Geometria (logicos): ventana (960x540 por omision; T024.4: "ventana"
+    // del guion) + barra de 28, centrada en x.
+    property int ventanaAncho: 960
+    property int ventanaAlto: 540
+    readonly property real ventanaX: (lienzo.width - lienzo.ventanaAncho) / 2
     readonly property real barraY: 52
     readonly property real contenidoY: lienzo.barraY + 28
     readonly property real transcripcionAbajo: 712
@@ -56,6 +64,40 @@ Window {
         const x = Math.max(0, Math.min(1, t))
         return x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2
     }
+    function tramo(t, desde, hasta) { // 0..1 lineal en [desde, hasta]
+        return Math.max(0, Math.min(1, (t - desde) / (hasta - desde)))
+    }
+    function salidaCuad(t) { // OutQuad
+        return 1 - (1 - t) * (1 - t)
+    }
+
+    // --- Portada y cierre (T024.4, 03-motion 4; T020 05-motion 1) ----------
+    // Tiempos en cuadros de la salida; la tabla de 03-motion es la fuente.
+    readonly property bool enPortada: lienzo.cuadro < lienzo.cuadrosPortada
+    readonly property int tCierre: lienzo.inicioCierre >= 0 ? lienzo.cuadro - lienzo.inicioCierre : -1
+    readonly property bool enCierre: lienzo.tCierre >= 0
+    // Fondo atenuado (0.6) bajo la marca: rampa 96-119 en la portada y
+    // 0-23 en el cierre.
+    readonly property real atenuacion: {
+        if (lienzo.enPortada)
+            return 0.6 + 0.4 * lienzo.suave(lienzo.tramo(lienzo.cuadro, 96, 120))
+        if (lienzo.enCierre)
+            return 1.0 - 0.4 * lienzo.suave(lienzo.tramo(lienzo.tCierre, 0, 24))
+        return 1.0
+    }
+    // Ventana: entra en 102-119 de la portada, sale en 0-14 del cierre.
+    readonly property real opacidadVentana: {
+        if (lienzo.enPortada)
+            return lienzo.suave(lienzo.tramo(lienzo.cuadro, 102, 120))
+        if (lienzo.enCierre)
+            return 1 - lienzo.suave(lienzo.tramo(lienzo.tCierre, 0, 15))
+        return 1
+    }
+    // Titulo y transcripcion: ocultos fuera de [portada, cierre).
+    readonly property real opacidadTextos: lienzo.enPortada ? 0
+        : lienzo.enCierre ? 1 - lienzo.suave(lienzo.tramo(lienzo.tCierre, 0, 15)) : 1
+    readonly property bool hayMarca: lienzo.enPortada || lienzo.enCierre
+
     function indiceCue(f) {
         let k = -1
         for (let i = 0; i < lienzo.cues.length && lienzo.cues[i].i <= f; ++i)
@@ -91,16 +133,24 @@ Window {
         property color c2: lienzo.paleta[2]
         property color c3: lienzo.paleta[3]
         property color acento: lienzo.paleta[4]
+        property real atenuacion: lienzo.atenuacion
         fragmentShader: "qrc:/satcfdi-video/qml/fondo.frag.qsb"
     }
 
     // --- Ventana (D21) --------------------------------------------------------
+    Item {
+        objectName: "capaVentana"
+        anchors.fill: parent
+        opacity: lienzo.opacidadVentana
+        visible: opacity > 0
+        // Fundido de grupo (sombra y ventana juntas) solo mientras dura.
+        layer.enabled: opacity > 0 && opacity < 1
     Rectangle {
         id: forma
         x: lienzo.ventanaX
         y: lienzo.barraY
-        width: 960
-        height: 568
+        width: lienzo.ventanaAncho
+        height: lienzo.ventanaAlto + 28
         radius: 12
         color: "#f0f0f2"
         visible: false
@@ -121,7 +171,7 @@ Window {
         objectName: "barraTitulo"
         x: lienzo.ventanaX
         y: lienzo.barraY
-        width: 960
+        width: lienzo.ventanaAncho
         height: 28
         topLeftRadius: 12
         topRightRadius: 12
@@ -156,20 +206,21 @@ Window {
         objectName: "cuadroApp"
         x: lienzo.ventanaX
         y: lienzo.contenidoY
-        width: 960
-        height: 540
+        width: lienzo.ventanaAncho
+        height: lienzo.ventanaAlto
         radio: 12
     }
     // Borde de 1 px para separar del fondo.
     Rectangle {
         x: lienzo.ventanaX
         y: lienzo.barraY
-        width: 960
-        height: 568
+        width: lienzo.ventanaAncho
+        height: lienzo.ventanaAlto + 28
         radius: 12
         color: "transparent"
         border.width: 0.5
         border.color: "#1a000000"
+    }
     }
 
     // --- Titulo de capitulo: margen superior (D21) ----------------------------
@@ -210,8 +261,8 @@ Window {
         tamano: 18
         lineas: 1
         texto: lienzo.capitulo > 0 ? lienzo.capitulos[lienzo.capitulo - 1].titulo : ""
-        opacity: lienzo.capitulo > 0 && lienzo.tTitulo < lienzo.kTitulo
-                 ? 0.55 * (1 - lienzo.suave(lienzo.tTitulo / lienzo.kTitulo)) : 0
+        opacity: lienzo.opacidadTextos * (lienzo.capitulo > 0 && lienzo.tTitulo < lienzo.kTitulo
+                 ? 0.55 * (1 - lienzo.suave(lienzo.tTitulo / lienzo.kTitulo)) : 0)
     }
     Pildora {
         objectName: "tituloCapitulo"
@@ -226,10 +277,10 @@ Window {
             if (lienzo.capitulo < 0)
                 return 0
             if (t < lienzo.kTitulo)
-                return lienzo.suave(t / lienzo.kTitulo)
+                return lienzo.opacidadTextos * lienzo.suave(t / lienzo.kTitulo)
             if (t < lienzo.cuadrosTitulo)
-                return 1
-            return 1 - 0.45 * lienzo.suave((t - lienzo.cuadrosTitulo) / lienzo.kTitulo)
+                return lienzo.opacidadTextos
+            return lienzo.opacidadTextos * (1 - 0.45 * lienzo.suave((t - lienzo.cuadrosTitulo) / lienzo.kTitulo))
         }
     }
 
@@ -257,7 +308,7 @@ Window {
         y: lienzo.transcripcionAbajo - height
         tamano: 20
         texto: lienzo.k >= 0 && lienzo.salidaActual > 0 ? lienzo.cues[lienzo.k].t : ""
-        opacity: lienzo.alfaActual
+        opacity: lienzo.opacidadTextos * lienzo.alfaActual
     }
     Pildora {
         // Cue anterior: sube desde la ranura actual en 8 cuadros y queda al 45 %.
@@ -269,7 +320,7 @@ Window {
         texto: lienzo.k >= 0 && lienzo.encadenado(lienzo.k) ? lienzo.cues[lienzo.k - 1].t : ""
         y: (lienzo.transcripcionAbajo - height) * (1 - lienzo.pSubir)
            + (actual.y - 3 - height) * lienzo.pSubir
-        opacity: (1 - 0.55 * lienzo.pSubir) * lienzo.salidaActual
+        opacity: lienzo.opacidadTextos * (1 - 0.55 * lienzo.pSubir) * lienzo.salidaActual
     }
     Pildora {
         // El anterior del anterior se desvanece mientras el nuevo sube.
@@ -281,6 +332,109 @@ Window {
         texto: lienzo.k >= 1 && lienzo.encadenado(lienzo.k) && lienzo.encadenado(lienzo.k - 1)
                ? lienzo.cues[lienzo.k - 2].t : ""
         y: actual.y - 3 - height - 30 * lienzo.pSubir
-        opacity: lienzo.pSubir < 1 ? 0.45 * (1 - lienzo.pSubir) : 0
+        opacity: lienzo.opacidadTextos * (lienzo.pSubir < 1 ? 0.45 * (1 - lienzo.pSubir) : 0)
+    }
+
+    // --- Marca: portada y cierre (T024.4, 03-motion 4) -----------------------
+    // s = 0.404 puntos por unidad SVG; capas rasterizadas con sourceSize en px
+    // (2x) sin reescalar, para que la suma de la portada (cuadro 90) coincida
+    // con el lockup del cierre. Halo: MultiEffect como la sombra de la ventana.
+    readonly property url dirMarca: Qt.resolvedUrl("../../../resources/branding/")
+    component CapaMarca: Image {
+        property real desdeY: 0
+        property real entra: 0   // cuadro en que empieza a entrar
+        property real dura: 6    // cuadros del fundido de opacidad
+        property real mueve: 0   // cuadros del movimiento en y (0 = sin)
+        readonly property real t: lienzo.cuadro
+        x: 0
+        y: mueve > 0 ? desdeY * (1 - lienzo.salidaCuad(lienzo.tramo(t, entra, entra + mueve))) : 0
+        width: 262
+        height: 252
+        sourceSize: Qt.size(524, 504)
+        smooth: true
+        opacity: lienzo.suave(lienzo.tramo(t, entra, entra + dura))
+    }
+    Item {
+        id: marcaPortada
+        objectName: "marcaPortada"
+        anchors.fill: parent
+        visible: lienzo.enPortada && opacity > 0
+        // 96-107: todas las capas salen.
+        opacity: 1 - lienzo.suave(lienzo.tramo(lienzo.cuadro, 96, 108))
+        layer.enabled: visible
+        layer.effect: MultiEffect {
+            shadowEnabled: true
+            shadowColor: "black"
+            shadowOpacity: 0.45
+            shadowBlur: 1.0
+            blurMax: 32
+            shadowHorizontalOffset: 0
+            shadowVerticalOffset: 0
+            autoPaddingEnabled: true
+        }
+        Item {
+            // Capas A-E en x 509, y 190 (262x252).
+            x: 509
+            y: 190
+            width: 262
+            height: 252
+            // A + D: 12-23, escala 0.96 -> 1.0 sobre el centro de la carpeta.
+            // Orden de apilado: A, B, C, D (frente sobre las hojas), E.
+            readonly property real escalaAD: 0.96 + 0.04 * lienzo.suave(lienzo.tramo(lienzo.cuadro, 12, 24))
+            CapaMarca { z: 0; source: lienzo.dirMarca + "video/video-carpeta.svg"; entra: 12; dura: 12; scale: parent.escalaAD }
+            CapaMarca { z: 3; source: lienzo.dirMarca + "video/video-frente.svg"; entra: 12; dura: 12; scale: parent.escalaAD }
+            CapaMarca { z: 1; source: lienzo.dirMarca + "video/video-hoja-posterior.svg"; entra: 18; mueve: 14; desdeY: -40 }
+            CapaMarca { z: 2; source: lienzo.dirMarca + "video/video-hoja-anterior.svg"; entra: 24; mueve: 14; desdeY: -56 }
+            CapaMarca { z: 4; source: lienzo.dirMarca + "video/video-pestana.svg"; entra: 38; dura: 6 }
+        }
+        Image {
+            // W: 42-53, opacidad y y +8 -> 0.
+            objectName: "wordmarkPortada"
+            x: 495
+            y: 448 + 8 * (1 - lienzo.salidaCuad(lienzo.tramo(lienzo.cuadro, 42, 54)))
+            width: 291
+            height: 34
+            sourceSize: Qt.size(582, 68)
+            smooth: true
+            source: lienzo.dirMarca + "marca/wordmark.svg"
+            opacity: lienzo.suave(lienzo.tramo(lienzo.cuadro, 42, 54))
+        }
+    }
+    Item {
+        id: marcaCierre
+        objectName: "marcaCierre"
+        anchors.fill: parent
+        visible: lienzo.enCierre && opacity > 0
+        // 10-21: lockup 0 -> 1 y escala 0.98 -> 1.0.
+        opacity: lienzo.suave(lienzo.tramo(lienzo.tCierre, 10, 22))
+        layer.enabled: visible
+        layer.effect: MultiEffect {
+            shadowEnabled: true
+            shadowColor: "black"
+            shadowOpacity: 0.45
+            shadowBlur: 1.0
+            blurMax: 32
+            shadowHorizontalOffset: 0
+            shadowVerticalOffset: 0
+            autoPaddingEnabled: true
+        }
+        Image {
+            x: 469
+            y: 190
+            width: 343
+            height: 318
+            sourceSize: Qt.size(686, 636)
+            smooth: true
+            scale: 0.98 + 0.02 * lienzo.suave(lienzo.tramo(lienzo.tCierre, 10, 22))
+            source: lienzo.dirMarca + "marca/lockup-video.svg"
+        }
+    }
+    Rectangle {
+        // Velo final: 112-135 de 0 a 1; 136-149 solido #052E1C.
+        objectName: "veloCierre"
+        anchors.fill: parent
+        color: "#052E1C"
+        opacity: lienzo.enCierre ? lienzo.tramo(lienzo.tCierre, 112, 136) : 0
+        visible: opacity > 0
     }
 }

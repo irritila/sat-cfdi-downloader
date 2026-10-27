@@ -175,17 +175,14 @@ DialogoRespaldoBase {
         Layout.fillWidth: true
     }
 
-    RowLayout {
-        spacing: Theme.espacioS
-        Layout.fillWidth: true
-        Layout.topMargin: Theme.espacioXs
-        Item { Layout.fillWidth: true }
+    acciones: [
+        Item { Layout.fillWidth: true },
         BotonAccion {
             objectName: "dialogoContrasenaCancelar"
             text: qsTr("Cancelar")
             enabled: !dialogo.procesando
             onClicked: dialogo.close()
-        }
+        },
         BotonAccion {
             objectName: "dialogoContrasenaConfirmar"
             text: dialogo.esCambio ? qsTr("Cambiar contraseña") : qsTr("Crear contraseña")
@@ -194,5 +191,5 @@ DialogoRespaldoBase {
             cargando: dialogo.procesando
             onClicked: dialogo.enviar()
         }
-    }
+    ]
 }

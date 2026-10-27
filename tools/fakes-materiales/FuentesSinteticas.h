@@ -36,8 +36,15 @@ public:
     void setAhora(const QDateTime& ahoraUtc) { m_datos.ahoraUtc = ahoraUtc; }
     void setSolicitudesCreadasAlEjecutar(std::optional<int> n) { m_datos.solicitudesCreadasAlEjecutar = n; }
     const PerfilDeclarado* perfil(const PerfilId& id) const;
-    // Cambia el estado (y conteos) de un mes y avisa datosCambiados.
-    void fijarMes(const PerfilId& perfil, int anio, int mes, const MesDeclarado& declarado);
+    // Cambia el estado (y conteos) de un mes y avisa datosCambiados (salvo
+    // `avisar` false: p. ej. dentro de ejecutar(), que ya recarga el mes).
+    void fijarMes(const PerfilId& perfil, int anio, int mes, const MesDeclarado& declarado, bool avisar = true);
+    // T024.4: agrega (o reemplaza) un perfil declarado; con proveedorPerfiles
+    // su visibilidad la decide el proveedor, pero sus meses valen siempre.
+    void declararPerfil(const PerfilDeclarado& perfil);
+    // T024.4: se llama al ejecutar una descarga guiada, antes de resolverla
+    // (el video pasa el mes a Preparando como el worker real).
+    std::function<void(const PreplanGuiado&)> alEjecutar;
     void fijarPreplan(const PreplanDeclarado& preplan) { m_datos.preplan = preplan; }
 
     // Facturas de un mes con filtro de direccion (nullopt = ambas), en el

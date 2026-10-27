@@ -59,9 +59,19 @@ QByteArray subtitulosSrt(const Guion& guion)
     return r.toUtf8();
 }
 
+QString comentarioHuellas(const Guion& guion)
+{
+    return QStringLiteral("satcfdi-d16 guion=%1 voz=%2").arg(guion.huella, guion.huellaVoz);
+}
+
 QByteArray metadatosCapitulos(const Guion& guion)
 {
     QString r = QStringLiteral(";FFMETADATA1\ntitle=%1\n").arg(escaparMetadato(guion.titulo));
+    // D16 (T024.4): huellas del guion y de la voz; verificar-d16.cmake las
+    // compara con el manifiesto (rechaza un video o una voz anteriores).
+    if (!guion.huella.isEmpty()) {
+        r += QStringLiteral("comment=%1\n").arg(escaparMetadato(comentarioHuellas(guion)));
+    }
     for (const Capitulo& c : guion.capitulos) {
         r += QStringLiteral("\n[CHAPTER]\nTIMEBASE=1/%1\nSTART=%2\nEND=%3\ntitle=%4\n")
                  .arg(kFps)
@@ -112,6 +122,12 @@ QByteArray lineaDeTiempoJson(const Guion& guion, bool rapido)
                            {QStringLiteral("fps"), kFps},
                            {QStringLiteral("rapido"), rapido},
                            {QStringLiteral("totalCuadros"), guion.totalCuadros},
+                           {QStringLiteral("huellaGuion"), guion.huella},
+                           {QStringLiteral("huellaVoz"), guion.huellaVoz},
+                           {QStringLiteral("ventana"), QJsonArray{guion.ventanaAncho, guion.ventanaAlto}},
+                           // T024.4: cuadros de portada (antes del capitulo 1) y cierre (al final).
+                           {QStringLiteral("portada"), guion.cuadrosPortada},
+                           {QStringLiteral("cierre"), guion.cuadrosCierre},
                            {QStringLiteral("capitulos"), capitulos}};
     return QJsonDocument(raiz).toJson(QJsonDocument::Indented);
 }

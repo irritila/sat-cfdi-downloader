@@ -43,6 +43,7 @@ DialogoRespaldoBase {
     prefijoNombre: "dialogoRestaurar"
     // Escape durante la verificacion la cancela (no cierra).
     bloqueado: dialogo.preparando || dialogo.solicitando || dialogo.terminada
+    accionesVisibles: !dialogo.terminada
     descripcionAccesible: qsTr("Restaurar sustituye tus datos actuales por los del respaldo.")
 
     function limpiarSecreto() {
@@ -298,31 +299,27 @@ DialogoRespaldoBase {
         Layout.fillWidth: true
     }
 
-    RowLayout {
-        visible: !dialogo.terminada
-        spacing: Theme.espacioS
-        Layout.fillWidth: true
-        Layout.topMargin: Theme.espacioXs
+    acciones: [
         BotonAccion {
             objectName: "botonDescartarRestaurar"
             visible: dialogo.preparada
             text: qsTr("Descartar")
             onClicked: dialogo.close() // onClosed descarta la preparacion
-        }
-        Item { Layout.fillWidth: true }
+        },
+        Item { Layout.fillWidth: true },
         BotonAccion {
             objectName: "botonCancelarRestaurar"
             visible: dialogo.inactiva
             text: qsTr("Cancelar")
             onClicked: dialogo.close()
-        }
+        },
         BotonAccion {
             id: botonCancelarVerificacion
             objectName: "botonCancelarVerificacion"
             visible: dialogo.preparando
             text: qsTr("Cancelar verificación")
             onClicked: dialogo.respaldo.cancelarRestauracion()
-        }
+        },
         BotonAccion {
             objectName: "botonVerificarRestaurar"
             visible: dialogo.inactiva
@@ -330,7 +327,7 @@ DialogoRespaldoBase {
             variante: "primario"
             enabled: dialogo.nombreArchivo.length > 0
             onClicked: dialogo.verificar()
-        }
+        },
         BotonAccion {
             id: botonRestaurar
             objectName: "botonRestaurarReiniciar"
@@ -341,7 +338,7 @@ DialogoRespaldoBase {
             cargando: dialogo.solicitando
             onClicked: confirmacion.open()
         }
-    }
+    ]
 
     DialogoConfirmacion {
         id: confirmacion

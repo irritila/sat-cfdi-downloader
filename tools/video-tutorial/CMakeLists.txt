@@ -107,6 +107,22 @@ target_link_libraries(satcfdi_video_tutorial PRIVATE
 )
 satcfdi_enable_warnings(satcfdi_video_tutorial)
 
+# T020 D6: IconoMenuBar.cpp renderiza los SVG del menu bar desde
+# :/menubar/...; sin ellos la ilustracion menuBar falla (regresion de T020,
+# corregida en T024.4). Mismos archivos que satcfdi_os_macos.
+set(_video_menu_svg_dir ${PROJECT_SOURCE_DIR}/resources/branding/menu)
+set(_video_menu_svg)
+foreach(_lado 18 36)
+    foreach(_estado "" "-trabajando" "-pausa" "-atencion")
+        list(APPEND _video_menu_svg ${_video_menu_svg_dir}/menu-${_lado}${_estado}.svg)
+    endforeach()
+endforeach()
+qt_add_resources(satcfdi_video_tutorial "satcfdi_video_menubar"
+    PREFIX "/menubar"
+    BASE ${_video_menu_svg_dir}
+    FILES ${_video_menu_svg}
+)
+
 # D22: fondo generativo como ShaderEffect con el shader precompilado a .qsb
 # (qsb de Qt ShaderTools, sin red): qrc:/satcfdi-video/qml/fondo.frag.qsb.
 find_package(Qt6 REQUIRED COMPONENTS ShaderTools)
@@ -211,11 +227,23 @@ set(SATCFDI_VIDEO_VERIFICACION_B "${SATCFDI_VIDEO_SALIDA}/verificacion/tutorial.
 add_custom_target(video_tutorial_verificar
     COMMAND ${CMAKE_COMMAND} -DMODO=verificar
             -DMANIFIESTO=${CMAKE_CURRENT_SOURCE_DIR}/verificacion-d16.json
+            -DGUION=${SATCFDI_VIDEO_GUION}
             -DA=${SATCFDI_VIDEO_SALIDA}/tutorial.mp4 -DB=${SATCFDI_VIDEO_VERIFICACION_B}
             -DFFMPEG=${SATCFDI_FFMPEG} -DFFPROBE=${SATCFDI_FFPROBE}
             -P ${CMAKE_CURRENT_SOURCE_DIR}/verificar-d16.cmake
     USES_TERMINAL
     COMMENT "Verificacion D16 del video tutorial"
+)
+# T024.4 (D16): regenera el manifiesto versionado desde la grabacion aprobada
+# (build/video/tutorial.linea-tiempo.json, con voz) y el guion vigente. Escribe
+# tools/video-tutorial/verificacion-d16.json: revisa el diff antes de versionarlo.
+add_custom_target(video_tutorial_manifiesto
+    COMMAND ${CMAKE_COMMAND} -DMODO=generar -DGUION=${SATCFDI_VIDEO_GUION}
+            -DLINEA_TIEMPO=${SATCFDI_VIDEO_SALIDA}/tutorial.linea-tiempo.json
+            -DMANIFIESTO=${CMAKE_CURRENT_SOURCE_DIR}/verificacion-d16.json
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/verificar-d16.cmake
+    USES_TERMINAL
+    COMMENT "Regenerando verificacion-d16.json desde la grabacion aprobada"
 )
 
 # Huella SHA-256 de notificacionLocalDe (src/app_core/IntegracionWorker.cpp)
@@ -230,7 +258,21 @@ set(_video_guion "${CMAKE_CURRENT_SOURCE_DIR}/guion-ejemplo.json")
 add_test(NAME satcfdi_video_guion_ejemplo COMMAND satcfdi_video_tutorial --guion ${_video_guion} --validar)
 # D13: el guion del tutorial es valido (presupuestos y 5-7 min), sin grabar.
 add_test(NAME satcfdi_video_guion_tutorial
-    COMMAND satcfdi_video_tutorial --guion ${CMAKE_CURRENT_SOURCE_DIR}/guion-tutorial.json --validar)
+    COMMAND ${CMAKE_COMMAND} -DHERRAMIENTA=$<TARGET_FILE:satcfdi_video_tutorial>
+            -DGUION=${CMAKE_CURRENT_SOURCE_DIR}/guion-tutorial.json -DCACHE=${SATCFDI_VIDEO_CACHE_VOZ}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/pruebas/validar-tutorial.cmake)
+# T024.4: --escenas con un id que no es del guion falla y lista los validos.
+add_test(NAME satcfdi_video_escenas_id_invalido
+    COMMAND satcfdi_video_tutorial --guion ${CMAKE_CURRENT_SOURCE_DIR}/guion-tutorial.json --validar
+            --escenas perfil/bienvenida,no-existe)
+set_tests_properties(satcfdi_video_escenas_id_invalido PROPERTIES LABELS "video;tools"
+    PASS_REGULAR_EXPRESSION "--escenas: \"no-existe\" no es una escena del guion; usa capitulo/escena: perfil/bienvenida")
+# T024.4: el id corto unico vale e imprime la duracion de la muestra.
+add_test(NAME satcfdi_video_escenas_id_corto
+    COMMAND satcfdi_video_tutorial --guion ${CMAKE_CURRENT_SOURCE_DIR}/guion-tutorial.json --validar
+            --escenas bienvenida,pdf)
+set_tests_properties(satcfdi_video_escenas_id_corto PROPERTIES LABELS "video;tools"
+    PASS_REGULAR_EXPRESSION "escenas: facturas/pdf, perfil/bienvenida -> muestra de [0-9]+ cuadros")
 # D13: una escena fuera de su presupuesto falla antes de grabar y la nombra.
 add_test(NAME satcfdi_video_guion_presupuesto
     COMMAND satcfdi_video_tutorial --guion ${CMAKE_CURRENT_SOURCE_DIR}/pruebas/guion-excede-presupuesto.json --validar)
@@ -242,6 +284,12 @@ add_test(NAME satcfdi_video_guion_resultado_exportacion
     COMMAND satcfdi_video_tutorial --guion ${CMAKE_CURRENT_SOURCE_DIR}/pruebas/guion-exportacion-resultado.json --validar)
 set_tests_properties(satcfdi_video_guion_resultado_exportacion PROPERTIES
     PASS_REGULAR_EXPRESSION "resultado de exportacion desconocido \"terminada\" \\(usa exito, advertencia, neutro, error, esperandoNombre\\)")
+# T024.4: 7 capitulos, 5-8 min, vocabulario retirado, tecla y avanzarMes.
+add_test(NAME satcfdi_video_reglas_tutorial
+    COMMAND ${CMAKE_COMMAND} -DHERRAMIENTA=$<TARGET_FILE:satcfdi_video_tutorial>
+            -DDIR=${CMAKE_CURRENT_SOURCE_DIR}/pruebas
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/pruebas/prueba-reglas-tutorial.cmake)
+set_tests_properties(satcfdi_video_reglas_tutorial PROPERTIES LABELS "video;tools")
 # --salida fuera del build se rechaza.
 add_test(NAME satcfdi_video_salida_fuera_build
     COMMAND satcfdi_video_tutorial --guion ${_video_guion} --salida ${CMAKE_CURRENT_SOURCE_DIR}/no-permitido --rapido)
@@ -266,6 +314,7 @@ add_test(NAME satcfdi_video_sync_notificaciones
 # D14: las ilustraciones traen su rotulo "Ilustración".
 add_test(NAME satcfdi_video_rotulo_ilustraciones
     COMMAND ${CMAKE_COMMAND} -DDIR=${PROJECT_SOURCE_DIR}/tools/capturas-manual/qml
+            -DDIR_VIDEO=${CMAKE_CURRENT_SOURCE_DIR}/qml
             -P ${CMAKE_CURRENT_SOURCE_DIR}/pruebas/rotulo-ilustraciones.cmake)
 set_tests_properties(satcfdi_video_guion_ejemplo satcfdi_video_guion_tutorial satcfdi_video_guion_presupuesto satcfdi_video_guion_resultado_exportacion satcfdi_video_salida_fuera_build
     satcfdi_video_sin_sesion satcfdi_video_red_control satcfdi_video_red_sandbox satcfdi_video_sync_notificaciones
@@ -280,6 +329,13 @@ add_test(NAME satcfdi_video_rapido
             -DSALIDA=${_video_prueba_dir}
             -DFFPROBE=${SATCFDI_FFPROBE}
             -P ${CMAKE_CURRENT_SOURCE_DIR}/pruebas/prueba-rapida.cmake)
+# T024.4 (D16): una ilustracion reducida da los mismos pixeles en dos corridas.
+add_test(NAME satcfdi_video_ilustracion_determinista
+    COMMAND ${CMAKE_COMMAND}
+            "-DHERRAMIENTA=${SATCFDI_VIDEO_SIN_RED};$<TARGET_FILE:satcfdi_video_tutorial>"
+            -DGUION=${_video_guion}
+            -DSALIDA=${_video_prueba_dir}/ilustracion
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/pruebas/prueba-ilustracion-determinista.cmake)
 # D6: documentoError y timeout de la barrera del visor PDF.
 add_test(NAME satcfdi_video_pdf_error
     COMMAND ${SATCFDI_VIDEO_SIN_RED} $<TARGET_FILE:satcfdi_video_tutorial> --guion ${_video_guion}
@@ -329,6 +385,28 @@ add_test(NAME satcfdi_video_barrera_exportacion COMMAND satcfdi_video_barrera_ex
 set_tests_properties(satcfdi_video_barrera_exportacion PROPERTIES LABELS "video;tools"
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+# T024.4: DemoVideo (descarga guiada simulada, Historial por lotes, respaldo
+# gobernado, facturasDescargadas y acciones vigiladas), sin QML.
+qt_add_executable(satcfdi_video_demo_tests
+    pruebas/TestDemoT0244.cpp
+    DatosDemo.h
+    DatosDemo.cpp
+    NotificacionesIlustradas.h
+    NotificacionesIlustradas.cpp
+    ${PROJECT_SOURCE_DIR}/src/infrastructure/os/macos/MacOSMapeos.cpp
+)
+target_include_directories(satcfdi_video_demo_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/tools/capturas-manual
+)
+target_link_libraries(satcfdi_video_demo_tests PRIVATE
+    satcfdi_video_guion satcfdi_fakes_materiales satcfdi_presentation satcfdi_application satcfdi_domain
+    satcfdi_ports satcfdi_cfdi_zip satcfdi_cfdi_xml satcfdi_cfdi_pdf libzip::zip Qt6::Test Qt6::Core Qt6::Gui)
+satcfdi_enable_warnings(satcfdi_video_demo_tests)
+add_test(NAME satcfdi_video_demo COMMAND satcfdi_video_demo_tests)
+set_tests_properties(satcfdi_video_demo PROPERTIES LABELS "video;tools" ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 # T022 D7: perdida del foco de macOS entre press y release (inyectada tras el
 # press del clic 2, "Nuevo perfil"): corregida por FiltroEntradaReal y, sin
 # el filtro, detectada antes del release con traza y PNG.
@@ -342,11 +420,23 @@ foreach(_caso corregida detectada)
                 -DCLIC=2
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/pruebas/prueba-desactivacion.cmake)
 endforeach()
+# T024.4 (03-motion 4): portada y cierre (marca, velo final, sin ventana).
+add_test(NAME satcfdi_video_portada_cierre
+    COMMAND ${CMAKE_COMMAND}
+            "-DHERRAMIENTA=${SATCFDI_VIDEO_SIN_RED};$<TARGET_FILE:satcfdi_video_tutorial>"
+            -DGUION=${CMAKE_CURRENT_SOURCE_DIR}/pruebas/guion-portada.json
+            -DDIR=${_video_prueba_dir}/portada
+            -DFFMPEG=${SATCFDI_FFMPEG}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/pruebas/prueba-portada.cmake)
 set_tests_properties(satcfdi_video_rapido satcfdi_video_pdf_error satcfdi_video_pdf_timeout satcfdi_video_composicion
+    satcfdi_video_portada_cierre satcfdi_video_ilustracion_determinista
     satcfdi_video_desactivacion_corregida satcfdi_video_desactivacion_detectada PROPERTIES
     LABELS "video;tools;grafica"
     SKIP_RETURN_CODE 77
     RUN_SERIAL TRUE
+    # Una sola sesion grafica (foco, ventanas y raton sinteticos): ademas de
+    # RUN_SERIAL, un candado comun por si otra prueba grafica se agrega sin el.
+    RESOURCE_LOCK satcfdi_sesion_grafica
     TIMEOUT 300)
 
 # --- Pruebas del paso de voz (label voz): motor de prueba, sin red ni clave ---
@@ -385,10 +475,13 @@ set_tests_properties(satcfdi_video_verificacion_d16 PROPERTIES LABELS "video;too
 
 # --- Musica de fondo (R4, label musica): sin sesion grafica (--solo-audio),
 # voz del motor de prueba, sin red ni clave ---
-foreach(_caso configuracion mezcla)
+# portada_cierre (T024.4): portada sin voz con entrada de 2 s; cierre con la
+# musica anclada (fundido 45-135 y silencio hasta el final).
+foreach(_caso configuracion mezcla portada_cierre)
     add_test(NAME satcfdi_video_musica_${_caso}
         COMMAND ${CMAKE_COMMAND}
                 -DCASO=${_caso}
+                -DFFMPEG=${SATCFDI_FFMPEG}
                 -DVOZ=$<TARGET_FILE:satcfdi_video_voz>
                 -DGRABADOR=$<TARGET_FILE:satcfdi_video_tutorial>
                 -DGUION=${CMAKE_CURRENT_SOURCE_DIR}/guion-ejemplo.json
@@ -411,4 +504,7 @@ set_tests_properties(satcfdi_video_con_voz PROPERTIES
     LABELS "video;voz;tools;grafica"
     SKIP_RETURN_CODE 77
     RUN_SERIAL TRUE
+    # Una sola sesion grafica (foco, ventanas y raton sinteticos): ademas de
+    # RUN_SERIAL, un candado comun por si otra prueba grafica se agrega sin el.
+    RESOURCE_LOCK satcfdi_sesion_grafica
     TIMEOUT 600)

@@ -38,6 +38,23 @@ target_link_libraries(satcfdi_manual_capturas PRIVATE
 )
 satcfdi_enable_warnings(satcfdi_manual_capturas)
 
+# T020 D6: IconoMenuBar.cpp renderiza los SVG del menu bar desde
+# :/menubar/...; sin ellos las ilustraciones 11 y 15 no tenian icono
+# (regresion de T020, corregida en T024.4). Mismos archivos que
+# satcfdi_os_macos.
+set(_capturas_menu_svg_dir ${PROJECT_SOURCE_DIR}/resources/branding/menu)
+set(_capturas_menu_svg)
+foreach(_lado 18 36)
+    foreach(_estado "" "-trabajando" "-pausa" "-atencion")
+        list(APPEND _capturas_menu_svg ${_capturas_menu_svg_dir}/menu-${_lado}${_estado}.svg)
+    endforeach()
+endforeach()
+qt_add_resources(satcfdi_manual_capturas "satcfdi_capturas_menubar"
+    PREFIX "/menubar"
+    BASE ${_capturas_menu_svg_dir}
+    FILES ${_capturas_menu_svg}
+)
+
 # T024.2: la herramienta fija su entorno (offscreen, Qt Quick software, escala
 # 2, reloj de animaciones virtual); no requiere sesion grafica ni roba el foco.
 add_custom_target(manual_capturas

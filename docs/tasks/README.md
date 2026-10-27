@@ -59,7 +59,7 @@ Ejemplo: `T001-modelo-fisico-sqlite.md`.
 | [T024.1](T024.1-vocabulario-y-notificaciones.md) | Completada | Vocabulario de la app y notificaciones |
 | [T024.2](T024.2-fakes-sinteticos-materiales.md) | Completada | Fakes sinteticos comunes para capturas y video |
 | [T024.3](T024.3-manual-y-capturas.md) | En revision del usuario | Manual y capturas al dia |
-| [T024.4](T024.4-video-tutorial-nuevo.md) | Pendiente | Video tutorial nuevo |
+| [T024.4](T024.4-video-tutorial-nuevo.md) | Completada | Video tutorial nuevo |
 | [T025](T025-respaldo-en-la-nube.md) | Completada | Respaldo cifrado en la nube del usuario (epica) |
 | [T025.1](T025.1-formato-y-cifrado-respaldo.md) | Completada | Formato y cifrado del respaldo |
 | [T025.2](T025.2-captura-consistente.md) | Completada | Captura consistente de los datos |

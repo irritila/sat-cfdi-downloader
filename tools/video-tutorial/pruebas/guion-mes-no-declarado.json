@@ -1,0 +1,54 @@
+{
+  "esquema": 1,
+  "tipo": "ejemplo",
+  "titulo": "Prueba: avanzarMes de un mes no declarado",
+  "presupuestoTotal": {
+    "min": 1,
+    "max": 100000
+  },
+  "datos": {
+    "ahora": "2026-10-01T10:00:00Z",
+    "perfiles": [
+      {
+        "clave": "principal",
+        "rfc": "XAXX010101000",
+        "nombre": "Contribuyente de ejemplo",
+        "efirma": "lista"
+      }
+    ],
+    "solicitudes": []
+  },
+  "capitulos": [
+    {
+      "id": "demo",
+      "titulo": "Demo",
+      "escenas": [
+        {
+          "id": "exportar",
+          "presupuesto": {
+            "min": 30,
+            "max": 300
+          },
+          "lineas": [
+            {
+              "id": "l1",
+              "texto": "Una linea corta."
+            }
+          ],
+          "acciones": [
+            {
+              "tipo": "esperar",
+              "cuadros": 40
+            },
+            {
+              "tipo": "avanzarMes",
+              "perfil": "principal",
+              "mes": "2026-09",
+              "estado": "disponibles"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

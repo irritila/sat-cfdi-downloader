@@ -62,10 +62,12 @@ QString ControlRespaldoSintetico::claveRecuperacionSintetica()
     return QStringLiteral("ABCD-EFGH-JKMN-PQRS-TUVW-XYZ2-3456-789A");
 }
 
-QFuture<ControlRespaldoSintetico::ResultadoOperacion> ControlRespaldoSintetico::configurarCarpeta(const QString&)
+QFuture<ControlRespaldoSintetico::ResultadoOperacion> ControlRespaldoSintetico::configurarCarpeta(const QString& rutaLocal)
 {
     estadoActual.carpetaConfigurada = true;
-    estadoActual.nombreCarpeta = QStringLiteral("Respaldos");
+    // T024.4: el nombre visible es el de la carpeta elegida (como la app).
+    const QString nombre = rutaLocal.section(QLatin1Char('/'), -1, -1, QString::SectionSkipEmpty);
+    estadoActual.nombreCarpeta = nombre.isEmpty() ? QStringLiteral("Respaldos") : nombre;
     emit estadoCambiado();
     return QtFuture::makeReadyValueFuture(ResultadoOperacion::exito({}));
 }

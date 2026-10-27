@@ -14,6 +14,9 @@ namespace video {
 QString tiempoSrt(int cuadro);
 QByteArray subtitulosSrt(const Guion& guion);
 QByteArray metadatosCapitulos(const Guion& guion);
+// D16 (T024.4): "satcfdi-d16 guion=<sha256> voz=<sha256|ninguna>" (etiqueta
+// comment del MP4).
+QString comentarioHuellas(const Guion& guion);
 QByteArray lineaDeTiempoJson(const Guion& guion, bool rapido);
 
 // Archivo a publicar: nombre final en el directorio de salida y su origen

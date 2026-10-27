@@ -28,6 +28,20 @@ Item {
     // de tools/capturas-manual ya traen el suyo (guion: "rotuloHerramienta").
     property bool rotuloHerramienta: false
     readonly property bool enIlustracion: raiz.ilustracion.toString().length > 0
+    // T024.4 (03-motion 2b): banner de notificacion sobre la app viva.
+    // [{titulo, cuerpo}] con los textos de ServicioNotificaciones; lo fijan
+    // mostrarBanner (inicioBanner) y ocultarBanner (finBanner).
+    property var banners: []
+    property int inicioBanner: -1000
+    property int finBanner: -1000
+    // Icono real de la app (lo fija la herramienta; vacio = sin icono).
+    property url iconoApp: ""
+    // T024.4 (03-motion 3): keycap de `tecla` con modificadores. Simbolos
+    // ("⌘", "4") y cuadro de inicio de la accion (el evento va en el 6).
+    property var teclasKeycap: []
+    property int inicioKeycap: -1000
+    // Portada y cierre (03-motion 4): el cursor se oculta fuera del contenido.
+    property bool ocultarCursor: false
 
     // Duraciones en cuadros (30 fps).
     readonly property int kTitulo: 9      // M2
@@ -35,6 +49,10 @@ Item {
     readonly property int kCambio: 4      // M10: 4 + 4 al cambiar de ilustracion
     readonly property int kCursor: 6      // M9
     readonly property int kOnda: 15       // M8
+    readonly property int kBannerEntrada: 10 // 2b: 0-9 entra (OutQuad)
+    readonly property int kBannerSalida: 10  // 2b: sale en 10 (InQuad)
+    readonly property int kBannerDesfase: 14 // 2b: el segundo entra en el 14
+    readonly property int kKeycap: 36        // 3: total
 
     function progreso(inicio, duracion) {
         return Math.max(0, Math.min(1, (raiz.cuadro - inicio) / duracion))
@@ -44,6 +62,9 @@ Item {
     }
     function salida(t) { // Easing.OutQuad
         return 1 - (1 - t) * (1 - t)
+    }
+    function entrada(t) { // Easing.InQuad
+        return t * t
     }
     function fundido(desde, hasta, inicio, duracion) {
         return desde + (hasta - desde) * raiz.suave(raiz.progreso(inicio, duracion))
@@ -153,6 +174,13 @@ Item {
             // Las ilustraciones se disenaron para 960x640: se reducen si no caben.
             scale: cargador.item ? Math.min(1, (capaIlustracion.width - 48) / cargador.item.width,
                                             (capaIlustracion.height - 72) / cargador.item.height) : 1
+            // T024.4 (D16): reducido, el texto se muestreaba con filtro lineal
+            // desde el atlas de glifos, cuyo orden depende de lo que se dibujo
+            // antes; la columna del borde de algunos glifos variaba entre
+            // corridas. Con una capa, la ilustracion se dibuja a escala 1
+            // (glifos alineados al pixel) y se reduce la textura de la capa.
+            layer.enabled: cargador.scale < 1
+            layer.smooth: true
             onLoaded: {
                 const p = raiz.parametrosMostrados
                 for (const clave in p)
@@ -177,6 +205,166 @@ Item {
                 color: "white"
                 font.pixelSize: 13
                 font.weight: Font.DemiBold
+            }
+        }
+    }
+
+    // --- Banner de notificacion (T024.4, 03-motion 2b) ----------------------
+    // 400x70 en x 544, y 12; el segundo, 82 mas abajo. Sin capa gris: la app
+    // sigue visible. Rotulo "Ilustración" bajo la pila con la misma opacidad.
+    Item {
+        id: pilaBanners
+        objectName: "bannerNotificacion"
+        readonly property real salidaBanner: raiz.entrada(raiz.progreso(raiz.finBanner, raiz.kBannerSalida))
+        readonly property bool saliendo: raiz.finBanner >= raiz.inicioBanner && raiz.cuadro >= raiz.finBanner
+        readonly property real opacidadPila: pilaBanners.saliendo ? 1 - pilaBanners.salidaBanner : 1
+        x: raiz.width - 416 // 544 en 960
+        y: 12
+        width: 400
+        height: raiz.banners.length * 82
+        visible: raiz.banners.length > 0 && raiz.cuadro >= raiz.inicioBanner
+                 && !(pilaBanners.saliendo && pilaBanners.salidaBanner >= 1)
+
+        Repeater {
+            model: raiz.banners
+            delegate: Rectangle {
+                id: banner
+                required property var modelData
+                required property int index
+                readonly property real p: raiz.salida(raiz.progreso(raiz.inicioBanner + banner.index * raiz.kBannerDesfase,
+                                                                    raiz.kBannerEntrada))
+                readonly property real opacidadEntrada: raiz.cuadro >= raiz.inicioBanner + banner.index * raiz.kBannerDesfase
+                                                        ? banner.p : 0
+                x: 48 * (1 - banner.p) + (pilaBanners.saliendo ? 48 * pilaBanners.salidaBanner : 0)
+                y: banner.index * 82
+                width: 400
+                height: 70
+                radius: 14
+                color: "#f2f2f4"
+                border.width: 1
+                border.color: "#d4d4d8"
+                opacity: banner.opacidadEntrada * pilaBanners.opacidadPila
+
+                Rectangle {
+                    z: -1
+                    anchors.fill: parent
+                    anchors.margins: -2
+                    anchors.topMargin: 1
+                    radius: 16
+                    color: "#26000000"
+                }
+                Image {
+                    id: iconoBanner
+                    x: 12
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 36
+                    height: 36
+                    sourceSize: Qt.size(72, 72)
+                    source: raiz.iconoApp
+                    smooth: true
+                }
+                Column {
+                    anchors.left: iconoBanner.right
+                    anchors.leftMargin: 10
+                    anchors.right: parent.right
+                    anchors.rightMargin: 12
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 2
+                    Text {
+                        width: parent.width
+                        text: banner.modelData.titulo
+                        color: "#1d1d1f"
+                        font.pixelSize: 13
+                        font.bold: true
+                        elide: Text.ElideRight
+                    }
+                    Text {
+                        width: parent.width
+                        text: banner.modelData.cuerpo
+                        color: "#3a3a3c"
+                        font.pixelSize: 13
+                        wrapMode: Text.Wrap
+                        maximumLineCount: 2
+                        elide: Text.ElideRight
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            objectName: "rotuloBanner"
+            anchors.right: parent.right
+            y: (raiz.banners.length - 1) * 82 + 70 + 6
+            width: rotuloBannerTexto.implicitWidth + 16
+            height: rotuloBannerTexto.implicitHeight + 6
+            radius: height / 2
+            color: "#1d1d1f"
+            opacity: pilaBanners.opacidadPila * raiz.salida(raiz.progreso(raiz.inicioBanner, raiz.kBannerEntrada))
+            Text {
+                id: rotuloBannerTexto
+                anchors.centerIn: parent
+                text: "Ilustración"
+                color: "white"
+                font.pixelSize: 12
+                font.bold: true
+            }
+        }
+    }
+
+    // --- Keycap de `tecla` con modificadores (T024.4, 03-motion 3) -------------
+    // 0-5 entra (opacidad y escala 0.9 -> 1, InOutQuad); 6-9 teclas hundidas
+    // (el evento sale en el 6); 28-35 sale.
+    Rectangle {
+        id: keycap
+        objectName: "teclaVisible"
+        readonly property int t: raiz.cuadro - raiz.inicioKeycap
+        readonly property real pEntrada: raiz.suave(Math.max(0, Math.min(1, keycap.t / 6)))
+        readonly property real pSalida: raiz.suave(Math.max(0, Math.min(1, (keycap.t - 28) / 8)))
+        readonly property bool hundidas: keycap.t >= 6 && keycap.t <= 9
+        x: (parent.width - width) / 2
+        y: raiz.height - 20 - height // borde inferior en 520 con 540
+        width: filaTeclas.implicitWidth + 16
+        height: 40 + 16
+        radius: 12
+        color: "#d91c1c1e"
+        scale: 0.9 + 0.1 * keycap.pEntrada
+        opacity: keycap.t < 0 || keycap.t >= raiz.kKeycap ? 0 : keycap.pEntrada * (1 - keycap.pSalida)
+        visible: opacity > 0 && raiz.teclasKeycap.length > 0
+
+        Row {
+            id: filaTeclas
+            anchors.centerIn: parent
+            spacing: 6
+            Repeater {
+                model: raiz.teclasKeycap
+                delegate: Item {
+                    id: tecla
+                    required property string modelData
+                    width: 40
+                    height: 40
+                    Rectangle {
+                        y: 2
+                        width: 40
+                        height: 40
+                        radius: 8
+                        color: "#00000026"
+                    }
+                    Rectangle {
+                        y: keycap.hundidas ? 1 : 0
+                        width: 40
+                        height: 40
+                        radius: 8
+                        color: keycap.hundidas ? "#e2e2e6" : "#f7f7f9"
+                        border.width: 1
+                        border.color: "#c8c8cc"
+                        Text {
+                            anchors.centerIn: parent
+                            text: tecla.modelData
+                            color: "#1d1d1f"
+                            font.pixelSize: tecla.modelData.length > 1 ? 14 : 18
+                        }
+                    }
+                }
             }
         }
     }
@@ -209,7 +397,7 @@ Item {
     Item {
         anchors.fill: parent
         opacity: raiz.opacidadCursor
-        visible: opacity > 0
+        visible: opacity > 0 && !raiz.ocultarCursor
 
         // Onda del clic (M8): 15 cuadros; disco (entra en 2 a 0.35, se apaga en 8).
         Rectangle {

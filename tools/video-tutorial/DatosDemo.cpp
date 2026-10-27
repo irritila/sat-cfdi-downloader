@@ -556,7 +556,7 @@ QList<EntradaHistorial> DemoVideo::historialDe(const PerfilId& perfil) const
             rfc = p.rfc;
         }
     }
-    QList<EntradaHistorial> entradas;
+    QList<EntradaHistorial> entradas = lotesDe(perfil); // T024.4
     for (const SolicitudDetalle& d : solicitudes.detalles) {
         const SolicitudResumen& r = d.resumen;
         if (rfc.isEmpty() || r.perfilRfc != rfc || solicitudes.ocultas.contains(r.id.texto())) {
@@ -772,6 +772,29 @@ QString DemoVideo::preparar()
         }
         solicitudes.detalles.append(d);
     }
+    if (const QString e = prepararMeses(raiz, entorno); !e.isEmpty()) {
+        return e;
+    }
+    // T024.4: estado inicial del respaldo (datos.respaldo); respaldarAhora()
+    // queda en curso hasta progresoRespaldo/resultadoRespaldo del guion.
+    if (m_datos.respaldo.declarado) {
+        EstadoRespaldoPresentacion e = materiales::ControlRespaldoSintetico::configurado();
+        e.carpetaConfigurada = m_datos.respaldo.carpeta;
+        e.nombreCarpeta = m_datos.respaldo.carpeta ? QStringLiteral("Respaldos") : QString();
+        e.contrasenaConfigurada = m_datos.respaldo.contrasena;
+        e.diarioActivado = m_datos.respaldo.diario;
+        e.ultimoExitoUtc.reset();
+        e.ultimoIntentoUtc.reset();
+        respaldo.ultimo.reset();
+        if (!m_datos.respaldo.ultimoExito.isEmpty()) {
+            ResultadoRespaldoPresentacion r = materiales::ControlRespaldoSintetico::exitoDeEjemplo();
+            r.fechaUtc = QDateTime::fromString(m_datos.respaldo.ultimoExito, Qt::ISODate).toUTC();
+            respaldo.ultimo = r;
+            e.ultimoExitoUtc = r.fechaUtc;
+            e.ultimoIntentoUtc = r.fechaUtc;
+        }
+        respaldo.estadoActual = e;
+    }
     return {};
 }
 
@@ -914,6 +937,44 @@ QVariantList DemoVideo::notificaciones(const QVariantMap& parametros, QString& e
                 return {};
             }
             r.append(notificacionIlustrada(notificador.recibidas.constFirst()));
+        } else if (tipo == QLatin1String("facturasDescargadas")) {
+            // T024.4: la de ServicioNotificaciones al completar la descarga
+            // de una direccion del mes (mismo texto que la app).
+            const QString perfil = p.value(QStringLiteral("perfil")).toString();
+            const QString mes = p.value(QStringLiteral("mes")).toString();
+            const EstadoMes* m = estadoMes(perfil, mes);
+            if (m == nullptr) {
+                error = QStringLiteral("notificacion: el mes %1 de '%2' no esta en datos.meses").arg(mes, perfil);
+                return {};
+            }
+            const TipoDescarga direccion = p.value(QStringLiteral("direccion")).toString() == QLatin1String("recibidas")
+                                               ? TipoDescarga::Recibidos
+                                               : TipoDescarga::Emitidos;
+            QString rfc;
+            int n = 0;
+            for (const PerfilGuion& x : m_datos.perfiles) {
+                ++n;
+                if (x.clave == perfil) {
+                    rfc = x.rfc;
+                    break;
+                }
+            }
+            TransicionNotificable t;
+            t.solicitudId = materiales::solicitudIdFija((n * 1'000'000 + m->mes.anio() * 100 + m->mes.mes()) * 10
+                                                        + (direccion == TipoDescarga::Emitidos ? 1 : 2));
+            t.tipo = TipoTransicionNotificable::DescargaCompleta;
+            t.tipoDescarga = direccion;
+            t.rfcSolicitante = rfc;
+            t.fechaInicialSat = m->mes.primerDia().toString(Qt::ISODate) + QStringLiteral("T00:00:00");
+            t.fechaFinalSat = m->mes.ultimoDia().toString(Qt::ISODate) + QStringLiteral("T23:59:59");
+            t.paquetes = 1;
+            t.descargados = 1;
+            const std::optional<Notificacion> notificacion = ServicioNotificaciones::componer(t);
+            if (!notificacion) {
+                error = QStringLiteral("notificacion: ServicioNotificaciones no genero la de facturas descargadas");
+                return {};
+            }
+            r.append(notificacionIlustrada(*notificacion));
         } else {
             const QString clave = p.value(QStringLiteral("perfil")).toString();
             const auto it = m_perfilId.constFind(clave);
@@ -938,6 +999,338 @@ QVariantList DemoVideo::notificaciones(const QVariantMap& parametros, QString& e
         }
     }
     return r;
+}
+
+// --- T024.4: acciones vigiladas (D10) ------------------------------------------------
+
+QFuture<ResultadoAccionFinder> AccionesVigiladas::prohibida(const QString& que)
+{
+    if (violacion.isEmpty()) {
+        violacion = QStringLiteral("la UI pidio %1 durante la grabacion (D10: usa un clic con \"sinEfecto\" y la "
+                                   "ilustracion finder)")
+                        .arg(que);
+    }
+    return listo(ResultadoAccionFinder{ResultadoAccionFinder::Estado::Mostrado, {}});
+}
+
+QFuture<ResultadoAccionFinder> AccionesVigiladas::mostrarPaquete(const SolicitudId&, const QString&)
+{
+    return prohibida(QStringLiteral("mostrar el ZIP en Finder"));
+}
+
+QFuture<ResultadoAccionFinder> AccionesVigiladas::abrirCarpetaSolicitud(const SolicitudId&)
+{
+    return prohibida(QStringLiteral("abrir la carpeta en Finder"));
+}
+
+QFuture<ResultadoAccionFinder> AccionesVigiladas::abrirCarpetaPaquetes()
+{
+    return prohibida(QStringLiteral("abrir la carpeta de descargas en Finder"));
+}
+
+QFuture<ResultadoAccionFinder> AccionesVigiladas::abrirEnVistaPrevia(const QString&)
+{
+    return prohibida(QStringLiteral("abrir el PDF en Vista Previa"));
+}
+
+QString DemoVideo::violacion() const
+{
+    return !perfiles.violacion.isEmpty() ? perfiles.violacion : acciones.violacion;
+}
+
+// --- T024.4: descarga guiada simulada (datos.meses, avanzarMes) ------------------------
+
+namespace {
+
+using materiales::EstadoDireccionSintetico;
+
+std::optional<CausaAtencion> causaDeClave(const QString& clave)
+{
+    for (int i = 0; i <= int(CausaAtencion::IndexacionSinProgramar); ++i) {
+        const auto c = CausaAtencion(i);
+        if (claveEstable(c) == clave) {
+            return c;
+        }
+    }
+    return std::nullopt;
+}
+
+EstadoDireccionSintetico estadoDireccion(const QString& estado)
+{
+    if (estado == QLatin1String("preparando")) {
+        return EstadoDireccionSintetico::Preparando;
+    }
+    if (estado == QLatin1String("disponibles") || estado == QLatin1String("disponiblesParcialmente")) {
+        return EstadoDireccionSintetico::Disponibles;
+    }
+    if (estado == QLatin1String("requiereAtencion")) {
+        return EstadoDireccionSintetico::RequiereAtencion;
+    }
+    return EstadoDireccionSintetico::SinDescargar;
+}
+
+bool conFacturas(EstadoDireccionSintetico e)
+{
+    return e == EstadoDireccionSintetico::Disponibles || e == EstadoDireccionSintetico::RequiereAtencion;
+}
+
+// Solicitud fuente fija de un mes y direccion (no choca con solicitudId(n)).
+SolicitudId solicitudDeMes(int perfil, MesCalendario mes, TipoDescarga direccion)
+{
+    return materiales::solicitudIdFija((perfil * 1'000'000 + mes.anio() * 100 + mes.mes()) * 10
+                                       + (direccion == TipoDescarga::Emitidos ? 1 : 2));
+}
+
+QString claveMesGuion(const QString& perfil, const QString& mes) { return perfil + QLatin1Char('/') + mes; }
+
+} // namespace
+
+const DemoVideo::EstadoMes* DemoVideo::estadoMes(const QString& perfil, const QString& mes) const
+{
+    const auto it = m_meses.constFind(claveMesGuion(perfil, mes));
+    return it == m_meses.constEnd() ? nullptr : &*it;
+}
+
+QString DemoVideo::prepararMeses(const QString& raiz, EntornoCalculoIndice& entorno)
+{
+    QHash<QString, int> indicePerfil;
+    QHash<QString, const PerfilGuion*> perfilPorClave;
+    int np = 0;
+    for (const PerfilGuion& p : m_datos.perfiles) {
+        indicePerfil.insert(p.clave, ++np);
+        perfilPorClave.insert(p.clave, &p);
+        // Todos (tambien los visible:false): Facturas pide sus meses en cuanto
+        // la UI los crea; la visibilidad la decide proveedorPerfiles.
+        materiales::PerfilDeclarado d;
+        d.id = m_perfilId.value(p.clave);
+        d.rfc = p.rfc;
+        d.nombre = p.nombre;
+        facturas.declararPerfil(d);
+    }
+    for (const MesGuion& g : m_datos.meses) {
+        const PerfilGuion& perfil = *perfilPorClave.value(g.perfil);
+        EstadoMes m;
+        m.datos = g;
+        m.perfil = m_perfilId.value(g.perfil);
+        m.mes = *MesCalendario::crear(g.mes.left(4).toInt(), g.mes.mid(5, 2).toInt());
+        const EstadoDireccionSintetico e = estadoDireccion(g.estado);
+        const bool emitidas = g.direccion != QLatin1String("recibidas");
+        const bool recibidas = g.direccion != QLatin1String("emitidas");
+        // La otra direccion de un estado de una sola direccion: Disponibles
+        // si requiere atencion (la otra se descargo), si no Sin descargar.
+        const EstadoDireccionSintetico otra = g.estado == QLatin1String("requiereAtencion")
+                                                  ? EstadoDireccionSintetico::Disponibles
+                                                  : EstadoDireccionSintetico::SinDescargar;
+        m.emitidas = emitidas ? e : otra;
+        m.recibidas = recibidas ? e : otra;
+        if (!g.causa.isEmpty()) {
+            m.causa = causaDeClave(g.causa).value_or(CausaAtencion::ErrorSat);
+        }
+        m.lote = g.estado != QLatin1String("sinDescargar");
+        if (!g.descargadoEn.isEmpty()) {
+            m.creadoEn = QDateTime::fromString(g.descargadoEn, Qt::ISODate).toUTC();
+        } else {
+            // Primer dia del mes siguiente, 16:00 UTC (nunca despues de "ahora").
+            m.creadoEn = std::min(QDateTime(m.mes.ultimoDia().addDays(1), QTime(16, 0), QTimeZone::UTC), m_ahora);
+        }
+        for (const TipoDescarga direccion : {TipoDescarga::Emitidos, TipoDescarga::Recibidos}) {
+            const bool esEmitidas = direccion == TipoDescarga::Emitidos;
+            const QList<CfdiGuion>& cfdis = esEmitidas ? g.emitidas : g.recibidas;
+            QList<CfdiMensual>& lista = esEmitidas ? m.listaEmitidas : m.listaRecibidas;
+            if (cfdis.isEmpty()) {
+                continue;
+            }
+            const int n = indicePerfil.value(g.perfil);
+            const SolicitudId solicitud = solicitudDeMes(n, m.mes, direccion);
+            // Mismo formato que los del SAT (y la ruta canonica de la app).
+            const QString paquete = QStringLiteral("0F1E2D3C-4B5A-4978-8796-%1_01")
+                                        .arg(solicitud.texto().right(12));
+            const auto ruta = rutapaquete::derivarRutaRelativa(
+                UbicacionPaquete{perfil.rfc, m.mes.primerDia().toString(Qt::ISODate) + QStringLiteral("T00:00:00"),
+                                 solicitud.texto(), paquete});
+            if (!ruta.esExito()) {
+                return QStringLiteral("mes '%1' de '%2': ruta de paquete invalida").arg(g.mes, g.perfil);
+            }
+            const QString relativa = ruta.valor();
+            const QString zip = QDir(raiz).filePath(relativa);
+            QDir().mkpath(QFileInfo(zip).absolutePath());
+            QList<QPair<QString, QByteArray>> entradas;
+            const int semilla = (m.mes.anio() % 100) * 12 + m.mes.mes() + (esEmitidas ? 0 : 50) + n * 7;
+            int nc = 0;
+            for (const CfdiGuion& c : cfdis) {
+                const QString uuid = uuidCfdi(semilla, nc++);
+                const QString rfcOtro = otroRfc(perfil.rfc);
+                const QByteArray xml = esEmitidas ? xmlCfdi(c, perfil.rfc, perfil.nombre, rfcOtro, c.contraparte, uuid)
+                                                  : xmlCfdi(c, rfcOtro, c.contraparte, perfil.rfc, perfil.nombre, uuid);
+                entradas.append({uuid + QStringLiteral(".xml"), xml});
+            }
+            if (const QString e2 = escribirZip(zip, entradas); !e2.isEmpty()) {
+                return QStringLiteral("mes '%1' de '%2': %3").arg(g.mes, g.perfil, e2);
+            }
+            PaqueteIndexable indexable;
+            indexable.paqueteId = paquete;
+            indexable.solicitudId = solicitud;
+            indexable.rutaLocal = relativa;
+            const CalculoPaquete calculo = calcularIndicePaquete(indexable, entorno, [] { return true; }, m_ahora);
+            if (calculo.tipo != CalculoPaquete::Tipo::Reemplazar
+                || calculo.indice.estado != EstadoIndicePaquete::Indexado
+                || calculo.indice.cfdis.size() != cfdis.size()) {
+                return QStringLiteral("mes '%1' de '%2': el ZIP sintetico no se indexo completo").arg(g.mes, g.perfil);
+            }
+            for (const CfdiIndexado& c : calculo.indice.cfdis) {
+                lista.append(CfdiMensual{CfdiListado{paquete, c.posicion, c.resumen}, direccion, solicitud, true});
+            }
+            // Como la app: fecha descendente.
+            std::stable_sort(lista.begin(), lista.end(), [](const CfdiMensual& a, const CfdiMensual& b) {
+                return a.cfdi.resumen.fecha > b.cfdi.resumen.fecha;
+            });
+            previsualizacion.zipPorPaquete.insert(paquete, zip);
+        }
+        const QString clave = claveMesGuion(g.perfil, g.mes);
+        m_meses.insert(clave, m);
+        publicarMes(m_meses[clave], false);
+    }
+    facturas.alEjecutar = [this](const PreplanGuiado& preplan) {
+        // Como el worker: las direcciones sin facturas pasan a Preparando y el
+        // lote aparece en el Historial (el guion lo termina con avanzarMes).
+        for (EstadoMes& m : m_meses) {
+            if (m.perfil != preplan.perfil || m.mes != preplan.mes) {
+                continue;
+            }
+            for (EstadoDireccionSintetico* e : {&m.emitidas, &m.recibidas}) {
+                if (*e != EstadoDireccionSintetico::Disponibles) {
+                    *e = EstadoDireccionSintetico::Preparando;
+                }
+            }
+            m.lote = true;
+            m.creadoEn = m_ahora;
+            publicarMes(m, false); // ejecutar() ya recarga el mes
+            emit historial.datosCambiados(m.perfil);
+        }
+    };
+    return {};
+}
+
+void DemoVideo::publicarMes(EstadoMes& m, bool avisar)
+{
+    materiales::MesDeclarado d;
+    d.estadoEmitidas = m.emitidas;
+    d.estadoRecibidas = m.recibidas;
+    d.causa = m.causa;
+    d.direccionCausa =
+        m.recibidas == EstadoDireccionSintetico::RequiereAtencion ? TipoDescarga::Recibidos : TipoDescarga::Emitidos;
+    d.listaEmitidas = conFacturas(m.emitidas) ? m.listaEmitidas : QList<CfdiMensual>{};
+    d.listaRecibidas = conFacturas(m.recibidas) ? m.listaRecibidas : QList<CfdiMensual>{};
+    d.emitidas = int(d.listaEmitidas->size());
+    d.recibidas = int(d.listaRecibidas->size());
+    facturas.fijarMes(m.perfil, m.mes.anio(), m.mes.mes(), d, avisar);
+    if (avisar) {
+        emit historial.datosCambiados(m.perfil);
+    }
+}
+
+QString DemoVideo::avanzarMes(const QString& perfil, const QString& mes, const QString& direccion,
+                              const QString& estado, const QString& causa)
+{
+    const auto it = m_meses.find(claveMesGuion(perfil, mes));
+    if (it == m_meses.end()) {
+        return QStringLiteral("avanzarMes: el mes %1 de '%2' no esta en datos.meses").arg(mes, perfil);
+    }
+    EstadoMes& m = *it;
+    const EstadoDireccionSintetico e = estadoDireccion(estado);
+    const bool emitidas = direccion.isEmpty() || direccion != QLatin1String("recibidas");
+    const bool recibidas = direccion.isEmpty() || direccion != QLatin1String("emitidas");
+    if (emitidas) {
+        m.emitidas = e;
+    }
+    if (recibidas) {
+        m.recibidas = e;
+    }
+    // Parcial: la direccion indicada completa y la otra sin descargar.
+    if (estado == QLatin1String("disponiblesParcialmente")) {
+        (emitidas ? m.recibidas : m.emitidas) = EstadoDireccionSintetico::SinDescargar;
+    }
+    if (!causa.isEmpty()) {
+        m.causa = causaDeClave(causa).value_or(m.causa);
+    }
+    if (estado != QLatin1String("sinDescargar")) {
+        m.lote = true;
+        if (!m.creadoEn.isValid() || m.creadoEn > m_ahora) {
+            m.creadoEn = m_ahora;
+        }
+    }
+    publicarMes(m, true);
+    return {};
+}
+
+QList<EntradaHistorial> DemoVideo::lotesDe(const PerfilId& perfil) const
+{
+    QList<EntradaHistorial> r;
+    for (auto it = m_meses.cbegin(); it != m_meses.cend(); ++it) {
+        const EstadoMes& m = *it;
+        if (m.perfil != perfil || !m.lote) {
+            continue;
+        }
+        EntradaHistorial e;
+        e.tipo = EntradaHistorial::Tipo::Guiada;
+        e.loteId = QStringLiteral("lote-") + it.key();
+        e.perfil = perfil;
+        e.mes = m.mes;
+        e.desde = m.mes.primerDia();
+        e.hasta = m.mes.ultimoDia();
+        e.creadoEn = m.creadoEn;
+        e.emitidas = conFacturas(m.emitidas) ? int(m.listaEmitidas.size()) : 0;
+        e.recibidas = conFacturas(m.recibidas) ? int(m.listaRecibidas.size()) : 0;
+        e.tieneEmitidas = m.emitidas != EstadoDireccionSintetico::SinDescargar;
+        e.tieneRecibidas = m.recibidas != EstadoDireccionSintetico::SinDescargar;
+        const auto hay = [&m](EstadoDireccionSintetico x) { return m.emitidas == x || m.recibidas == x; };
+        if (hay(EstadoDireccionSintetico::RequiereAtencion)) {
+            e.resultado = ResultadoHistorial::RequiereAtencion;
+            e.puedeReintentar = true;
+        } else if (hay(EstadoDireccionSintetico::Preparando)) {
+            e.resultado = ResultadoHistorial::EnPreparacion;
+        } else if (e.emitidas + e.recibidas == 0) {
+            e.resultado = ResultadoHistorial::SinFacturas;
+        } else {
+            e.resultado = ResultadoHistorial::Completa;
+        }
+        r.append(e);
+    }
+    return r;
+}
+
+QString DemoVideo::progresoRespaldo(const QString& fase, qint64 bytes, qint64 total)
+{
+    if (!respaldo.estadoActual.enCurso) {
+        return QStringLiteral("progresoRespaldo: no hay un respaldo en curso (falta pulsar \"Respaldar ahora\")");
+    }
+    using Fase = respaldo::RespaldoService::Fase;
+    const Fase f = fase == QLatin1String("captura")       ? Fase::Captura
+                   : fase == QLatin1String("escritura")   ? Fase::Escritura
+                   : fase == QLatin1String("publicacion") ? Fase::Publicacion
+                                                          : Fase::Depuracion;
+    respaldo.emitirProgreso(f, quint64(bytes), quint64(total));
+    return {};
+}
+
+QString DemoVideo::resultadoRespaldo(const QString& resultado, const QString& fechaIso, qint64 bytes)
+{
+    if (!respaldo.estadoActual.enCurso) {
+        return QStringLiteral("resultadoRespaldo: no hay un respaldo en curso (falta pulsar \"Respaldar ahora\")");
+    }
+    ResultadoRespaldoPresentacion r;
+    r.fechaUtc = fechaIso.isEmpty() ? m_ahora : QDateTime::fromString(fechaIso, Qt::ISODate).toUTC();
+    r.bytes = quint64(bytes);
+    if (resultado == QLatin1String("conAvisos")) {
+        r.estado = respaldo::ResultadoRespaldo::Estado::ExitoConAdvertencias;
+        r.omitidos = 1;
+    } else if (resultado == QLatin1String("error")) {
+        r.estado = respaldo::ResultadoRespaldo::Estado::ErrorDestino;
+        r.errorDestino = respaldo::ErrorDestino::Categoria::SinEscritura;
+        r.bytes = 0;
+    }
+    respaldo.terminarRespaldo(r);
+    return {};
 }
 
 } // namespace video

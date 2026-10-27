@@ -704,14 +704,25 @@ caffeinate -i sandbox-exec -f tools/video-tutorial/sin-red.sb \
 cmake --build build --target video_tutorial_verificar
 # o, para cualquier par de videos (B es opcional: sin B solo contra el manifiesto):
 cmake -DMODO=verificar -DMANIFIESTO=tools/video-tutorial/verificacion-d16.json \
+      -DGUION=tools/video-tutorial/guion-tutorial.json \
       -DA=build/video/tutorial.mp4 -DB=build/video/verificacion/tutorial.mp4 \
       -DFFMPEG=$(which ffmpeg) -DFFPROBE=$(which ffprobe) -P tools/video-tutorial/verificar-d16.cmake
 ```
 
 Cada grabacion completa tarda unos 20 minutos (`caffeinate -i` evita que el
 equipo se suspenda). Si cambia el guion aprobado, el manifiesto se regenera
-desde la linea de tiempo de la grabacion aprobada (`-DMODO=generar`, ver la
-cabecera de `verificar-d16.cmake`) y se revisa en el diff. Las salidas
+desde la linea de tiempo de la grabacion aprobada y se revisa en el diff:
+
+```bash
+cmake --build build --target video_tutorial          # grabacion aprobada (con voz)
+cmake --build build --target video_tutorial_manifiesto
+git diff tools/video-tutorial/verificacion-d16.json
+```
+
+Desde T024.4 el manifiesto (esquema 2) guarda la huella del guion y de la voz,
+y cada MP4 las lleva en su etiqueta `comment`: `video_tutorial_verificar`
+falla con el manifiesto del video anterior, con otro guion o con un video
+grabado con un cache de voz anterior. Las salidas
 (`build/video/`) estan ignoradas por git.
 
 ## Directorios de build

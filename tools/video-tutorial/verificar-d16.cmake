@@ -2,10 +2,17 @@
 # versionado (verificacion-d16.json) y, si se da una segunda, las dos entre si.
 # Sale con codigo != 0 si algo no coincide.
 #
-#   cmake -DMODO=verificar -DMANIFIESTO=<verificacion-d16.json> -DA=<a.mp4> [-DB=<b.mp4>]
+#   cmake -DMODO=verificar -DMANIFIESTO=<verificacion-d16.json> -DGUION=<guion.json> -DA=<a.mp4> [-DB=<b.mp4>]
 #         -DFFMPEG=<ffmpeg> -DFFPROBE=<ffprobe> [-DTRABAJO=<dir>] -P verificar-d16.cmake
 #   cmake -DMODO=generar -DGUION=<guion.json> -DLINEA_TIEMPO=<x.linea-tiempo.json>
 #         -DMANIFIESTO=<salida.json> -P verificar-d16.cmake
+#
+# T024.4 (esquema 2): el manifiesto lleva la huella del guion (SHA-256 del
+# archivo) y la de la voz (claves de bloque del cache usado), que la grabacion
+# escribe en su linea de tiempo y en la etiqueta `comment` del MP4
+# ("satcfdi-d16 guion=<sha> voz=<sha>"). verificar falla si el manifiesto no
+# tiene huellas (el del video anterior), si es de otro guion, o si un MP4 se
+# grabo con otro guion u otra voz (p. ej. la cache del video anterior).
 #
 # Contra el manifiesto: video h264 WxH a 30/1, audio aac 48 kHz, duraciones de
 # pistas iguales +-toleranciaPistasMs, total en [duracionMin, duracionMax], numero de
@@ -28,6 +35,16 @@ if(MODO STREQUAL "generar")
     # tiempo de una grabacion aprobada.
     file(READ "${LINEA_TIEMPO}" lt)
     file(READ "${GUION}" g)
+    file(SHA256 "${GUION}" huella_guion)
+    string(JSON huella_lt ERROR_VARIABLE sin_huella GET "${lt}" huellaGuion)
+    string(JSON huella_voz ERROR_VARIABLE sin_voz GET "${lt}" huellaVoz)
+    if(sin_huella OR NOT huella_lt STREQUAL huella_guion)
+        message(FATAL_ERROR "la linea de tiempo ${LINEA_TIEMPO} no es de ${GUION} (huella '${huella_lt}', "
+                            "guion ${huella_guion}): graba de nuevo con el guion vigente")
+    endif()
+    if(sin_voz OR huella_voz STREQUAL "ninguna" OR huella_voz STREQUAL "")
+        message(FATAL_ERROR "la grabacion de ${LINEA_TIEMPO} no tiene voz (--voz): el manifiesto D16 es del video con voz")
+    endif()
     string(JSON total GET "${lt}" totalCuadros)
     string(JSON fps GET "${lt}" fps)
     string(JSON nc LENGTH "${lt}" capitulos)
@@ -40,7 +57,12 @@ if(MODO STREQUAL "generar")
         string(JSON fin GET "${lt}" capitulos ${c} fin)
         string(JSON idc GET "${lt}" capitulos ${c} id)
         string(REPLACE "\"" "\\\"" titulo_json "${titulo}")
-        list(APPEND capitulos "{\"titulo\": \"${titulo_json}\", \"inicio\": ${inicio}, \"fin\": ${fin}}")
+        # El MP4 hace empezar el primer capitulo en 0 (con portada, la incluye).
+        set(inicio_mp4 ${inicio})
+        if(c EQUAL 0)
+            set(inicio_mp4 0)
+        endif()
+        list(APPEND capitulos "{\"titulo\": \"${titulo_json}\", \"inicio\": ${inicio_mp4}, \"fin\": ${fin}}")
         # Un cuadro por capitulo: mitad de su primera escena.
         string(JSON e0 GET "${lt}" capitulos ${c} escenas 0 id)
         string(JSON d0 GET "${lt}" capitulos ${c} escenas 0 duracion)
@@ -112,14 +134,16 @@ if(MODO STREQUAL "generar")
     list(JOIN capitulos ",\n    " capitulos_json)
     list(JOIN cuadros ",\n    " cuadros_json)
     file(WRITE "${MANIFIESTO}" "{
-  \"esquema\": 1,
-  \"descripcion\": \"Manifiesto de verificacion D16 de T017 (verificar-d16.cmake). Generado de guion-tutorial.json y de la linea de tiempo de la grabacion aprobada.\",
+  \"esquema\": 2,
+  \"descripcion\": \"Manifiesto de verificacion D16 (T017, T024.4; verificar-d16.cmake). Generado de guion-tutorial.json y de la linea de tiempo de la grabacion aprobada.\",
+  \"huellaGuion\": \"${huella_guion}\",
+  \"huellaVoz\": \"${huella_voz}\",
   \"video\": {\"codec\": \"h264\", \"ancho\": 2560, \"alto\": 1440, \"fps\": \"${fps}/1\"},
   \"audio\": {\"codec\": \"aac\", \"frecuencia\": 48000,
             \"decodificacion\": \"ffmpeg -i <mp4> -map 0:a:0 -c:a pcm_s16le -ar 48000 -ac 2 -f md5 -\"},
   \"toleranciaPistasMs\": 100,
   \"duracionMinS\": 300,
-  \"duracionMaxS\": 450,
+  \"duracionMaxS\": 480,
   \"totalCuadros\": ${total},
   \"psnrMinimoDb\": 60,
   \"picoVerdaderoMaximoAacDb\": -1.8,
@@ -135,8 +159,8 @@ if(MODO STREQUAL "generar")
     return()
 endif()
 
-if(NOT MODO STREQUAL "verificar" OR NOT EXISTS "${MANIFIESTO}" OR NOT EXISTS "${A}")
-    message(FATAL_ERROR "uso: -DMODO=verificar -DMANIFIESTO=<json> -DA=<mp4> [-DB=<mp4>] -DFFMPEG -DFFPROBE")
+if(NOT MODO STREQUAL "verificar" OR NOT EXISTS "${MANIFIESTO}" OR NOT EXISTS "${A}" OR NOT EXISTS "${GUION}")
+    message(FATAL_ERROR "uso: -DMODO=verificar -DMANIFIESTO=<json> -DGUION=<guion.json> -DA=<mp4> [-DB=<mp4>] -DFFMPEG -DFFPROBE")
 endif()
 if(DEFINED B AND NOT B STREQUAL "" AND NOT EXISTS "${B}")
     message(FATAL_ERROR "no existe ${B}")
@@ -149,6 +173,17 @@ string(JSON fps_m GET "${m}" video fps)
 string(REGEX REPLACE "/.*" "" fps_n "${fps_m}")
 string(JSON total_m GET "${m}" totalCuadros)
 string(JSON psnr_min GET "${m}" psnrMinimoDb)
+
+# T024.4: huellas. Un manifiesto sin ellas es el del video anterior (T017).
+string(JSON huella_m ERROR_VARIABLE sin_huella_m GET "${m}" huellaGuion)
+string(JSON huella_voz_m ERROR_VARIABLE sin_voz_m GET "${m}" huellaVoz)
+file(SHA256 "${GUION}" huella_guion)
+if(sin_huella_m OR sin_voz_m)
+    fallar("el manifiesto ${MANIFIESTO} no tiene huellas del guion ni de la voz (es el del video anterior): "
+           "regeneralo con -DMODO=generar (docs/development.md)")
+elseif(NOT huella_m STREQUAL huella_guion)
+    fallar("el manifiesto es de otro guion (huella ${huella_m}; ${GUION} es ${huella_guion}): regeneralo")
+endif()
 
 # Contra el manifiesto. Deja <prefijo>_cuadros.
 macro(contra_manifiesto video prefijo)
@@ -233,6 +268,19 @@ macro(contra_manifiesto video prefijo)
         else()
             message("${prefijo}: audio decodificado ${li} LUFS, pico verdadero ${tp} dBTP (maximo ${tp_max})")
         endif()
+    endif()
+    # T024.4: el MP4 se grabo con este guion y con la voz del manifiesto.
+    execute_process(COMMAND ${FFPROBE} -v error -show_entries format_tags=comment -of default=nw=1:nk=1 "${video}"
+                    OUTPUT_VARIABLE comentario OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(NOT comentario MATCHES "^satcfdi-d16 guion=([0-9a-f]+) voz=([0-9a-fnigua]+)$")
+        fallar("${prefijo}: el MP4 no trae las huellas D16 (grabado con una herramienta anterior)")
+    elseif(NOT CMAKE_MATCH_1 STREQUAL huella_m)
+        fallar("${prefijo}: grabado con otro guion (huella ${CMAKE_MATCH_1}; manifiesto ${huella_m})")
+    elseif(NOT CMAKE_MATCH_2 STREQUAL huella_voz_m)
+        fallar("${prefijo}: grabado con otra voz (huella ${CMAKE_MATCH_2}; manifiesto ${huella_voz_m}); "
+               "p. ej. la cache de voz del video anterior")
+    else()
+        message("${prefijo}: huellas de guion y voz OK")
     endif()
     if(NOT "${${prefijo}_cuadros}" STREQUAL "${total_m}")
         fallar("${prefijo}: ${${prefijo}_cuadros} cuadros; el manifiesto dice ${total_m}")

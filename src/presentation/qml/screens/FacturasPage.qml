@@ -245,6 +245,8 @@ Page {
             descripcion: qsTr("Archivo Fiscal guarda en este equipo las facturas emitidas y recibidas de cada RFC, mes por mes.")
             objectNameTitulo: "tituloGuiaFacturas"
             Layout.fillWidth: true
+            // Su ancho maximo es 380 (el de sus textos): centrarlo en la guia.
+            Layout.alignment: Qt.AlignHCenter
         }
 
         Rectangle {

@@ -280,6 +280,11 @@ TestCase {
         compare(findChild(p, "pasoFacturas").Accessible.name.indexOf("Descarga las facturas de un mes") >= 0, true)
         verify(!findChild(p, "listaMeses").visible)
         verify(!findChild(p, "comboPerfilFacturas").visible)
+        // T024.4: el encabezado de la guia queda centrado sobre la lista de pasos.
+        const guia = findChild(p, "guiaPrimerUsoFacturas")
+        const titulo = findChild(p, "tituloGuiaFacturas")
+        const centroTitulo = titulo.mapToItem(guia, titulo.width / 2, 0).x
+        fuzzyCompare(centroTitulo, guia.width / 2, 1)
         capturar(p, "01-sin-perfiles-960")
         mouseClick(findChild(p, "boton_pasoPerfil"))
         tryCompare(fixtureFacturas.app, "pagina", AppViewModel.Perfiles)

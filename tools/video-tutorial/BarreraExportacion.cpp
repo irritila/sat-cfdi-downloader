@@ -1,6 +1,7 @@
 #include "BarreraExportacion.h"
 
 #include "presentation/viewmodels/ExportacionFacturasViewModel.h"
+#include "presentation/viewmodels/RespaldoViewModel.h"
 
 #include <QCoreApplication>
 #include <QElapsedTimer>
@@ -58,6 +59,37 @@ QString esperarExportacion(satcfdi::ExportacionFacturasViewModel* vm, const QStr
         break;
     }
     return QStringLiteral("estado de exportacion inesperado");
+}
+
+QString esperarRespaldo(satcfdi::RespaldoViewModel* vm, const QString& esperado, int timeoutMs,
+                        const std::function<bool()>& bombear)
+{
+    const QString variante = esperado == QLatin1String("conAvisos") ? QStringLiteral("advertencia")
+                             : esperado == QLatin1String("error")   ? QStringLiteral("error")
+                                                                    : QStringLiteral("exito");
+    if (vm == nullptr || !vm->disponible()) {
+        return QStringLiteral("el respaldo no esta disponible");
+    }
+    if (!vm->respaldando() && !vm->hayResultado()) {
+        return QStringLiteral("no hay un respaldo en curso ni un resultado (falta pulsar \"Respaldar ahora\")");
+    }
+    QElapsedTimer t;
+    t.start();
+    while (vm->respaldando() || !vm->hayResultado()) {
+        if (!bombear()) {
+            return QStringLiteral("interrumpida");
+        }
+        if (t.elapsed() > timeoutMs) {
+            return QStringLiteral("timeout de %1 ms esperando el resultado del respaldo (falta resultadoRespaldo)")
+                .arg(timeoutMs);
+        }
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+    }
+    if (vm->varianteResultado() != variante) {
+        return QStringLiteral("resultado de respaldo \"%1\" (%2); se esperaba \"%3\"")
+            .arg(vm->varianteResultado(), vm->tituloResultado(), variante);
+    }
+    return {};
 }
 
 } // namespace video

@@ -44,12 +44,30 @@ enum class EstadoMesSintetico {
     SinDescargar,
 };
 
+// T024.4: estado de una direccion del mes (descarga guiada simulada del video).
+enum class EstadoDireccionSintetico {
+    SinDescargar,
+    Preparando,       // hueco reservado por una solicitud en curso
+    Disponibles,      // cobertura completa
+    RequiereAtencion, // causa en `causa`
+};
+
 struct MesDeclarado {
     EstadoMesSintetico estado = EstadoMesSintetico::SinDescargar;
     int emitidas = 0;
     int recibidas = 0;
     CausaAtencion causa = CausaAtencion::ZipIlegible;
     TipoDescarga direccionCausa = TipoDescarga::Recibidos;
+    // T024.4: si existen, sustituyen a `estado` (que la fuente deriva con la
+    // precedencia ADR 0019: RequiereAtencion > Preparando > Disponibles >
+    // DisponiblesParcialmente > SinDescargar) y a `direccionCausa`.
+    std::optional<EstadoDireccionSintetico> estadoEmitidas;
+    std::optional<EstadoDireccionSintetico> estadoRecibidas;
+    // T024.4: facturas explicitas (p. ej. indexadas de un ZIP sintetico real,
+    // para que el PDF salga del renderer). Si existen, sustituyen a las
+    // generadas por conteo (cfdisDelMes) de esa direccion.
+    std::optional<QList<CfdiMensual>> listaEmitidas;
+    std::optional<QList<CfdiMensual>> listaRecibidas;
 };
 
 struct PerfilDeclarado {

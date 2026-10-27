@@ -1,6 +1,6 @@
 # Grabacion con voz del motor de prueba (T017 D8, D13): pista AAC-LC estereo
 # 48 kHz, misma duracion que el video (+-0.1 s), loudness integrado entre -17
-# y -15 LUFS, pico verdadero <= -1 dBTP y cada cue del .srt alineado con el
+# y -15 LUFS, pico verdadero <= -2.3 dBTP y cada cue del .srt alineado con el
 # inicio de su clip (+-1 cuadro). Sin sesion grafica: 77 (SKIP).
 # Variables: VOZ, HERRAMIENTA (lista), GUION, DIR, FFMPEG, FFPROBE.
 
@@ -67,8 +67,10 @@ message("loudness integrado: ${lufs} LUFS; pico verdadero: ${pico} dBTP")
 if(lufs STREQUAL "" OR lufs LESS -17 OR lufs GREATER -15)
     message(FATAL_ERROR "loudness integrado ${lufs} LUFS fuera de [-17, -15]")
 endif()
-if(pico STREQUAL "" OR pico GREATER -1)
-    message(FATAL_ERROR "pico verdadero ${pico} dBTP por encima de -1")
+# D25: maximo -1.8 dBTP en el AAC decodificado; la voz se normaliza a -3 dBTP
+# (kPicoObjetivoVozDb) para dejar al menos 0.5 dB de holgura tras el AAC.
+if(pico STREQUAL "" OR pico GREATER -2.3)
+    message(FATAL_ERROR "pico verdadero ${pico} dBTP por encima de -2.3 (D25: -1.8 con 0.5 dB de holgura)")
 endif()
 
 # Alineacion: cada cue empieza justo antes de su voz (donde termina un

@@ -121,10 +121,7 @@ DialogoRespaldoBase {
         Accessible.name: text
     }
 
-    RowLayout {
-        spacing: Theme.espacioS
-        Layout.fillWidth: true
-        Layout.topMargin: Theme.espacioXs
+    acciones: [
         BotonAccion {
             id: botonCopiar
             objectName: "botonCopiarClave"
@@ -138,7 +135,7 @@ DialogoRespaldoBase {
                         : qsTr("No se pudo copiar la clave.")
                 botonCopiar.Accessible.announce(dialogo.confirmacion)
             }
-        }
+        },
         BotonAccion {
             id: botonImprimir
             objectName: "botonImprimirClave"
@@ -152,8 +149,8 @@ DialogoRespaldoBase {
                         ? qsTr("Clave enviada a la impresora.") : qsTr("No se imprimió la clave.")
                 botonImprimir.Accessible.announce(dialogo.confirmacion)
             }
-        }
-        Item { Layout.fillWidth: true }
+        },
+        Item { Layout.fillWidth: true },
         BotonAccion {
             id: botonGuardada
             objectName: "botonClaveGuardada"
@@ -162,5 +159,5 @@ DialogoRespaldoBase {
             enabled: !dialogo.respaldo.imprimiendo
             onClicked: dialogo.confirmarGuardada()
         }
-    }
+    ]
 }

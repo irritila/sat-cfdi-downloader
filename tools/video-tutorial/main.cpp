@@ -233,21 +233,27 @@ int main(int argc, char* argv[])
     // --escenas: solo esas escenas salen en el video (muestra montada, D12).
     // Las demas se ejecutan igual (para dejar la app en el mismo estado) pero
     // sus cuadros no se graban; sin voz propia usan la duracion estimada.
+    // Ids: "capitulo/escena" o solo "escena" si es unica en el guion (un id
+    // corto ambiguo o desconocido falla y lista los validos).
     QSet<QString> incluidas;
     for (const QString& id : escenasPedidas) {
-        bool alguna = false;
+        QStringList coincidencias;
+        QStringList validos;
         for (const video::Capitulo& c : guion.capitulos) {
             for (const video::Escena& e : c.escenas) {
+                validos.append(video::idEscena(c, e));
                 if (id == e.id || id == video::idEscena(c, e)) {
-                    incluidas.insert(video::idEscena(c, e));
-                    alguna = true;
+                    coincidencias.append(video::idEscena(c, e));
                 }
             }
         }
-        if (!alguna) {
-            std::fprintf(stderr, "error: --escenas: \"%s\" no es una escena del guion\n", qPrintable(id));
+        if (coincidencias.size() != 1) {
+            std::fprintf(stderr, "error: --escenas: \"%s\" %s; usa capitulo/escena: %s\n", qPrintable(id),
+                         coincidencias.isEmpty() ? "no es una escena del guion" : "es ambiguo",
+                         qPrintable((coincidencias.isEmpty() ? validos : coincidencias).join(QStringLiteral(", "))));
             return 2;
         }
+        incluidas.insert(coincidencias.constFirst());
     }
     video::OpcionesPlan plan;
     // Sin --voz: audio estimado por longitud del texto (video sin audio).
@@ -284,10 +290,37 @@ int main(int argc, char* argv[])
         std::fprintf(stderr, "guion invalido: %s\n", qPrintable(e));
         return 1;
     }
+    // D16 (T024.4): huella de la voz usada = SHA-256 de las claves de bloque
+    // (sintesis + lineas + montaje) del cache, ordenadas. Otra voz (p. ej. la
+    // cache del video anterior) da otra huella y verificar-d16 la rechaza.
+    if (!dirVoz.isEmpty()) {
+        QStringList claves;
+        for (const video::Capitulo& c : guion.capitulos) {
+            for (const video::Escena& e : c.escenas) {
+                for (const video::Bloque& b : e.bloques) {
+                    const QString clave =
+                        video::claveBloque(video::claveSintesis(configVoz, b.textoHablado), b.textosLineas, configVoz);
+                    if (audiosVoz.contains(clave)) {
+                        claves.append(clave);
+                    }
+                }
+            }
+        }
+        claves.sort();
+        guion.huellaVoz = QString::fromLatin1(
+            QCryptographicHash::hash(claves.join(QLatin1Char('\n')).toUtf8(), QCryptographicHash::Sha256).toHex());
+    }
     // Linea de tiempo de las salidas (.srt, capitulos, mezcla): el guion
     // completo o solo las escenas pedidas, consecutivas.
     const video::Guion salida = incluidas.isEmpty() ? guion : video::recortarGuion(guion, incluidas);
     opciones.escenas = incluidas;
+    if (!incluidas.isEmpty()) {
+        QStringList ids(incluidas.cbegin(), incluidas.cend());
+        ids.sort();
+        std::printf("escenas: %s -> muestra de %d cuadros (%.2f s); el guion completo dura %d cuadros\n",
+                    qPrintable(ids.join(QStringLiteral(", "))), salida.totalCuadros,
+                    double(salida.totalCuadros) / video::kFps, guion.totalCuadros);
+    }
     if (validar && detalle) {
         for (const video::Capitulo& c : salida.capitulos) {
             for (const video::Escena& e : c.escenas) {

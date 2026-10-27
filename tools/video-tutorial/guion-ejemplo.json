@@ -70,6 +70,22 @@
           }
         ]
       }
+    ],
+    "meses": [
+      {
+        "perfil": "principal",
+        "mes": "2026-08",
+        "estado": "disponibles",
+        "emitidas": 3,
+        "recibidas": 2
+      },
+      {
+        "perfil": "principal",
+        "mes": "2026-09",
+        "estado": "sinDescargar",
+        "emitidas": 2,
+        "recibidas": 1
+      }
     ]
   },
   "capitulos": [
@@ -643,6 +659,112 @@
             {
               "tipo": "esperar",
               "cuadros": 20
+            }
+          ]
+        },
+        {
+          "id": "meses",
+          "presupuesto": {
+            "min": 120,
+            "max": 600
+          },
+          "lineas": [
+            {
+              "id": "l1",
+              "texto": "Con Comando 1 vuelves a Facturas y el mes pasa de Preparando a Disponibles."
+            }
+          ],
+          "acciones": [
+            {
+              "tipo": "tecla",
+              "tecla": "Escape"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 6
+            },
+            {
+              "tipo": "tecla",
+              "tecla": "Cmd+1"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 10
+            },
+            {
+              "tipo": "mover",
+              "objetivo": "titularFranja",
+              "cuadros": 18
+            },
+            {
+              "tipo": "avanzarMes",
+              "perfil": "principal",
+              "mes": "2026-09",
+              "estado": "preparando"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 15
+            },
+            {
+              "tipo": "avanzarMes",
+              "perfil": "principal",
+              "mes": "2026-09",
+              "direccion": "emitidas",
+              "estado": "disponibles"
+            },
+            {
+              "tipo": "avanzarMes",
+              "perfil": "principal",
+              "mes": "2026-09",
+              "direccion": "recibidas",
+              "estado": "disponibles"
+            },
+            {
+              "tipo": "mostrarBanner",
+              "notificaciones": [
+                {
+                  "tipo": "facturasDescargadas",
+                  "perfil": "principal",
+                  "mes": "2026-09",
+                  "direccion": "emitidas"
+                },
+                {
+                  "tipo": "facturasDescargadas",
+                  "perfil": "principal",
+                  "mes": "2026-09",
+                  "direccion": "recibidas"
+                }
+              ]
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 40
+            },
+            {
+              "tipo": "ocultarBanner"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 12
+            },
+            {
+              "tipo": "tecla",
+              "tecla": "Cmd+3"
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 20
+            },
+            {
+              "tipo": "esperarConteo",
+              "objetivo": "listaHistorial",
+              "conteo": 4,
+              "timeoutMs": 5000
+            },
+            {
+              "tipo": "esperar",
+              "cuadros": 10
             }
           ]
         }

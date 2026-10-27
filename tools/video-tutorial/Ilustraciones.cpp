@@ -7,6 +7,9 @@
 #include <QDir>
 #include <QImage>
 
+#ifndef SATCFDI_VIDEO_QML_DIR
+#error "SATCFDI_VIDEO_QML_DIR debe definirse en CMake"
+#endif
 #ifndef SATCFDI_CAPTURAS_QML_DIR
 #error "SATCFDI_CAPTURAS_QML_DIR debe definirse en CMake"
 #endif
@@ -22,7 +25,8 @@ QVariantList entradasMenu()
 {
     menubar::EstadoMenu estado;
     estado.monitoreo.fase = OSIntegration::EstadoMonitoreo::Fase::ActivoEnEspera;
-    estado.monitoreo.pendientes = 1;
+    // T024.4 (7.1): monitoreo activo sin pendientes (la entrada se oculta).
+    estado.monitoreo.pendientes = 0;
     estado.preferenciaLoginItem = true;
     estado.loginItem = OSIntegration::LoginItemStatus::Enabled;
     estado.notificaciones = OSIntegration::NotificationStatus::Granted;
@@ -97,6 +101,10 @@ QString prepararIlustracion(const Accion& a, const DemoVideo& demo, const QStrin
         p.insert(QStringLiteral("notificaciones"), ns);
     } else if (a.ilustracion == QLatin1String("finder")) {
         qml = QStringLiteral("IlustracionFinder.qml");
+    } else if (a.ilustracion == QLatin1String("selectorCarpeta")) {
+        // T024.4 (03-motion 2a): ilustracion propia del video.
+        archivo = QUrl::fromLocalFile(QStringLiteral(SATCFDI_VIDEO_QML_DIR "/IlustracionSelectorCarpeta.qml"));
+        return {};
     } else {
         qml = QStringLiteral("IlustracionSelectorArchivos.qml");
     }

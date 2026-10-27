@@ -18,10 +18,15 @@ namespace video {
 
 inline constexpr int kFps = 30;
 inline constexpr int kEsquema = 1;
-// D7/D13/D20: duracion total del tutorial definitivo (tipo "tutorial"): de
-// 5 a 7:30 min (13500 cuadros).
+// T024 D7 (antes T017 D7/D20, 7:30): duracion total del tutorial definitivo
+// (tipo "tutorial"): de 5:00 a 8:00 (9000 a 14400 cuadros).
 inline constexpr int kTotalTutorialMin = 5 * 60 * kFps;
-inline constexpr int kTotalTutorialMax = 7 * 60 * kFps + 30 * kFps;
+inline constexpr int kTotalTutorialMax = 8 * 60 * kFps;
+// T024 D7: el tutorial tiene exactamente 7 capitulos.
+inline constexpr int kCapitulosTutorial = 7;
+// Ventana logica de la app (raiz "ventana"; motion elige 960x540 o 960x600).
+inline constexpr int kVentanaAnchoPorOmision = 960;
+inline constexpr int kVentanaAltoPorOmision = 540;
 // Audio de la voz (D8, D19): 48 kHz; 1600 muestras por cuadro.
 inline constexpr int kMuestrasPorSegundo = 48000;
 inline constexpr int kMuestrasPorCuadro = kMuestrasPorSegundo / kFps;
@@ -48,7 +53,7 @@ enum class TipoAccion {
     Mover,              // objetivo (objectName), cuadros, desplazamiento
     Clic,               // en la posicion actual del cursor
     Escribir,           // texto, cuadrosPorCaracter
-    Tecla,              // tecla: Enter | Escape | Tab | Abajo | Arriba
+    Tecla,              // tecla: [Cmd+][Shift+][Opcion+][Ctrl+]<tecla> (p. ej. Enter, Cmd+4)
     EsperarLinea,       // linea, momento: inicio | fin
     AvanzarSolicitud,   // solicitud (clave), estado
     MostrarIlustracion, // ilustracion, parametros
@@ -61,7 +66,27 @@ enum class TipoAccion {
     MostrarSolicitudes, // claves: reemplaza la lista visible
     SeleccionarArchivoEFirma, // archivo (certificado | llave), ruta sintetica
     CompletarEFirma,    // perfil, vigenteHasta: termina "Validando…" con exito
+    // T024.4:
+    AvanzarMes,         // perfil, mes (yyyy-MM), direccion, estado, causa: franja y lista de Facturas
+    ElegirCarpeta,      // destino (exportacion | respaldo), ruta sintetica: lo que entregaria el FolderDialog
+    ProgresoRespaldo,   // fase, bytes, total: progreso del respaldo en curso
+    ResultadoRespaldo,  // resultado, fecha?, bytes?: termina el respaldo en curso
+    EsperarRespaldo,    // resultado: barrera sobre el resultado visible del respaldo
+    Desplazar,          // objetivo (Flickable), hasta | delta, cuadros: contentY por cuadro (motion 5)
+    MostrarBanner,      // notificaciones: banner sobre la app viva (motion 2b)
+    OcultarBanner,
 };
+// Motion 3: `tecla` con modificadores (o "mostrar") dura 36 cuadros con
+// keycap; el evento sale en el cuadro 6.
+inline constexpr int kCuadrosTeclaKeycap = 36;
+inline constexpr int kCuadroEventoKeycap = 6;
+// T024.4 (03-motion 4; 01-audio-voz 2): portada y cierre.
+inline constexpr int kCuadrosPortada = 120;
+inline constexpr int kCuadrosCierre = 150;
+inline constexpr int kCierreInicioFundidoMusica = 45; // cuadro local del cierre
+inline constexpr int kCierreSilencioMusica = 135;     // silencio desde aqui
+// Motion 2b: el banner sale en 10 cuadros desde ocultarBanner.
+inline constexpr int kCuadrosSalidaBanner = 10;
 
 struct Accion {
     TipoAccion tipo = TipoAccion::Esperar;
@@ -69,7 +94,11 @@ struct Accion {
     QString objetivo;
     QPointF desplazamiento;
     QString texto;
-    QString tecla;
+    QString tecla;          // Tecla: la tecla sin modificadores (Enter, 4, E...)
+    QStringList modificadores; // Tecla: Cmd, Shift, Opcion, Ctrl (en ese orden)
+    bool keycap = false;       // Tecla: dibujar el keycap (motion 3)
+    std::optional<double> hasta; // Desplazar: contentY absoluto
+    double delta = 0;            // Desplazar: relativo (sin `hasta`)
     QString linea;
     bool alFinal = false; // EsperarLinea: momento "fin"
     bool sinEfecto = false; // Clic: solo visual (p. ej. Elegir…, que abriria un dialogo nativo)
@@ -92,6 +121,15 @@ struct Accion {
     QString efirma;
     QString vigenteHasta; // ISO UTC; vacio = la del estado
     QStringList claves;
+    QString mes;       // AvanzarMes: yyyy-MM
+    QString direccion; // AvanzarMes: emitidas | recibidas | ambas
+    QString causa;     // AvanzarMes con requiereAtencion: claveEstable(CausaAtencion)
+    QString destino;   // ElegirCarpeta: exportacion | respaldo
+    QString fase;      // ProgresoRespaldo: captura | escritura | publicacion | depuracion
+    qint64 bytes = 0;  // ProgresoRespaldo / ResultadoRespaldo
+    qint64 total = 0;  // ProgresoRespaldo
+    QString resultado; // ResultadoRespaldo / EsperarRespaldo: exito | conAvisos | error
+    QString fecha;     // ResultadoRespaldo: ISO UTC (vacio = datos.ahora)
     int inicio = 0; // cuadro relativo a la escena (planificado)
 };
 
@@ -179,10 +217,36 @@ struct SolicitudGuion {
     bool visible = true;    // false: aparece con mostrarSolicitudes
 };
 
+// T024.4: mes del catalogo de Facturas (descarga guiada simulada). Las
+// facturas son las que el SAT tiene del mes; cuales se ven depende del estado
+// (avanzarMes cambia el estado como lo haria el worker real).
+struct MesGuion {
+    QString perfil;    // clave de perfil
+    QString mes;       // yyyy-MM
+    QString estado;    // estadosMes()
+    QString direccion; // emitidas | recibidas | ambas (ver README)
+    QString causa;     // requiereAtencion: claveEstable(CausaAtencion); vacio = la del fake
+    QString descargadoEn; // ISO UTC opcional: fecha del lote en el Historial
+    QList<CfdiGuion> emitidas;
+    QList<CfdiGuion> recibidas;
+};
+
+// T024.4: estado inicial del respaldo (raiz datos.respaldo; ausente = carpeta,
+// contrasena y respaldo diario configurados, como el fake comun).
+struct RespaldoGuion {
+    bool declarado = false;
+    bool carpeta = true;
+    bool contrasena = true;
+    bool diario = true;
+    QString ultimoExito; // ISO UTC; vacio = sin respaldo previo
+};
+
 struct DatosGuion {
     QString ahora; // ISO UTC, reloj fijo de la app
     QList<PerfilGuion> perfiles;
     QList<SolicitudGuion> solicitudes;
+    QList<MesGuion> meses;
+    RespaldoGuion respaldo;
 };
 
 // Musica de fondo generada localmente (R4, 08-audio-musica.md; raiz
@@ -221,6 +285,13 @@ struct Guion {
     // D14: la herramienta agrega su propio rotulo "Ilustración". Por omision
     // no: las ilustraciones de tools/capturas-manual ya traen el suyo.
     bool rotuloHerramienta = false;
+    // T024.4 (03-motion 4): portada y cierre con la marca, sin voz. Raiz
+    // "portada": true / "cierre": true. Planificados (escalados con --rapido);
+    // 0 = sin ellos (tambien en un guion recortado con --escenas).
+    bool portada = false;
+    bool cierre = false;
+    int cuadrosPortada = 0;
+    int cuadrosCierre = 0;
     QVariantMap voz;        // modelo, voz, instrucciones, formato, velocidad
     // D19: pausas minimas entre bloques, escenas y capitulos (ms), contando el
     // silencio existente en los extremos de los bloques.
@@ -235,6 +306,14 @@ struct Guion {
     int pausaMaxima = 0;
     ConfigMusica musica;
     Composicion composicion;
+    // T024.4: ventana logica de la app (raiz "ventana": {ancho, alto}).
+    int ventanaAncho = kVentanaAnchoPorOmision;
+    int ventanaAlto = kVentanaAltoPorOmision;
+    // D16 (T024.4): SHA-256 del archivo del guion (lo fija leerGuion).
+    QString huella;
+    // D16 (T024.4): SHA-256 de las claves de bloque de la voz usada (cache de
+    // montaje y alineacion), "ninguna" sin --voz. Lo fija la grabacion.
+    QString huellaVoz = QStringLiteral("ninguna");
     DatosGuion datos;
     QList<Capitulo> capitulos;
     int totalCuadros = 0; // planificado
@@ -243,6 +322,11 @@ struct Guion {
 // Estados de solicitud y nombres de ilustracion aceptados por el guion.
 const QStringList& estadosSolicitud();
 const QStringList& ilustracionesDisponibles();
+// T024.4: estados de mes de avanzarMes y datos.meses.
+const QStringList& estadosMes();
+// T024 D3: palabras prohibidas en texto y voz del tutorial. Devuelve la
+// palabra encontrada (vacio si no hay), sin distinguir mayusculas ni acentos.
+QString vocabularioProhibido(const QString& texto);
 
 // Lee y valida la estructura. Mensaje de error con la ruta (escena) o vacio.
 QString leerGuion(const QString& ruta, Guion& guion);

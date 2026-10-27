@@ -12,6 +12,8 @@
 #include <QPair>
 #include <QString>
 
+#include <optional>
+#include <utility>
 #include <vector>
 
 namespace video {
@@ -41,7 +43,11 @@ Intervalos unirIntervalos(Intervalos intervalos, qint64 hueco);
 
 // Pad del preset, mono, `muestras` de largo, con los fundidos globales y ya
 // ecualizado (filtros continuos en toda la duracion). Determinista.
-std::vector<float> generarCama(qint64 muestras, const ConfigMusica& config);
+// T024.4: con `salidaAnclada` = [a, b) (muestras), el fundido de salida va de
+// a a b y despues hay silencio hasta `muestras` (cierre del video); sin el,
+// el fundido global de `salidaMs` termina con la pista.
+std::vector<float> generarCama(qint64 muestras, const ConfigMusica& config,
+                               std::optional<std::pair<qint64, qint64>> salidaAnclada = std::nullopt);
 // Ganancia lineal del ducking en la muestra `n` (intervalos ya unidos).
 // Tras el ultimo intervalo la atenuacion se mantiene hasta el final.
 class Ducking {

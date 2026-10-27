@@ -25,6 +25,23 @@ TestCase {
         }
     }
 
+    // T024.4: pagina en una ventana propia del tamano indicado.
+    Component {
+        id: ventanaComp
+        Window {
+            id: ventana
+            visible: true
+            readonly property alias pagina: paginaEnVentana
+            RespaldoPage {
+                id: paginaEnVentana
+                width: ventana.width
+                height: ventana.height
+                app: fixtureFacturas.app
+                respaldo: fixtureRespaldo.respaldo
+            }
+        }
+    }
+
     function cleanup() {
         // T024.1: barrido de vocabulario del estado final (Diagnostico excluido).
         const fallasVocabulario = barrido.revisarVentana(caso)
@@ -277,5 +294,77 @@ TestCase {
         mouseClick(findChild(c.contentItem, "confirmacionDescarteConfirmar"))
         compare(fixtureRespaldo.descartesDatosPrevios(), 1)
         verify(findChild(p, "botonDescartarDatosPrevios").cargando)
+    }
+
+    // ---- T024.4: alto limitado a la ventana (resumen de restauracion) ----
+
+    function test_restaurarAltoLimitadoALaVentana_data() {
+        return [
+            // 540 y 420 (minimo de la ventana): el resumen cabe o se limita
+            // segun la fuente; 320 fuerza el limite; 1280x800 no lo limita.
+            { tag: "960x540", ancho: 960, alto: 540 },
+            { tag: "960x420", ancho: 960, alto: 420 },
+            { tag: "960x320", ancho: 960, alto: 320, limitado: true },
+            { tag: "1280x800", ancho: 1280, alto: 800, limitado: false }
+        ]
+    }
+
+    function test_restaurarAltoLimitadoALaVentana(fila) {
+        fixtureRespaldo.reiniciar(0, false, false)
+        const w = createTemporaryObject(ventanaComp, caso, { width: fila.ancho, height: fila.alto })
+        verify(w)
+        w.requestActivate()
+        tryVerify(() => w.active)
+        const p = w.pagina
+        findChild(p, "botonRestaurar").clicked()
+        const d = p.dialogoRestaurar
+        tryVerify(() => d.opened)
+        d.archivo = "file:///Users/usuario/Respaldos/ArchivoFiscal-prueba.afbak"
+        d.nombreArchivo = "ArchivoFiscal-prueba.afbak"
+        escribir(d.campoSecreto, "contrasena-sintetica-1")
+        d.verificar()
+        fixtureRespaldo.responderPreparacion()
+        tryCompare(d, "estado", RespaldoViewModel.Preparada)
+        const restaurar = findChild(d.contentItem, "botonRestaurarReiniciar")
+        tryVerify(() => restaurar.activeFocus)
+        waitForRendering(d.contentItem)
+
+        const flick = d.desplazable
+        const limitado = d.implicitHeight > w.height - 32
+        if (fila.limitado !== undefined)
+            compare(limitado, fila.limitado, "limite esperado")
+        if (!limitado) {
+            compare(d.height, d.implicitHeight)
+            verify(!d.desbordado)
+            verify(!flick.clip)
+            verify(!findChild(d.contentItem, "dialogoRestaurarBarra").visible)
+        } else {
+            compare(d.height, w.height - 32)
+            verify(d.y >= 16 && d.y + d.height <= w.height - 16)
+            verify(d.desbordado)
+            verify(findChild(d.contentItem, "dialogoRestaurarBarra").visible)
+            verify(flick.contentHeight > flick.height)
+            mouseWheel(flick, flick.width / 2, flick.height / 2, 0, -240)
+            tryVerify(() => flick.contentY > 0)
+        }
+        // Botones fijos al pie, dentro de la ventana y pulsables.
+        const pos = restaurar.mapToItem(null, 0, 0)
+        verify(pos.y >= 0 && pos.y + restaurar.height <= w.height,
+               "Restaurar dentro de la ventana: " + pos.y + "+" + restaurar.height + " en " + w.height)
+        const descartar = findChild(d.contentItem, "botonDescartarRestaurar")
+        verify(descartar.mapToItem(null, 0, 0).y + descartar.height <= w.height)
+        wait(Qt.styleHints.mouseDoubleClickInterval + 20)
+        mouseClick(restaurar)
+        const confirmacion = d.dialogoConfirmacion
+        tryVerify(() => confirmacion.opened)
+        confirmacion.close()
+        tryVerify(() => !confirmacion.visible)
+        wait(Qt.styleHints.mouseDoubleClickInterval + 20)
+        mouseClick(descartar)
+        tryVerify(() => !d.visible)
+        compare(fixtureRespaldo.descartesRestauracion(), 1)
+        w.destroy()
+        caso.Window.window.requestActivate()
+        tryVerify(() => caso.Window.window.active)
     }
 }

@@ -243,7 +243,7 @@ Intervalos unirIntervalos(Intervalos intervalos, qint64 hueco)
     return r;
 }
 
-std::vector<float> generarCama(qint64 muestras, const ConfigMusica& config)
+std::vector<float> generarCama(qint64 muestras, const ConfigMusica& config, std::optional<std::pair<qint64, qint64>> salidaAnclada)
 {
     std::vector<float> cama(size_t(std::max<qint64>(muestras, 0)), 0.0f);
     std::array<double, kNotaMaxima + 1> frecuencias{};
@@ -289,7 +289,17 @@ std::vector<float> generarCama(qint64 muestras, const ConfigMusica& config)
         if (n < entrada) {
             v *= (1.0 - std::cos(kPi * double(n) / double(entrada))) / 2.0;
         }
-        if (n >= muestras - salida) {
+        if (salidaAnclada) {
+            // T024.4 (01-audio-voz 2): fundido anclado al cierre (medio
+            // coseno de a a b) y silencio hasta el final; la pista conserva
+            // su duracion completa.
+            const auto [a, b] = *salidaAnclada;
+            if (n >= b) {
+                v = 0;
+            } else if (n >= a) {
+                v *= (1.0 + std::cos(kPi * double(n - a) / double(b - a))) / 2.0;
+            }
+        } else if (n >= muestras - salida) {
             v *= (1.0 - std::cos(kPi * double(muestras - 1 - n) / double(salida))) / 2.0;
         }
         cama[size_t(n)] = float(eq(v));
@@ -356,6 +366,15 @@ QString mezclarMusica(const Guion& planificado, const QString& pistaVoz, const Q
     fv.close();
 
     const Intervalos unidos = unirIntervalos(intervalosVoz(planificado), muestrasDeMs(kHuecoUnionMs));
+    // T024.4: con cierre, el fundido de salida se ancla a sus cuadros 45-135
+    // (escalados con --rapido) en vez de terminar con la pista.
+    std::optional<std::pair<qint64, qint64>> salidaAnclada;
+    if (planificado.cuadrosCierre > 0) {
+        const qint64 inicioCierre = qint64(planificado.totalCuadros - planificado.cuadrosCierre);
+        const qint64 a = inicioCierre + qint64(planificado.cuadrosCierre) * kCierreInicioFundidoMusica / kCuadrosCierre;
+        const qint64 b = inicioCierre + qint64(planificado.cuadrosCierre) * kCierreSilencioMusica / kCuadrosCierre;
+        salidaAnclada = std::pair{a * kMuestrasPorCuadro, std::max(a + 1, b) * kMuestrasPorCuadro};
+    }
 
     // 1) Cama calibrada y con ducking, del cache o generada.
     QJsonArray intervalosJson;
@@ -372,6 +391,10 @@ QString mezclarMusica(const Guion& planificado, const QString& pistaVoz, const Q
                                {QStringLiteral("entradaMs"), config.entradaMs},
                                {QStringLiteral("salidaMs"), config.salidaMs},
                                {QStringLiteral("muestras"), double(total)},
+                               {QStringLiteral("salidaAnclada"),
+                                salidaAnclada ? QJsonValue(QJsonArray{double(salidaAnclada->first),
+                                                                      double(salidaAnclada->second)})
+                                              : QJsonValue()},
                                {QStringLiteral("intervalos"), intervalosJson},
                                {QStringLiteral("ffmpeg"), versionFfmpeg(ffmpeg)}};
     informe.clave = QString::fromLatin1(
@@ -401,7 +424,7 @@ QString mezclarMusica(const Guion& planificado, const QString& pistaVoz, const Q
         }
     }
     if (!informe.desdeCache) {
-        musica = generarCama(total, config);
+        musica = generarCama(total, config, salidaAnclada);
         // Calibracion de la cama ecualizada (antes del ducking) a nivelLufs,
         // medida como se escucha: estereo con ambos canales iguales.
         const QString medida = QDir(dirTrabajo).filePath(QStringLiteral("cama.f32"));

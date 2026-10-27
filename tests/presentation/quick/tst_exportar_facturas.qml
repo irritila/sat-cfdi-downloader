@@ -59,6 +59,24 @@ TestCase {
         return p
     }
 
+    // T024.4: pagina en una ventana propia del tamano indicado (el dialogo se
+    // limita a la ventana de su Overlay).
+    Component {
+        id: ventanaComp
+        Window {
+            id: ventana
+            visible: true
+            readonly property alias pagina: paginaEnVentana
+            FacturasPage {
+                id: paginaEnVentana
+                anchors.fill: parent
+                app: fixtureFacturas.app
+                facturas: fixtureFacturas.facturas
+                exportacion: fixtureFacturas.exportacion
+            }
+        }
+    }
+
     function abrirMes(p) {
         clic(findChild(p, "botonExportarMes"))
         const d = p.dialogoExportar
@@ -366,5 +384,100 @@ TestCase {
         tryVerify(() => findChild(p, "botonExportarMes").visible)
         verify(!findChild(p, "botonExportarMes").enabled)
         verify(!findChild(p, "botonElegirFacturas").enabled)
+    }
+
+    // ---- T024.4: alto limitado a la ventana ----
+
+    function test_altoLimitadoALaVentana_data() {
+        return [
+            { tag: "960x540", ancho: 960, alto: 540, limitado: true },
+            { tag: "960x420", ancho: 960, alto: 420, limitado: true },
+            { tag: "1280x800", ancho: 1280, alto: 800, limitado: false }
+        ]
+    }
+
+    function test_altoLimitadoALaVentana(fila) {
+        fixtureFacturas.reiniciar(true)
+        fixtureFacturas.fijarEstadoMes(9, "Disponibles")
+        fixtureFacturas.habilitarExportacion()
+        fixtureFacturas.app.mostrarFacturas()
+        const w = createTemporaryObject(ventanaComp, caso, { width: fila.ancho, height: fila.alto })
+        verify(w)
+        w.requestActivate()
+        tryVerify(() => w.active)
+        const p = w.pagina
+        tryCompare(fixtureFacturas.facturas, "mes", 9)
+        tryVerify(() => p.lista.mostrar && p.lista.count > 0)
+        tryVerify(() => fixtureFacturas.exportacion.puedeExportar)
+        const e = fixtureFacturas.exportacion
+        const d = abrirMes(p)
+        e.elegirDestino(caso.carpeta)
+        // "Varios meses" es el estado mas alto de la configuracion.
+        clic(hijo(d, "segmento_modoRango"))
+        tryCompare(e, "modo", ExportacionFacturasViewModel.Rango)
+        tryCompare(e, "estado", ExportacionFacturasViewModel.Dialogo)
+        waitForRendering(d.contentItem)
+
+        const flick = d.desplazable
+        const barra = hijo(d, "dialogoExportarBarra")
+        if (!fila.limitado) {
+            // Ventana grande: el alto natural, sin barra ni recorte.
+            compare(d.height, d.implicitHeight)
+            verify(!d.desbordado)
+            verify(!flick.clip)
+            verify(!barra.visible)
+            compare(flick.contentY, 0)
+        } else {
+            verify(d.implicitHeight > w.height - 32, "el contenido natural no cabe")
+            compare(d.height, w.height - 32)
+            verify(d.y >= 16 && d.y + d.height <= w.height - 16)
+            verify(d.desbordado)
+            verify(flick.interactive)
+            verify(barra.visible)
+            verify(flick.contentHeight > flick.height)
+            // La rueda desplaza el contenido.
+            mouseWheel(flick, flick.width / 2, flick.height / 2, 0, -240)
+            tryVerify(() => flick.contentY > 0)
+            flick.contentY = 0
+            // El foco en un control oculto lo trae a la vista.
+            const campo = hijo(d, "campoNombreExportar")
+            campo.forceActiveFocus(Qt.TabFocusReason)
+            tryVerify(() => flick.contentY > 0)
+            const r = campo.mapToItem(flick, 0, 0, campo.width, campo.height)
+            verify(r.y >= 0 && r.y + r.height <= flick.height, "nombre visible tras el foco")
+            // Y el foco de vuelta en el alcance lo vuelve a mostrar.
+            const alcance = hijo(d, "segmento_modoRango")
+            flick.contentY = flick.contentHeight - flick.height
+            alcance.forceActiveFocus(Qt.BacktabFocusReason)
+            tryVerify(() => {
+                const ra = alcance.mapToItem(flick, 0, 0, alcance.width, alcance.height)
+                return ra.y >= 0 && ra.y + ra.height <= flick.height
+            }, 2000, "alcance visible tras el foco")
+            // Con Tab (teclado real) hasta el nombre: se desplaza a el.
+            for (let i = 0; i < 12 && w.activeFocusItem !== campo; ++i)
+                keyClick(Qt.Key_Tab)
+            compare(w.activeFocusItem, campo)
+            tryVerify(() => {
+                const rc = campo.mapToItem(flick, 0, 0, campo.width, campo.height)
+                return rc.y >= 0 && rc.y + rc.height <= flick.height
+            }, 2000, "nombre visible tras Tab")
+        }
+        // Boton principal dentro de la ventana y pulsable.
+        const exportar = hijo(d, "botonExportar")
+        verify(exportar.enabled)
+        const pos = exportar.mapToItem(null, 0, 0)
+        verify(pos.y >= 0 && pos.y + exportar.height <= w.height,
+               "Exportar dentro de la ventana: " + pos.y + "+" + exportar.height + " en " + w.height)
+        verify(pos.x >= 0 && pos.x + exportar.width <= w.width)
+        clic(exportar)
+        tryCompare(e, "estado", ExportacionFacturasViewModel.Resultado)
+        const cerrar = hijo(d, "botonCerrarExportar")
+        const posCerrar = cerrar.mapToItem(null, 0, 0)
+        verify(posCerrar.y + cerrar.height <= w.height)
+        clic(cerrar)
+        tryCompare(e, "estado", ExportacionFacturasViewModel.Inactivo)
+        w.destroy()
+        caso.Window.window.requestActivate()
+        tryVerify(() => caso.Window.window.active)
     }
 }

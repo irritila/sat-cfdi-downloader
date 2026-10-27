@@ -89,7 +89,12 @@ QString leerCacheVoz(const QString& dirCache, QHash<QString, AudioCacheado>& blo
 // Pista de voz completa del guion planificado (PCM s16le estereo 48 kHz,
 // totalCuadros * 1600 muestras): cada tramo de linea en su posicion, ajuste
 // moderado por bloque (+-3 dB hacia la mediana) y normalizacion de la pista
-// completa en dos pasadas (I=-16 LUFS, TP=-2 dBTP) con ffmpeg.
+// completa en dos pasadas (I=-16 LUFS, TP=kPicoObjetivoVozDb) con ffmpeg.
+// D25: objetivo de pico verdadero de la pista de voz. El AAC sube el pico
+// ~0.3-0.8 dB al decodificar; con -2 dBTP la muestra de T024.4 llego a
+// -1.76 dBTP (maximo -1.8). -3 deja ~1 dB de holgura sin tocar los -16 LUFS.
+inline constexpr double kPicoObjetivoVozDb = -3.0;
+
 QString escribirMezcla(const Guion& guion, const ConfigVoz& config, const QHash<QString, AudioCacheado>& bloques,
                        const QString& ffmpeg, const QString& dirTrabajo, const QString& ruta);
 

@@ -16,6 +16,7 @@
 #include "RespaldoSintetico.h"
 #include "ServiciosFijos.h" // tools/capturas-manual
 
+#include "application/cfdi/CalculoIndicePaquete.h"
 #include "application/primeruso/ConsultaPrimerUso.h"
 
 #include "infrastructure/cfdi/pdf/RenderizadorPdfCfdi.h"
@@ -141,6 +142,27 @@ private:
     std::vector<std::unique_ptr<QPromise<ResultadoGenerar>>> m_pendientes;
 };
 
+// D10 (T024.4): las acciones que abririan Finder o Vista Previa no se
+// ejecutan; dejan una violacion que hace fallar la grabacion (en su lugar,
+// `clic` con `sinEfecto` y la ilustracion `finder`). Las de operacion SAT no
+// hacen nada (como capturas::AccionesNulas).
+class AccionesVigiladas final : public AccionesSolicitud, public AccionesFinder {
+public:
+    QString violacion; // no vacio = la grabacion debe fallar
+
+    void enviar(const SolicitudId&) override {}
+    void verificarAhora(const SolicitudId&) override {}
+    void reintentarDescarga(const SolicitudId&) override {}
+    void reintentarDescargaPaquete(const SolicitudId&, const QString&) override {}
+    QFuture<ResultadoAccionFinder> mostrarPaquete(const SolicitudId&, const QString&) override;
+    QFuture<ResultadoAccionFinder> abrirCarpetaSolicitud(const SolicitudId&) override;
+    QFuture<ResultadoAccionFinder> abrirCarpetaPaquetes() override;
+    QFuture<ResultadoAccionFinder> abrirEnVistaPrevia(const QString&) override;
+
+private:
+    QFuture<ResultadoAccionFinder> prohibida(const QString& que);
+};
+
 class DemoVideo {
 public:
     DemoVideo(const DatosGuion& datos, QString dirTemporal);
@@ -161,14 +183,26 @@ public:
     // ServicioNotificaciones y las acciones de notificacionLocalDe (copia).
     // parametros.notificaciones: [{tipo: descargaCompleta, solicitud} |
     // {tipo: efirmaPorVencer, perfil}].
+    // T024.4: {tipo: facturasDescargadas, perfil, mes, direccion}: la
+    // notificacion real de descarga completa de esa direccion del mes.
     QVariantList notificaciones(const QVariantMap& parametros, QString& error) const;
+    // T024.4: descarga guiada simulada. Cambia el estado de la(s)
+    // direccion(es) del mes (README, avanzarMes) y avisa a Facturas e
+    // Historial como lo haria el worker. Error o vacio.
+    QString avanzarMes(const QString& perfil, const QString& mes, const QString& direccion, const QString& estado,
+                       const QString& causa);
+    // T024.4: respaldo gobernado por el guion (requiere uno en curso).
+    QString progresoRespaldo(const QString& fase, qint64 bytes, qint64 total);
+    QString resultadoRespaldo(const QString& resultado, const QString& fechaIso, qint64 bytes);
+    // Violacion pendiente (perfil no declarado, Finder o Vista Previa): vacio si no hay.
+    QString violacion() const;
 
     QDateTime ahora() const { return m_ahora; }
 
     SolicitudesGuion solicitudes;
     PerfilesGuion perfiles;
     CredencialesGuion credenciales;
-    capturas::AccionesNulas acciones;
+    AccionesVigiladas acciones;
     capturas::ExistenciaFija existencia;
     CatalogoGuion catalogo;
     PrevisualizacionZip previsualizacion;
@@ -188,8 +222,26 @@ public:
     materiales::ControlRestauracionSintetico restauracion;
     materiales::DatosPreviosSinteticos datosPrevios;
 
+    // Estado de un mes declarado (datos.meses), por direccion.
+    struct EstadoMes {
+        MesGuion datos;
+        PerfilId perfil;
+        MesCalendario mes = *MesCalendario::crear(2000, 1);
+        materiales::EstadoDireccionSintetico emitidas = materiales::EstadoDireccionSintetico::SinDescargar;
+        materiales::EstadoDireccionSintetico recibidas = materiales::EstadoDireccionSintetico::SinDescargar;
+        CausaAtencion causa = CausaAtencion::ErrorSat;
+        bool lote = false;  // aparece en el Historial
+        QDateTime creadoEn; // fecha del lote
+        QList<CfdiMensual> listaEmitidas; // las del SAT (ZIP indexado)
+        QList<CfdiMensual> listaRecibidas;
+    };
+    const EstadoMes* estadoMes(const QString& perfil, const QString& mes) const;
+
 private:
     static materiales::DatosFacturas datosFacturas(const DatosGuion& datos);
+    QString prepararMeses(const QString& raiz, EntornoCalculoIndice& entorno);
+    void publicarMes(EstadoMes& m, bool avisar);
+    QList<EntradaHistorial> lotesDe(const PerfilId& perfil) const;
     static materiales::DatosExportacion datosExportacion();
     QList<PerfilFacturas> perfilesFacturas() const;
     QList<EntradaHistorial> historialDe(const PerfilId& perfil) const;
@@ -200,6 +252,7 @@ private:
     QDateTime m_ahora;
     QHash<QString, QString> m_paquetePorSolicitud; // clave -> idPaqueteSat
     QHash<QString, PerfilId> m_perfilId;           // clave -> id
+    QHash<QString, EstadoMes> m_meses;             // "clave/yyyy-MM"
 };
 
 } // namespace video

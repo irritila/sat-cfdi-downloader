@@ -17,6 +17,7 @@
 
 namespace satcfdi {
 class ExportacionFacturasViewModel;
+class RespaldoViewModel;
 }
 
 namespace video {
@@ -28,5 +29,12 @@ namespace video {
 // grabacion ya fallo).
 QString esperarExportacion(satcfdi::ExportacionFacturasViewModel* vm, const QString& esperado, int timeoutMs,
                            const std::function<bool()>& bombear);
+
+// T024.4: barrera del respaldo gobernado por el guion. Espera (reloj
+// congelado) a que RespaldoViewModel muestre el resultado y exige su variante:
+// exito -> "exito", conAvisos -> "advertencia", error -> "error". Vacio o el
+// error (sin respaldo en curso ni resultado, timeout u otra variante).
+QString esperarRespaldo(satcfdi::RespaldoViewModel* vm, const QString& esperado, int timeoutMs,
+                        const std::function<bool()>& bombear);
 
 } // namespace video

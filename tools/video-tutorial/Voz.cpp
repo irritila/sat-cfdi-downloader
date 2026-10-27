@@ -300,7 +300,8 @@ QString escribirMezcla(const Guion& guion, const ConfigVoz& config, const QHash<
                               QStringLiteral("f32le"), QStringLiteral("-ar"), QStringLiteral("48000"),
                               QStringLiteral("-ac"), QStringLiteral("2"), QStringLiteral("-i"), cruda};
     Salida s = ejecutar(ffmpeg, entrada + QStringList{QStringLiteral("-af"),
-                                                      QStringLiteral("loudnorm=I=-16:TP=-2:LRA=11:print_format=json"),
+                                                      QStringLiteral("loudnorm=I=-16:TP=%1:LRA=11:print_format=json")
+                                                          .arg(kPicoObjetivoVozDb, 0, 'f', 1),
                                                       QStringLiteral("-f"), QStringLiteral("null"), QStringLiteral("-")});
     const QString texto = QString::fromUtf8(s.err);
     const qsizetype i = texto.lastIndexOf(QLatin1Char('{'));
@@ -310,9 +311,10 @@ QString escribirMezcla(const Guion& guion, const ConfigVoz& config, const QHash<
         return QStringLiteral("ffmpeg no pudo medir el loudness de la pista de voz");
     }
     const auto m = [&](const char* k) { return medida.value(QLatin1String(k)).toString(); };
-    const QString filtro = QStringLiteral("loudnorm=I=-16:TP=-2:LRA=11:measured_I=%1:measured_TP=%2:measured_LRA=%3:"
+    const QString filtro = QStringLiteral("loudnorm=I=-16:TP=%6:LRA=11:measured_I=%1:measured_TP=%2:measured_LRA=%3:"
                                           "measured_thresh=%4:offset=%5:linear=true,aresample=48000")
-                               .arg(m("input_i"), m("input_tp"), m("input_lra"), m("input_thresh"), m("target_offset"));
+                               .arg(m("input_i"), m("input_tp"), m("input_lra"), m("input_thresh"), m("target_offset"))
+                               .arg(kPicoObjetivoVozDb, 0, 'f', 1);
     s = ejecutar(ffmpeg, QStringList{QStringLiteral("-y"), QStringLiteral("-loglevel"), QStringLiteral("error")} + entrada
                              + QStringList{QStringLiteral("-af"), filtro, QStringLiteral("-f"), QStringLiteral("s16le"),
                                            QStringLiteral("-ar"), QStringLiteral("48000"), QStringLiteral("-ac"),

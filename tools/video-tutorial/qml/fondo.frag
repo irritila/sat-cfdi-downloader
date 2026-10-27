@@ -17,6 +17,7 @@ layout(std140, binding = 0) uniform buf {
     float fase;     // desfase por capitulo (interpolado al cambiar)
     float aspecto;  // ancho / alto
     float giro;     // radianes (2 grados por minuto)
+    float atenuacion; // T024.4: 0.6 bajo la marca de portada y cierre, 1.0 el resto
     vec4 c0;        // verde noche (base)
     vec4 c1;        // verde Santos
     vec4 c2;        // verde claro (altas luces)
@@ -88,6 +89,8 @@ void main()
     // Acento dorado: franja estrecha de la segunda capa del warp (<= 5 %).
     float franja = smoothstep(0.035, 0.0, abs(length(r) - 0.62)) * smoothstep(0.55, 0.75, f);
     color = mix(color, acento.rgb, franja * 0.55);
+    // Atenuacion (portada y cierre), antes de la vineta.
+    color *= atenuacion;
     // Vineta: oscurece los bordes un 20 %.
     float d = length((uv - 0.5) * vec2(aspecto, 1.0)) / (0.5 * length(vec2(aspecto, 1.0)));
     color *= 1.0 - 0.20 * smoothstep(0.35, 1.0, d);

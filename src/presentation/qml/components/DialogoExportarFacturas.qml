@@ -415,17 +415,14 @@ DialogoRespaldoBase {
     }
 
     // ---- Botones ----
-    RowLayout {
-        spacing: Theme.espacioS
-        Layout.fillWidth: true
-        Layout.topMargin: Theme.espacioXs
-        Item { Layout.fillWidth: true }
+    acciones: [
+        Item { Layout.fillWidth: true },
         BotonAccion {
             objectName: "botonCancelarExportar"
             visible: dialogo.configurando
             text: qsTr("Cancelar")
             onClicked: dialogo.close()
-        }
+        },
         BotonAccion {
             objectName: "botonExportar"
             visible: dialogo.configurando
@@ -436,14 +433,14 @@ DialogoRespaldoBase {
                          ? dialogo.exportacion.textoConteo
                          : !dialogo.exportacion.hayCarpetaDestino ? qsTr("Elige una carpeta para guardar el archivo") : ""
             onClicked: dialogo.exportacion.iniciar()
-        }
+        },
         BotonAccion {
             id: botonCancelarExportacion
             objectName: "botonCancelarExportacion"
             visible: dialogo.exportando || dialogo.esperandoNombre
             text: qsTr("Cancelar exportación")
             onClicked: dialogo.exportacion.cancelar()
-        }
+        },
         BotonAccion {
             objectName: "botonGuardarConNombre"
             visible: dialogo.esperandoNombre
@@ -451,7 +448,7 @@ DialogoRespaldoBase {
             variante: "primario"
             enabled: dialogo.exportacion.nombreZip.trim().length > 0
             onClicked: dialogo.exportacion.publicarConNombre()
-        }
+        },
         BotonAccion {
             id: botonCerrar
             objectName: "botonCerrarExportar"
@@ -460,5 +457,5 @@ DialogoRespaldoBase {
             variante: "primario"
             onClicked: dialogo.close()
         }
-    }
+    ]
 }
