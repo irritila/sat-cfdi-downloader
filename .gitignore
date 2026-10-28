@@ -2,6 +2,8 @@
 
 # Directorios de build de CMake (build/, build-core/, build-platform/, ...)
 /build*/
+# Builds antiguos archivados (no se borran: caches y evidencias de tareas cerradas)
+/.builds-archivo/
 
 # Qt Creator / CMake
 CMakeLists.txt.user*

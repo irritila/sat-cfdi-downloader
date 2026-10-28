@@ -12,7 +12,7 @@ Que cambiar de app mientras corren las pruebas graficas o una grabacion de `tool
 
 T022 encontro que, si el usuario cambia de app entre el press y el release de un clic sintetico, Qt Quick suelta el agarre del boton y el release no lo alcanza. El usuario confirmo que cambia de app durante las corridas. T022 agrego un filtro que descarta `WindowDeactivate` y una comprobacion antes del release que hace fallar la prueba con mensaje claro ("perdio el agarre del raton antes del release") y PNG.
 
-El filtro no basta: en la verificacion de T022 (2026-10-26), 11 de 75 corridas (`satcfdi_video_rapido` 3 de 25, `pdf_error` 8 de 25) fallaron con ese mensaje al cambiar de app de verdad; evidencia en `build-video/t022/final/`. La perdida real del agarre llega por otra via que la inyeccion de T022 (`handleFocusWindowChanged(nullptr)`) no imita. El usuario decidio cerrar T022 sin investigarla.
+El filtro no basta: en la verificacion de T022 (2026-10-26), 11 de 75 corridas (`satcfdi_video_rapido` 3 de 25, `pdf_error` 8 de 25) fallaron con ese mensaje al cambiar de app de verdad; evidencia en `.builds-archivo/build-video/t022/final/`. La perdida real del agarre llega por otra via que la inyeccion de T022 (`handleFocusWindowChanged(nullptr)`) no imita. El usuario decidio cerrar T022 sin investigarla.
 
 ## Alcance
 
