@@ -1,3 +1,13 @@
+<p align="center">
+  <img src="docs/img/icono-app.png" width="128" height="128" alt="Icono de Archivo Fiscal: carpeta verde con dos hojas y pestaña dorada">
+</p>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="resources/branding/marca/wordmark.svg">
+    <img src="resources/branding/marca/wordmark-mono.svg" width="320" alt="Archivo Fiscal">
+  </picture>
+</p>
+
 # Archivo Fiscal
 
 Este repositorio contiene una aplicacion de escritorio local-first para gestionar solicitudes de descarga masiva de CFDI. La descarga usa el servicio web que el SAT pone al servicio del contribuyente.

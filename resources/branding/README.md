@@ -61,3 +61,11 @@ cmake --build build-branding --target branding_hoja       # build-branding/brand
 La conversion a trazos usa Qt (`QTextLayout` para la forma y el kerning,
 `QRawFont::pathForGlyph` para los contornos) con el TTF versionado; falla si Qt
 resuelve otra fuente. Tras regenerar, revisar el diff y correr ctest.
+
+## README del repositorio
+
+El encabezado de `README.md` usa `docs/img/icono-app.png` (256 px, extraido
+del icono compilado; regenerarlo cuando cambie el icono:
+`sips -s format png resources/macos/AppIcon-compilado/AppIcon.icns --out docs/img/icono-app.png`)
+y el wordmark (`wordmark.svg` en tema oscuro, `wordmark-mono.svg` en claro).
+La marca sin contenedor no se usa ahi (D7).
